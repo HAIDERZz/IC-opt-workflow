@@ -4,6 +4,23 @@ Date: 2026-05-28
 
 This checkpoint preserves the planning state for continuing after context compaction.
 
+## Latest Execution Checkpoint
+
+As of 2026-05-29, implementation has started on branch `plan-a-hermes-file-contract-mvp`.
+
+Read this newer execution handoff first:
+
+```text
+ic-auto-opt-workflow/docs/EXECUTION_PROGRESS_2026-05-29.md
+```
+
+Current execution state:
+
+- Task 1 complete and reviewed.
+- Task 2 complete and reviewed.
+- Task 3 complete and reviewed.
+- Task 4 implemented and spec-reviewed, but code quality review requested changes. Continue from Task 4 fixes before starting Task 5.
+
 ## Files Already Read
 
 - `ic-auto-opt-workflow/PROJECT_STRUCTURE.md`
