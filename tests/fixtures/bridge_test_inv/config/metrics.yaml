@@ -1,0 +1,39 @@
+schema_version: "1.0"
+
+metrics:
+  - name: rise
+    unit: ps
+    maestro_formula: "riseTime(VT('/VOUT') 0 nil 1.2 nil 10 90 nil 'time')"
+    required_signals:
+      - time
+      - VOUT
+
+  - name: fall
+    unit: ps
+    maestro_formula: "fallTime(VT('/VOUT') 0 nil 1.2 nil 90 10 nil 'time')"
+    required_signals:
+      - time
+      - VOUT
+
+  - name: DC
+    unit: u
+    maestro_formula: "average(abs(IT('/VDD')))"
+    required_signals:
+      - VDD
+
+constraints:
+  - metric: rise
+    op: lt
+    value: "80 ps"
+
+  - metric: fall
+    op: lt
+    value: "80 ps"
+
+  - metric: DC
+    op: lt
+    value: "400 u"
+
+objective:
+  direction: minimize
+  expression: "(rise + fall) * DC"
