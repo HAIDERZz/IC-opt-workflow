@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import math
 import re
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
@@ -312,6 +313,8 @@ def _validate_continuous_variable(
         )
     if lower > upper:
         issues.append(_issue("variables.yaml", path, f"{name} lower must be <= upper"))
+    # Continuous candidates are generated as lower + k * step <= upper; upper may
+    # be off-grid, unlike integer ranges where exact divisibility is required.
     return issues
 
 
@@ -376,18 +379,32 @@ def _validate_objective_expression(
                     f"objective references unknown metric {node.id}",
                 )
             )
-        elif isinstance(node, ast.Constant) and (
-            isinstance(node.value, bool) or not isinstance(node.value, int | float)
-        ):
-            issues.append(
-                _issue(
-                    "metrics.yaml",
-                    "objective.expression",
-                    f"unsupported objective literal {node.value!r}",
-                )
-            )
+        elif isinstance(node, ast.Constant):
+            issues.extend(_validate_objective_literal(node.value))
 
     return issues
+
+
+def _validate_objective_literal(value: object) -> list[ValidationIssue]:
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        return [
+            _issue(
+                "metrics.yaml",
+                "objective.expression",
+                f"unsupported objective literal {value!r}",
+            )
+        ]
+
+    if isinstance(value, float) and not math.isfinite(value):
+        return [
+            _issue(
+                "metrics.yaml",
+                "objective.expression",
+                "objective numeric literals must be finite",
+            )
+        ]
+
+    return []
 
 
 def _is_allowed_objective_node(node: ast.AST) -> bool:
