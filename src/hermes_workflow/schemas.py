@@ -2,13 +2,23 @@ from __future__ import annotations
 
 import re
 from enum import StrEnum
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StrictBool,
+    StrictFloat,
+    StrictInt,
+    field_validator,
+    model_validator,
+)
 
 
 SCHEMA_VERSION = "1.0"
 NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+NonEmptyStr = Annotated[str, Field(min_length=1)]
 
 
 class StrictModel(BaseModel):
@@ -69,19 +79,19 @@ class ProjectInfo(StrictModel):
 
 
 class TestbenchConfig(StrictModel):
-    virtuoso_library: str
-    cell: str
-    design_view: str
-    maestro_view: str
-    test_name: str
-    corner: str
+    virtuoso_library: NonEmptyStr
+    cell: NonEmptyStr
+    design_view: NonEmptyStr
+    maestro_view: NonEmptyStr
+    test_name: NonEmptyStr
+    corner: NonEmptyStr
 
 
 class NetlistConfig(StrictModel):
     source: Literal["existing_maestro_setup"]
     export_method: Literal["maeCreateNetlistForCorner"]
-    exported_input_scs: str
-    template_scs: str
+    exported_input_scs: NonEmptyStr
+    template_scs: NonEmptyStr
 
 
 class SafetyConfig(StrictModel):
@@ -102,9 +112,9 @@ class ProjectConfig(StrictModel):
 class VariableSpec(StrictModel):
     name: str
     kind: VariableKind
-    lower: str
-    upper: str
-    step: str
+    lower: NonEmptyStr
+    upper: NonEmptyStr
+    step: NonEmptyStr
 
     @field_validator("name")
     @classmethod
@@ -126,9 +136,9 @@ class VariablesConfig(StrictModel):
 
 class MetricSpec(StrictModel):
     name: str
-    unit: str
-    maestro_formula: str
-    required_signals: list[str]
+    unit: NonEmptyStr
+    maestro_formula: NonEmptyStr
+    required_signals: list[NonEmptyStr]
 
     @field_validator("name")
     @classmethod
@@ -146,7 +156,7 @@ class MetricSpec(StrictModel):
 class ConstraintSpec(StrictModel):
     metric: str
     op: ConstraintOp
-    value: str
+    value: NonEmptyStr
 
     @field_validator("metric")
     @classmethod
@@ -156,7 +166,7 @@ class ConstraintSpec(StrictModel):
 
 class ObjectiveSpec(StrictModel):
     direction: ObjectiveDirection
-    expression: str
+    expression: NonEmptyStr
 
 
 class MetricsConfig(StrictModel):
@@ -177,11 +187,11 @@ class SpectreSettings(StrictModel):
     engine: Literal["spectre_x"]
     preset: SpectrePreset
     output_format: Literal["psfascii"]
-    parallel_jobs: int = Field(ge=1)
-    timeout_s: int = Field(gt=0)
-    require_license_check: bool
-    keep_failed_runs: bool
-    keep_successful_runs: bool
+    parallel_jobs: StrictInt = Field(ge=1)
+    timeout_s: StrictInt = Field(gt=0)
+    require_license_check: StrictBool
+    keep_failed_runs: StrictBool
+    keep_successful_runs: StrictBool
 
 
 class SpectreConfig(StrictModel):
@@ -192,10 +202,10 @@ class SpectreConfig(StrictModel):
 class OptimizerSettings(StrictModel):
     algorithm: OptimizerAlgorithm
     initialization: InitializationMethod
-    max_evaluations: int = Field(ge=1)
-    batch_size: int = Field(ge=1)
-    random_seed: int
-    failure_penalty: float = Field(gt=0)
+    max_evaluations: StrictInt = Field(ge=1)
+    batch_size: StrictInt = Field(ge=1)
+    random_seed: StrictInt
+    failure_penalty: StrictFloat = Field(gt=0)
     deduplicate_candidates: Literal[True]
 
 

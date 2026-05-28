@@ -5,10 +5,12 @@ import yaml
 from pydantic import ValidationError
 
 from hermes_workflow.schemas import (
+    OptimizerAlgorithm,
     MetricsConfig,
     OptimizerConfig,
     ProjectConfig,
     SpectreConfig,
+    SpectrePreset,
     VariablesConfig,
 )
 
@@ -31,8 +33,8 @@ def test_schema_models_parse_confirmed_contracts() -> None:
     assert [variable.name for variable in variables.variables] == ["FN", "WN", "FP", "WP"]
     assert [metric.name for metric in metrics.metrics] == ["rise", "fall", "DC"]
     assert spectre.spectre.engine == "spectre_x"
-    assert spectre.spectre.preset == "ax"
-    assert optimizer.optimizer.algorithm == "turbo"
+    assert spectre.spectre.preset is SpectrePreset.AX
+    assert optimizer.optimizer.algorithm is OptimizerAlgorithm.TURBO
 
 
 def test_variables_reject_duplicate_names() -> None:
@@ -51,9 +53,48 @@ def test_metrics_reject_empty_required_signals() -> None:
         MetricsConfig.model_validate(payload)
 
 
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("unit", ""),
+        ("maestro_formula", "   "),
+    ],
+)
+def test_metrics_reject_empty_required_strings(field: str, value: str) -> None:
+    payload = load_yaml("metrics.yaml")
+    payload["metrics"][0][field] = value
+
+    with pytest.raises(ValidationError):
+        MetricsConfig.model_validate(payload)
+
+
+def test_metrics_reject_empty_required_signal_names() -> None:
+    payload = load_yaml("metrics.yaml")
+    payload["metrics"][0]["required_signals"] = [""]
+
+    with pytest.raises(ValidationError):
+        MetricsConfig.model_validate(payload)
+
+
 def test_spectre_rejects_non_spectre_x_engine() -> None:
     payload = load_yaml("spectre.yaml")
     payload["spectre"]["engine"] = "aps"
+
+    with pytest.raises(ValidationError):
+        SpectreConfig.model_validate(payload)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("parallel_jobs", "10"),
+        ("timeout_s", "3600"),
+        ("keep_successful_runs", "false"),
+    ],
+)
+def test_spectre_rejects_coerced_scalar_types(field: str, value: str) -> None:
+    payload = load_yaml("spectre.yaml")
+    payload["spectre"][field] = value
 
     with pytest.raises(ValidationError):
         SpectreConfig.model_validate(payload)
