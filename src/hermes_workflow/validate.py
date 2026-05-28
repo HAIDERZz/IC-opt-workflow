@@ -32,7 +32,7 @@ CONFIG_MODELS: dict[str, type[BaseModel]] = {
 INTEGER_RE = re.compile(r"^[+-]?\d+$")
 CONTINUOUS_RE = re.compile(
     r"^\s*(?P<value>[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)"
-    r"(?:\s+(?P<unit>\S+))?\s*$"
+    r"(?:\s*(?P<unit>\S+))?\s*$"
 )
 
 
@@ -376,7 +376,9 @@ def _validate_objective_expression(
                     f"objective references unknown metric {node.id}",
                 )
             )
-        elif isinstance(node, ast.Constant) and not isinstance(node.value, int | float):
+        elif isinstance(node, ast.Constant) and (
+            isinstance(node.value, bool) or not isinstance(node.value, int | float)
+        ):
             issues.append(
                 _issue(
                     "metrics.yaml",

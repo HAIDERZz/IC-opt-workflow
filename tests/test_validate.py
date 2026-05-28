@@ -84,6 +84,22 @@ def test_objective_expression_rejects_unknown_metric_names(tmp_path: Path) -> No
     )
 
 
+def test_objective_expression_rejects_boolean_literals(tmp_path: Path) -> None:
+    project_dir = copy_fixture_project(tmp_path)
+    metrics_path = project_dir / "config" / "metrics.yaml"
+    payload = read_yaml(metrics_path)
+    payload["objective"]["expression"] = "rise + True"
+    write_yaml(metrics_path, payload)
+
+    report = validate_project_files(project_dir)
+
+    assert report.ok is False
+    assert any(
+        "unsupported objective literal True" in issue.message
+        for issue in report.issues
+    )
+
+
 def test_netlist_paths_must_stay_under_expected_directories(tmp_path: Path) -> None:
     project_dir = copy_fixture_project(tmp_path)
     project_config_path = project_dir / "config" / "project_config.yaml"
@@ -99,6 +115,21 @@ def test_netlist_paths_must_stay_under_expected_directories(tmp_path: Path) -> N
         in issue.message
         for issue in report.issues
     )
+
+
+def test_continuous_step_accepts_attached_unit_suffixes(tmp_path: Path) -> None:
+    project_dir = copy_fixture_project(tmp_path)
+    variables_path = project_dir / "config" / "variables.yaml"
+    payload = read_yaml(variables_path)
+    payload["variables"][1]["lower"] = "0.3um"
+    payload["variables"][1]["upper"] = "3um"
+    payload["variables"][1]["step"] = "0.2um"
+    write_yaml(variables_path, payload)
+
+    report = validate_project_files(project_dir)
+
+    assert report.ok is True
+    assert report.issues == []
 
 
 def test_continuous_step_units_must_match(tmp_path: Path) -> None:
