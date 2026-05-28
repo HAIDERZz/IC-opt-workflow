@@ -32,6 +32,7 @@ def test_valid_project_files_pass(tmp_path: Path) -> None:
 
     assert report.ok is True
     assert report.issues == []
+    assert report.format() == "validation passed"
     assert_valid_project(project_dir)
 
 

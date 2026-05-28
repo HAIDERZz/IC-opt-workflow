@@ -53,7 +53,7 @@ class ValidationReport:
 
     def format(self) -> str:
         if self.ok:
-            return "Hermes project contracts are valid."
+            return "validation passed"
         return "\n".join(
             f"{issue.file}:{issue.path}: {issue.message}" for issue in self.issues
         )
