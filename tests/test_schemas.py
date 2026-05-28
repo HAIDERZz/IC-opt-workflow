@@ -98,3 +98,28 @@ def test_spectre_rejects_coerced_scalar_types(field: str, value: str) -> None:
 
     with pytest.raises(ValidationError):
         SpectreConfig.model_validate(payload)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("immutable_after_package", 1),
+        ("allow_maestro_setup_modification", 0),
+    ],
+)
+def test_project_safety_rejects_numeric_boolean_literals(
+    field: str, value: int
+) -> None:
+    payload = load_yaml("project_config.yaml")
+    payload["safety"][field] = value
+
+    with pytest.raises(ValidationError):
+        ProjectConfig.model_validate(payload)
+
+
+def test_optimizer_rejects_numeric_boolean_literal() -> None:
+    payload = load_yaml("optimizer.yaml")
+    payload["optimizer"]["deduplicate_candidates"] = 1
+
+    with pytest.raises(ValidationError):
+        OptimizerConfig.model_validate(payload)

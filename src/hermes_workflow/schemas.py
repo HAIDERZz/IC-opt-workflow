@@ -31,6 +31,12 @@ def validate_name(value: str, label: str) -> str:
     return value
 
 
+def validate_fixed_bool(value: bool, expected: bool, label: str) -> bool:
+    if value is not expected:
+        raise ValueError(f"{label} must be {str(expected).lower()}")
+    return value
+
+
 class VariableKind(StrEnum):
     INTEGER = "integer"
     CONTINUOUS_STEP = "continuous_step"
@@ -95,10 +101,24 @@ class NetlistConfig(StrictModel):
 
 
 class SafetyConfig(StrictModel):
-    immutable_after_package: Literal[True]
-    require_hermes_approval_before_real_run: Literal[True]
-    allow_maestro_setup_modification: Literal[False]
-    allow_only_variable_templating: Literal[True]
+    immutable_after_package: StrictBool
+    require_hermes_approval_before_real_run: StrictBool
+    allow_maestro_setup_modification: StrictBool
+    allow_only_variable_templating: StrictBool
+
+    @field_validator(
+        "immutable_after_package",
+        "require_hermes_approval_before_real_run",
+        "allow_only_variable_templating",
+    )
+    @classmethod
+    def _value_must_be_true(cls, value: bool) -> bool:
+        return validate_fixed_bool(value, True, "safety value")
+
+    @field_validator("allow_maestro_setup_modification")
+    @classmethod
+    def _value_must_be_false(cls, value: bool) -> bool:
+        return validate_fixed_bool(value, False, "safety value")
 
 
 class ProjectConfig(StrictModel):
@@ -206,7 +226,12 @@ class OptimizerSettings(StrictModel):
     batch_size: StrictInt = Field(ge=1)
     random_seed: StrictInt
     failure_penalty: StrictFloat = Field(gt=0)
-    deduplicate_candidates: Literal[True]
+    deduplicate_candidates: StrictBool
+
+    @field_validator("deduplicate_candidates")
+    @classmethod
+    def _deduplicate_candidates_must_be_true(cls, value: bool) -> bool:
+        return validate_fixed_bool(value, True, "deduplicate_candidates")
 
 
 class OptimizerConfig(StrictModel):
