@@ -5,7 +5,11 @@ import typer
 
 from hermes_workflow import __version__
 from hermes_workflow.approvals import decide_first_real_run
-from hermes_workflow.package import build_execution_package, create_project_from_template
+from hermes_workflow.package import (
+    TemplateError,
+    build_execution_package,
+    create_project_from_template,
+)
 from hermes_workflow.validate import validate_project_files
 
 
@@ -33,6 +37,11 @@ def main(
     return None
 
 
+def _exit_with_error(exc: Exception) -> None:
+    typer.echo(str(exc))
+    raise typer.Exit(code=1)
+
+
 @app.command("init")
 def init_command(
     destination: Annotated[Path, typer.Argument(help="Project directory to create.")],
@@ -41,7 +50,10 @@ def init_command(
         typer.Option("--force", help="Overwrite files inside an existing project directory."),
     ] = False,
 ) -> None:
-    project_dir = create_project_from_template(destination, force=force)
+    try:
+        project_dir = create_project_from_template(destination, force=force)
+    except TemplateError as exc:
+        _exit_with_error(exc)
     typer.echo(str(project_dir))
 
 
@@ -52,7 +64,10 @@ def validate_command(
         typer.Argument(help="Project directory containing config/*.yaml."),
     ],
 ) -> None:
-    report = validate_project_files(project_dir)
+    try:
+        report = validate_project_files(project_dir)
+    except (OSError, ValueError) as exc:
+        _exit_with_error(exc)
     typer.echo(report.format())
     if not report.ok:
         raise typer.Exit(code=1)
@@ -65,7 +80,10 @@ def package_command(
         typer.Argument(help="Project directory to package for Claude Code."),
     ],
 ) -> None:
-    manifest = build_execution_package(project_dir)
+    try:
+        manifest = build_execution_package(project_dir)
+    except (FileExistsError, OSError, ValueError) as exc:
+        _exit_with_error(exc)
     typer.echo(str(manifest.path.relative_to(project_dir)))
 
 
@@ -76,7 +94,10 @@ def approve_command(
         typer.Argument(help="Project directory with Claude preflight reports."),
     ],
 ) -> None:
-    instruction = decide_first_real_run(project_dir)
+    try:
+        instruction = decide_first_real_run(project_dir)
+    except (OSError, ValueError) as exc:
+        _exit_with_error(exc)
     typer.echo(instruction["decision"])
     if instruction["decision"] != "approve_first_real_run":
         raise typer.Exit(code=1)
