@@ -8,7 +8,7 @@ from hashlib import sha256
 from importlib import resources
 from pathlib import Path
 
-from hermes_workflow.validate import assert_valid_project
+from hermes_workflow.validate import ContractBundle, assert_valid_project
 
 
 TEMPLATE_PACKAGE = "hermes_workflow"
@@ -73,7 +73,10 @@ def sha256_file(path: Path) -> str:
 
 
 def render_execution_task(project_dir: Path, manifest_payload: dict) -> str:
-    bundle = assert_valid_project(project_dir)
+    return _render_execution_task(assert_valid_project(project_dir), manifest_payload)
+
+
+def _render_execution_task(bundle: ContractBundle, manifest_payload: dict) -> str:
     variable_names = ", ".join(
         f"`{variable.name}`" for variable in bundle.variables.variables
     )
@@ -189,6 +192,6 @@ def build_execution_package(
         json.dumps(payload, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
-    task_text = render_execution_task(project_dir, payload)
+    task_text = _render_execution_task(bundle, payload)
     (execution_dir / "EXECUTION_TASK.md").write_text(task_text, encoding="utf-8")
     return ExecutionManifest(path=manifest_path, payload=payload)
