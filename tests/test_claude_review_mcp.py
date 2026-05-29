@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import subprocess
 from pathlib import Path
 from types import ModuleType
@@ -183,3 +184,27 @@ def test_claude_failure_returns_mcp_error(tmp_path: Path) -> None:
 
     assert response["error"]["code"] == -32000
     assert "authentication failed" in response["error"]["message"]
+
+
+def test_project_mcp_config_registers_claude_review_server() -> None:
+    config = json.loads((ROOT / ".mcp.json").read_text(encoding="utf-8"))
+
+    server = config["mcpServers"]["claude-review"]
+    assert server["command"] == "python"
+    assert server["args"] == ["tools/claude_review_mcp.py"]
+
+
+def test_main_reads_json_lines_and_writes_json_responses(monkeypatch, capsys) -> None:
+    server = load_server()
+    request = json.dumps({"jsonrpc": "2.0", "id": 8, "method": "tools/list"}) + "\n"
+    monkeypatch.setattr(server.sys, "stdin", [request])
+
+    exit_code = server.main()
+
+    assert exit_code == 0
+    output = json.loads(capsys.readouterr().out)
+    assert output["id"] == 8
+    assert {tool["name"] for tool in output["result"]["tools"]} == {
+        "spec_review",
+        "code_quality_review",
+    }

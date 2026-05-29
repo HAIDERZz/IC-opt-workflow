@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "claude-review": {
+      "command": "python",
+      "args": ["tools/claude_review_mcp.py"]
+    }
+  }
+}
