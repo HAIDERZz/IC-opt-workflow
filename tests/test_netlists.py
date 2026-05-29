@@ -113,3 +113,55 @@ ac ac start=1 stop=10G
     assert report.status == PassFail.PASS
     assert "parameters temperature=27 FN={{FN}} FP={{FP}} WN={{WN}} WP={{WP}}" in template_text
     assert "X0 (IN OUT VDD VSS) wrapped FN=99 WP=99u" in template_text
+
+
+def test_prepare_netlist_writes_fail_report_when_input_is_missing(
+    tmp_path: Path,
+) -> None:
+    project_dir = tmp_path / "bridge_test_inv"
+    create_project_from_template(project_dir)
+
+    report = prepare_netlist(project_dir)
+
+    assert report.status == PassFail.FAIL
+    assert "exported input.scs is missing" in report.issues[0]
+    assert not (project_dir / "netlists" / "templates" / "template.scs").exists()
+    assert _load_netlist_report(project_dir) == report
+
+
+def test_prepare_netlist_writes_fail_report_when_approved_variable_is_missing(
+    tmp_path: Path,
+) -> None:
+    project_dir = _project_with_input(
+        tmp_path,
+        """simulator lang=spectre
+parameters temperature=27 FN=4 FP=4 WN=0.6u
+tran tran stop=10n
+""",
+    )
+
+    report = prepare_netlist(project_dir)
+
+    assert report.status == PassFail.FAIL
+    assert report.approved_variables_template_status["WP"] is False
+    assert "approved variable WP was not found in top-level parameters" in report.issues
+    assert not (project_dir / "netlists" / "templates" / "template.scs").exists()
+
+
+def test_prepare_netlist_writes_fail_report_for_duplicate_approved_variable(
+    tmp_path: Path,
+) -> None:
+    project_dir = _project_with_input(
+        tmp_path,
+        """simulator lang=spectre
+parameters temperature=27 FN=4 FP=4 WN=0.6u WP=1.2u
+parameters FN=5
+tran tran stop=10n
+""",
+    )
+
+    report = prepare_netlist(project_dir)
+
+    assert report.status == PassFail.FAIL
+    assert "approved variable FN appears more than once in top-level parameters" in report.issues
+    assert not (project_dir / "netlists" / "templates" / "template.scs").exists()

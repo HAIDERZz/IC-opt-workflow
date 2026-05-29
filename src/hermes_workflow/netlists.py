@@ -36,6 +36,8 @@ def prepare_netlist(project_dir: Path) -> NetlistPreparationReport:
     if status == PassFail.PASS:
         template_path.parent.mkdir(parents=True, exist_ok=True)
         template_path.write_text(template_text, encoding="utf-8")
+    elif template_path.exists():
+        template_path.unlink()
 
     report = _build_report(
         bundle,
