@@ -237,17 +237,43 @@ Reviews:
 - Claude MCP spec review: passed after the validation-refactor fix.
 - Claude MCP code-quality review: passed with no Critical or Important issues; only minor non-blocking notes.
 
-### Stop Point Before Task 7
+### Task 7: Claude Preflight Report Readers
 
-Status: Task 6 complete; Task 7 not started.
+Status: completed and committed.
 
-Next action: start Task 7, Claude preflight report readers, using `superpowers:subagent-driven-development`.
+Commits:
 
-Do not redo Tasks 1-6 unless new review feedback appears.
+- `6d4cc76 feat: read claude preflight reports`
+
+Implemented:
+
+- `src/hermes_workflow/reports.py` defines strict Pydantic report models for netlist preparation, dry run, and health check files.
+- `load_preflight_reports(project_dir)` loads the three required preflight report JSON files and aggregates readiness messages.
+- `tests/report_helpers.py` writes reusable pass-report fixtures for Task 7 and downstream approval tests.
+- `tests/test_reports.py` covers happy-path readiness and failed dry-run message aggregation.
+- `tests/__init__.py` was added so the plan-specified `tests.report_helpers` import resolves consistently under pytest.
+
+Verification:
+
+- `pytest tests/test_reports.py -v`: passed, 2 tests.
+- `pytest -q`: passed, 45 tests.
+- `ruff check .`: passed.
+
+Reviews:
+
+- Claude MCP spec review: passed.
+- Claude MCP code-quality review: passed with no Critical or Important issues; only minor non-blocking notes.
+
+### Stop Point Before Task 8
+
+Status: Task 7 complete; Task 8 not started.
+
+Next action: start Task 8, Hermes first-run approval gate, using `superpowers:subagent-driven-development`.
+
+Do not redo Tasks 1-7 unless new review feedback appears.
 
 ## Remaining Plan A Tasks
 
-- Task 7: Claude preflight report readers.
 - Task 8: Hermes first-run approval gate.
 - Task 9: CLI contract smoke tests.
 - Final review and branch finish check.
@@ -260,5 +286,5 @@ Do not redo Tasks 1-6 unless new review feedback appears.
 2. ic-auto-opt-workflow/docs/COMPACT_RESUME_CHECKPOINT.md
 3. ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。请使用 superpowers:subagent-driven-development 从 Task 7: Claude preflight report readers 开始。Task 1-6 已完成并通过 review gate；不要回到 Task 1-6，除非有新的 review feedback。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。请使用 superpowers:subagent-driven-development 从 Task 8: Hermes first-run approval gate 开始。Task 1-7 已完成并通过 review gate；不要回到 Task 1-7，除非有新的 review feedback。
 ```

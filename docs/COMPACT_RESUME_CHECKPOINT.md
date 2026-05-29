@@ -23,7 +23,8 @@ Current execution state:
 - Claude Review MCP project tooling complete and available.
 - Task 5 complete and reviewed.
 - Task 6 complete and reviewed.
-- Continue from Task 7: Claude preflight report readers.
+- Task 7 complete and reviewed.
+- Continue from Task 8: Hermes first-run approval gate.
 
 ## Files Already Read
 
