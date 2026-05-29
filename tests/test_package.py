@@ -22,6 +22,24 @@ def test_create_project_from_template_writes_expected_tree(tmp_path: Path) -> No
     assert validate_project_files(project_dir).ok is True
 
 
+def test_create_project_from_template_preserves_gitkeep_files(tmp_path: Path) -> None:
+    project_dir = tmp_path / "bridge_test_inv"
+    expected_gitkeep_files = [
+        "netlists/exported/.gitkeep",
+        "netlists/templates/.gitkeep",
+        "src/.gitkeep",
+        "execution_package/.gitkeep",
+        "ledger/.gitkeep",
+        "state/.gitkeep",
+        "reports/.gitkeep",
+    ]
+
+    create_project_from_template(project_dir)
+
+    for relative_path in expected_gitkeep_files:
+        assert (project_dir / relative_path).is_file()
+
+
 def test_create_project_from_template_refuses_non_empty_destination(
     tmp_path: Path,
 ) -> None:

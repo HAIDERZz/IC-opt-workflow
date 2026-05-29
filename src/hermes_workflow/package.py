@@ -22,7 +22,7 @@ def _copy_template_tree(destination: Path) -> None:
         target = destination / item.name
         if item.is_dir():
             _copy_resource_directory(item, target)
-        elif item.name != ".gitkeep":
+        else:
             target.write_bytes(item.read_bytes())
 
 
@@ -32,7 +32,7 @@ def _copy_resource_directory(source: resources.abc.Traversable, destination: Pat
         target = destination / item.name
         if item.is_dir():
             _copy_resource_directory(item, target)
-        elif item.name != ".gitkeep":
+        else:
             target.write_bytes(item.read_bytes())
 
 
