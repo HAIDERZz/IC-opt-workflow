@@ -112,3 +112,74 @@ def test_spec_review_rejects_missing_repo_before_claude_call(tmp_path: Path) -> 
     run.assert_not_called()
     assert response["error"]["code"] == -32000
     assert "repo_path does not exist" in response["error"]["message"]
+
+
+def test_code_quality_review_prompt_includes_git_range_and_sections(tmp_path: Path) -> None:
+    server = load_server()
+    completed = subprocess.CompletedProcess(
+        args=["claude"],
+        returncode=0,
+        stdout="### Strengths\nsolid\n\n### Assessment\nReady to proceed? Yes\n",
+        stderr="",
+    )
+
+    with patch.object(server.subprocess, "run", return_value=completed) as run:
+        response = server.handle_request(
+            {
+                "jsonrpc": "2.0",
+                "id": 6,
+                "method": "tools/call",
+                "params": {
+                    "name": "code_quality_review",
+                    "arguments": {
+                        "repo_path": str(tmp_path),
+                        "requirements": "Task 5 manifest requirements",
+                        "base_sha": "abc123",
+                        "head_sha": "def456",
+                        "description": "Added manifest builder",
+                        "extra_context": "Focus on package.py boundaries",
+                    },
+                },
+            }
+        )
+
+    prompt = run.call_args.args[0][-1]
+    assert "git diff --stat abc123..def456" in prompt
+    assert "git diff abc123..def456" in prompt
+    assert "Task 5 manifest requirements" in prompt
+    assert "Added manifest builder" in prompt
+    assert "Focus on package.py boundaries" in prompt
+    assert "#### Critical (Must Fix)" in prompt
+    assert response["result"]["content"][0]["text"].startswith("### Strengths")
+
+
+def test_claude_failure_returns_mcp_error(tmp_path: Path) -> None:
+    server = load_server()
+    completed = subprocess.CompletedProcess(
+        args=["claude"],
+        returncode=1,
+        stdout="",
+        stderr="authentication failed",
+    )
+
+    with patch.object(server.subprocess, "run", return_value=completed):
+        response = server.handle_request(
+            {
+                "jsonrpc": "2.0",
+                "id": 7,
+                "method": "tools/call",
+                "params": {
+                    "name": "code_quality_review",
+                    "arguments": {
+                        "repo_path": str(tmp_path),
+                        "requirements": "requirements",
+                        "base_sha": "abc123",
+                        "head_sha": "def456",
+                        "description": "description",
+                    },
+                },
+            }
+        )
+
+    assert response["error"]["code"] == -32000
+    assert "authentication failed" in response["error"]["message"]
