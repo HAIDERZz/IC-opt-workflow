@@ -99,7 +99,7 @@ def approve_command(
 ) -> None:
     try:
         instruction = decide_first_real_run(project_dir)
-    except (OSError, ValueError) as exc:
+    except OSError as exc:
         _exit_with_error(exc)
         return
     typer.echo(instruction["decision"])

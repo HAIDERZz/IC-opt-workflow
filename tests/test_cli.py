@@ -31,6 +31,8 @@ def test_cli_init_and_validate(tmp_path: Path) -> None:
 def test_cli_package_and_approve(tmp_path: Path) -> None:
     project_dir = tmp_path / "bridge_test_inv"
     init_result = runner.invoke(app, ["init", str(project_dir)])
+    assert init_result.exit_code == 0
+
     package_result = runner.invoke(app, ["package", str(project_dir)])
     write_pass_reports(project_dir)
     approve_result = runner.invoke(app, ["approve", str(project_dir)])
@@ -38,7 +40,6 @@ def test_cli_package_and_approve(tmp_path: Path) -> None:
     instruction = json.loads(
         (project_dir / "supervisor_instruction.json").read_text(encoding="utf-8")
     )
-    assert init_result.exit_code == 0
     assert package_result.exit_code == 0
     assert "execution_package/execution_manifest.json" in package_result.stdout
     assert approve_result.exit_code == 0
