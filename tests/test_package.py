@@ -1,9 +1,15 @@
+import json
+from hashlib import sha256
 from importlib import resources
 from pathlib import Path
 
 import pytest
 
-from hermes_workflow.package import TemplateError, create_project_from_template
+from hermes_workflow.package import (
+    TemplateError,
+    build_execution_package,
+    create_project_from_template,
+)
 from hermes_workflow.validate import validate_project_files
 
 
@@ -86,3 +92,26 @@ def test_project_template_is_packaged_with_hermes_workflow() -> None:
 
     assert template.is_dir()
     assert template.joinpath("TASK.md").is_file()
+
+
+def test_build_execution_package_copies_config_and_records_hashes(tmp_path: Path) -> None:
+    project_dir = tmp_path / "bridge_test_inv"
+    create_project_from_template(project_dir)
+
+    manifest = build_execution_package(
+        project_dir,
+        created_at_utc="2026-05-28T00:00:00Z",
+    )
+
+    manifest_path = project_dir / "execution_package" / "execution_manifest.json"
+    copied_config = project_dir / "execution_package" / "config" / "variables.yaml"
+    source_config = project_dir / "config" / "variables.yaml"
+    expected_hash = sha256(source_config.read_bytes()).hexdigest()
+    manifest_payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+    assert manifest.path == manifest_path
+    assert copied_config.read_text(encoding="utf-8") == source_config.read_text(encoding="utf-8")
+    assert manifest_payload["schema_version"] == "1.0"
+    assert manifest_payload["project_name"] == "bridge_test_inv"
+    assert manifest_payload["created_at_utc"] == "2026-05-28T00:00:00Z"
+    assert manifest_payload["immutable_config_files"]["config/variables.yaml"] == expected_hash
