@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from hermes_workflow.package import (
+    CONFIG_FILE_NAMES,
     TemplateError,
     build_execution_package,
     create_project_from_template,
@@ -104,14 +105,39 @@ def test_build_execution_package_copies_config_and_records_hashes(tmp_path: Path
     )
 
     manifest_path = project_dir / "execution_package" / "execution_manifest.json"
-    copied_config = project_dir / "execution_package" / "config" / "variables.yaml"
-    source_config = project_dir / "config" / "variables.yaml"
-    expected_hash = sha256(source_config.read_bytes()).hexdigest()
     manifest_payload = json.loads(manifest_path.read_text(encoding="utf-8"))
 
     assert manifest.path == manifest_path
-    assert copied_config.read_text(encoding="utf-8") == source_config.read_text(encoding="utf-8")
     assert manifest_payload["schema_version"] == "1.0"
     assert manifest_payload["project_name"] == "bridge_test_inv"
     assert manifest_payload["created_at_utc"] == "2026-05-28T00:00:00Z"
-    assert manifest_payload["immutable_config_files"]["config/variables.yaml"] == expected_hash
+    for file_name in CONFIG_FILE_NAMES:
+        copied_config = project_dir / "execution_package" / "config" / file_name
+        source_config = project_dir / "config" / file_name
+        expected_hash = sha256(source_config.read_bytes()).hexdigest()
+
+        assert copied_config.read_text(encoding="utf-8") == source_config.read_text(
+            encoding="utf-8"
+        )
+        assert (
+            manifest_payload["immutable_config_files"][f"config/{file_name}"]
+            == expected_hash
+        )
+
+
+def test_build_execution_package_refuses_existing_manifest(tmp_path: Path) -> None:
+    project_dir = tmp_path / "bridge_test_inv"
+    create_project_from_template(project_dir)
+    build_execution_package(project_dir, created_at_utc="2026-05-28T00:00:00Z")
+
+    with pytest.raises(FileExistsError, match="execution package already exists"):
+        build_execution_package(project_dir, created_at_utc="2026-05-28T00:00:00Z")
+
+
+def test_build_execution_package_reports_missing_config_file(tmp_path: Path) -> None:
+    project_dir = tmp_path / "bridge_test_inv"
+    create_project_from_template(project_dir)
+    (project_dir / "config" / "optimizer.yaml").unlink()
+
+    with pytest.raises(ValueError, match="config/optimizer.yaml"):
+        build_execution_package(project_dir, created_at_utc="2026-05-28T00:00:00Z")

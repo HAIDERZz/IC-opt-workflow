@@ -69,7 +69,7 @@ def create_project_from_template(destination: Path, *, force: bool = False) -> P
 
 
 def sha256_file(path: Path) -> str:
-    return sha256(Path(path).read_bytes()).hexdigest()
+    return sha256(path.read_bytes()).hexdigest()
 
 
 def build_execution_package(
@@ -81,6 +81,10 @@ def build_execution_package(
     bundle = assert_valid_project(project_dir)
     execution_dir = project_dir / "execution_package"
     config_destination = execution_dir / "config"
+    manifest_path = execution_dir / "execution_manifest.json"
+    if manifest_path.exists():
+        raise FileExistsError(f"execution package already exists: {manifest_path}")
+
     execution_dir.mkdir(parents=True, exist_ok=True)
     config_destination.mkdir(parents=True, exist_ok=True)
 
@@ -106,7 +110,6 @@ def build_execution_package(
             "state/health_check.json",
         ],
     }
-    manifest_path = execution_dir / "execution_manifest.json"
     manifest_path.write_text(
         json.dumps(payload, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
