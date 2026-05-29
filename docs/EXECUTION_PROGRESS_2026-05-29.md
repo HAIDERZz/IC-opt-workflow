@@ -8,7 +8,7 @@ This note preserves the implementation state for continuing Plan A after context
 - Branch: `plan-a-hermes-file-contract-mvp`
 - Baseline branch: `master`
 - Baseline commit: `885e97f docs: capture workflow planning baseline`
-- Latest Task 4 implementation/review commit before this checkpoint: `9fd283c docs: align template package snippets`
+- Latest Plan A implementation commit before this documentation handoff: `720adb9 fix: clarify cli json error handling`
 - Active plan: `docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md`
 - Execution method: `superpowers:subagent-driven-development`
 - Dependencies installed in active Python environment on 2026-05-29: `pytest`, `typer`, `pydantic`, `PyYAML`, `ruff`
@@ -293,26 +293,63 @@ Reviews:
 - Claude MCP spec review: passed after review fixes.
 - Claude MCP code-quality review: initially requested malformed-manifest handling and missing branch tests; final re-review passed with no Critical or Important issues.
 
-### Stop Point Before Task 9
+### Task 9: CLI Contract Smoke Tests
 
-Status: Task 8 complete; Task 9 not started.
+Status: completed and committed.
 
-Next action: start Task 9, CLI contract smoke tests, using `superpowers:subagent-driven-development`.
+Commits:
 
-Do not redo Tasks 1-8 unless new review feedback appears.
+- `3ef818c feat: add hermes workflow cli commands`
+- `96fe092 fix: report cli domain errors cleanly`
+- `1411a71 fix: clarify cli error control flow`
+- `716b0db fix: tighten cli approval error handling`
+- `4b269a9 fix: harden cli approve error surface`
+- `720adb9 fix: clarify cli json error handling`
 
-## Remaining Plan A Tasks
+Implemented:
 
-- Task 9: CLI contract smoke tests.
-- Final review and branch finish check.
+- `hermes-workflow init <project_dir>` creates the packaged Spectre Maestro project template.
+- `hermes-workflow validate <project_dir>` validates the five YAML file contracts.
+- `hermes-workflow package <project_dir>` builds `execution_package/execution_manifest.json` and `EXECUTION_TASK.md`.
+- `hermes-workflow approve <project_dir>` writes `supervisor_instruction.json` and exits nonzero for rejected first-run decisions.
+- CLI smoke tests cover init/validate and package/approve happy paths.
+- CLI error-surface tests cover package/init/approve domain failures without traceback leakage.
+- README now includes the MVP CLI command sequence and approval semantics.
+
+Important decisions/fixes:
+
+- CLI commands catch only expected file-contract/domain errors and convert them into clean `exit code 1` output.
+- `_exit_with_error()` is typed `NoReturn`; unreachable post-exit `return` statements were removed.
+- `approve` explicitly handles malformed preflight JSON through `json.JSONDecodeError` and a regression test for malformed `dry_run_report.json`.
+- No broad-plan Task 10 mock optimizer loop work was added.
+
+Verification:
+
+- `pytest tests/test_cli.py -v`: passed, 6 tests.
+- `pytest -q`: passed, 56 tests.
+- `ruff check .`: passed.
+
+Reviews:
+
+- Claude MCP spec review for final Task 9 head: spec compliant with noted defensive extras.
+- Claude MCP code-quality review for final Task 9 head: passed with no Critical or Important issues.
+
+### Focused Plan A Completion
+
+Status: focused Plan A complete through Task 9.
+
+Focused Plan A does not contain a Task 10. The earlier broad plan has a separate Task 10, `Mock Optimization Loop Contract`, but that work is outside the Hermes File Contract MVP scope and was not started here.
+
+Next recommended action: hand off from focused Plan A into a new or resumed broader-plan development thread. The new worker should read `docs/OPENCODE_HANDOFF_2026-05-29.md` first and decide whether to start broad-plan Task 10 as a new scoped implementation plan.
 
 ## Resume Prompt
 
 ```text
 请继续执行 IC auto optimization workflow 的 Plan A。先阅读：
-1. ic-auto-opt-workflow/docs/EXECUTION_PROGRESS_2026-05-29.md
-2. ic-auto-opt-workflow/docs/COMPACT_RESUME_CHECKPOINT.md
-3. ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md
+1. ic-auto-opt-workflow/docs/OPENCODE_HANDOFF_2026-05-29.md
+2. ic-auto-opt-workflow/docs/EXECUTION_PROGRESS_2026-05-29.md
+3. ic-auto-opt-workflow/docs/COMPACT_RESUME_CHECKPOINT.md
+4. ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。请使用 superpowers:subagent-driven-development 从 Task 9: CLI contract smoke tests 开始。Task 1-8 已完成并通过 review gate；不要回到 Task 1-8，除非有新的 review feedback。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。请先阅读 docs/OPENCODE_HANDOFF_2026-05-29.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md。Focused Plan A Task 1-9 已完成并通过 spec/code-quality review gate、pytest 和 ruff；不要重做 Task 1-9。下一步如要继续开发，请先确认是否从 broad plan 的 Task 10: Mock Optimization Loop Contract 开新 scoped plan。
 ```

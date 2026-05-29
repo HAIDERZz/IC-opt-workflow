@@ -25,7 +25,8 @@ Current execution state:
 - Task 6 complete and reviewed.
 - Task 7 complete and reviewed.
 - Task 8 complete and reviewed.
-- Continue from Task 9: CLI contract smoke tests.
+- Task 9 complete and reviewed.
+- Focused Plan A is complete. The earlier broad plan's Task 10 is not part of focused Plan A and has not been started.
 
 ## Files Already Read
 
@@ -306,37 +307,27 @@ optimizer:
 
 ## Next Step
 
-Continue by decomposing Plan A into detailed TDD implementation tasks:
+Focused Plan A is complete through Task 9.
+
+Do not redo Plan A Tasks 1-9 unless new review feedback appears. The next development decision is whether to leave the focused Hermes File Contract MVP branch as-is, merge/finish it, or start a new scoped plan for the earlier broad plan's Task 10, `Mock Optimization Loop Contract`.
+
+Read the opencode handoff first:
 
 ```text
-Task 1: Python package scaffold
-Task 2: schema models
-Task 3: validation across the five YAML contracts
-Task 4: project template generation
-Task 5: execution package builder
-Task 6: EXECUTION_TASK.md renderer
-Task 7: Claude preflight report readers
-Task 8: Hermes approval gate
-Task 9: CLI contract smoke tests
+ic-auto-opt-workflow/docs/OPENCODE_HANDOFF_2026-05-29.md
 ```
-
-Use the `superpowers:writing-plans` skill and keep writing into:
-
-```text
-ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md
-```
-
-Do not implement source code until the user approves the completed plan.
 
 ## Resume Prompt
 
 Use this prompt after compact:
 
 ```text
-请继续 IC auto optimization workflow 的 Plan A 规划。先阅读：
-1. ic-auto-opt-workflow/docs/COMPACT_RESUME_CHECKPOINT.md
-2. ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md
-3. 如需背景再读 ic-auto-opt-workflow/PROJECT_STRUCTURE.md 和 docs/HANDOFF_TO_LINUX_CODEX.md
+请继续 IC auto optimization workflow。先阅读：
+1. ic-auto-opt-workflow/docs/OPENCODE_HANDOFF_2026-05-29.md
+2. ic-auto-opt-workflow/docs/EXECUTION_PROGRESS_2026-05-29.md
+3. ic-auto-opt-workflow/docs/COMPACT_RESUME_CHECKPOINT.md
+4. ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md
+5. 如需进入后续范围，再读 ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md
 
-当前已确认：Plan A 只做 Hermes File Contract MVP，不做 USER_TASK.md parser，不实现代码；继续 standalone Spectre backend；五个 YAML contract 已确认。请使用 superpowers:writing-plans skill，从“Plan A 任务分解”继续，按 TDD task 粒度写入同一个 plan 文件，不要直接实现代码。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。Focused Plan A Task 1-9 已完成并通过 spec/code-quality review gate、pytest 和 ruff；不要重做 Task 1-9。下一步请先确认是否从 broad plan 的 Task 10: Mock Optimization Loop Contract 开新 scoped plan。
 ```
