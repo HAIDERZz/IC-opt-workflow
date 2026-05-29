@@ -122,19 +122,11 @@ class OptimizerState(BaseModel):
 
 ## Mock Metric Design
 
-The mock optimizer computes deterministic pseudo-metrics from parameter values. The formula for each metric is derived from the variable names and their numeric values:
+The mock optimizer computes deterministic pseudo-metrics from parameter values for every project, including the `bridge_test_inv` fixture. It does not contain project-specific metric formulas or fixture-specific special cases.
 
-For the `bridge_test_inv` fixture with variables `FN`, `WN`, `FP`, `WP` and metrics `rise`, `fall`, `DC`:
+For each declared metric, the implementation normalizes candidate parameter values to numeric values, computes `hashlib.sha256(f"{metric_name}:{sorted_param_values}".encode()).digest()`, maps the digest to a float in a stable placeholder range, and adds a deterministic metric-name offset. The same metric name and parameter set always produce the same value.
 
-- `rise = 30.0 + 5.0 * FN + 2.0 * WN_numeric - 1.0 * FP - 0.5 * WP_numeric`
-- `fall = 25.0 + 4.0 * FN + 1.5 * WN_numeric + 2.0 * FP - 0.3 * WP_numeric`
-- `DC = 200.0 - 10.0 * FN - 15.0 * WN_numeric - 8.0 * FP - 20.0 * WP_numeric`
-
-Where `WN_numeric` and `WP_numeric` are the numeric part of the continuous_step values (e.g., `"1.0 um"` → `1.0`).
-
-For general projects, the mock metric formulas use a seeded pseudo-random function of the parameter values, so outputs are reproducible given the same seed. The implementation uses `hashlib.sha256(f"{metric_name}:{sorted_params}").hexdigest()` mapped to a float in a sensible range, then scaled by metric config hints if available.
-
-**Important:** The mock optimizer does NOT interpret `maestro_formula`. It computes deterministic placeholder values. This is a deliberate MVP choice—real metric computation requires Spectre results and belongs in a later plan.
+**Important:** The mock optimizer does NOT interpret `maestro_formula`, does NOT implement the real rise/fall/DC equations for `bridge_test_inv`, and does NOT attempt to approximate circuit behavior. It computes deterministic placeholder values only. Real metric computation requires Spectre results and belongs in a later plan.
 
 ---
 
