@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 from typing import Annotated, NoReturn
 
@@ -96,7 +97,7 @@ def approve_command(
 ) -> None:
     try:
         instruction = decide_first_real_run(project_dir)
-    except (OSError, ValueError) as exc:
+    except (OSError, json.JSONDecodeError, ValueError) as exc:
         _exit_with_error(exc)
     typer.echo(instruction["decision"])
     if instruction["decision"] != "approve_first_real_run":
