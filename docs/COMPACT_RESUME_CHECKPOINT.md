@@ -19,7 +19,11 @@ Current execution state:
 - Task 1 complete and reviewed.
 - Task 2 complete and reviewed.
 - Task 3 complete and reviewed.
-- Task 4 implemented and spec-reviewed, but code quality review requested changes. Continue from Task 4 fixes before starting Task 5.
+- Task 4 complete and reviewed.
+- Claude Review MCP project tooling complete and available.
+- Task 5 complete and reviewed.
+- Task 6 complete and reviewed.
+- Continue from Task 7: Claude preflight report readers.
 
 ## Files Already Read
 

@@ -158,6 +158,8 @@ Commits:
 - `5c32764 feat: add claude spec review tool`
 - `b32aa37 feat: add claude code quality review tool`
 - `c6a76ca docs: register claude review mcp server`
+- `15bfe6c docs: note claude review mcp handoff`
+- `a719d1f fix: pass claude review prompt via stdin`
 
 Implemented:
 
@@ -172,7 +174,7 @@ Verification:
 - `pytest -q`: passed, 39 tests.
 - `ruff check .`: passed.
 - `printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | python tools/claude_review_mcp.py`: returned `spec_review` and `code_quality_review`.
-- `claude --version`: `2.1.156 (Claude Code)`.
+- `claude --version`: `2.1.153 (Claude Code)` after rollback from a CLI regression.
 
 Usage:
 
@@ -181,18 +183,70 @@ Usage:
 
 ## Current Task
 
-### Stop Point Before Task 5
+### Task 5: Execution Package Manifest Builder
 
-Status: Task 5 not started.
+Status: completed and committed.
 
-Next action: start Task 5, Execution package manifest builder, using `superpowers:subagent-driven-development`.
+Commits:
 
-Do not redo Task 4 unless new review feedback appears.
+- `daea0f1 feat: build execution package manifest`
+- `b0cfdca fix: harden execution package manifest`
+
+Implemented:
+
+- `build_execution_package()` validates the project, copies the five immutable config files into `execution_package/config`, records SHA-256 hashes, and writes `execution_manifest.json`.
+- Existing manifests are refused with `FileExistsError` to avoid silent overwrite of an immutable snapshot.
+- Missing config files are surfaced through the existing `assert_valid_project()` validation boundary.
+- Package tests cover all five copied config files and hashes, duplicate manifest refusal, and missing config reporting.
+
+Verification:
+
+- `pytest tests/test_package.py -v`: passed, 9 tests after Task 5 hardening.
+- `pytest tests/test_schemas.py tests/test_validate.py tests/test_package.py -v`: passed, 33 tests after Task 6.
+- `ruff check .`: passed.
+
+Reviews:
+
+- Claude MCP spec review: passed.
+- Claude MCP code-quality review: first returned two Important items; hardening commit addressed the overwrite risk and expanded test coverage.
+
+### Task 6: `EXECUTION_TASK.md` Renderer
+
+Status: completed and committed.
+
+Commits:
+
+- `009fbde feat: render claude execution task`
+- `b907b64 fix: avoid duplicate execution task validation`
+
+Implemented:
+
+- `render_execution_task(project_dir, manifest_payload)` renders the public Task 6 Markdown API.
+- `build_execution_package()` writes `execution_package/EXECUTION_TASK.md`.
+- A private bundle renderer avoids re-validating the project during `build_execution_package()` while preserving the public renderer API.
+- Package tests assert the required execution task content: project, backend, Spectre X preset, variables, Maestro safety rule, and supervisor approval wait.
+
+Verification:
+
+- `pytest tests/test_package.py -v`: passed, 10 tests.
+- `pytest tests/test_schemas.py tests/test_validate.py tests/test_package.py -v`: passed, 33 tests.
+- `ruff check .`: passed.
+
+Reviews:
+
+- Claude MCP spec review: passed after the validation-refactor fix.
+- Claude MCP code-quality review: passed with no Critical or Important issues; only minor non-blocking notes.
+
+### Stop Point Before Task 7
+
+Status: Task 6 complete; Task 7 not started.
+
+Next action: start Task 7, Claude preflight report readers, using `superpowers:subagent-driven-development`.
+
+Do not redo Tasks 1-6 unless new review feedback appears.
 
 ## Remaining Plan A Tasks
 
-- Task 5: Execution package manifest builder.
-- Task 6: `EXECUTION_TASK.md` renderer.
 - Task 7: Claude preflight report readers.
 - Task 8: Hermes first-run approval gate.
 - Task 9: CLI contract smoke tests.
@@ -206,5 +260,5 @@ Do not redo Task 4 unless new review feedback appears.
 2. ic-auto-opt-workflow/docs/COMPACT_RESUME_CHECKPOINT.md
 3. ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。请使用 superpowers:subagent-driven-development 从 Task 5: Execution package manifest builder 开始。Task 1-4 已完成并通过 review gate；不要回到 Task 4，除非有新的 review feedback。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。请使用 superpowers:subagent-driven-development 从 Task 7: Claude preflight report readers 开始。Task 1-6 已完成并通过 review gate；不要回到 Task 1-6，除非有新的 review feedback。
 ```
