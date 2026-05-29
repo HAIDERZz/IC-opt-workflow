@@ -58,3 +58,58 @@ dcOp dc oppoint=rawfile
     assert report.analysis_statements == ["tran", "dcOp"]
     assert report.forbidden_setup_changes_detected is False
     assert report.issues == []
+
+
+def test_prepare_netlist_templates_backslash_continued_parameters(
+    tmp_path: Path,
+) -> None:
+    project_dir = _project_with_input(
+        tmp_path,
+        """simulator lang=spectre
+parameters \\
+    temperature=27 \\
+    L2=45n FN=4 \\
+    FP=4 WN=0.6u WP=1.2u
+I0 (VOUT IN VSS VSS) inverter w=WP*FP fingers=FN
+pss pss fund=1G harms=10
+pac pac maxsideband=10
+pnoise pnoise maxsideband=10
+""",
+    )
+
+    report = prepare_netlist(project_dir)
+
+    template_text = (
+        project_dir / "netlists" / "templates" / "template.scs"
+    ).read_text(encoding="utf-8")
+    assert report.status == PassFail.PASS
+    assert "FN={{FN}}" in template_text
+    assert "FP={{FP}}" in template_text
+    assert "WN={{WN}}" in template_text
+    assert "WP={{WP}}" in template_text
+    assert "L2=45n" in template_text
+    assert "w=WP*FP fingers=FN" in template_text
+    assert report.analysis_statements == ["pss", "pac", "pnoise"]
+
+
+def test_prepare_netlist_does_not_template_instance_parameters(tmp_path: Path) -> None:
+    project_dir = _project_with_input(
+        tmp_path,
+        """simulator lang=spectre
+parameters temperature=27 FN=4 FP=4 WN=0.6u WP=1.2u
+subckt wrapped IN OUT VDD VSS
+M0 (OUT IN VSS VSS) nmos w=WN*FN l=45n
+ends wrapped
+X0 (IN OUT VDD VSS) wrapped FN=99 WP=99u
+ac ac start=1 stop=10G
+""",
+    )
+
+    report = prepare_netlist(project_dir)
+
+    template_text = (
+        project_dir / "netlists" / "templates" / "template.scs"
+    ).read_text(encoding="utf-8")
+    assert report.status == PassFail.PASS
+    assert "parameters temperature=27 FN={{FN}} FP={{FP}} WN={{WN}} WP={{WP}}" in template_text
+    assert "X0 (IN OUT VDD VSS) wrapped FN=99 WP=99u" in template_text
