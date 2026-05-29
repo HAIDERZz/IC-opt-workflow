@@ -72,6 +72,81 @@ def sha256_file(path: Path) -> str:
     return sha256(path.read_bytes()).hexdigest()
 
 
+def render_execution_task(project_dir: Path, manifest_payload: dict) -> str:
+    bundle = assert_valid_project(project_dir)
+    variable_names = ", ".join(
+        f"`{variable.name}`" for variable in bundle.variables.variables
+    )
+    metric_lines = "\n".join(
+        f"- `{metric.name}` [{metric.unit}]: `{metric.maestro_formula}`"
+        for metric in bundle.metrics.metrics
+    )
+    constraint_lines = "\n".join(
+        f"- `{constraint.metric}` {constraint.op.value} `{constraint.value}`"
+        for constraint in bundle.metrics.constraints
+    )
+    hash_lines = "\n".join(
+        f"- `{path}`: `{digest}`"
+        for path, digest in sorted(manifest_payload["immutable_config_files"].items())
+    )
+    return f"""# Claude Code Execution Task
+
+Project: `{bundle.project_config.project.name}`
+Backend: `{bundle.project_config.project.backend}`
+Created at UTC: `{manifest_payload["created_at_utc"]}`
+
+## Scope
+
+Use `virtuoso-bridge-lite` skills to prepare the project-local execution files. Do not run a real Spectre optimization before Hermes approval.
+
+## Testbench
+
+- Virtuoso library: `{bundle.project_config.testbench.virtuoso_library}`
+- Cell: `{bundle.project_config.testbench.cell}`
+- Design view: `{bundle.project_config.testbench.design_view}`
+- Maestro view: `{bundle.project_config.testbench.maestro_view}`
+- Test name: `{bundle.project_config.testbench.test_name}`
+- Corner: `{bundle.project_config.testbench.corner}`
+
+## Allowed Variables
+
+Only template these variables in the exported Spectre deck: {variable_names}
+
+## Metrics
+
+{metric_lines}
+
+## Constraints
+
+{constraint_lines}
+
+## Objective
+
+- Direction: `{bundle.metrics.objective.direction.value}`
+- Expression: `{bundle.metrics.objective.expression}`
+
+## Spectre Policy
+
+- Engine: `spectre_x`
+- Spectre X preset: `{bundle.spectre.spectre.preset.value}`
+- Output format: `{bundle.spectre.spectre.output_format}`
+- Candidate-level parallel jobs: `{bundle.spectre.spectre.parallel_jobs}`
+- Per-candidate timeout seconds: `{bundle.spectre.spectre.timeout_s}`
+
+## Safety Rules
+
+- Do not modify Maestro setup.
+- Do not change analysis statements, model includes, simulator options, save options, constraints, objective, variable bounds, or variable step sizes.
+- Template only approved variables.
+- Write `reports/netlist_preparation_report.json`, `reports/dry_run_report.json`, `reports/review_report.md`, and `state/health_check.json`.
+- Wait for `supervisor_instruction.json` before the first real Spectre run.
+
+## Immutable Config Hashes
+
+{hash_lines}
+"""
+
+
 def build_execution_package(
     project_dir: Path,
     *,
@@ -114,4 +189,6 @@ def build_execution_package(
         json.dumps(payload, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+    task_text = render_execution_task(project_dir, payload)
+    (execution_dir / "EXECUTION_TASK.md").write_text(task_text, encoding="utf-8")
     return ExecutionManifest(path=manifest_path, payload=payload)

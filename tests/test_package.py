@@ -141,3 +141,24 @@ def test_build_execution_package_reports_missing_config_file(tmp_path: Path) -> 
 
     with pytest.raises(ValueError, match="config/optimizer.yaml"):
         build_execution_package(project_dir, created_at_utc="2026-05-28T00:00:00Z")
+
+
+def test_build_execution_package_writes_execution_task(tmp_path: Path) -> None:
+    project_dir = tmp_path / "bridge_test_inv"
+    create_project_from_template(project_dir)
+
+    build_execution_package(project_dir, created_at_utc="2026-05-28T00:00:00Z")
+
+    task_text = (project_dir / "execution_package" / "EXECUTION_TASK.md").read_text(
+        encoding="utf-8"
+    )
+    assert "# Claude Code Execution Task" in task_text
+    assert "Project: `bridge_test_inv`" in task_text
+    assert "Backend: `maestro_exported_spectre_deck`" in task_text
+    assert "Spectre X preset: `ax`" in task_text
+    assert "`FN`, `WN`, `FP`, `WP`" in task_text
+    assert "Do not modify Maestro setup" in task_text
+    assert (
+        "Wait for `supervisor_instruction.json` before the first real Spectre run"
+        in task_text
+    )
