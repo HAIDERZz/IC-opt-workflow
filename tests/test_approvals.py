@@ -50,6 +50,41 @@ def test_approval_gate_writes_reject_instruction_when_preflight_fails(
     assert "mock metric failed" in instruction["reason"]
 
 
+def test_approval_gate_rejects_missing_execution_manifest(tmp_path: Path) -> None:
+    project_dir = tmp_path / "bridge_test_inv"
+    create_project_from_template(project_dir)
+
+    instruction = decide_first_real_run(
+        project_dir,
+        created_at_utc="2026-05-28T00:10:00Z",
+    )
+
+    instruction_path = project_dir / "supervisor_instruction.json"
+    payload = json.loads(instruction_path.read_text(encoding="utf-8"))
+    assert instruction["decision"] == "reject_first_real_run"
+    assert instruction["reason"] == "execution manifest is missing"
+    assert instruction["approved_config_hashes"] == {}
+    assert payload == instruction
+
+
+def test_approval_gate_rejects_invalid_project_config(tmp_path: Path) -> None:
+    project_dir = tmp_path / "bridge_test_inv"
+    create_project_from_template(project_dir)
+    build_execution_package(project_dir, created_at_utc="2026-05-28T00:00:00Z")
+    write_pass_reports(project_dir)
+    (project_dir / "config" / "variables.yaml").unlink()
+
+    instruction = decide_first_real_run(
+        project_dir,
+        created_at_utc="2026-05-28T00:10:00Z",
+    )
+
+    assert instruction["decision"] == "reject_first_real_run"
+    assert "config/variables.yaml" in instruction["reason"]
+    assert "required config file is missing" in instruction["reason"]
+    assert instruction["approved_config_hashes"]["config/project_config.yaml"]
+
+
 def test_approval_gate_rejects_invalid_execution_manifest(tmp_path: Path) -> None:
     project_dir = tmp_path / "bridge_test_inv"
     create_project_from_template(project_dir)
