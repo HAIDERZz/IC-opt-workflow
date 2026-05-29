@@ -148,6 +148,37 @@ Reviews:
 - Final spec compliance: passed.
 - Final code quality: approved.
 
+## Claude Review MCP
+
+Status: implemented as project tooling before Task 5.
+
+Commits:
+
+- `1935667 feat: add claude review mcp shell`
+- `5c32764 feat: add claude spec review tool`
+- `b32aa37 feat: add claude code quality review tool`
+- `c6a76ca docs: register claude review mcp server`
+
+Implemented:
+
+- `tools/claude_review_mcp.py`
+- `.mcp.json`
+- `docs/CLAUDE_REVIEW_MCP.md`
+- `tests/test_claude_review_mcp.py`
+
+Verification:
+
+- `pytest tests/test_claude_review_mcp.py -v`: passed, 9 tests.
+- `pytest -q`: passed, 39 tests.
+- `ruff check .`: passed.
+- `printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | python tools/claude_review_mcp.py`: returned `spec_review` and `code_quality_review`.
+- `claude --version`: `2.1.156 (Claude Code)`.
+
+Usage:
+
+- Use `claude-review.spec_review` and `claude-review.code_quality_review` as review gates for Task 5-9 when the MCP host has loaded the project server.
+- If the MCP host has not reloaded project config, continue with existing subagent reviews or invoke the server script directly for smoke checks.
+
 ## Current Task
 
 ### Stop Point Before Task 5
