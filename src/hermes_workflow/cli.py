@@ -6,6 +6,7 @@ import typer
 
 from hermes_workflow import __version__
 from hermes_workflow.approvals import decide_first_real_run
+from hermes_workflow.mock_optimizer import run_mock_optimization
 from hermes_workflow.package import (
     TemplateError,
     build_execution_package,
@@ -102,3 +103,25 @@ def approve_command(
     typer.echo(instruction["decision"])
     if instruction["decision"] != "approve_first_real_run":
         raise typer.Exit(code=1)
+
+
+@app.command("mock-run")
+def mock_run_command(
+    project_dir: Annotated[
+        Path,
+        typer.Argument(help="Project directory with validated config/*.yaml."),
+    ],
+    max_evaluations: Annotated[
+        int | None,
+        typer.Option(
+            "--max-evaluations",
+            help="Override max_evaluations from optimizer.yaml.",
+        ),
+    ] = None,
+) -> None:
+    try:
+        state = run_mock_optimization(project_dir, max_evaluations=max_evaluations)
+    except (OSError, ValueError) as exc:
+        _exit_with_error(exc)
+    typer.echo(f"mock optimization completed: {state.current_evaluations}/{state.max_evaluations} evaluations")
+    typer.echo(f"best candidate: {state.best_candidate_id or 'none'}")

@@ -237,3 +237,55 @@ class OptimizerSettings(StrictModel):
 class OptimizerConfig(StrictModel):
     schema_version: Literal["1.0"]
     optimizer: OptimizerSettings
+
+
+class LedgerRow(StrictModel):
+    candidate_id: str
+    parameters: dict[str, str]
+    metrics: dict[str, float]
+    constraints_passed: bool
+    objective: float
+    batch_id: StrictInt
+    simulation_status: str
+    timestamp_utc: str
+
+    @field_validator("simulation_status")
+    @classmethod
+    def _status_is_recognized(cls, value: str) -> str:
+        allowed = {"mock_pass", "mock_constraint_fail", "mock_error"}
+        if value not in allowed:
+            raise ValueError(f"simulation_status must be one of {allowed}")
+        return value
+
+
+class BestCandidate(StrictModel):
+    candidate_id: str
+    parameters: dict[str, str]
+    metrics: dict[str, float]
+    constraints_passed: bool
+    objective: float
+    batch_id: StrictInt
+    timestamp_utc: str
+
+
+class OptimizerState(StrictModel):
+    schema_version: Literal["1.0"]
+    project_name: str
+    algorithm: str
+    initialization: str
+    current_evaluations: StrictInt
+    max_evaluations: StrictInt
+    batch_size: StrictInt
+    random_seed: StrictInt
+    best_candidate_id: str | None
+    status: str
+    started_at_utc: str
+    updated_at_utc: str
+
+    @field_validator("status")
+    @classmethod
+    def _status_is_recognized(cls, value: str) -> str:
+        allowed = {"running", "completed", "stopped"}
+        if value not in allowed:
+            raise ValueError(f"status must be one of {allowed}")
+        return value

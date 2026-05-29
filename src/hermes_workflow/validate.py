@@ -36,6 +36,23 @@ CONTINUOUS_RE = re.compile(
     r"(?:\s*(?P<unit>\S+))?\s*$"
 )
 
+_ALLOWED_OBJECTIVE_NODES = (
+    ast.Expression,
+    ast.BinOp,
+    ast.UnaryOp,
+    ast.Name,
+    ast.Load,
+    ast.Constant,
+    ast.Add,
+    ast.Sub,
+    ast.Mult,
+    ast.Div,
+    ast.Pow,
+    ast.Mod,
+    ast.UAdd,
+    ast.USub,
+)
+
 
 @dataclass(frozen=True)
 class ValidationIssue:
@@ -408,25 +425,71 @@ def _validate_objective_literal(value: object) -> list[ValidationIssue]:
 
 
 def _is_allowed_objective_node(node: ast.AST) -> bool:
-    return isinstance(
-        node,
-        (
-            ast.Expression,
-            ast.BinOp,
-            ast.UnaryOp,
-            ast.Name,
-            ast.Load,
-            ast.Constant,
-            ast.Add,
-            ast.Sub,
-            ast.Mult,
-            ast.Div,
-            ast.Pow,
-            ast.Mod,
-            ast.UAdd,
-            ast.USub,
-        ),
-    )
+    return isinstance(node, _ALLOWED_OBJECTIVE_NODES)
+
+
+def evaluate_objective(expression: str, metrics: dict[str, float]) -> float:
+    """Evaluate a validated objective expression against computed metric values.
+
+    Parses the expression AST, substitutes metric names with float values,
+    and evaluates arithmetic. Only allows the same nodes as validation:
+    metric name references, numeric constants, and arithmetic operators.
+
+    Raises ValueError if the expression contains unknown names, disallowed
+    nodes, boolean constants, or non-finite numeric constants.
+    """
+    try:
+        tree = ast.parse(expression, mode="eval")
+    except SyntaxError as exc:
+        raise ValueError(f"invalid objective expression: {exc.msg}") from exc
+
+    for node in ast.walk(tree):
+        if not isinstance(node, _ALLOWED_OBJECTIVE_NODES):
+            raise ValueError(
+                f"unsupported objective expression node {type(node).__name__}"
+            )
+        if isinstance(node, ast.Name):
+            if node.id not in metrics:
+                raise ValueError(f"objective references unknown metric {node.id}")
+        elif isinstance(node, ast.Constant):
+            if isinstance(node.value, bool) or not isinstance(node.value, int | float):
+                raise ValueError(f"unsupported objective literal {node.value!r}")
+            if isinstance(node.value, float) and not math.isfinite(node.value):
+                raise ValueError("objective numeric literals must be finite")
+
+    return _eval_ast(tree.body, metrics)
+
+
+def _eval_ast(node: ast.AST, metrics: dict[str, float]) -> float:
+    """Recursively evaluate an objective AST node with metric substitution."""
+    if isinstance(node, ast.Constant):
+        return float(node.value)
+    if isinstance(node, ast.Name):
+        return metrics[node.id]
+    if isinstance(node, ast.UnaryOp):
+        operand = _eval_ast(node.operand, metrics)
+        if isinstance(node.op, ast.UAdd):
+            return operand
+        if isinstance(node.op, ast.USub):
+            return -operand
+        raise ValueError(f"unsupported unary operator {type(node.op).__name__}")
+    if isinstance(node, ast.BinOp):
+        left = _eval_ast(node.left, metrics)
+        right = _eval_ast(node.right, metrics)
+        if isinstance(node.op, ast.Add):
+            return left + right
+        if isinstance(node.op, ast.Sub):
+            return left - right
+        if isinstance(node.op, ast.Mult):
+            return left * right
+        if isinstance(node.op, ast.Div):
+            return left / right
+        if isinstance(node.op, ast.Pow):
+            return left**right
+        if isinstance(node.op, ast.Mod):
+            return left % right
+        raise ValueError(f"unsupported binary operator {type(node.op).__name__}")
+    raise ValueError(f"unsupported objective expression node {type(node).__name__}")
 
 
 def _validate_optimizer_contract(bundle: ContractBundle) -> list[ValidationIssue]:

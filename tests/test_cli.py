@@ -87,3 +87,27 @@ def test_cli_approve_reports_malformed_preflight_without_traceback(
     assert isinstance(result.exception, SystemExit)
     assert "Expecting property name enclosed in double quotes" in result.stdout
     assert "Traceback" not in result.output
+
+
+def test_cli_mock_run_produces_artifacts(tmp_path: Path) -> None:
+    project_dir = tmp_path / "bridge_test_inv"
+    runner.invoke(app, ["init", str(project_dir)])
+
+    result = runner.invoke(app, ["mock-run", str(project_dir), "--max-evaluations", "4"])
+
+    assert result.exit_code == 0
+    assert "mock optimization completed" in result.stdout
+    assert (project_dir / "ledger" / "experiment_ledger.jsonl").exists()
+    assert (project_dir / "state" / "optimizer_state.json").exists()
+    assert (project_dir / "state" / "best_candidate.json").exists()
+    assert (project_dir / "state" / "health_check.json").exists()
+
+
+def test_cli_mock_run_reports_domain_error_without_traceback(tmp_path: Path) -> None:
+    missing_project = tmp_path / "missing"
+
+    result = runner.invoke(app, ["mock-run", str(missing_project)])
+
+    assert result.exit_code == 1
+    assert isinstance(result.exception, SystemExit)
+    assert "Traceback" not in result.output
