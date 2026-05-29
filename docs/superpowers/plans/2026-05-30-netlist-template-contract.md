@@ -46,6 +46,16 @@ This plan implements only C-1:
 - Do not widen `NetlistPreparationReport`; use the existing schema in `reports.py`.
 - Commit after each task if tests pass.
 
+## Execution Status
+
+Paused on 2026-05-30 after Task 3. Do not redo Tasks 1-3.
+
+- Task 1 complete and reviewed: `1ab42e1 feat: prepare spectre netlist templates`.
+- Task 2 complete and reviewed: `6ce3e69 fix: support continued spectre parameters`.
+- Task 3 complete and reviewed: `8e59ac9 fix: report unsafe netlist templating failures`.
+- Next resume point: Task 4, CLI Command.
+- Latest targeted verification: `pytest tests/test_netlists.py -v` passed, 6 tests; `ruff check src/hermes_workflow/netlists.py tests/test_netlists.py` passed.
+
 ---
 
 ### Task 1: Single-Line Parameter Templating

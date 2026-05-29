@@ -342,6 +342,65 @@ Focused Hermes Plan A ends at Task 9. There is no Task 10 in this Hermes File Co
 
 Next recommended action: hand off from focused Plan A into a new, user-confirmed development scope. The new worker should read `docs/OPENCODE_HANDOFF_2026-05-29.md` first, avoid redoing Plan A Tasks 1-9, and create or refresh a scoped plan for whatever follow-up the user chooses.
 
+## Plan C: Netlist Template Contract
+
+Status: paused after Task 3 on 2026-05-30. Do not start Task 4 until the user resumes.
+
+Plan files:
+
+- Spec: `docs/superpowers/specs/2026-05-30-netlist-template-contract-design.md`
+- Implementation plan: `docs/superpowers/plans/2026-05-30-netlist-template-contract.md`
+
+Commits:
+
+- `51253fe docs: design netlist template contract`
+- `e1e428e docs: plan netlist template contract`
+- `1ab42e1 feat: prepare spectre netlist templates`
+- `6ce3e69 fix: support continued spectre parameters`
+- `8e59ac9 fix: report unsafe netlist templating failures`
+
+Completed:
+
+- Task 1: single-line top-level Spectre `parameters` assignment templating.
+- Task 2: backslash-continued `parameters` blocks and no instance-parameter templating.
+- Task 3: fail reports for missing exported input, missing approved variables, duplicate approved variables, and stale `template.scs` cleanup on failure.
+
+Implemented so far:
+
+- `src/hermes_workflow/netlists.py`
+- `tests/test_netlists.py`
+
+Verification:
+
+- Baseline before Plan C execution: `pytest -q` passed, 138 tests.
+- Baseline before Plan C execution: `ruff check .` passed.
+- After Task 1: `pytest tests/test_netlists.py::test_prepare_netlist_templates_single_line_parameter_values -v` passed.
+- After Task 1: `ruff check src/hermes_workflow/netlists.py tests/test_netlists.py` passed.
+- After Task 2: `pytest tests/test_netlists.py -v` passed, 3 tests.
+- After Task 2: `ruff check src/hermes_workflow/netlists.py tests/test_netlists.py` passed.
+- After Task 3: `pytest tests/test_netlists.py -v` passed, 6 tests.
+- After Task 3: `ruff check src/hermes_workflow/netlists.py tests/test_netlists.py` passed.
+
+Reviews:
+
+- Task 1 spec review: passed; Task 1 code-quality review: passed with no Critical or Important issues.
+- Task 2 spec review: passed; Task 2 code-quality review: passed with no Critical or Important issues.
+- Task 3 spec review: passed; Task 3 code-quality review: passed with no Critical or Important issues.
+
+Important decisions:
+
+- The four real `input.scs` examples under `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example` are local reference material only and must not be committed.
+- Repository tests use sanitized inline Spectre snippets only.
+- Current netlist templater rewrites only approved variable RHS values in top-level `parameters` statements.
+- Device, subckt, source, analysis, include, model, and save statements remain unchanged.
+
+Next resume point:
+
+- Continue with Plan C Task 4: CLI Command.
+- Do not redo Tasks 1-3.
+- Do not copy real `input.scs` examples into the repository.
+- After Task 4, continue Task 5 local-only real deck smoke/progress note, then Task 6 final review gate.
+
 ## Resume Prompt
 
 ```text

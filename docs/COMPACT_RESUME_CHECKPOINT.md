@@ -27,6 +27,13 @@ Current execution state:
 - Task 8 complete and reviewed.
 - Task 9 complete and reviewed.
 - Focused Plan A is complete. Hermes File Contract MVP ends at Task 9; there is no Plan A Task 10.
+- Plan B mock optimization loop is complete and committed.
+- Plan C netlist template contract has started.
+- Plan C Task 1 complete and reviewed: `1ab42e1 feat: prepare spectre netlist templates`.
+- Plan C Task 2 complete and reviewed: `6ce3e69 fix: support continued spectre parameters`.
+- Plan C Task 3 complete and reviewed: `8e59ac9 fix: report unsafe netlist templating failures`.
+- Current pause point: stop before Plan C Task 4. Resume with `docs/superpowers/plans/2026-05-30-netlist-template-contract.md` Task 4.
+- Real `input.scs` examples under `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example` are local-only references and must not be committed.
 
 ## Files Already Read
 
@@ -45,8 +52,10 @@ Current execution state:
 
 - Current focused plan: `ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md`
 - Earlier broad plan: `ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md`
+- Active Plan C follow-up plan: `ic-auto-opt-workflow/docs/superpowers/plans/2026-05-30-netlist-template-contract.md`
+- Active Plan C spec: `ic-auto-opt-workflow/docs/superpowers/specs/2026-05-30-netlist-template-contract-design.md`
 
-Continue with the focused Plan A file unless the user explicitly asks to return to the broad plan.
+Plan A is complete. If resuming current development, continue Plan C from Task 4 unless the user explicitly changes scope.
 
 ## Confirmed Plan A Scope
 
