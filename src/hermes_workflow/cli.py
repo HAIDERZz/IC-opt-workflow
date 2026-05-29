@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, NoReturn
 
 import typer
 
@@ -37,7 +37,7 @@ def main(
     return None
 
 
-def _exit_with_error(exc: Exception) -> None:
+def _exit_with_error(exc: Exception) -> NoReturn:
     typer.echo(str(exc))
     raise typer.Exit(code=1)
 
@@ -54,7 +54,6 @@ def init_command(
         project_dir = create_project_from_template(destination, force=force)
     except TemplateError as exc:
         _exit_with_error(exc)
-        return
     typer.echo(str(project_dir))
 
 
@@ -69,7 +68,6 @@ def validate_command(
         report = validate_project_files(project_dir)
     except (OSError, ValueError) as exc:
         _exit_with_error(exc)
-        return
     typer.echo(report.format())
     if not report.ok:
         raise typer.Exit(code=1)
@@ -86,7 +84,6 @@ def package_command(
         manifest = build_execution_package(project_dir)
     except (FileExistsError, OSError, ValueError) as exc:
         _exit_with_error(exc)
-        return
     typer.echo(str(manifest.path.relative_to(project_dir)))
 
 
@@ -99,9 +96,8 @@ def approve_command(
 ) -> None:
     try:
         instruction = decide_first_real_run(project_dir)
-    except OSError as exc:
+    except (OSError, ValueError) as exc:
         _exit_with_error(exc)
-        return
     typer.echo(instruction["decision"])
     if instruction["decision"] != "approve_first_real_run":
         raise typer.Exit(code=1)

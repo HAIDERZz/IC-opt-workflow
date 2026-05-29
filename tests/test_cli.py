@@ -67,3 +67,23 @@ def test_cli_init_reports_template_error_without_traceback(tmp_path: Path) -> No
     assert isinstance(result.exception, SystemExit)
     assert "destination exists and is not a directory" in result.stdout
     assert "Traceback" not in result.output
+
+
+def test_cli_approve_reports_malformed_preflight_without_traceback(
+    tmp_path: Path,
+) -> None:
+    project_dir = tmp_path / "bridge_test_inv"
+    runner.invoke(app, ["init", str(project_dir)])
+    runner.invoke(app, ["package", str(project_dir)])
+    write_pass_reports(project_dir)
+    (project_dir / "reports" / "dry_run_report.json").write_text(
+        "{",
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(app, ["approve", str(project_dir)])
+
+    assert result.exit_code == 1
+    assert isinstance(result.exception, SystemExit)
+    assert "Expecting property name enclosed in double quotes" in result.stdout
+    assert "Traceback" not in result.output
