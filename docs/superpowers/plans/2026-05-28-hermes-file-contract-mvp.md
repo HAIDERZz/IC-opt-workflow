@@ -1713,22 +1713,51 @@ Create `ic-auto-opt-workflow/src/hermes_workflow/package.py`:
 from __future__ import annotations
 
 import shutil
+from importlib import resources
 from pathlib import Path
 
 
-TEMPLATE_DIR = Path(__file__).resolve().parent / "templates" / "spectre_maestro_project"
+TEMPLATE_PACKAGE = "hermes_workflow"
+TEMPLATE_PATH = ("templates", "spectre_maestro_project")
 
 
 class TemplateError(RuntimeError):
     pass
 
 
+def _copy_template_tree(destination: Path) -> None:
+    template = resources.files(TEMPLATE_PACKAGE).joinpath(*TEMPLATE_PATH)
+    if not template.is_dir():
+        raise TemplateError("project template is not packaged")
+
+    for item in template.iterdir():
+        target = destination / item.name
+        if item.is_dir():
+            _copy_resource_directory(item, target)
+        else:
+            target.write_bytes(item.read_bytes())
+
+
+def _copy_resource_directory(source: resources.abc.Traversable, destination: Path) -> None:
+    destination.mkdir(parents=True, exist_ok=True)
+    for item in source.iterdir():
+        target = destination / item.name
+        if item.is_dir():
+            _copy_resource_directory(item, target)
+        else:
+            target.write_bytes(item.read_bytes())
+
+
 def create_project_from_template(destination: Path, *, force: bool = False) -> Path:
     destination = Path(destination)
-    if destination.exists() and any(destination.iterdir()) and not force:
+    if destination.exists() and not destination.is_dir():
+        raise TemplateError("destination exists and is not a directory")
+    if destination.exists() and force:
+        shutil.rmtree(destination)
+    elif destination.exists() and any(destination.iterdir()):
         raise TemplateError("destination already exists and is not empty")
     destination.mkdir(parents=True, exist_ok=True)
-    shutil.copytree(TEMPLATE_DIR, destination, dirs_exist_ok=True)
+    _copy_template_tree(destination)
     return destination
 ```
 
@@ -1806,22 +1835,23 @@ Expected: FAIL with `ImportError` for `build_execution_package`.
 
 - [ ] **Step 3: Implement execution package manifest builder**
 
-Replace `ic-auto-opt-workflow/src/hermes_workflow/package.py` with:
+Preserve the Task 4 template-copy implementation in `ic-auto-opt-workflow/src/hermes_workflow/package.py` exactly as written, including `importlib.resources`, packaged template discovery, file-destination `TemplateError`, and clean `force=True` regeneration.
+
+Add these imports near the existing imports:
 
 ```python
-from __future__ import annotations
-
 import json
-import shutil
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from hashlib import sha256
-from pathlib import Path
 
 from hermes_workflow.validate import assert_valid_project
+```
 
+Then append these Task 5 constants and functions below the existing `create_project_from_template()` implementation:
 
-TEMPLATE_DIR = Path(__file__).resolve().parent / "templates" / "spectre_maestro_project"
+```python
+
 CONFIG_FILE_NAMES = [
     "project_config.yaml",
     "variables.yaml",
@@ -1831,23 +1861,10 @@ CONFIG_FILE_NAMES = [
 ]
 
 
-class TemplateError(RuntimeError):
-    pass
-
-
 @dataclass(frozen=True)
 class ExecutionManifest:
     path: Path
     payload: dict
-
-
-def create_project_from_template(destination: Path, *, force: bool = False) -> Path:
-    destination = Path(destination)
-    if destination.exists() and any(destination.iterdir()) and not force:
-        raise TemplateError("destination already exists and is not empty")
-    destination.mkdir(parents=True, exist_ok=True)
-    shutil.copytree(TEMPLATE_DIR, destination, dirs_exist_ok=True)
-    return destination
 
 
 def sha256_file(path: Path) -> str:

@@ -137,7 +137,7 @@ Review state:
 
 Blocking Task 4 code-quality findings:
 
-1. `create_project_from_template(..., force=True)` currently overlays/merges into an existing destination because it uses `shutil.copytree(..., dirs_exist_ok=True)`. Stale files remain. Decide and implement explicit semantics. Recommended fix: make `force=True` perform a clean regeneration by deleting/recreating the destination directory, with a test proving stale files are removed.
+1. `create_project_from_template(..., force=True)` previously overlaid/merged into an existing destination, so stale files remained. The required fix was to make `force=True` perform a clean regeneration by deleting/recreating the destination directory, with a test proving stale files are removed.
 2. Template discovery needed to use the packaged canonical tree at `src/hermes_workflow/templates/spectre_maestro_project` via package resources, rather than a top-level `templates/` checkout-only tree.
 3. If destination exists as a file, current behavior is a raw filesystem error rather than `TemplateError`. Add a test and return a deliberate `TemplateError`.
 
