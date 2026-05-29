@@ -321,7 +321,7 @@ Important decisions/fixes:
 - CLI commands catch only expected file-contract/domain errors and convert them into clean `exit code 1` output.
 - `_exit_with_error()` is typed `NoReturn`; unreachable post-exit `return` statements were removed.
 - `approve` explicitly handles malformed preflight JSON through `json.JSONDecodeError` and a regression test for malformed `dry_run_report.json`.
-- No broad-plan Task 10 mock optimizer loop work was added.
+- No optimizer loop, runner, Spectre execution, or follow-up workflow scope was added.
 
 Verification:
 
@@ -338,9 +338,9 @@ Reviews:
 
 Status: focused Plan A complete through Task 9.
 
-Focused Plan A does not contain a Task 10. The earlier broad plan has a separate Task 10, `Mock Optimization Loop Contract`, but that work is outside the Hermes File Contract MVP scope and was not started here.
+Focused Hermes Plan A ends at Task 9. There is no Task 10 in this Hermes File Contract MVP plan.
 
-Next recommended action: hand off from focused Plan A into a new or resumed broader-plan development thread. The new worker should read `docs/OPENCODE_HANDOFF_2026-05-29.md` first and decide whether to start broad-plan Task 10 as a new scoped implementation plan.
+Next recommended action: hand off from focused Plan A into a new, user-confirmed development scope. The new worker should read `docs/OPENCODE_HANDOFF_2026-05-29.md` first, avoid redoing Plan A Tasks 1-9, and create or refresh a scoped plan for whatever follow-up the user chooses.
 
 ## Resume Prompt
 
@@ -351,5 +351,5 @@ Next recommended action: hand off from focused Plan A into a new or resumed broa
 3. ic-auto-opt-workflow/docs/COMPACT_RESUME_CHECKPOINT.md
 4. ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。请先阅读 docs/OPENCODE_HANDOFF_2026-05-29.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md。Focused Plan A Task 1-9 已完成并通过 spec/code-quality review gate、pytest 和 ruff；不要重做 Task 1-9。下一步如要继续开发，请先确认是否从 broad plan 的 Task 10: Mock Optimization Loop Contract 开新 scoped plan。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。请先阅读 docs/OPENCODE_HANDOFF_2026-05-29.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md。Hermes File Contract MVP 的 Plan A Task 1-9 已完成并通过 spec/code-quality review gate、pytest 和 ruff；不要重做 Task 1-9，也不要寻找 Plan A Task 10。下一步如要继续开发，请先向用户确认新的后续开发范围，并为该范围新建或刷新 scoped plan。
 ```

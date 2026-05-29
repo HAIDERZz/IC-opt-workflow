@@ -7,7 +7,7 @@ This handoff summarizes the current `ic-auto-opt-workflow` state so opencode can
 - Repo: `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow`
 - Branch: `plan-a-hermes-file-contract-mvp`
 - Focused plan: `docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md`
-- Broad follow-up plan: `docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md`
+- Historical planning context: `docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md`
 - Latest implementation commit before handoff docs: `720adb9 fix: clarify cli json error handling`
 
 ## Current Status
@@ -107,17 +107,17 @@ tests/
 
 ## Next Development Decision
 
-Focused Plan A has no Task 10. The earlier broad plan has Task 10, `Mock Optimization Loop Contract`, but that belongs to the next scope boundary.
+Focused Hermes Plan A ends at Task 9. There is no Task 10 in this Hermes File Contract MVP plan.
 
 Recommended next move for opencode:
 
 1. Treat Plan A Task 1-9 as complete.
 2. Do not rework completed modules unless a new review finding appears.
-3. Decide whether to start broad-plan Task 10 as a new scoped plan.
-4. If starting Task 10, write or refresh a focused plan first, then implement with TDD and run spec/code-quality review gates before moving on.
+3. Ask the user to confirm the next development scope.
+4. For any follow-up scope, write or refresh a focused plan first, then implement with TDD and run spec/code-quality review gates before moving on.
 
 ## One-Sentence Continue Prompt
 
 ```text
-请在 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow 的 branch plan-a-hermes-file-contract-mvp 上继续开发：先阅读 docs/OPENCODE_HANDOFF_2026-05-29.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md 和两个 plan 文件；Focused Plan A Task 1-9 已完成并通过 review/pytest/ruff，不要重做，下一步先确认是否从 broad plan Task 10: Mock Optimization Loop Contract 开新 scoped plan 并继续实现。
+请在 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow 的 branch plan-a-hermes-file-contract-mvp 上继续开发：先阅读 docs/OPENCODE_HANDOFF_2026-05-29.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md 和 Hermes Plan A 文件；Hermes File Contract MVP 的 Plan A Task 1-9 已完成并通过 review/pytest/ruff，不要重做，也不要寻找 Plan A Task 10；下一步先向用户确认新的后续开发范围，并为该范围新建或刷新 scoped plan。
 ```

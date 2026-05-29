@@ -26,7 +26,7 @@ Current execution state:
 - Task 7 complete and reviewed.
 - Task 8 complete and reviewed.
 - Task 9 complete and reviewed.
-- Focused Plan A is complete. The earlier broad plan's Task 10 is not part of focused Plan A and has not been started.
+- Focused Plan A is complete. Hermes File Contract MVP ends at Task 9; there is no Plan A Task 10.
 
 ## Files Already Read
 
@@ -309,7 +309,7 @@ optimizer:
 
 Focused Plan A is complete through Task 9.
 
-Do not redo Plan A Tasks 1-9 unless new review feedback appears. The next development decision is whether to leave the focused Hermes File Contract MVP branch as-is, merge/finish it, or start a new scoped plan for the earlier broad plan's Task 10, `Mock Optimization Loop Contract`.
+Do not redo Plan A Tasks 1-9 unless new review feedback appears. The next development decision is whether to leave the focused Hermes File Contract MVP branch as-is, merge/finish it, or start a new user-confirmed scoped plan for follow-up work.
 
 Read the opencode handoff first:
 
@@ -327,7 +327,7 @@ Use this prompt after compact:
 2. ic-auto-opt-workflow/docs/EXECUTION_PROGRESS_2026-05-29.md
 3. ic-auto-opt-workflow/docs/COMPACT_RESUME_CHECKPOINT.md
 4. ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md
-5. 如需进入后续范围，再读 ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md
+5. 如需背景，再读 ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。Focused Plan A Task 1-9 已完成并通过 spec/code-quality review gate、pytest 和 ruff；不要重做 Task 1-9。下一步请先确认是否从 broad plan 的 Task 10: Mock Optimization Loop Contract 开新 scoped plan。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。Hermes File Contract MVP 的 Plan A Task 1-9 已完成并通过 spec/code-quality review gate、pytest 和 ruff；不要重做 Task 1-9，也不要寻找 Plan A Task 10。下一步请先向用户确认新的后续开发范围，并为该范围新建或刷新 scoped plan。
 ```
