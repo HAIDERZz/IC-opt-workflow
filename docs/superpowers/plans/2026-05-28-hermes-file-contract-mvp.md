@@ -61,27 +61,27 @@ ic-auto-opt-workflow/
 │       ├── validate.py
 │       ├── package.py
 │       ├── reports.py
-│       └── approvals.py
-├── templates/
-│   └── spectre_maestro_project/
-│       ├── TASK.md
-│       ├── METRICS.md
-│       ├── CIRCUIT_KNOWLEDGE.md
-│       ├── FAILURE_PLAYBOOK.md
-│       ├── config/
-│       │   ├── project_config.yaml
-│       │   ├── variables.yaml
-│       │   ├── metrics.yaml
-│       │   ├── spectre.yaml
-│       │   └── optimizer.yaml
-│       ├── netlists/
-│       │   ├── exported/.gitkeep
-│       │   └── templates/.gitkeep
-│       ├── src/.gitkeep
-│       ├── execution_package/.gitkeep
-│       ├── ledger/.gitkeep
-│       ├── state/.gitkeep
-│       └── reports/.gitkeep
+│       ├── approvals.py
+│       └── templates/
+│           └── spectre_maestro_project/
+│               ├── TASK.md
+│               ├── METRICS.md
+│               ├── CIRCUIT_KNOWLEDGE.md
+│               ├── FAILURE_PLAYBOOK.md
+│               ├── config/
+│               │   ├── project_config.yaml
+│               │   ├── variables.yaml
+│               │   ├── metrics.yaml
+│               │   ├── spectre.yaml
+│               │   └── optimizer.yaml
+│               ├── netlists/
+│               │   ├── exported/.gitkeep
+│               │   └── templates/.gitkeep
+│               ├── src/.gitkeep
+│               ├── execution_package/.gitkeep
+│               ├── ledger/.gitkeep
+│               ├── state/.gitkeep
+│               └── reports/.gitkeep
 └── tests/
     ├── fixtures/
     │   └── bridge_test_inv/
@@ -1452,22 +1452,22 @@ git commit -m "feat: validate hermes config contracts"
 
 **Files:**
 - Create: `ic-auto-opt-workflow/src/hermes_workflow/package.py`
-- Create: `ic-auto-opt-workflow/templates/spectre_maestro_project/TASK.md`
-- Create: `ic-auto-opt-workflow/templates/spectre_maestro_project/METRICS.md`
-- Create: `ic-auto-opt-workflow/templates/spectre_maestro_project/CIRCUIT_KNOWLEDGE.md`
-- Create: `ic-auto-opt-workflow/templates/spectre_maestro_project/FAILURE_PLAYBOOK.md`
-- Create: `ic-auto-opt-workflow/templates/spectre_maestro_project/config/project_config.yaml`
-- Create: `ic-auto-opt-workflow/templates/spectre_maestro_project/config/variables.yaml`
-- Create: `ic-auto-opt-workflow/templates/spectre_maestro_project/config/metrics.yaml`
-- Create: `ic-auto-opt-workflow/templates/spectre_maestro_project/config/spectre.yaml`
-- Create: `ic-auto-opt-workflow/templates/spectre_maestro_project/config/optimizer.yaml`
-- Create: `ic-auto-opt-workflow/templates/spectre_maestro_project/netlists/exported/.gitkeep`
-- Create: `ic-auto-opt-workflow/templates/spectre_maestro_project/netlists/templates/.gitkeep`
-- Create: `ic-auto-opt-workflow/templates/spectre_maestro_project/src/.gitkeep`
-- Create: `ic-auto-opt-workflow/templates/spectre_maestro_project/execution_package/.gitkeep`
-- Create: `ic-auto-opt-workflow/templates/spectre_maestro_project/ledger/.gitkeep`
-- Create: `ic-auto-opt-workflow/templates/spectre_maestro_project/state/.gitkeep`
-- Create: `ic-auto-opt-workflow/templates/spectre_maestro_project/reports/.gitkeep`
+- Create: `ic-auto-opt-workflow/src/hermes_workflow/templates/spectre_maestro_project/TASK.md`
+- Create: `ic-auto-opt-workflow/src/hermes_workflow/templates/spectre_maestro_project/METRICS.md`
+- Create: `ic-auto-opt-workflow/src/hermes_workflow/templates/spectre_maestro_project/CIRCUIT_KNOWLEDGE.md`
+- Create: `ic-auto-opt-workflow/src/hermes_workflow/templates/spectre_maestro_project/FAILURE_PLAYBOOK.md`
+- Create: `ic-auto-opt-workflow/src/hermes_workflow/templates/spectre_maestro_project/config/project_config.yaml`
+- Create: `ic-auto-opt-workflow/src/hermes_workflow/templates/spectre_maestro_project/config/variables.yaml`
+- Create: `ic-auto-opt-workflow/src/hermes_workflow/templates/spectre_maestro_project/config/metrics.yaml`
+- Create: `ic-auto-opt-workflow/src/hermes_workflow/templates/spectre_maestro_project/config/spectre.yaml`
+- Create: `ic-auto-opt-workflow/src/hermes_workflow/templates/spectre_maestro_project/config/optimizer.yaml`
+- Create: `ic-auto-opt-workflow/src/hermes_workflow/templates/spectre_maestro_project/netlists/exported/.gitkeep`
+- Create: `ic-auto-opt-workflow/src/hermes_workflow/templates/spectre_maestro_project/netlists/templates/.gitkeep`
+- Create: `ic-auto-opt-workflow/src/hermes_workflow/templates/spectre_maestro_project/src/.gitkeep`
+- Create: `ic-auto-opt-workflow/src/hermes_workflow/templates/spectre_maestro_project/execution_package/.gitkeep`
+- Create: `ic-auto-opt-workflow/src/hermes_workflow/templates/spectre_maestro_project/ledger/.gitkeep`
+- Create: `ic-auto-opt-workflow/src/hermes_workflow/templates/spectre_maestro_project/state/.gitkeep`
+- Create: `ic-auto-opt-workflow/src/hermes_workflow/templates/spectre_maestro_project/reports/.gitkeep`
 - Create: `ic-auto-opt-workflow/tests/test_package.py`
 
 - [ ] **Step 1: Write failing project template tests**
@@ -1520,7 +1520,7 @@ Expected: FAIL with `ModuleNotFoundError: No module named 'hermes_workflow.packa
 
 - [ ] **Step 3: Add template files**
 
-Create `ic-auto-opt-workflow/templates/spectre_maestro_project/TASK.md`:
+Create `ic-auto-opt-workflow/src/hermes_workflow/templates/spectre_maestro_project/TASK.md`:
 
 ```markdown
 # Optimization Task
@@ -1530,7 +1530,7 @@ This project is driven by the structured files under `config/`.
 Hermes owns the config files and approval gate. Claude Code owns netlist export, variable templating, project-local metric code, dry run, and real optimization only after Hermes approval.
 ```
 
-Create `ic-auto-opt-workflow/templates/spectre_maestro_project/METRICS.md`:
+Create `ic-auto-opt-workflow/src/hermes_workflow/templates/spectre_maestro_project/METRICS.md`:
 
 ```markdown
 # Metric Contract Notes
@@ -1540,7 +1540,7 @@ Metric definitions live in `config/metrics.yaml`.
 `maestro_formula` is preserved for traceability and review. The first MVP does not implement a generic Maestro calculator parser.
 ```
 
-Create `ic-auto-opt-workflow/templates/spectre_maestro_project/CIRCUIT_KNOWLEDGE.md`:
+Create `ic-auto-opt-workflow/src/hermes_workflow/templates/spectre_maestro_project/CIRCUIT_KNOWLEDGE.md`:
 
 ```markdown
 # Circuit Knowledge
@@ -1548,7 +1548,7 @@ Create `ic-auto-opt-workflow/templates/spectre_maestro_project/CIRCUIT_KNOWLEDGE
 Record circuit-specific interpretation notes here during execution. Do not change `config/*.yaml` when adding notes.
 ```
 
-Create `ic-auto-opt-workflow/templates/spectre_maestro_project/FAILURE_PLAYBOOK.md`:
+Create `ic-auto-opt-workflow/src/hermes_workflow/templates/spectre_maestro_project/FAILURE_PLAYBOOK.md`:
 
 ```markdown
 # Failure Playbook
@@ -1556,7 +1556,7 @@ Create `ic-auto-opt-workflow/templates/spectre_maestro_project/FAILURE_PLAYBOOK.
 Use this file for project-specific recovery notes after Claude writes an escalation report.
 ```
 
-Create `ic-auto-opt-workflow/templates/spectre_maestro_project/config/project_config.yaml`:
+Create `ic-auto-opt-workflow/src/hermes_workflow/templates/spectre_maestro_project/config/project_config.yaml`:
 
 ```yaml
 schema_version: "1.0"
@@ -1587,7 +1587,7 @@ safety:
   allow_only_variable_templating: true
 ```
 
-Create `ic-auto-opt-workflow/templates/spectre_maestro_project/config/variables.yaml`:
+Create `ic-auto-opt-workflow/src/hermes_workflow/templates/spectre_maestro_project/config/variables.yaml`:
 
 ```yaml
 schema_version: "1.0"
@@ -1618,7 +1618,7 @@ variables:
     step: "0.2 um"
 ```
 
-Create `ic-auto-opt-workflow/templates/spectre_maestro_project/config/metrics.yaml`:
+Create `ic-auto-opt-workflow/src/hermes_workflow/templates/spectre_maestro_project/config/metrics.yaml`:
 
 ```yaml
 schema_version: "1.0"
@@ -1662,7 +1662,7 @@ objective:
   expression: "(rise + fall) * DC"
 ```
 
-Create `ic-auto-opt-workflow/templates/spectre_maestro_project/config/spectre.yaml`:
+Create `ic-auto-opt-workflow/src/hermes_workflow/templates/spectre_maestro_project/config/spectre.yaml`:
 
 ```yaml
 schema_version: "1.0"
@@ -1678,7 +1678,7 @@ spectre:
   keep_successful_runs: true
 ```
 
-Create `ic-auto-opt-workflow/templates/spectre_maestro_project/config/optimizer.yaml`:
+Create `ic-auto-opt-workflow/src/hermes_workflow/templates/spectre_maestro_project/config/optimizer.yaml`:
 
 ```yaml
 schema_version: "1.0"
@@ -1696,13 +1696,13 @@ optimizer:
 Create empty `.gitkeep` files at:
 
 ```text
-templates/spectre_maestro_project/netlists/exported/.gitkeep
-templates/spectre_maestro_project/netlists/templates/.gitkeep
-templates/spectre_maestro_project/src/.gitkeep
-templates/spectre_maestro_project/execution_package/.gitkeep
-templates/spectre_maestro_project/ledger/.gitkeep
-templates/spectre_maestro_project/state/.gitkeep
-templates/spectre_maestro_project/reports/.gitkeep
+src/hermes_workflow/templates/spectre_maestro_project/netlists/exported/.gitkeep
+src/hermes_workflow/templates/spectre_maestro_project/netlists/templates/.gitkeep
+src/hermes_workflow/templates/spectre_maestro_project/src/.gitkeep
+src/hermes_workflow/templates/spectre_maestro_project/execution_package/.gitkeep
+src/hermes_workflow/templates/spectre_maestro_project/ledger/.gitkeep
+src/hermes_workflow/templates/spectre_maestro_project/state/.gitkeep
+src/hermes_workflow/templates/spectre_maestro_project/reports/.gitkeep
 ```
 
 - [ ] **Step 4: Implement template copy logic**
@@ -1716,7 +1716,7 @@ import shutil
 from pathlib import Path
 
 
-TEMPLATE_DIR = Path(__file__).resolve().parents[2] / "templates" / "spectre_maestro_project"
+TEMPLATE_DIR = Path(__file__).resolve().parent / "templates" / "spectre_maestro_project"
 
 
 class TemplateError(RuntimeError):
@@ -1749,7 +1749,7 @@ Run:
 
 ```bash
 cd ic-auto-opt-workflow
-git add src/hermes_workflow/package.py templates/spectre_maestro_project tests/test_package.py
+git add src/hermes_workflow/package.py src/hermes_workflow/templates/spectre_maestro_project tests/test_package.py
 git commit -m "feat: add hermes project template"
 ```
 
@@ -1821,7 +1821,7 @@ from pathlib import Path
 from hermes_workflow.validate import assert_valid_project
 
 
-TEMPLATE_DIR = Path(__file__).resolve().parents[2] / "templates" / "spectre_maestro_project"
+TEMPLATE_DIR = Path(__file__).resolve().parent / "templates" / "spectre_maestro_project"
 CONFIG_FILE_NAMES = [
     "project_config.yaml",
     "variables.yaml",

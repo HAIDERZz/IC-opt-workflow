@@ -121,7 +121,7 @@ Commit already made:
 Implemented so far:
 
 - `src/hermes_workflow/package.py`
-- `templates/spectre_maestro_project/**`
+- `src/hermes_workflow/templates/spectre_maestro_project/**`
 - `tests/test_package.py`
 
 Verification from worker:
@@ -138,7 +138,7 @@ Review state:
 Blocking Task 4 code-quality findings:
 
 1. `create_project_from_template(..., force=True)` currently overlays/merges into an existing destination because it uses `shutil.copytree(..., dirs_exist_ok=True)`. Stale files remain. Decide and implement explicit semantics. Recommended fix: make `force=True` perform a clean regeneration by deleting/recreating the destination directory, with a test proving stale files are removed.
-2. Template discovery is source-tree-only via `Path(__file__).resolve().parents[2] / "templates" / "spectre_maestro_project"`. This works in the repo checkout, but not after package installation because top-level `templates/` is not package data. For this MVP, either document/accept source-checkout semantics or move to package data/importlib resources. Since later CLI likely uses this after install, recommended fix is to make templates package data before Task 9.
+2. Template discovery needed to use the packaged canonical tree at `src/hermes_workflow/templates/spectre_maestro_project` via package resources, rather than a top-level `templates/` checkout-only tree.
 3. If destination exists as a file, current behavior is a raw filesystem error rather than `TemplateError`. Add a test and return a deliberate `TemplateError`.
 
 Recommended next implementation patch for Task 4:

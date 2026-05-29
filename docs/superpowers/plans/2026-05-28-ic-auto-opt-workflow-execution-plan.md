@@ -45,7 +45,7 @@ ic-auto-opt-workflow/
 │   ├── reports.py
 │   ├── approvals.py
 │   └── final_report.py
-├── templates/spectre_maestro_project/
+├── src/hermes_workflow/templates/spectre_maestro_project/
 │   ├── TASK.md
 │   ├── METRICS.md
 │   ├── CIRCUIT_KNOWLEDGE.md
@@ -441,7 +441,7 @@ git commit -m "feat: validate optimization project contracts"
 ## Task 4: Project Template Generation
 
 **Files:**
-- Create: `templates/spectre_maestro_project/**`
+- Create: `src/hermes_workflow/templates/spectre_maestro_project/**`
 - Modify: `src/hermes_workflow/cli.py`
 - Create: `src/hermes_workflow/package.py`
 - Test: `tests/test_package_execution.py`
@@ -606,7 +606,7 @@ git commit -m "feat: build claude execution package"
 ## Task 6: Claude Execution Task Document
 
 **Files:**
-- Modify: `templates/spectre_maestro_project/execution_package/.gitkeep`
+- Modify: `src/hermes_workflow/templates/spectre_maestro_project/execution_package/.gitkeep`
 - Create through package builder: `execution_package/EXECUTION_TASK.md`
 - Test: `tests/test_package_execution.py`
 
@@ -822,9 +822,9 @@ git commit -m "test: verify hermes claude file contracts"
 ## Task 10: Mock Optimization Loop Contract
 
 **Files:**
-- Create: `templates/spectre_maestro_project/src/mock_simulator.py`
+- Create: `src/hermes_workflow/templates/spectre_maestro_project/src/mock_simulator.py`
 - Create: `tests/test_mock_optimization_contract.py`
-- Modify: `templates/spectre_maestro_project/src/optimization_loop.py`
+- Modify: `src/hermes_workflow/templates/spectre_maestro_project/src/optimization_loop.py`
 
 - [ ] **Step 1: Write mock loop tests**
 
@@ -887,14 +887,14 @@ Expected: PASS.
 
 ```bash
 cd ic-auto-opt-workflow
-git add templates/spectre_maestro_project/src tests/test_mock_optimization_contract.py
+git add src/hermes_workflow/templates/spectre_maestro_project/src tests/test_mock_optimization_contract.py
 git commit -m "feat: validate optimization state contract with mock loop"
 ```
 
 ## Task 11: Exported `input.scs` Preparation Contract
 
 **Files:**
-- Modify: `templates/spectre_maestro_project/src/render_netlist.py`
+- Modify: `src/hermes_workflow/templates/spectre_maestro_project/src/render_netlist.py`
 - Create: `tests/test_netlist_template_contract.py`
 - Add fixture: `tests/fixtures/netlists/input.scs`
 
@@ -950,15 +950,15 @@ Expected: PASS.
 
 ```bash
 cd ic-auto-opt-workflow
-git add templates/spectre_maestro_project/src/render_netlist.py tests/test_netlist_template_contract.py tests/fixtures/netlists/input.scs
+git add src/hermes_workflow/templates/spectre_maestro_project/src/render_netlist.py tests/test_netlist_template_contract.py tests/fixtures/netlists/input.scs
 git commit -m "feat: constrain exported spectre netlist templating"
 ```
 
 ## Task 12: Spectre Runner Template After Approval
 
 **Files:**
-- Modify: `templates/spectre_maestro_project/src/run_candidate.py`
-- Modify: `templates/spectre_maestro_project/src/optimization_loop.py`
+- Modify: `src/hermes_workflow/templates/spectre_maestro_project/src/run_candidate.py`
+- Modify: `src/hermes_workflow/templates/spectre_maestro_project/src/optimization_loop.py`
 - Test: `tests/test_spectre_runner_contract.py`
 
 - [ ] **Step 1: Write approval enforcement tests**
@@ -1004,7 +1004,7 @@ Expected: PASS without requiring Cadence or SSH.
 
 ```bash
 cd ic-auto-opt-workflow
-git add templates/spectre_maestro_project/src/run_candidate.py templates/spectre_maestro_project/src/optimization_loop.py tests/test_spectre_runner_contract.py
+git add src/hermes_workflow/templates/spectre_maestro_project/src/run_candidate.py src/hermes_workflow/templates/spectre_maestro_project/src/optimization_loop.py tests/test_spectre_runner_contract.py
 git commit -m "feat: guard real spectre execution behind approval"
 ```
 

@@ -236,46 +236,34 @@ D:/EDA_AI_AGENT/ic-auto-opt-workflow/
 │       ├── validate.py
 │       ├── package.py
 │       ├── schemas.py
-│       └── report.py
-├── templates/
-│   └── spectre_maestro_project/
-│       ├── TASK.md
-│       ├── METRICS.md
-│       ├── CIRCUIT_KNOWLEDGE.md
-│       ├── FAILURE_PLAYBOOK.md
-│       ├── config/
-│       │   ├── project_config.yaml
-│       │   ├── variables.yaml
-│       │   ├── metrics.yaml
-│       │   ├── spectre.yaml
-│       │   └── optimizer.yaml
-│       ├── netlists/
-│       │   ├── README.md
-│       │   ├── exported/
-│       │   │   └── .gitkeep
-│       │   └── templates/
-│       │       └── .gitkeep
-│       ├── src/
-│       │   ├── metrics.py
-│       │   ├── render_netlist.py
-│       │   ├── run_candidate.py
-│       │   ├── dry_run.py
-│       │   └── optimization_loop.py
-│       ├── execution_package/
-│       │   └── .gitkeep
-│       ├── ledger/
-│       │   └── experiment_ledger.jsonl
-│       ├── state/
-│       │   ├── optimizer_state.json
-│       │   ├── best_candidate.json
-│       │   ├── health_check.json
-│       │   └── final_summary.json
-│       ├── reports/
-│       │   ├── dry_run_report.json
-│       │   ├── review_report.md
-│       │   └── final_report.md
-│       ├── escalation_report.json
-│       └── supervisor_instruction.json
+│       ├── report.py
+│       └── templates/
+│           └── spectre_maestro_project/
+│               ├── TASK.md
+│               ├── METRICS.md
+│               ├── CIRCUIT_KNOWLEDGE.md
+│               ├── FAILURE_PLAYBOOK.md
+│               ├── config/
+│               │   ├── project_config.yaml
+│               │   ├── variables.yaml
+│               │   ├── metrics.yaml
+│               │   ├── spectre.yaml
+│               │   └── optimizer.yaml
+│               ├── netlists/
+│               │   ├── exported/
+│               │   │   └── .gitkeep
+│               │   └── templates/
+│               │       └── .gitkeep
+│               ├── src/
+│               │   └── .gitkeep
+│               ├── execution_package/
+│               │   └── .gitkeep
+│               ├── ledger/
+│               │   └── .gitkeep
+│               ├── state/
+│               │   └── .gitkeep
+│               └── reports/
+│                   └── .gitkeep
 ├── examples/
 │   └── bridge_test_inv/
 │       ├── USER_TASK.md
