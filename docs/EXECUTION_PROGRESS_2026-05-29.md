@@ -264,17 +264,45 @@ Reviews:
 - Claude MCP spec review: passed.
 - Claude MCP code-quality review: passed with no Critical or Important issues; only minor non-blocking notes.
 
-### Stop Point Before Task 8
+### Task 8: Hermes First-Run Approval Gate
 
-Status: Task 7 complete; Task 8 not started.
+Status: completed and committed.
 
-Next action: start Task 8, Hermes first-run approval gate, using `superpowers:subagent-driven-development`.
+Commits:
 
-Do not redo Tasks 1-7 unless new review feedback appears.
+- `e530f94 feat: add hermes first-run approval gate`
+- `7031fb9 fix: reject malformed approval manifests`
+- `f644674 test: cover approval reject branches`
+
+Implemented:
+
+- `src/hermes_workflow/approvals.py` writes `supervisor_instruction.json` via `decide_first_real_run()`.
+- Approval requires a present execution manifest, valid project config, and ready Claude preflight reports.
+- Rejection paths cover missing manifest, malformed manifest, missing manifest hashes, invalid config, and failed preflight reports.
+- Approval output allows `run_standalone_spectre_optimizer` and pins the approved immutable config hashes.
+- Rejection output allows escalation/revision actions and forbids standalone Spectre optimizer execution.
+
+Verification:
+
+- `pytest tests/test_approvals.py -v`: passed, 6 tests after review fixes.
+- `pytest -q`: passed, 51 tests.
+- `ruff check .`: passed.
+
+Reviews:
+
+- Claude MCP spec review: passed after review fixes.
+- Claude MCP code-quality review: initially requested malformed-manifest handling and missing branch tests; final re-review passed with no Critical or Important issues.
+
+### Stop Point Before Task 9
+
+Status: Task 8 complete; Task 9 not started.
+
+Next action: start Task 9, CLI contract smoke tests, using `superpowers:subagent-driven-development`.
+
+Do not redo Tasks 1-8 unless new review feedback appears.
 
 ## Remaining Plan A Tasks
 
-- Task 8: Hermes first-run approval gate.
 - Task 9: CLI contract smoke tests.
 - Final review and branch finish check.
 
@@ -286,5 +314,5 @@ Do not redo Tasks 1-7 unless new review feedback appears.
 2. ic-auto-opt-workflow/docs/COMPACT_RESUME_CHECKPOINT.md
 3. ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。请使用 superpowers:subagent-driven-development 从 Task 8: Hermes first-run approval gate 开始。Task 1-7 已完成并通过 review gate；不要回到 Task 1-7，除非有新的 review feedback。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。请使用 superpowers:subagent-driven-development 从 Task 9: CLI contract smoke tests 开始。Task 1-8 已完成并通过 review gate；不要回到 Task 1-8，除非有新的 review feedback。
 ```

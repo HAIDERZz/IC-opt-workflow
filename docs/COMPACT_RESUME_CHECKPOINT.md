@@ -24,7 +24,8 @@ Current execution state:
 - Task 5 complete and reviewed.
 - Task 6 complete and reviewed.
 - Task 7 complete and reviewed.
-- Continue from Task 8: Hermes first-run approval gate.
+- Task 8 complete and reviewed.
+- Continue from Task 9: CLI contract smoke tests.
 
 ## Files Already Read
 
