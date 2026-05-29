@@ -8,7 +8,7 @@ This note preserves the implementation state for continuing Plan A after context
 - Branch: `plan-a-hermes-file-contract-mvp`
 - Baseline branch: `master`
 - Baseline commit: `885e97f docs: capture workflow planning baseline`
-- Current HEAD at pause: `d226b3b feat: add hermes project template`
+- Latest Task 4 implementation/review commit before this checkpoint: `9fd283c docs: align template package snippets`
 - Active plan: `docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md`
 - Execution method: `superpowers:subagent-driven-development`
 - Dependencies installed in active Python environment on 2026-05-29: `pytest`, `typer`, `pydantic`, `PyYAML`, `ruff`
@@ -108,61 +108,58 @@ Reviews:
 - Final spec compliance: passed.
 - Final code quality: approved with minor future hardening notes about `load_contract_bundle()` semantics and additional error-format tests.
 
-## Current Task
-
 ### Task 4: Project Template Generation
 
-Status: in progress, not complete.
+Status: complete.
 
-Commit already made:
+Commits:
 
 - `d226b3b feat: add hermes project template`
+- `e3138dc fix: make template regeneration explicit`
+- `3d5767c fix: preserve template gitkeep files`
+- `9b818e9 fix: keep packaged template source canonical`
+- `9fd283c docs: align template package snippets`
 
-Implemented so far:
+Implemented:
 
 - `src/hermes_workflow/package.py`
 - `src/hermes_workflow/templates/spectre_maestro_project/**`
 - `tests/test_package.py`
+- `pyproject.toml` package-data entries for packaged template resources
 
-Verification from worker:
+Important decisions/fixes:
 
-- `pytest tests/test_package.py -v`: passed, 2 tests.
-- `pytest tests/test_schemas.py tests/test_validate.py tests/test_package.py -v`: passed, 25 tests.
+- `create_project_from_template(..., force=True)` performs clean regeneration by removing an existing destination directory before copying templates. Stale files are removed.
+- File destinations raise `TemplateError("destination exists and is not a directory")`.
+- Template discovery uses `importlib.resources` and the canonical packaged template tree at `src/hermes_workflow/templates/spectre_maestro_project`.
+- The old top-level `templates/spectre_maestro_project` tree was removed to avoid divergent template sources.
+- Generated projects preserve the seven required `.gitkeep` placeholders.
+- Plan snippets were updated to preserve Task 4 package-resource behavior before Task 5 adds manifest functions.
+
+Verification:
+
+- `pytest tests/test_package.py -v`: passed, 6 tests.
+- `pytest tests/test_schemas.py tests/test_validate.py tests/test_package.py -v`: passed, 29 tests.
 - `ruff check .`: passed.
+- Installed-package smoke test generated a template project from packaged resources and validated `.gitkeep` preservation.
 
-Review state:
+Reviews:
 
-- Spec compliance review: passed.
-- Code quality review: changes requested.
+- Final spec compliance: passed.
+- Final code quality: approved.
 
-Blocking Task 4 code-quality findings:
+## Current Task
 
-1. `create_project_from_template(..., force=True)` previously overlaid/merged into an existing destination, so stale files remained. The required fix was to make `force=True` perform a clean regeneration by deleting/recreating the destination directory, with a test proving stale files are removed.
-2. Template discovery needed to use the packaged canonical tree at `src/hermes_workflow/templates/spectre_maestro_project` via package resources, rather than a top-level `templates/` checkout-only tree.
-3. If destination exists as a file, current behavior is a raw filesystem error rather than `TemplateError`. Add a test and return a deliberate `TemplateError`.
+### Stop Point Before Task 5
 
-Recommended next implementation patch for Task 4:
+Status: Task 5 not started.
 
-- Add tests in `tests/test_package.py`:
-  - `test_create_project_from_template_force_recreates_destination`
-  - `test_create_project_from_template_rejects_file_destination`
-- Update `create_project_from_template()`:
-  - if destination exists and is a file, raise `TemplateError("destination exists and is not a directory")`
-  - if destination is a non-empty directory and `force=False`, keep current refusal
-  - if destination is a directory and `force=True`, remove it with `shutil.rmtree(destination)` before copying the template
-- Keep Task 5/6 behavior out of Task 4.
-- Re-run:
-  - `pytest tests/test_package.py -v`
-  - `pytest tests/test_schemas.py tests/test_validate.py tests/test_package.py -v`
-  - `ruff check .`
-- Commit:
-  - `git add src/hermes_workflow/package.py tests/test_package.py`
-  - `git commit -m "fix: make template regeneration explicit"`
-- Then rerun Task 4 spec compliance review and code quality review.
+Next action: start Task 5, Execution package manifest builder, using `superpowers:subagent-driven-development`.
+
+Do not redo Task 4 unless new review feedback appears.
 
 ## Remaining Plan A Tasks
 
-- Task 4: finish code quality fixes and pass review gate.
 - Task 5: Execution package manifest builder.
 - Task 6: `EXECUTION_TASK.md` renderer.
 - Task 7: Claude preflight report readers.
@@ -178,5 +175,5 @@ Recommended next implementation patch for Task 4:
 2. ic-auto-opt-workflow/docs/COMPACT_RESUME_CHECKPOINT.md
 3. ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。请使用 superpowers:subagent-driven-development 从 Task 4 的 code-quality fixes 继续，不要跳到 Task 5。Task 1-3 已完成并通过 review；Task 4 已实现且 spec review 通过，但 code quality review 要求修复 force=True overlay、file destination error surface、以及模板 discovery/package-data 决策。请先完成 Task 4 review gate，再继续 Task 5。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。请使用 superpowers:subagent-driven-development 从 Task 5: Execution package manifest builder 开始。Task 1-4 已完成并通过 review gate；不要回到 Task 4，除非有新的 review feedback。
 ```
