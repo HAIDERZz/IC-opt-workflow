@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import importlib.util
-import json
+import subprocess
 from pathlib import Path
 from types import ModuleType
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -46,3 +47,68 @@ def test_unknown_method_returns_json_rpc_error() -> None:
 
     assert response["error"]["code"] == -32601
     assert "unknown method" in response["error"]["message"]
+
+
+def test_spec_review_invokes_claude_with_read_only_review_prompt(tmp_path: Path) -> None:
+    server = load_server()
+    completed = subprocess.CompletedProcess(
+        args=["claude"],
+        returncode=0,
+        stdout="\u2705 Spec compliant\n",
+        stderr="",
+    )
+
+    with patch.object(server.subprocess, "run", return_value=completed) as run:
+        response = server.handle_request(
+            {
+                "jsonrpc": "2.0",
+                "id": 4,
+                "method": "tools/call",
+                "params": {
+                    "name": "spec_review",
+                    "arguments": {
+                        "repo_path": str(tmp_path),
+                        "task_text": "Task 5 requirements",
+                        "implementer_report": "Implemented manifest builder",
+                        "git_range": "abc123..def456",
+                    },
+                },
+            }
+        )
+
+    command = run.call_args.args[0]
+    prompt = command[-1]
+    assert command[:2] == ["claude", "-p"]
+    assert "--permission-mode" in command
+    assert "Edit" not in command
+    assert "Task 5 requirements" in prompt
+    assert "Implemented manifest builder" in prompt
+    assert "abc123..def456" in prompt
+    assert "Do not trust the implementer report" in prompt
+    assert response["result"]["content"] == [{"type": "text", "text": "\u2705 Spec compliant\n"}]
+
+
+def test_spec_review_rejects_missing_repo_before_claude_call(tmp_path: Path) -> None:
+    server = load_server()
+    missing = tmp_path / "missing"
+
+    with patch.object(server.subprocess, "run") as run:
+        response = server.handle_request(
+            {
+                "jsonrpc": "2.0",
+                "id": 5,
+                "method": "tools/call",
+                "params": {
+                    "name": "spec_review",
+                    "arguments": {
+                        "repo_path": str(missing),
+                        "task_text": "Task",
+                        "implementer_report": "Report",
+                    },
+                },
+            }
+        )
+
+    run.assert_not_called()
+    assert response["error"]["code"] == -32000
+    assert "repo_path does not exist" in response["error"]["message"]
