@@ -137,11 +137,11 @@ def run_claude_review(repo_path: Path, prompt: str) -> str:
         "Read,Bash",
         "--allowedTools",
         *READ_ONLY_ALLOWED_TOOLS,
-        prompt,
     ]
     completed = subprocess.run(
         command,
         cwd=repo_path,
+        input=prompt,
         text=True,
         capture_output=True,
         timeout=DEFAULT_TIMEOUT_SECONDS,

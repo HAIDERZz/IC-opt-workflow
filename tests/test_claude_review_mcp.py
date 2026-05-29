@@ -78,8 +78,17 @@ def test_spec_review_invokes_claude_with_read_only_review_prompt(tmp_path: Path)
         )
 
     command = run.call_args.args[0]
-    prompt = command[-1]
-    assert command[:2] == ["claude", "-p"]
+    prompt = run.call_args.kwargs["input"]
+    assert command == [
+        "claude",
+        "-p",
+        "--permission-mode",
+        "plan",
+        "--tools",
+        "Read,Bash",
+        "--allowedTools",
+        *server.READ_ONLY_ALLOWED_TOOLS,
+    ]
     assert "--permission-mode" in command
     assert "Edit" not in command
     assert "Task 5 requirements" in prompt
@@ -144,7 +153,7 @@ def test_code_quality_review_prompt_includes_git_range_and_sections(tmp_path: Pa
             }
         )
 
-    prompt = run.call_args.args[0][-1]
+    prompt = run.call_args.kwargs["input"]
     assert "git diff --stat abc123..def456" in prompt
     assert "git diff abc123..def456" in prompt
     assert "Task 5 manifest requirements" in prompt
