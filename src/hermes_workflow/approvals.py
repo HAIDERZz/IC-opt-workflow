@@ -24,8 +24,10 @@ def decide_first_real_run(
         instruction = _reject(created_at, "execution manifest is missing", {})
         return _write_instruction(project_dir, instruction)
 
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    approved_hashes = manifest["immutable_config_files"]
+    approved_hashes, manifest_error = _load_approved_config_hashes(manifest_path)
+    if manifest_error is not None:
+        instruction = _reject(created_at, manifest_error, {})
+        return _write_instruction(project_dir, instruction)
 
     if not validation_report.ok:
         instruction = _reject(created_at, validation_report.format(), approved_hashes)
@@ -66,6 +68,21 @@ def _reject(created_at_utc: str, reason: str, approved_hashes: dict[str, str]) -
         "forbidden_actions": ["run_standalone_spectre_optimizer"],
         "approved_config_hashes": approved_hashes,
     }
+
+
+def _load_approved_config_hashes(path: Path) -> tuple[dict[str, str], str | None]:
+    try:
+        manifest = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        return {}, f"execution manifest is invalid: {exc.msg}"
+
+    if not isinstance(manifest, dict):
+        return {}, "execution manifest is invalid: expected JSON object"
+
+    approved_hashes = manifest.get("immutable_config_files")
+    if not isinstance(approved_hashes, dict):
+        return {}, "execution manifest is missing immutable_config_files"
+    return approved_hashes, None
 
 
 def _write_instruction(project_dir: Path, instruction: dict) -> dict:

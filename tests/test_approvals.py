@@ -48,3 +48,41 @@ def test_approval_gate_writes_reject_instruction_when_preflight_fails(
     assert instruction["decision"] == "reject_first_real_run"
     assert "dry run status is fail" in instruction["reason"]
     assert "mock metric failed" in instruction["reason"]
+
+
+def test_approval_gate_rejects_invalid_execution_manifest(tmp_path: Path) -> None:
+    project_dir = tmp_path / "bridge_test_inv"
+    create_project_from_template(project_dir)
+    build_execution_package(project_dir, created_at_utc="2026-05-28T00:00:00Z")
+    write_pass_reports(project_dir)
+    manifest_path = project_dir / "execution_package" / "execution_manifest.json"
+    manifest_path.write_text("{not-json", encoding="utf-8")
+
+    instruction = decide_first_real_run(
+        project_dir,
+        created_at_utc="2026-05-28T00:10:00Z",
+    )
+
+    assert instruction["decision"] == "reject_first_real_run"
+    assert "execution manifest is invalid" in instruction["reason"]
+    assert instruction["approved_config_hashes"] == {}
+
+
+def test_approval_gate_rejects_manifest_missing_config_hashes(tmp_path: Path) -> None:
+    project_dir = tmp_path / "bridge_test_inv"
+    create_project_from_template(project_dir)
+    build_execution_package(project_dir, created_at_utc="2026-05-28T00:00:00Z")
+    write_pass_reports(project_dir)
+    manifest_path = project_dir / "execution_package" / "execution_manifest.json"
+    manifest_payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    del manifest_payload["immutable_config_files"]
+    write_json(manifest_path, manifest_payload)
+
+    instruction = decide_first_real_run(
+        project_dir,
+        created_at_utc="2026-05-28T00:10:00Z",
+    )
+
+    assert instruction["decision"] == "reject_first_real_run"
+    assert "execution manifest is missing immutable_config_files" in instruction["reason"]
+    assert instruction["approved_config_hashes"] == {}
