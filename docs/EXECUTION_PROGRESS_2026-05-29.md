@@ -237,7 +237,7 @@ Reviews:
 - Claude MCP spec review: passed after the validation-refactor fix.
 - Claude MCP code-quality review: passed with no Critical or Important issues; only minor non-blocking notes.
 
-### Task 7: Claude Preflight Report Readers
+### Task 7: Preflight Report Readers
 
 Status: completed and committed.
 
@@ -277,7 +277,7 @@ Commits:
 Implemented:
 
 - `src/hermes_workflow/approvals.py` writes `supervisor_instruction.json` via `decide_first_real_run()`.
-- Approval requires a present execution manifest, valid project config, and ready Claude preflight reports.
+- Approval requires a present execution manifest, valid project config, and ready preflight reports.
 - Rejection paths cover missing manifest, malformed manifest, missing manifest hashes, invalid config, and failed preflight reports.
 - Approval output allows `run_standalone_spectre_optimizer` and pins the approved immutable config hashes.
 - Rejection output allows escalation/revision actions and forbids standalone Spectre optimizer execution.
@@ -422,6 +422,13 @@ Next recommended action:
 ## Plan C-2: Dry-Run Candidate Renderer
 
 Status: design spec and implementation plan complete as of 2026-05-30. Coding has not started.
+
+Route alignment:
+
+- The historical broad plan has been updated so current project files agree on the responsibility split.
+- Hermes owns deterministic preflight: validation, netlist preparation, dry-run rendering, packaging, and approval.
+- The execution agent owns Maestro export and post-approval real Spectre/optimizer execution through `virtuoso-bridge-lite`.
+- `render_netlist.py` and `dry_run.py` inside the generated execution package are no longer the preferred route for preflight.
 
 Spec:
 

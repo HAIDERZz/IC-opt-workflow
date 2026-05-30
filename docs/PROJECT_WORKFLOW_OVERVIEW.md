@@ -8,6 +8,7 @@
 - Plan B mock optimization loop 已完成并提交。
 - Plan C C-1 netlist template contract 已完成并提交。
 - Plan C C-2 dry-run candidate renderer 已完成设计 spec 和 implementation plan，但尚未开始编码。
+- 顶层 broad plan 已对齐当前路线：Hermes 负责 deterministic preflight，执行 agent 负责 Maestro export 和 approval 之后的真实 Spectre/optimizer 执行。
 - 下一步开发入口是 `docs/superpowers/plans/2026-05-30-dry-run-candidate-renderer.md` 的 C-2 Task 1。
 - `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example` 下的真实 `input.scs` 示例只作为本地参考，不能提交进仓库。
 
@@ -16,6 +17,8 @@
 本项目的目标，是把 IC 仿真优化从“靠 agent 读 skill 后临场发挥”的流程，升级成一个可验证、可复用、可审计的 Hermes 文件合同工作流。
 
 `virtuoso-bridge-lite` 仍然是 Virtuoso/Spectre 能力层：它负责提供和 Cadence 工具交互的 skill、脚本和桥接能力。`ic-auto-opt-workflow` 则是它上面的一层流程约束：定义 YAML 合同、验证合同、生成执行包、准备 netlist 模板、读取 preflight report、控制首次真实仿真的 supervisor approval，并为未来真实优化循环提供状态和 ledger 结构。
+
+当前路线明确把 `prepare-netlist` 和计划中的 `dry-run` 放在 Hermes deterministic preflight 内，而不是让执行 agent 每次在 execution package 中重新编写 `render_netlist.py` 或 `dry_run.py`。执行 agent 的边界保留在工具侧动作：Maestro export、真实 Spectre run、真实 optimizer loop 和真实 metric extraction。
 
 ```mermaid
 flowchart TD

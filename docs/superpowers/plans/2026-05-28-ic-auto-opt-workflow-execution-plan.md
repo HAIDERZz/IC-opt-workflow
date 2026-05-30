@@ -4,7 +4,7 @@
 
 **Goal:** Build the upper Hermes workflow layer for Maestro-exported Spectre deck optimization while treating `virtuoso-bridge-lite` as the lower tool/skill dependency.
 
-**Architecture:** Hermes owns user-facing project files, schema validation, execution package creation, approval gates, report/state inspection, and final reporting. Claude Code owns Maestro deck export, variable-only netlist templating, project-local metrics, dry run, and post-approval Spectre/optimizer execution through the existing `virtuoso`, `spectre`, and `optimizer` skills. The workflow is file-contract driven and never depends on chat history.
+**Architecture:** Hermes owns user-facing project files, schema validation, deterministic preflight, execution package creation, approval gates, report/state inspection, and final reporting. Deterministic preflight includes safe netlist preparation and dry-run candidate rendering because those steps are contract checks that must be reproducible and reviewable before any real simulator action. The execution agent owns tool-side actions: Maestro deck export through `virtuoso-bridge-lite`, project-local metric extraction for real results, and post-approval Spectre/optimizer execution through the existing `virtuoso`, `spectre`, and `optimizer` skills. The workflow is file-contract driven and never depends on chat history.
 
 **Tech Stack:** Python 3.11+, `pydantic>=2`, `PyYAML`, `typer`, `pytest`, `ruff`, local dependency on sibling `../virtuoso-bridge-lite`, Cadence/Virtuoso/Spectre only behind explicit dry-run and approval gates.
 
@@ -20,13 +20,34 @@
 - `virtuoso-bridge-lite/skills/spectre/SKILL.md`
 - `virtuoso-bridge-lite/skills/optimizer/SKILL.md`
 
+## Current Route Alignment
+
+This broad plan was originally drafted with some preflight runner scripts living inside the generated execution package. The current accepted route, confirmed after focused Plan A and Plan C, supersedes that detail:
+
+- Hermes owns deterministic preflight:
+  - `hermes-workflow validate`
+  - `hermes-workflow prepare-netlist`
+  - planned `hermes-workflow dry-run`
+  - `hermes-workflow package`
+  - `hermes-workflow approve`
+- The execution agent owns non-deterministic or tool-side operations:
+  - inspect/export Maestro deck through `virtuoso-bridge-lite`
+  - copy or place exported `input.scs`
+  - run real Spectre only after `approve_first_real_run`
+  - execute the real optimizer loop and metric extraction after approval
+- Project-local runner scripts such as `render_netlist.py` and `dry_run.py` are no longer the preferred route for preflight. The corresponding behavior is implemented or planned as Hermes modules:
+  - `src/hermes_workflow/netlists.py`
+  - `src/hermes_workflow/dry_run.py`
+- The project template keeps `src/.gitkeep` as a future extension area, not as the source of deterministic preflight behavior.
+- The placeholder syntax is `{{VARIABLE_NAME}}`, not the early draft `@@NAME@@`.
+
 ## Hard Constraints
 
 - Do not reimplement `virtuoso-bridge-lite` skills or duplicate bridge internals.
 - Do not modify Maestro simulation setup: analyses, model includes, save/output settings, simulator options, and corners remain sourced from exported `input.scs`.
-- Template only user-approved variables, using `@@NAME@@` markers in `template.scs`.
-- Do not build a generic Maestro calculator parser for MVP; Hermes stores formulas and required signals, Claude implements project-local `metrics.py`.
-- Do not run real Spectre or optimizer before dry run artifacts pass Hermes approval.
+- Template only user-approved variables, using `{{VARIABLE_NAME}}` markers in `template.scs`.
+- Do not build a generic Maestro calculator parser for MVP; Hermes stores formulas and required signals, and later execution-side metric adapters compare real results against those contracts.
+- Do not run real Spectre or optimizer before Hermes deterministic preflight artifacts pass and Hermes writes approval.
 - Persist all state in files: configs, execution manifest, reports, ledger, optimizer state, health, escalation, and final summary.
 - Treat the `Claude-cli-skill` interface as an external adapter boundary. The first implementation verifies file contracts before wiring the real invocation path.
 
@@ -44,6 +65,8 @@ ic-auto-opt-workflow/
 │   ├── package.py
 │   ├── reports.py
 │   ├── approvals.py
+│   ├── netlists.py
+│   ├── dry_run.py
 │   └── final_report.py
 ├── src/hermes_workflow/templates/spectre_maestro_project/
 │   ├── TASK.md
@@ -58,12 +81,7 @@ ic-auto-opt-workflow/
 │   │   └── optimizer.yaml
 │   ├── netlists/exported/.gitkeep
 │   ├── netlists/templates/.gitkeep
-│   ├── src/
-│   │   ├── metrics.py
-│   │   ├── render_netlist.py
-│   │   ├── run_candidate.py
-│   │   ├── dry_run.py
-│   │   └── optimization_loop.py
+│   ├── src/.gitkeep
 │   ├── execution_package/.gitkeep
 │   ├── ledger/.gitkeep
 │   ├── state/.gitkeep
@@ -209,25 +227,25 @@ optimizer:
   min_initial_points_rule: "max(2 * n_variables, batch_size)"
 ```
 
-### Claude Output Contracts
+### Preflight Report Contracts
 
 `reports/netlist_preparation_report.json`:
 
 ```json
 {
+  "schema_version": "1.0",
   "status": "pass",
-  "input_scs_path": "netlists/exported/input.scs",
-  "template_scs_path": "netlists/templates/template.scs",
-  "input_scs_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-  "template_scs_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-  "approved_variables": ["FN", "WN", "FP", "WP"],
-  "templated_variables": ["FN", "WN", "FP", "WP"],
+  "exported_input_scs": "netlists/exported/input.scs",
+  "template_scs": "netlists/templates/template.scs",
+  "approved_variables_template_status": {
+    "FN": true,
+    "WN": true,
+    "FP": true,
+    "WP": true
+  },
   "analysis_statements": ["tran", "dc"],
-  "model_includes_found": true,
-  "simulator_options_found": true,
-  "save_options_found": true,
-  "non_variable_setup_modified": false,
-  "messages": []
+  "forbidden_setup_changes_detected": false,
+  "issues": []
 }
 ```
 
@@ -235,18 +253,20 @@ optimizer:
 
 ```json
 {
+  "schema_version": "1.0",
   "status": "pass",
-  "config_validated": true,
-  "rendered_candidate_path": "dry_run/rendered/input.scs",
-  "all_placeholders_replaced": true,
-  "metrics_imported": true,
-  "mock_metrics": {"rise": 42.0, "fall": 43.0, "DC": 120.0},
-  "constraints_passed": true,
-  "objective_value": 10200.0,
+  "rendered_candidate_scs": "runs/dry_run/input.scs",
+  "placeholder_check": {
+    "unresolved_placeholders": [],
+    "unexpected_template_variables": []
+  },
+  "metrics_import_ok": true,
+  "mock_metrics_ok": true,
+  "objective_ok": true,
+  "constraints_ok": true,
   "ledger_write_ok": true,
   "state_write_ok": true,
-  "real_spectre_executed": false,
-  "messages": []
+  "issues": []
 }
 ```
 
@@ -254,13 +274,13 @@ optimizer:
 
 ```json
 {
+  "schema_version": "1.0",
   "status": "healthy",
-  "phase": "dry_run_ready_for_approval",
-  "budget_used": 0,
-  "budget_total": 100,
-  "last_batch_ok": true,
-  "requires_hermes_action": true,
-  "action_reason": "first_real_run_approval_required"
+  "real_run_started": false,
+  "current_evaluations": 0,
+  "best_candidate_path": null,
+  "last_batch_id": null,
+  "issues": []
 }
 ```
 
@@ -535,14 +555,9 @@ execution_package/config/variables.yaml
 execution_package/config/metrics.yaml
 execution_package/config/spectre.yaml
 execution_package/config/optimizer.yaml
-execution_package/src/metrics.py
-execution_package/src/render_netlist.py
-execution_package/src/dry_run.py
-execution_package/src/run_candidate.py
-execution_package/src/optimization_loop.py
 ```
 
-Assert manifest contains SHA-256 hashes for copied immutable contract files and `required_skills` equals `["virtuoso", "spectre", "optimizer"]`.
+Assert manifest contains SHA-256 hashes for copied immutable contract files and declares the required preflight reports.
 
 - [ ] **Step 2: Run package tests and confirm failure**
 
@@ -670,9 +685,9 @@ Cover:
 ```text
 valid netlist preparation pass report loads
 missing templated variable fails
-non_variable_setup_modified true fails approval readiness
-dry_run_report with real_spectre_executed true fails approval readiness
-health_check with requires_hermes_action false fails first approval readiness
+forbidden_setup_changes_detected true fails approval readiness
+dry_run_report with unresolved placeholders fails approval readiness
+health_check with real_run_started true fails first approval readiness
 invalid JSON reports return structured issue instead of traceback
 ```
 
@@ -687,12 +702,10 @@ Expected: FAIL because report readers are not defined.
 `reports.py` must export:
 
 ```text
-read_json_model(path: Path, model_type: type[BaseModel]) -> BaseModel
-load_claude_preflight_outputs(project_dir: Path) -> ClaudePreflightOutputs
-validate_preflight_outputs(outputs: ClaudePreflightOutputs, manifest: ExecutionManifest) -> list[ValidationIssue]
+load_preflight_reports(project_dir: Path) -> PreflightReports
 ```
 
-Validation must compare templated variables against `variables.yaml` and verify immutable hashes still match the execution manifest.
+Validation must aggregate readiness messages from `netlist_preparation_report.json`, `dry_run_report.json`, and `state/health_check.json`.
 
 - [ ] **Step 4: Verify tests pass**
 
@@ -705,7 +718,7 @@ Expected: PASS.
 ```bash
 cd ic-auto-opt-workflow
 git add src/hermes_workflow/reports.py src/hermes_workflow/schemas.py tests/test_report_contracts.py
-git commit -m "feat: read and validate claude preflight reports"
+git commit -m "feat: read and validate preflight reports"
 ```
 
 ## Task 8: Hermes Approval Gate
@@ -785,18 +798,18 @@ git commit -m "feat: add hermes first-run approval gate"
 - Modify: `src/hermes_workflow/package.py`
 - Modify: `src/hermes_workflow/reports.py`
 
-- [ ] **Step 1: Write Hermes-stub test for Claude outputs**
+- [ ] **Step 1: Write Hermes-stub test for preflight outputs**
 
-The test builds an execution package, copies fixture Claude outputs into the project, and asserts Hermes accepts or rejects based only on files.
+The test builds an execution package, copies fixture preflight outputs into the project, and asserts Hermes accepts or rejects based only on files.
 
 - [ ] **Step 2: Write Claude-stub test for Hermes instructions**
 
 The test simulates:
 
 ```text
-Claude writes passing preflight files
+preflight files are present and passing
 Hermes writes approve_first_real_run
-Claude writes healthy batch state
+execution state reports healthy batch state
 Hermes reads best_candidate and health_check
 Hermes can produce final_summary input for final report
 ```
@@ -893,10 +906,13 @@ git commit -m "feat: validate optimization state contract with mock loop"
 
 ## Task 11: Exported `input.scs` Preparation Contract
 
+**Current route:** completed as Plan C C-1 in Hermes, not as an execution-package render-netlist script.
+
 **Files:**
-- Modify: `src/hermes_workflow/templates/spectre_maestro_project/src/render_netlist.py`
-- Create: `tests/test_netlist_template_contract.py`
-- Add fixture: `tests/fixtures/netlists/input.scs`
+- Create: `src/hermes_workflow/netlists.py`
+- Create: `tests/test_netlists.py`
+- Modify: `src/hermes_workflow/cli.py`
+- Modify: `tests/test_cli.py`
 
 - [ ] **Step 1: Write netlist templating tests**
 
@@ -913,13 +929,13 @@ saveOptions options save=allpub
 Tests assert:
 
 ```text
-only FN/WN/FP/WP values are replaced with @@FN@@/@@WN@@/@@FP@@/@@WP@@
+only FN/WN/FP/WP values are replaced with {{FN}}/{{WN}}/{{FP}}/{{WP}}
 analysis statements remain byte-identical
 include/model lines remain byte-identical
 simulatorOptions remain byte-identical
 saveOptions remain byte-identical
 unapproved variable VDD is not templated
-missing approved variable creates escalation payload
+missing approved variable writes a fail netlist_preparation_report.json
 ```
 
 - [ ] **Step 2: Run netlist tests and confirm failure**
@@ -928,17 +944,15 @@ Run: `cd ic-auto-opt-workflow && pytest tests/test_netlist_template_contract.py 
 
 Expected: FAIL until templating helper exists.
 
-- [ ] **Step 3: Implement templating helper in project template**
+- [ ] **Step 3: Implement Hermes netlist preparation**
 
-`render_netlist.py` must expose:
+`netlists.py` must expose:
 
 ```text
-create_template(input_scs: Path, output_scs: Path, approved_variables: list[str]) -> NetlistTemplateReport
-render_candidate(template_scs: Path, output_scs: Path, parameters: dict[str, str]) -> None
-verify_no_placeholders(path: Path) -> list[str]
+prepare_netlist(project_dir: Path) -> NetlistPreparationReport
 ```
 
-Matching must target Spectre parameter assignments and must not run a free-form global replace across the full file.
+Matching must target top-level Spectre `parameters` assignment RHS values and must not run a free-form global replace across the full file.
 
 - [ ] **Step 4: Verify netlist tests pass**
 
@@ -950,11 +964,13 @@ Expected: PASS.
 
 ```bash
 cd ic-auto-opt-workflow
-git add src/hermes_workflow/templates/spectre_maestro_project/src/render_netlist.py tests/test_netlist_template_contract.py tests/fixtures/netlists/input.scs
+git add src/hermes_workflow/netlists.py src/hermes_workflow/cli.py tests/test_netlists.py tests/test_cli.py
 git commit -m "feat: constrain exported spectre netlist templating"
 ```
 
 ## Task 12: Spectre Runner Template After Approval
+
+**Current route:** future work. This remains execution-agent/tool-side integration and should not be implemented as part of Hermes deterministic preflight.
 
 **Files:**
 - Modify: `src/hermes_workflow/templates/spectre_maestro_project/src/run_candidate.py`
@@ -1119,7 +1135,7 @@ create project from template
 copy bridge_test_inv fixture configs
 validate contracts
 build execution package
-copy passing Claude preflight fixtures
+copy passing preflight fixtures
 inspect preflight
 write approve_first_real_run supervisor instruction
 run mock optimization loop
@@ -1191,11 +1207,11 @@ Include sequence:
 ```text
 Hermes validates project
 Hermes builds execution package
-Claude exports input.scs through virtuoso skill
-Claude writes netlist_preparation_report.json
-Claude runs dry_run.py without real Spectre
+Execution agent exports input.scs through virtuoso skill
+Hermes prepares template.scs and writes netlist_preparation_report.json
+Hermes runs deterministic dry-run without real Spectre and writes dry_run_report.json
 Hermes writes supervisor_instruction.json
-Claude runs first real Spectre batch only after approve_first_real_run
+Execution agent runs first real Spectre batch only after approve_first_real_run
 ```
 
 - [ ] **Step 3: Document escalation triggers**
@@ -1230,14 +1246,15 @@ git commit -m "docs: add real integration readiness checklist"
 
 1. Tasks 1-3: file contracts and schema validation.
 2. Tasks 4-6: project template and execution package.
-3. Tasks 7-8: Claude preflight report reading and Hermes approval gate.
+3. Tasks 7-8: preflight report reading and Hermes approval gate.
 4. Task 9: independent agent file-contract verification.
 5. Task 10: mock optimization loop without Cadence.
-6. Task 11: exported `input.scs` templating contract.
-7. Task 12: approved Spectre runner template.
-8. Task 13: explicit Claude/Virtuoso execution contract.
-9. Tasks 14-15: final report and end-to-end smoke.
-10. Task 16: real integration checklist.
+6. Task 11 / Plan C C-1: Hermes exported `input.scs` templating contract.
+7. Plan C C-2: Hermes deterministic dry-run candidate renderer.
+8. Task 12: approved Spectre runner integration, kept execution-agent/tool-side and post-approval.
+9. Task 13: explicit Claude/Virtuoso execution contract.
+10. Tasks 14-15: final report and end-to-end smoke.
+11. Task 16: real integration checklist.
 
 ## Verification Commands
 
@@ -1267,7 +1284,7 @@ virtuoso-bridge license
 
 ## Self-Review
 
-- Spec coverage: The plan covers file contracts, schema definition, Hermes template generation, validation, execution package builder, Claude dry-run expectations, agent verification harnesses, mock optimization loop, exported `input.scs` templating, approved Spectre runner, and real integration readiness.
+- Spec coverage: The plan covers file contracts, schema definition, Hermes template generation, validation, execution package builder, Hermes deterministic preflight, agent verification harnesses, mock optimization loop, exported `input.scs` templating, approved Spectre runner, and real integration readiness.
 - Boundary check: The plan keeps `virtuoso-bridge-lite` as a dependency and does not copy its `virtuoso`, `spectre`, or `optimizer` implementations.
 - Safety check: The plan enforces dry run and `supervisor_instruction.json` approval before real Spectre or optimizer execution.
 - Open interface check: The `Claude-cli-skill` boundary is handled by file contracts first, with real adapter wiring deferred until its exact invocation interface is known.
