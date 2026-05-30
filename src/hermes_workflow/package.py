@@ -113,7 +113,7 @@ Use `virtuoso-bridge-lite` skills only for tool-side actions. Inspect or export 
 
 ## Allowed Variables
 
-Only template these variables in the exported Spectre deck: {variable_names}
+Hermes may template only these variables in `netlists/templates/template.scs`: {variable_names}
 
 ## Metrics
 
@@ -161,7 +161,7 @@ hermes-workflow approve PROJECT_DIR
 
 - Do not modify Maestro setup.
 - Do not change analysis statements, model includes, simulator options, save options, constraints, objective, variable bounds, or variable step sizes.
-- Template only approved variables when Hermes prepares `template.scs`.
+- Template only approved variables when Hermes prepares `netlists/templates/template.scs`.
 - Wait for `supervisor_instruction.json` before the first real Spectre run.
 
 ## Immutable Config Hashes

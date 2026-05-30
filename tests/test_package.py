@@ -157,7 +157,15 @@ def test_build_execution_package_writes_execution_task(tmp_path: Path) -> None:
     assert "Backend: `maestro_exported_spectre_deck`" in task_text
     assert "Spectre X preset: `ax`" in task_text
     assert "`FN`, `WN`, `FP`, `WP`" in task_text
+    assert (
+        "Hermes may template only these variables in `netlists/templates/template.scs`"
+        in task_text
+    )
     assert "Do not modify Maestro setup" in task_text
+    assert (
+        "Template only approved variables when Hermes prepares "
+        "`netlists/templates/template.scs`"
+    ) in task_text
     assert (
         "Wait for `supervisor_instruction.json` before the first real Spectre run"
         in task_text
@@ -170,6 +178,7 @@ def test_build_execution_package_writes_execution_task(tmp_path: Path) -> None:
     assert "hermes-workflow dry-run PROJECT_DIR" in task_text
     assert "hermes-workflow preflight-health PROJECT_DIR" in task_text
     assert "hermes-workflow approve PROJECT_DIR" in task_text
+    assert "Only template these variables in the exported Spectre deck" not in task_text
     assert "Write `reports/netlist_preparation_report.json`" not in task_text
 
 
