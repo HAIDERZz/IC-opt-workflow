@@ -131,6 +131,8 @@ def test_approval_gate_rejects_health_report_with_real_run_started(
     create_project_from_template(project_dir)
     build_execution_package(project_dir, created_at_utc="2026-05-28T00:00:00Z")
     write_pass_reports(project_dir)
+    (project_dir / "ledger").mkdir(parents=True, exist_ok=True)
+    (project_dir / "ledger" / "experiment_ledger.jsonl").write_text("{}\n", encoding="utf-8")
     health_path = project_dir / "state" / "health_check.json"
     health_payload = json.loads(health_path.read_text(encoding="utf-8"))
     health_payload["status"] = "error"

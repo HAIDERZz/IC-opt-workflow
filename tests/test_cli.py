@@ -246,13 +246,14 @@ tran tran stop=10n
     health_result = runner.invoke(app, ["preflight-health", str(project_dir)])
     approve_result = runner.invoke(app, ["approve", str(project_dir)])
 
-    instruction = json.loads(
-        (project_dir / "supervisor_instruction.json").read_text(encoding="utf-8")
-    )
     assert prepare_result.exit_code == 0
     assert dry_run_result.exit_code == 0
     assert health_result.exit_code == 0
     assert approve_result.exit_code == 0
+
+    instruction = json.loads(
+        (project_dir / "supervisor_instruction.json").read_text(encoding="utf-8")
+    )
     assert instruction["decision"] == "approve_first_real_run"
     assert instruction["reason"] == "config validation and preflight reports passed"
     assert not (project_dir / "ledger" / "experiment_ledger.jsonl").exists()
