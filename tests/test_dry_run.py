@@ -60,3 +60,92 @@ tran tran stop=10n
     assert not (project_dir / "ledger" / "experiment_ledger.jsonl").exists()
     assert not (project_dir / "state" / "optimizer_state.json").exists()
     assert not (project_dir / "state" / "best_candidate.json").exists()
+
+
+def test_run_dry_run_reports_missing_template(tmp_path: Path) -> None:
+    project_dir = create_project_from_template(tmp_path / "bridge_test_inv")
+
+    report = run_dry_run(project_dir)
+
+    persisted = _load_report(project_dir)
+    assert report == persisted
+    assert report.status == PassFail.FAIL
+    assert "template.scs is missing: netlists/templates/template.scs" in report.issues
+    assert not (project_dir / "runs" / "dry_run" / "input.scs").exists()
+
+
+def test_run_dry_run_reports_missing_approved_placeholder(tmp_path: Path) -> None:
+    project_dir = _create_project_with_template(
+        tmp_path,
+        """simulator lang=spectre
+parameters FN={{FN}} WN={{WN}} FP={{FP}}
+tran tran stop=10n
+""",
+    )
+
+    report = run_dry_run(project_dir)
+
+    assert report.status == PassFail.FAIL
+    assert "approved variable WP placeholder is missing from template" in report.issues
+    assert not (project_dir / "runs" / "dry_run" / "input.scs").exists()
+
+
+def test_run_dry_run_reports_unexpected_placeholder(tmp_path: Path) -> None:
+    project_dir = _create_project_with_template(
+        tmp_path,
+        """simulator lang=spectre
+parameters FN={{FN}} WN={{WN}} FP={{FP}} WP={{WP}} GAIN={{GAIN}}
+tran tran stop=10n
+""",
+    )
+
+    report = run_dry_run(project_dir)
+
+    assert report.status == PassFail.FAIL
+    assert report.placeholder_check.unexpected_template_variables == ["GAIN"]
+    assert report.placeholder_check.unresolved_placeholders == ["{{GAIN}}"]
+    assert "unexpected template variable GAIN" in report.issues
+    assert "rendered candidate still contains unresolved placeholders" in report.issues
+    assert not (project_dir / "runs" / "dry_run" / "input.scs").exists()
+
+
+def test_run_dry_run_reports_unresolved_malformed_placeholder(tmp_path: Path) -> None:
+    project_dir = _create_project_with_template(
+        tmp_path,
+        """simulator lang=spectre
+parameters FN={{FN}} WN={{WN}} FP={{FP}} WP={{WP}} BAD={{ GAIN }}
+tran tran stop=10n
+""",
+    )
+
+    report = run_dry_run(project_dir)
+
+    assert report.status == PassFail.FAIL
+    assert report.placeholder_check.unresolved_placeholders == ["{{ GAIN }}"]
+    assert "rendered candidate still contains unresolved placeholders" in report.issues
+    assert not (project_dir / "runs" / "dry_run" / "input.scs").exists()
+
+
+def test_run_dry_run_removes_stale_render_on_failure(tmp_path: Path) -> None:
+    project_dir = _create_project_with_template(
+        tmp_path,
+        """simulator lang=spectre
+parameters FN={{FN}} WN={{WN}} FP={{FP}} WP={{WP}}
+tran tran stop=10n
+""",
+    )
+    first_report = run_dry_run(project_dir)
+    assert first_report.status == PassFail.PASS
+    template_path = project_dir / "netlists" / "templates" / "template.scs"
+    template_path.write_text(
+        """simulator lang=spectre
+parameters FN={{FN}} WN={{WN}} FP={{FP}} WP={{WP}} EXTRA={{EXTRA}}
+tran tran stop=10n
+""",
+        encoding="utf-8",
+    )
+
+    failed_report = run_dry_run(project_dir)
+
+    assert failed_report.status == PassFail.FAIL
+    assert not (project_dir / "runs" / "dry_run" / "input.scs").exists()

@@ -14,6 +14,7 @@ from hermes_workflow.validate import ContractBundle, assert_valid_project
 
 
 PLACEHOLDER_RE = re.compile(r"{{(?P<name>[A-Za-z_][A-Za-z0-9_]*)}}")
+UNRESOLVED_PLACEHOLDER_RE = re.compile(r"{{[^{}]*}}")
 RENDERED_CANDIDATE = "runs/dry_run/input.scs"
 
 
@@ -139,7 +140,9 @@ def _render_template(
     for name, value in candidate.items():
         rendered = rendered.replace(f"{{{{{name}}}}}", value)
 
-    unresolved = sorted({match.group(0) for match in PLACEHOLDER_RE.finditer(rendered)})
+    unresolved = sorted(
+        {match.group(0) for match in UNRESOLVED_PLACEHOLDER_RE.finditer(rendered)}
+    )
     if unresolved:
         issues.append("rendered candidate still contains unresolved placeholders")
 
