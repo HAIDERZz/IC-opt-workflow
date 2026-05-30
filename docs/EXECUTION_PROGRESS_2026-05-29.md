@@ -505,6 +505,9 @@ Commits:
 - `a4e2473 docs: record preflight readiness progress`
 - `bbbfcd7 docs: fill preflight readiness progress hash`
 - `6befb7b docs: clarify preflight readiness resume state`
+- `88a8c21 docs: align preflight readiness pending verification`
+- `f3bc789 docs: mark stale handoff notes historical`
+- `919bb84 docs: refresh opencode handoff for c3 verification`
 
 Implemented:
 

@@ -43,7 +43,7 @@ Current execution state:
 - C-2 dry-run candidate renderer is complete and reviewed. Final verification: `pytest -q` passed, 159 tests; `ruff check .` passed; local-only smoke passed.
 - C-3 execution package preflight readiness design spec exists: `a60b229 docs: design preflight readiness contract`.
 - C-3 implementation plan exists: `docs/superpowers/plans/2026-05-30-execution-package-preflight-readiness.md`.
-- C-3 is complete through Task 5 documentation as of 2026-05-31. Final verification (full pytest) pending Task 6.
+- C-3 is complete through Task 5 documentation as of 2026-05-31. Task 6 final verification includes full pytest, spec review, and code-quality review.
 - Real `input.scs` examples under `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example` are local-only references and must not be committed.
 
 ## Files Already Read
