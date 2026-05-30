@@ -47,6 +47,10 @@ def test_write_preflight_health_fails_closed_for_real_run_artifacts(
         "{}\n",
         encoding="utf-8",
     )
+    (project_dir / "state" / "optimizer_state.json").write_text(
+        "{}\n",
+        encoding="utf-8",
+    )
 
     report = write_preflight_health(project_dir)
 
@@ -63,8 +67,13 @@ def test_write_preflight_health_fails_closed_for_real_run_artifacts(
         "pre-approval real-run artifact exists: state/best_candidate.json"
         in report.issues
     )
+    assert (
+        "pre-approval real-run artifact exists: state/optimizer_state.json"
+        in report.issues
+    )
     assert (project_dir / "ledger" / "experiment_ledger.jsonl").exists()
     assert (project_dir / "state" / "best_candidate.json").exists()
+    assert (project_dir / "state" / "optimizer_state.json").exists()
 
 
 def test_write_preflight_health_does_not_fabricate_report_for_invalid_config(
