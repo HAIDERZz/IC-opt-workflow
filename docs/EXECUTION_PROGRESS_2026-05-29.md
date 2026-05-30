@@ -340,7 +340,7 @@ Status: focused Plan A complete through Task 9.
 
 Focused Hermes Plan A ends at Task 9. There is no Task 10 in this Hermes File Contract MVP plan.
 
-Next recommended action: hand off from focused Plan A into a new, user-confirmed development scope. The new worker should read `docs/OPENCODE_HANDOFF_2026-05-29.md` first, avoid redoing Plan A Tasks 1-9, and create or refresh a scoped plan for whatever follow-up the user chooses.
+Next recommended action (historical): hand off from focused Plan A into a new, user-confirmed development scope. This was superseded by later Plan C-3 status; current next action is C-3 Task 6 final verification. The new worker should read `docs/OPENCODE_HANDOFF_2026-05-29.md` first, avoid redoing Plan A Tasks 1-9, and create or refresh a scoped plan for whatever follow-up the user chooses.
 
 ## Plan C: Netlist Template Contract
 
@@ -413,11 +413,12 @@ Important decisions:
 - Current netlist templater rewrites only approved variable RHS values in top-level `parameters` statements.
 - Device, subckt, source, analysis, include, model, and save statements remain unchanged.
 
-Next recommended action:
+Next recommended action (historical):
 
 - Plan C C-1 is complete.
 - Do not copy real `input.scs` examples into the repository.
 - Next scope should be confirmed before starting a new Plan C follow-up task.
+- This was superseded by later Plan C-3 status; current next action is C-3 Task 6 final verification.
 
 ## Plan C-2: Dry-Run Candidate Renderer
 
@@ -474,10 +475,11 @@ Reviews:
 - Final spec review: passed.
 - Final code-quality review: passed through the project Claude Review MCP wrapper with no Critical or Important findings.
 
-Next resume point:
+Next resume point (historical):
 
 - Plan C-2 is complete.
 - Next follow-up scope should be confirmed before starting additional Plan C work.
+- This was superseded by later Plan C-3 status; current next action is C-3 Task 6 final verification.
 
 ## Plan C-3: Execution Package Preflight Readiness
 

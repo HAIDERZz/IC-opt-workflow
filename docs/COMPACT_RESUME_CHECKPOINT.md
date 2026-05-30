@@ -1,6 +1,7 @@
 # Compact Resume Checkpoint
 
 Date: 2026-05-28
+Last updated: 2026-05-31
 
 This checkpoint preserves the planning state for continuing after context compaction.
 
@@ -35,7 +36,7 @@ Current execution state:
 - Plan C Task 4 complete and reviewed: `04fa358 feat: add prepare netlist cli`.
 - Plan C Task 5 complete: full tests, ruff, and local-only real deck smoke passed.
 - Plan C Task 6 complete: final review blockers fixed in `da23a7f fix: harden netlist parameter scanner`; final spec and code-quality re-reviews passed.
-- Current state: Plan C C-1 is complete. Confirm the next scope before starting additional Plan C work.
+- Plan C C-1 was complete at this checkpoint. The next scope was confirmed, leading to C-2 and C-3 below.
 - Plan C-2 dry-run candidate renderer design spec exists: `e2b1c30 docs: design dry-run candidate renderer`.
 - Plan C-2 implementation plan exists: `5441972 docs: plan dry-run candidate renderer`.
 - The historical broad plan has been aligned to the current route: Hermes owns deterministic preflight; the execution agent owns Maestro export and post-approval real execution.
@@ -330,14 +331,15 @@ optimizer:
 
 ## Next Step
 
-Focused Plan A is complete through Task 9.
+Plan A, Plan B, Plan C C-1, and Plan C C-2 are complete. Plan C C-3 is complete through Task 5 documentation as of 2026-05-31.
 
-Do not redo Plan A Tasks 1-9 unless new review feedback appears. The next development decision is whether to leave the focused Hermes File Contract MVP branch as-is, merge/finish it, or start a new user-confirmed scoped plan for follow-up work.
+Current next step: C-3 Task 6 final verification (full pytest, spec review, code-quality review) before confirming any new scope. Do not redo Plan A Tasks 1-9 unless new review feedback appears.
 
-Read the opencode handoff first:
+Read the handoff files first:
 
 ```text
 ic-auto-opt-workflow/docs/OPENCODE_HANDOFF_2026-05-29.md
+ic-auto-opt-workflow/docs/EXECUTION_PROGRESS_2026-05-29.md
 ```
 
 ## Resume Prompt
