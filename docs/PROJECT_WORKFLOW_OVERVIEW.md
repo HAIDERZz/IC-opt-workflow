@@ -7,9 +7,9 @@
 - Plan A Hermes File Contract MVP 已完成到 Task 9。Hermes 部分没有 Plan A Task 10。
 - Plan B mock optimization loop 已完成并提交。
 - Plan C C-1 netlist template contract 已完成并提交。
-- Plan C C-2 dry-run candidate renderer 已完成实现到 Task 5，最终 Task 6 review gate/closeout 尚未执行。
+- Plan C C-2 dry-run candidate renderer 已完成并通过最终 review gate。
 - 顶层 broad plan 已对齐当前路线：Hermes 负责 deterministic preflight，执行 agent 负责 Maestro export 和 approval 之后的真实 Spectre/optimizer 执行。
-- 下一步开发入口是 `docs/superpowers/plans/2026-05-30-dry-run-candidate-renderer.md` 的 C-2 Task 6。
+- 下一步需要先确认新的后续开发范围。
 - `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example` 下的真实 `input.scs` 示例只作为本地参考，不能提交进仓库。
 
 ## 1. 项目概览
@@ -87,7 +87,7 @@ flowchart TD
   C-2 设计文档，定义 dry-run 的边界：渲染一个 lower-bound candidate、检查 placeholder/mock metric/objective/constraint/writability，不运行 Spectre/Virtuoso/optimizer loop。
 
 - `docs/superpowers/plans/2026-05-30-dry-run-candidate-renderer.md`
-  C-2 implementation plan。当前已实现到 Task 5，新增了 `src/hermes_workflow/dry_run.py` 和 `hermes-workflow dry-run`；最终 Task 6 review gate/closeout 尚未执行。
+  C-2 implementation plan。当前已完成，新增了 `src/hermes_workflow/dry_run.py` 和 `hermes-workflow dry-run`。
 
 - `src/hermes_workflow/dry_run.py`
   渲染一个 lower-bound candidate，检查 placeholder、mock metric、objective、constraint evaluability、`ledger/` 和 `state/` writability，并写入 `reports/dry_run_report.json`。

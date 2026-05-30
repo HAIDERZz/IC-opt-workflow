@@ -37,6 +37,30 @@ Do not commit local real netlist examples from `/home/zzchen/Agent_virtuoso/EDA_
 - Modify `docs/EXECUTION_PROGRESS_2026-05-29.md`: record C-2 task progress.
 - Modify `docs/COMPACT_RESUME_CHECKPOINT.md`: record resumable C-2 checkpoint.
 
+## Execution Status
+
+Status: complete as of 2026-05-30.
+
+Completed commits:
+
+- Task 1: `b925cb9 feat: add dry-run renderer`
+- Task 2: `b042a74 fix: enforce dry-run placeholder failures`
+- Task 3: `c2e08d2 test: lock dry-run mock check semantics`
+- Task 4: `9fffb90 feat: add dry-run cli command`
+- Task 5: `59c0aff docs: record dry-run renderer progress`
+- Task 6 hardening: `1835c94 fix: report dry-run render write failures`
+
+Final verification:
+
+- `pytest -q`: passed, 159 tests.
+- `ruff check .`: passed.
+- Local-only smoke under `/tmp/hermes_c2_smoke` passed using `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example/input.scs`: `prepare-netlist` passed and `dry-run` passed.
+
+Final reviews:
+
+- Final spec review: passed.
+- Final code-quality review: passed through the project Claude Review MCP wrapper with no Critical or Important findings.
+
 ## Task 1: Dry-Run Success Path
 
 **Files:**

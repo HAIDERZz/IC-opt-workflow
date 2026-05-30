@@ -421,7 +421,7 @@ Next recommended action:
 
 ## Plan C-2: Dry-Run Candidate Renderer
 
-Status: implementation complete through Task 5 as of 2026-05-30. Final Task 6 review gate and closeout remain.
+Status: complete as of 2026-05-30.
 
 Route alignment:
 
@@ -446,6 +446,8 @@ Commit:
 - `b042a74 fix: enforce dry-run placeholder failures`
 - `c2e08d2 test: lock dry-run mock check semantics`
 - `9fffb90 feat: add dry-run cli command`
+- `59c0aff docs: record dry-run renderer progress`
+- `1835c94 fix: report dry-run render write failures`
 
 Implemented:
 
@@ -457,9 +459,9 @@ Implemented:
 
 Verification:
 
-- `pytest tests/test_dry_run.py -v`: passed, 8 tests.
-- `pytest tests/test_cli.py tests/test_dry_run.py -v`: passed, 20 tests.
-- `pytest -q`: passed, 158 tests.
+- `pytest tests/test_dry_run.py -v`: passed, 9 tests.
+- `pytest tests/test_cli.py tests/test_dry_run.py -v`: passed, 21 tests.
+- `pytest -q`: passed, 159 tests.
 - `ruff check .`: passed.
 - Local-only smoke under `/tmp/hermes_c2_smoke` passed using `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example/input.scs`: `prepare-netlist` passed and `dry-run` passed.
 
@@ -469,12 +471,13 @@ Reviews:
 - Task 2 spec review: passed; Task 2 code-quality review: passed with no Critical or Important issues.
 - Task 3 spec review: passed; Task 3 code-quality review: passed with no Critical or Important issues.
 - Task 4 spec review: passed; Task 4 code-quality review: passed with no Critical or Important issues.
-- Final Task 6 review gate has not run yet.
+- Final spec review: passed.
+- Final code-quality review: passed through the project Claude Review MCP wrapper with no Critical or Important findings.
 
 Next resume point:
 
-- Run C-2 Task 6 final verification and final spec/code-quality reviews.
-- If final reviews pass, mark the C-2 plan complete and commit closeout docs.
+- Plan C-2 is complete.
+- Next follow-up scope should be confirmed before starting additional Plan C work.
 
 ## Resume Prompt
 
@@ -485,5 +488,5 @@ Next resume point:
 3. ic-auto-opt-workflow/docs/COMPACT_RESUME_CHECKPOINT.md
 4. ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。请先阅读 docs/OPENCODE_HANDOFF_2026-05-29.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md、docs/superpowers/specs/2026-05-30-dry-run-candidate-renderer-design.md、docs/superpowers/plans/2026-05-30-dry-run-candidate-renderer.md。Hermes File Contract MVP 的 Plan A Task 1-9 已完成；Plan B mock optimization loop 已完成；Plan C C-1 netlist template contract 已完成。C-2 dry-run candidate renderer 已完成实现到 Task 5，`pytest -q` 为 158 passed，`ruff check .` passed，本地真实 deck smoke passed；下一步从 C-2 Task 6 final review gate and closeout 开始，运行最终 spec/code-quality review，修复 Critical/Important 后再关闭计划。不要提交或复制本地真实 input.scs 示例。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。请先阅读 docs/OPENCODE_HANDOFF_2026-05-29.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md。Hermes File Contract MVP 的 Plan A Task 1-9 已完成；Plan B mock optimization loop 已完成；Plan C C-1 netlist template contract 已完成；Plan C C-2 dry-run candidate renderer 已完成并通过最终 spec/code-quality review gate、`pytest -q` 159 passed、`ruff check .` passed、本地真实 deck smoke passed。下一步请先向用户确认新的后续开发范围，并为该范围新建或刷新 scoped plan。不要提交或复制本地真实 input.scs 示例。
 ```
