@@ -481,7 +481,7 @@ Next resume point:
 
 ## Plan C-3: Execution Package Preflight Readiness
 
-Status: complete as of 2026-05-31.
+Status: complete through Task 5 documentation as of 2026-05-31; Task 6 final verification pending.
 
 Spec:
 
@@ -500,6 +500,9 @@ Commits:
 - `ded8d11 feat: add preflight health cli`
 - `79df214 test: cover preapproval readiness flow`
 - `900dcf2 fix: harden preapproval flow tests`
+- `a4e2473 docs: record preflight readiness progress`
+- `bbbfcd7 docs: fill preflight readiness progress hash`
+- `6befb7b docs: clarify preflight readiness resume state`
 
 Implemented:
 
@@ -517,17 +520,17 @@ Verification:
 
 Next recommended action:
 
-- Plan C-3 is complete.
-- Next Plan C scope should be confirmed before adding real Spectre execution or optimizer-loop integration.
+- Plan C-3 is complete through Task 5 documentation.
+- Continue C-3 Task 6 final verification (full pytest, spec review, code-quality review) before confirming any new scope.
 
 ## Resume Prompt
 
 ```text
-请继续执行 IC auto optimization workflow 的 Plan A。先阅读：
+请继续执行 IC auto optimization workflow。先阅读：
 1. ic-auto-opt-workflow/docs/OPENCODE_HANDOFF_2026-05-29.md
 2. ic-auto-opt-workflow/docs/EXECUTION_PROGRESS_2026-05-29.md
 3. ic-auto-opt-workflow/docs/COMPACT_RESUME_CHECKPOINT.md
 4. ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。请先阅读 docs/OPENCODE_HANDOFF_2026-05-29.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md。Hermes File Contract MVP 的 Plan A Task 1-9 已完成；Plan B mock optimization loop 已完成；Plan C C-1 netlist template contract 已完成；Plan C C-2 dry-run candidate renderer 已完成；Plan C C-3 execution package preflight readiness 已完成。下一步请先向用户确认新的后续开发范围，并为该范围新建或刷新 scoped plan。不要提交或复制本地真实 input.scs 示例。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。请先阅读 docs/OPENCODE_HANDOFF_2026-05-29.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md。Hermes File Contract MVP 的 Plan A Task 1-9 已完成；Plan B mock optimization loop 已完成；Plan C C-1 netlist template contract 已完成；Plan C C-2 dry-run candidate renderer 已完成；Plan C C-3 execution package preflight readiness 已完成至 Task 5 文档，Task 6 final verification 待执行。下一步请先继续 C-3 Task 6 final verification（完整 pytest、spec review、code-quality review），不要先确认新的后续开发范围。不要提交或复制本地真实 input.scs 示例。
 ```

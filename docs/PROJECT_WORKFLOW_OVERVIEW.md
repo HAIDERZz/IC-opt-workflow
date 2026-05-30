@@ -2,15 +2,15 @@
 
 ## 当前项目节点
 
-截至 2026-05-30：
+截至 2026-05-31：
 
 - Plan A Hermes File Contract MVP 已完成到 Task 9。Hermes 部分没有 Plan A Task 10。
 - Plan B mock optimization loop 已完成并提交。
 - Plan C C-1 netlist template contract 已完成并提交。
 - Plan C C-2 dry-run candidate renderer 已完成并通过最终 review gate。
-- Plan C C-3 execution package preflight readiness 已完成：生成的 execution package 将 Maestro export 分配给执行 agent，Hermes 拥有 `prepare-netlist`、`dry-run`、`preflight-health` 和 `approve`。
+- Plan C C-3 execution package preflight readiness 已完成至 Task 5 文档，Task 6 final verification 待执行：生成的 execution package 将 Maestro export 分配给执行 agent，Hermes 拥有 `prepare-netlist`、`dry-run`、`preflight-health` 和 `approve`。
 - 顶层 broad plan 已对齐当前路线：Hermes 负责 deterministic preflight，执行 agent 负责 Maestro export 和 approval 之后的真实 Spectre/optimizer 执行。
-- 下一步需要先确认新的后续开发范围。
+- 下一步：先继续 C-3 Task 6 final verification（完整 pytest、spec review、code-quality review），不要先确认新的后续开发范围。
 - `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example` 下的真实 `input.scs` 示例只作为本地参考，不能提交进仓库。
 
 ## 1. 项目概览
@@ -161,7 +161,7 @@ projects/bridge_test_inv/netlists/exported/input.scs
 hermes-workflow prepare-netlist projects/bridge_test_inv
 ```
 
-执��� deterministic dry-run：
+执行 deterministic dry-run：
 
 ```bash
 hermes-workflow dry-run projects/bridge_test_inv
