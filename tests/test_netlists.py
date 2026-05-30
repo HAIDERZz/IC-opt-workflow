@@ -165,3 +165,50 @@ tran tran stop=10n
     assert report.status == PassFail.FAIL
     assert "approved variable FN appears more than once in top-level parameters" in report.issues
     assert not (project_dir / "netlists" / "templates" / "template.scs").exists()
+
+
+def test_prepare_netlist_templates_values_with_whitespace_units(tmp_path: Path) -> None:
+    project_dir = _project_with_input(
+        tmp_path,
+        """simulator lang=spectre
+parameters temperature=27 FN=4 FP=4 WN=0.6 u WP=1.2 u
+tran tran stop=10n
+""",
+    )
+
+    report = prepare_netlist(project_dir)
+
+    template_text = (
+        project_dir / "netlists" / "templates" / "template.scs"
+    ).read_text(encoding="utf-8")
+    assert report.status == PassFail.PASS
+    assert "WN={{WN}}" in template_text
+    assert "WP={{WP}}" in template_text
+    assert "WN={{WN}} u" not in template_text
+    assert "WP={{WP}} u" not in template_text
+
+
+def test_prepare_netlist_fails_closed_for_subckt_parameter_assignments(
+    tmp_path: Path,
+) -> None:
+    project_dir = _project_with_input(
+        tmp_path,
+        """simulator lang=spectre
+parameters temperature=27 FP=4 WP=1.2u
+subckt wrapped IN OUT VDD VSS
+parameters FN=4 WN=0.6u
+M0 (OUT IN VSS VSS) nmos w=WN*FN l=45n
+ends wrapped
+tran tran stop=10n
+""",
+    )
+
+    report = prepare_netlist(project_dir)
+
+    assert report.status == PassFail.FAIL
+    assert report.forbidden_setup_changes_detected is True
+    assert "approved variable FN was found outside top-level parameters" in report.issues
+    assert "approved variable WN was found outside top-level parameters" in report.issues
+    assert "approved variable FN was not found in top-level parameters" in report.issues
+    assert "approved variable WN was not found in top-level parameters" in report.issues
+    assert not (project_dir / "netlists" / "templates" / "template.scs").exists()

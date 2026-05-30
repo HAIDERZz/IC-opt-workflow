@@ -27,7 +27,13 @@ def prepare_netlist(project_dir: Path) -> NetlistPreparationReport:
         return report
 
     deck_text = exported_path.read_text(encoding="utf-8")
-    template_text, template_status, analysis_statements, issues = _template_deck(
+    (
+        template_text,
+        template_status,
+        analysis_statements,
+        forbidden_setup_changes_detected,
+        issues,
+    ) = _template_deck(
         deck_text,
         variable_names,
     )
@@ -44,7 +50,7 @@ def prepare_netlist(project_dir: Path) -> NetlistPreparationReport:
         status,
         template_status,
         analysis_statements,
-        False,
+        forbidden_setup_changes_detected,
         issues,
     )
     _write_report(bundle, report)
@@ -61,7 +67,7 @@ def _project_path(bundle: ContractBundle, relative_path: str) -> Path:
 def _template_deck(
     deck_text: str,
     variable_names: list[str],
-) -> tuple[str, dict[str, bool], list[str], list[str]]:
+) -> tuple[str, dict[str, bool], list[str], bool, list[str]]:
     template_status = {name: False for name in variable_names}
     seen_counts = {name: 0 for name in variable_names}
     lines = deck_text.splitlines(keepends=True)
@@ -69,6 +75,8 @@ def _template_deck(
     analysis_statements: list[str] = []
     variable_set = set(variable_names)
     issues: list[str] = []
+    ineligible_counts = {name: 0 for name in variable_names}
+    subckt_depth = 0
 
     for statement in _logical_statements(lines):
         statement_text = "".join(lines[index] for index in statement)
@@ -76,7 +84,21 @@ def _template_deck(
         if first_token in ANALYSIS_NAMES and first_token not in analysis_statements:
             analysis_statements.append(first_token)
 
+        is_top_level = subckt_depth == 0
+        if first_token == "subckt":
+            subckt_depth += 1
+        elif first_token == "ends" and subckt_depth > 0:
+            subckt_depth -= 1
+
         if first_token != "parameters":
+            continue
+
+        if not is_top_level:
+            for name, count in _count_approved_assignments(
+                statement_text,
+                variable_set,
+            ).items():
+                ineligible_counts[name] += count
             continue
 
         rewritten, found_counts = _rewrite_parameter_statement(
@@ -100,8 +122,18 @@ def _template_deck(
             issues.append(f"approved variable {name} was not found in top-level parameters")
         elif count > 1:
             issues.append(f"approved variable {name} appears more than once in top-level parameters")
+    for name, count in ineligible_counts.items():
+        if count:
+            issues.append(f"approved variable {name} was found outside top-level parameters")
 
-    return "".join(output_lines), template_status, analysis_statements, issues
+    forbidden_setup_changes_detected = any(ineligible_counts.values())
+    return (
+        "".join(output_lines),
+        template_status,
+        analysis_statements,
+        forbidden_setup_changes_detected,
+        issues,
+    )
 
 
 def _logical_statements(lines: list[str]) -> list[list[int]]:
@@ -154,6 +186,18 @@ def _rewrite_parameter_statement(
     return "".join(pieces), found_counts
 
 
+def _count_approved_assignments(
+    statement_text: str,
+    variable_set: set[str],
+) -> dict[str, int]:
+    found_counts = {name: 0 for name in variable_set}
+    for match in ASSIGNMENT_TOKEN_RE.finditer(statement_text):
+        name = match.group("name")
+        if name in variable_set:
+            found_counts[name] += 1
+    return found_counts
+
+
 def _assignment_value_end(
     statement_text: str,
     matches: list[re.Match[str]],
@@ -164,12 +208,10 @@ def _assignment_value_end(
         next_start = matches[index + 1].start()
     else:
         next_start = len(statement_text)
-    value_end = value_start
-    for char in statement_text[value_start:next_start]:
-        if char.isspace() or char == "\\":
-            break
-        value_end += 1
-    return value_end
+    segment = statement_text[value_start:next_start]
+    if "\\" in segment:
+        segment = segment[: segment.index("\\")]
+    return value_start + len(segment.rstrip())
 
 
 def _split_rewritten_statement(
