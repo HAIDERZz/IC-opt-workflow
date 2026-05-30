@@ -419,6 +419,43 @@ Next recommended action:
 - Do not copy real `input.scs` examples into the repository.
 - Next scope should be confirmed before starting a new Plan C follow-up task.
 
+## Plan C-2: Dry-Run Candidate Renderer
+
+Status: design spec and implementation plan complete as of 2026-05-30. Coding has not started.
+
+Spec:
+
+- `docs/superpowers/specs/2026-05-30-dry-run-candidate-renderer-design.md`
+
+Implementation plan:
+
+- `docs/superpowers/plans/2026-05-30-dry-run-candidate-renderer.md`
+
+Commit:
+
+- `e2b1c30 docs: design dry-run candidate renderer`
+- `5441972 docs: plan dry-run candidate renderer`
+
+Current boundary:
+
+- C-2 is intended to render a deterministic lower-bound candidate from `netlists/templates/template.scs` into `runs/dry_run/input.scs`.
+- C-2 should write the existing `reports/dry_run_report.json` schema.
+- C-2 should check unresolved/unexpected placeholders and mock metric/objective/constraint evaluability.
+- C-2 must not run Spectre, Virtuoso, or the optimizer loop.
+
+Important status note:
+
+- C-2 implementation must follow the six-task plan and use review gates after each task.
+- The plan is structured for `superpowers:subagent-driven-development` and can delegate focused coding work to Claude CLI workers.
+- No C-2 implementation code has been written yet.
+
+Next resume point:
+
+- Review the C-2 design spec.
+- Review the C-2 implementation plan.
+- Start with C-2 Task 1: Dry-Run Success Path.
+- Do not skip ahead to C-2 CLI or final docs before Task 1-3 renderer semantics are green.
+
 ## Resume Prompt
 
 ```text
@@ -428,5 +465,5 @@ Next recommended action:
 3. ic-auto-opt-workflow/docs/COMPACT_RESUME_CHECKPOINT.md
 4. ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。请先阅读 docs/OPENCODE_HANDOFF_2026-05-29.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md。Hermes File Contract MVP 的 Plan A Task 1-9 已完成并通过 spec/code-quality review gate、pytest 和 ruff；不要重做 Task 1-9，也不要寻找 Plan A Task 10。下一步如要继续开发，请先向用户确认新的后续开发范围，并为该范围新建或刷新 scoped plan。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。请先阅读 docs/OPENCODE_HANDOFF_2026-05-29.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md、docs/superpowers/specs/2026-05-30-dry-run-candidate-renderer-design.md、docs/superpowers/plans/2026-05-30-dry-run-candidate-renderer.md。Hermes File Contract MVP 的 Plan A Task 1-9 已完成；Plan B mock optimization loop 已完成；Plan C C-1 netlist template contract 已完成。C-2 dry-run candidate renderer 已完成 design spec 和 implementation plan，但尚未开始编码。下一步请使用 superpowers:subagent-driven-development，从 C-2 plan 的 Task 1: Dry-Run Success Path 开始执行，每个 task 后运行测试、ruff 和 review gate；不要提交或复制本地真实 input.scs 示例。
 ```

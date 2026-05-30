@@ -36,6 +36,9 @@ Current execution state:
 - Plan C Task 5 complete: full tests, ruff, and local-only real deck smoke passed.
 - Plan C Task 6 complete: final review blockers fixed in `da23a7f fix: harden netlist parameter scanner`; final spec and code-quality re-reviews passed.
 - Current state: Plan C C-1 is complete. Confirm the next scope before starting additional Plan C work.
+- Plan C-2 dry-run candidate renderer design spec exists: `e2b1c30 docs: design dry-run candidate renderer`.
+- Plan C-2 implementation plan exists: `5441972 docs: plan dry-run candidate renderer`.
+- C-2 coding has not started. Resume at C-2 Task 1: Dry-Run Success Path.
 - Real `input.scs` examples under `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example` are local-only references and must not be committed.
 
 ## Files Already Read
@@ -57,8 +60,10 @@ Current execution state:
 - Earlier broad plan: `ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md`
 - Active Plan C follow-up plan: `ic-auto-opt-workflow/docs/superpowers/plans/2026-05-30-netlist-template-contract.md`
 - Active Plan C spec: `ic-auto-opt-workflow/docs/superpowers/specs/2026-05-30-netlist-template-contract-design.md`
+- Active C-2 design spec: `ic-auto-opt-workflow/docs/superpowers/specs/2026-05-30-dry-run-candidate-renderer-design.md`
+- Active C-2 implementation plan: `ic-auto-opt-workflow/docs/superpowers/plans/2026-05-30-dry-run-candidate-renderer.md`
 
-Plan A and Plan C C-1 are complete. If resuming current development, confirm the next scope unless the user explicitly names it.
+Plan A, Plan B, and Plan C C-1 are complete. If resuming C-2, execute `docs/superpowers/plans/2026-05-30-dry-run-candidate-renderer.md` from Task 1 unless the user changes scope.
 
 ## Confirmed Plan A Scope
 
