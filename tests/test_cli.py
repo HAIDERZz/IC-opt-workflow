@@ -225,3 +225,36 @@ def test_cli_approve_help_uses_generic_preflight_language() -> None:
     assert result.exit_code == 0
     assert "Project directory with preflight reports" in result.stdout
     assert "Claude preflight reports" not in result.stdout
+
+
+def test_cli_preapproval_flow_can_approve_without_real_execution(
+    tmp_path: Path,
+) -> None:
+    project_dir = tmp_path / "bridge_test_inv"
+    assert runner.invoke(app, ["init", str(project_dir)]).exit_code == 0
+    assert runner.invoke(app, ["package", str(project_dir)]).exit_code == 0
+    (project_dir / "netlists" / "exported" / "input.scs").write_text(
+        """simulator lang=spectre
+parameters temperature=27 FN=4 FP=4 WN=0.6u WP=1.2u
+tran tran stop=10n
+""",
+        encoding="utf-8",
+    )
+
+    prepare_result = runner.invoke(app, ["prepare-netlist", str(project_dir)])
+    dry_run_result = runner.invoke(app, ["dry-run", str(project_dir)])
+    health_result = runner.invoke(app, ["preflight-health", str(project_dir)])
+    approve_result = runner.invoke(app, ["approve", str(project_dir)])
+
+    instruction = json.loads(
+        (project_dir / "supervisor_instruction.json").read_text(encoding="utf-8")
+    )
+    assert prepare_result.exit_code == 0
+    assert dry_run_result.exit_code == 0
+    assert health_result.exit_code == 0
+    assert approve_result.exit_code == 0
+    assert instruction["decision"] == "approve_first_real_run"
+    assert instruction["reason"] == "config validation and preflight reports passed"
+    assert not (project_dir / "ledger" / "experiment_ledger.jsonl").exists()
+    assert not (project_dir / "state" / "optimizer_state.json").exists()
+    assert not (project_dir / "state" / "best_candidate.json").exists()

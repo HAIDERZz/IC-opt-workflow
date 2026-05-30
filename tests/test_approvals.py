@@ -122,3 +122,33 @@ def test_approval_gate_rejects_manifest_missing_config_hashes(tmp_path: Path) ->
     assert instruction["decision"] == "reject_first_real_run"
     assert "execution manifest is missing immutable_config_files" in instruction["reason"]
     assert instruction["approved_config_hashes"] == {}
+
+
+def test_approval_gate_rejects_health_report_with_real_run_started(
+    tmp_path: Path,
+) -> None:
+    project_dir = tmp_path / "bridge_test_inv"
+    create_project_from_template(project_dir)
+    build_execution_package(project_dir, created_at_utc="2026-05-28T00:00:00Z")
+    write_pass_reports(project_dir)
+    health_path = project_dir / "state" / "health_check.json"
+    health_payload = json.loads(health_path.read_text(encoding="utf-8"))
+    health_payload["status"] = "error"
+    health_payload["real_run_started"] = True
+    health_payload["issues"] = [
+        "pre-approval real-run artifact exists: ledger/experiment_ledger.jsonl"
+    ]
+    write_json(health_path, health_payload)
+
+    instruction = decide_first_real_run(
+        project_dir,
+        created_at_utc="2026-05-28T00:10:00Z",
+    )
+
+    assert instruction["decision"] == "reject_first_real_run"
+    assert "health status is error" in instruction["reason"]
+    assert "real run already started before approval" in instruction["reason"]
+    assert (
+        "pre-approval real-run artifact exists: ledger/experiment_ledger.jsonl"
+        in instruction["reason"]
+    )
