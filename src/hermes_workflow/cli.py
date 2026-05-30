@@ -7,6 +7,7 @@ import typer
 from hermes_workflow import __version__
 from hermes_workflow.approvals import decide_first_real_run
 from hermes_workflow.dry_run import run_dry_run
+from hermes_workflow.health import write_preflight_health
 from hermes_workflow.mock_optimizer import run_mock_optimization
 from hermes_workflow.netlists import prepare_netlist
 from hermes_workflow.package import (
@@ -121,6 +122,28 @@ def dry_run_command(
     raise typer.Exit(code=1)
 
 
+@app.command("preflight-health")
+def preflight_health_command(
+    project_dir: Annotated[
+        Path,
+        typer.Argument(help="Project directory with validated config/*.yaml."),
+    ],
+) -> None:
+    try:
+        report = write_preflight_health(project_dir)
+    except (OSError, ValueError) as exc:
+        _exit_with_error(exc)
+    if report.status.value == "healthy":
+        typer.echo("preflight health passed")
+        return
+
+    typer.echo("preflight health failed")
+    for issue in report.issues:
+        typer.echo(issue)
+    typer.echo("report: state/health_check.json")
+    raise typer.Exit(code=1)
+
+
 @app.command("package")
 def package_command(
     project_dir: Annotated[
@@ -139,7 +162,7 @@ def package_command(
 def approve_command(
     project_dir: Annotated[
         Path,
-        typer.Argument(help="Project directory with Claude preflight reports."),
+        typer.Argument(help="Project directory with preflight reports."),
     ],
 ) -> None:
     try:

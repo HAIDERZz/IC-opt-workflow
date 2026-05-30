@@ -42,7 +42,7 @@ def decide_first_real_run(
         "schema_version": "1.0",
         "created_at_utc": created_at,
         "decision": "approve_first_real_run",
-        "reason": "config validation and Claude preflight reports passed",
+        "reason": "config validation and preflight reports passed",
         "allowed_actions": ["run_standalone_spectre_optimizer"],
         "forbidden_actions": [
             "modify_maestro_setup",

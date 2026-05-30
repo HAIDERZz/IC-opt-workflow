@@ -177,3 +177,51 @@ def test_cli_dry_run_reports_failure_without_traceback(tmp_path: Path) -> None:
     assert "template.scs is missing: netlists/templates/template.scs" in result.stdout
     assert "reports/dry_run_report.json" in result.stdout
     assert "Traceback" not in result.output
+
+
+def test_cli_preflight_health_writes_health_report(tmp_path: Path) -> None:
+    project_dir = tmp_path / "bridge_test_inv"
+    runner.invoke(app, ["init", str(project_dir)])
+
+    result = runner.invoke(app, ["preflight-health", str(project_dir)])
+
+    payload = json.loads(
+        (project_dir / "state" / "health_check.json").read_text(encoding="utf-8")
+    )
+    assert result.exit_code == 0
+    assert "preflight health passed" in result.stdout
+    assert payload["status"] == "healthy"
+    assert payload["real_run_started"] is False
+
+
+def test_cli_preflight_health_reports_real_run_artifacts_without_traceback(
+    tmp_path: Path,
+) -> None:
+    project_dir = tmp_path / "bridge_test_inv"
+    runner.invoke(app, ["init", str(project_dir)])
+    (project_dir / "state" / "optimizer_state.json").write_text(
+        "{}\n",
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(app, ["preflight-health", str(project_dir)])
+
+    payload = json.loads(
+        (project_dir / "state" / "health_check.json").read_text(encoding="utf-8")
+    )
+    assert result.exit_code == 1
+    assert isinstance(result.exception, SystemExit)
+    assert "preflight health failed" in result.stdout
+    assert "pre-approval real-run artifact exists: state/optimizer_state.json" in result.stdout
+    assert "report: state/health_check.json" in result.stdout
+    assert "Traceback" not in result.output
+    assert payload["status"] == "error"
+    assert payload["real_run_started"] is True
+
+
+def test_cli_approve_help_uses_generic_preflight_language() -> None:
+    result = runner.invoke(app, ["approve", "--help"])
+
+    assert result.exit_code == 0
+    assert "Project directory with preflight reports" in result.stdout
+    assert "Claude preflight reports" not in result.stdout

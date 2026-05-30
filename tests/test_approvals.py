@@ -23,6 +23,7 @@ def test_approval_gate_writes_approve_instruction(tmp_path: Path) -> None:
     payload = json.loads(instruction_path.read_text(encoding="utf-8"))
     assert instruction["decision"] == "approve_first_real_run"
     assert payload["decision"] == "approve_first_real_run"
+    assert payload["reason"] == "config validation and preflight reports passed"
     assert "run_standalone_spectre_optimizer" in payload["allowed_actions"]
     assert payload["approved_config_hashes"]["config/project_config.yaml"]
 
