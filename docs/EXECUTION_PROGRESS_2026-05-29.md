@@ -344,7 +344,7 @@ Next recommended action: hand off from focused Plan A into a new, user-confirmed
 
 ## Plan C: Netlist Template Contract
 
-Status: Task 5 completed on 2026-05-30. Continue with Task 6 final review gate.
+Status: completed through Task 6 on 2026-05-30.
 
 Plan files:
 
@@ -359,6 +359,8 @@ Commits:
 - `6ce3e69 fix: support continued spectre parameters`
 - `8e59ac9 fix: report unsafe netlist templating failures`
 - `04fa358 feat: add prepare netlist cli`
+- `5bf3e33 docs: record netlist template progress`
+- `da23a7f fix: harden netlist parameter scanner`
 
 Completed:
 
@@ -367,6 +369,7 @@ Completed:
 - Task 3: fail reports for missing exported input, missing approved variables, duplicate approved variables, and stale `template.scs` cleanup on failure.
 - Task 4: `hermes-workflow prepare-netlist` CLI command and CLI smoke tests.
 - Task 5: full verification, local-only real deck smoke in `/tmp`, and progress update.
+- Task 6: final spec/code-quality gate and scanner hardening from review feedback.
 
 Implemented so far:
 
@@ -390,6 +393,9 @@ Verification:
 - During Task 5: `pytest -q` passed, 146 tests.
 - During Task 5: `ruff check .` passed.
 - During Task 5: local-only smoke under `/tmp/hermes_plan_c_smoke` passed for `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example/input.scs`, `input1.scs`, `input2.scs`, and `input3.scs`.
+- During Task 6 after review fixes: `pytest -q` passed, 148 tests.
+- During Task 6 after review fixes: `ruff check .` passed.
+- During Task 6 after review fixes: local-only smoke under `/tmp/hermes_plan_c_smoke` passed again for all four real deck examples.
 
 Reviews:
 
@@ -397,6 +403,8 @@ Reviews:
 - Task 2 spec review: passed; Task 2 code-quality review: passed with no Critical or Important issues.
 - Task 3 spec review: passed; Task 3 code-quality review: passed with no Critical or Important issues.
 - Task 4 spec review: passed; Task 4 code-quality review: passed with no Critical or Important issues.
+- Task 6 final spec review: passed.
+- Task 6 final code-quality review initially found Critical/Important scanner issues. Commit `da23a7f` fixed whitespace-unit RHS spans, subckt/non-top-level parameter handling, and `forbidden_setup_changes_detected` propagation. Final code-quality re-review passed with no Critical or Important issues.
 
 Important decisions:
 
@@ -405,12 +413,11 @@ Important decisions:
 - Current netlist templater rewrites only approved variable RHS values in top-level `parameters` statements.
 - Device, subckt, source, analysis, include, model, and save statements remain unchanged.
 
-Next resume point:
+Next recommended action:
 
-- Continue with Plan C Task 6: Review Gate And Final Verification.
-- Do not redo Tasks 1-5.
+- Plan C C-1 is complete.
 - Do not copy real `input.scs` examples into the repository.
-- Run final full-suite verification and Claude review gates for `51253fe..HEAD`.
+- Next scope should be confirmed before starting a new Plan C follow-up task.
 
 ## Resume Prompt
 
