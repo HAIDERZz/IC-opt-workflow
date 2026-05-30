@@ -12,9 +12,9 @@ This handoff summarizes the current `ic-auto-opt-workflow` state so opencode can
 
 ## Current Status
 
-Focused Plan A, Hermes File Contract MVP, is complete through Task 9.
+Plan A (Hermes File Contract MVP) Task 1-9 complete. Plan B (mock optimization loop) complete. Plan C-1 (netlist template contract) complete. Plan C-2 (dry-run candidate renderer) complete. Plan C-3 (execution package preflight readiness) complete through Task 5 documentation as of 2026-05-31, with Task 6 final verification pending.
 
-Completed scope:
+Plan A completed scope:
 
 - Python package scaffold and Typer entry point.
 - Pydantic schemas for the five structured YAML contracts.
@@ -107,17 +107,18 @@ tests/
 
 ## Next Development Decision
 
-Focused Hermes Plan A ends at Task 9. There is no Task 10 in this Hermes File Contract MVP plan.
+Plan A Task 1-9, Plan B, Plan C-1, and Plan C-2 are complete. Plan C-3 is complete through Task 5 documentation as of 2026-05-31; Task 6 final verification (full pytest, spec review, code-quality review) is pending.
 
 Recommended next move for opencode:
 
-1. Treat Plan A Task 1-9 as complete.
+1. Treat Plan A Task 1-9, Plan B, Plan C-1, and Plan C-2 as complete.
 2. Do not rework completed modules unless a new review finding appears.
-3. Ask the user to confirm the next development scope.
-4. For any follow-up scope, write or refresh a focused plan first, then implement with TDD and run spec/code-quality review gates before moving on.
+3. Continue C-3 Task 6 final verification first. Do not confirm a new development scope before Task 6 is complete.
+4. Real `input.scs` examples under `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example` are local reference material only and must not be committed.
+5. Preflight-health state is tracked in `state/health_check.json` (see `src/hermes_workflow/health.py` and `hermes-workflow preflight-health` CLI).
 
 ## One-Sentence Continue Prompt
 
 ```text
-请在 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow 的 branch plan-a-hermes-file-contract-mvp 上继续开发：先阅读 docs/OPENCODE_HANDOFF_2026-05-29.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md 和 Hermes Plan A 文件；Hermes File Contract MVP 的 Plan A Task 1-9 已完成并通过 review/pytest/ruff，不要重做，也不要寻找 Plan A Task 10；下一步先向用户确认新的后续开发范围，并为该范围新建或刷新 scoped plan。
+请在 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow 的 branch plan-a-hermes-file-contract-mvp 上继续开发：先阅读 docs/OPENCODE_HANDOFF_2026-05-29.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md 和 Hermes Plan A 文件。Plan A Task 1-9 已完成，Plan B 已完成，Plan C-1 已完成，Plan C-2 已完成，Plan C-3 已完成至 Task 5 文档（2026-05-31），Task 6 final verification 待执行。下一步先继续 C-3 Task 6 final verification（完整 pytest、spec review、code-quality review），不要先确认新的后续开发范围。本地 input.scs 示例禁止提交到仓库。
 ```

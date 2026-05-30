@@ -340,7 +340,7 @@ Status: focused Plan A complete through Task 9.
 
 Focused Hermes Plan A ends at Task 9. There is no Task 10 in this Hermes File Contract MVP plan.
 
-Next recommended action (historical): hand off from focused Plan A into a new, user-confirmed development scope. This was superseded by later Plan C-3 status; current next action is C-3 Task 6 final verification. The new worker should read `docs/OPENCODE_HANDOFF_2026-05-29.md` first, avoid redoing Plan A Tasks 1-9, and create or refresh a scoped plan for whatever follow-up the user chooses.
+Next recommended action (historical): hand off from focused Plan A into a new, user-confirmed development scope. This was superseded by later Plan C-3 status; current next action is C-3 Task 6 final verification. The new worker should read `docs/OPENCODE_HANDOFF_2026-05-29.md` first, avoid redoing Plan A Tasks 1-9, and proceed directly to C-3 Task 6 final verification before confirming any new scope.
 
 ## Plan C: Netlist Template Contract
 
