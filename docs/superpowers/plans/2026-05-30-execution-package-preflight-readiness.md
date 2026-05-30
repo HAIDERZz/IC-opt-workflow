@@ -36,7 +36,7 @@ Do not commit or copy real `input.scs` examples from `/home/zzchen/Agent_virtuos
 
 ## Execution Status
 
-Status: complete as of 2026-05-31.
+Status: complete through Task 5 documentation as of 2026-05-31; Task 6 final verification pending.
 
 Completed commits:
 
@@ -48,6 +48,7 @@ Completed commits:
 - Task 4: `79df214 test: cover preapproval readiness flow`
 - Task 4 fix: `900dcf2 fix: harden preapproval flow tests`
 - Task 5: `a4e2473 docs: record preflight readiness progress`
+- Task 5 follow-up: `bbbfcd7 docs: fill preflight readiness progress hash`
 
 Final verification (after Task 6):
 

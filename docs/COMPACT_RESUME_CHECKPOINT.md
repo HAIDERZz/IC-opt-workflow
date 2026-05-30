@@ -352,5 +352,5 @@ Use this prompt after compact:
 4. ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md
 5. 如需背景，再读 ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。Hermes File Contract MVP 的 Plan A Task 1-9 已完成并通过 spec/code-quality review gate、pytest 和 ruff；不要重做 Task 1-9，也不要寻找 Plan A Task 10。下一步请先向用户确认新的后续开发范围，并为该范围新建或刷新 scoped plan。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。Plan A Task 1-9 已完成并通过 spec/code-quality review gate、pytest 和 ruff；Plan B mock optimization loop 完成并已提交；Plan C C-1 netlist template contract 完成并已提交；Plan C C-2 dry-run candidate renderer 完成并已提交；Plan C C-3 execution package preflight readiness 已完成至 Task 5 文档，Task 6 final verification 待执行。下一步请先继续 C-3 Task 6 final verification（完整 pytest、spec review、code-quality review），不要先确认新的后续开发范围。真实 input.scs 示例在 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example 下，仅供本地参考，请勿将其提交到仓库。
 ```
