@@ -39,7 +39,8 @@ Current execution state:
 - Plan C-2 dry-run candidate renderer design spec exists: `e2b1c30 docs: design dry-run candidate renderer`.
 - Plan C-2 implementation plan exists: `5441972 docs: plan dry-run candidate renderer`.
 - The historical broad plan has been aligned to the current route: Hermes owns deterministic preflight; the execution agent owns Maestro export and post-approval real execution.
-- C-2 coding has not started. Resume at C-2 Task 1: Dry-Run Success Path.
+- C-2 implementation is complete through Task 5: renderer, failure checks, mock/writability semantics, CLI, full verification, and local-only smoke have passed.
+- C-2 final Task 6 review gate and closeout remain. Resume at C-2 Task 6.
 - Real `input.scs` examples under `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example` are local-only references and must not be committed.
 
 ## Files Already Read
@@ -64,7 +65,7 @@ Current execution state:
 - Active C-2 design spec: `ic-auto-opt-workflow/docs/superpowers/specs/2026-05-30-dry-run-candidate-renderer-design.md`
 - Active C-2 implementation plan: `ic-auto-opt-workflow/docs/superpowers/plans/2026-05-30-dry-run-candidate-renderer.md`
 
-Plan A, Plan B, and Plan C C-1 are complete. If resuming C-2, execute `docs/superpowers/plans/2026-05-30-dry-run-candidate-renderer.md` from Task 1 unless the user changes scope.
+Plan A, Plan B, and Plan C C-1 are complete. C-2 is implemented through Task 5. If resuming C-2, execute `docs/superpowers/plans/2026-05-30-dry-run-candidate-renderer.md` from Task 6 unless the user changes scope.
 
 ## Confirmed Plan A Scope
 
