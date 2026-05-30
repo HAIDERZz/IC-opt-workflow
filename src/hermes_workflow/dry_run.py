@@ -97,8 +97,13 @@ def run_dry_run(project_dir: Path) -> DryRunReport:
     )
 
     if status == PassFail.PASS:
-        rendered_path.parent.mkdir(parents=True, exist_ok=True)
-        rendered_path.write_text(rendered_text, encoding="utf-8")
+        try:
+            rendered_path.parent.mkdir(parents=True, exist_ok=True)
+            rendered_path.write_text(rendered_text, encoding="utf-8")
+        except OSError as exc:
+            issues.append(f"rendered candidate could not be written: {exc}")
+            status = PassFail.FAIL
+            _cleanup_rendered(rendered_path)
     else:
         _cleanup_rendered(rendered_path)
 

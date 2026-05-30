@@ -194,3 +194,22 @@ tran tran stop=10n
     assert not (project_dir / "state" / "optimizer_state.json").exists()
     assert not (project_dir / "state" / "best_candidate.json").exists()
     assert not (project_dir / "state" / "health_check.json").exists()
+
+
+def test_run_dry_run_reports_render_write_failure(tmp_path: Path) -> None:
+    project_dir = _create_project_with_template(
+        tmp_path,
+        """simulator lang=spectre
+parameters FN={{FN}} WN={{WN}} FP={{FP}} WP={{WP}}
+tran tran stop=10n
+""",
+    )
+    (project_dir / "runs").write_text("not a directory", encoding="utf-8")
+
+    report = run_dry_run(project_dir)
+
+    persisted = _load_report(project_dir)
+    assert report == persisted
+    assert report.status == PassFail.FAIL
+    assert report.issues
+    assert "rendered candidate could not be written" in report.issues[0]
