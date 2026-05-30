@@ -8,7 +8,7 @@ This note preserves the implementation state for continuing Plan A after context
 - Branch: `plan-a-hermes-file-contract-mvp`
 - Baseline branch: `master`
 - Baseline commit: `885e97f docs: capture workflow planning baseline`
-- Latest Plan A implementation commit before this documentation handoff: `720adb9 fix: clarify cli json error handling`
+- Latest C-3 code commit before docs-only cleanup: `900dcf2 fix: harden preapproval flow tests`; docs cleanup continues through current HEAD
 - Active plan: `docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md`
 - Execution method: `superpowers:subagent-driven-development`
 - Dependencies installed in active Python environment on 2026-05-29: `pytest`, `typer`, `pydantic`, `PyYAML`, `ruff`

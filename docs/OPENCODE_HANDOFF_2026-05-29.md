@@ -8,7 +8,7 @@ This handoff was originally dated 2026-05-29 and updated 2026-05-31 for C-3 Task
 - Branch: `plan-a-hermes-file-contract-mvp`
 - Focused plan: `docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md`
 - Historical planning context: `docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md`
-- Latest implementation commit before handoff docs: `720adb9 fix: clarify cli json error handling`
+- Latest C-3 code commit before docs-only handoff cleanup: `900dcf2 fix: harden preapproval flow tests`; later docs commits exist through current HEAD
 
 ## Current Status
 
@@ -40,15 +40,17 @@ Out of scope and not implemented:
 
 ## Verification And Reviews
 
-Latest verification before this handoff:
+Latest verification before this handoff (targeted C-3 docs/task verification, pre-Task-6):
 
 ```bash
-pytest -q
-# 56 passed
+pytest tests/test_cli.py tests/test_approvals.py tests/test_health.py tests/test_package.py -v
+# 37 passed
 
 ruff check .
 # All checks passed
 ```
+
+Full `pytest -q` is pending Task 6 final verification.
 
 Task 9 review gates at final code head:
 
@@ -101,6 +103,8 @@ src/hermes_workflow/validate.py
 src/hermes_workflow/package.py
 src/hermes_workflow/reports.py
 src/hermes_workflow/approvals.py
+src/hermes_workflow/health.py              # preflight health-check report writer
+src/hermes_workflow/netlists.py             # Spectre netlist parameter templater
 src/hermes_workflow/cli.py
 tests/
 ```
