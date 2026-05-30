@@ -47,7 +47,7 @@ Completed commits:
 - Task 3: `ded8d11 feat: add preflight health cli`
 - Task 4: `79df214 test: cover preapproval readiness flow`
 - Task 4 fix: `900dcf2 fix: harden preapproval flow tests`
-- Task 5: docs commit being created by this task.
+- Task 5: `a4e2473 docs: record preflight readiness progress`
 
 Final verification (after Task 6):
 
