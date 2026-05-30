@@ -8,6 +8,7 @@ This handoff was originally dated 2026-05-29 and updated 2026-05-31 for C-3 Task
 - Branch: `plan-a-hermes-file-contract-mvp`
 - Focused plan: `docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md`
 - Historical planning context: `docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md`
+- Latest next-development log: `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`
 - Latest C-3 code commit before docs-only handoff cleanup: `900dcf2 fix: harden preapproval flow tests`; later docs commits exist through current HEAD
 
 ## Current Status
@@ -88,6 +89,7 @@ Read in this order:
 
 ```text
 docs/OPENCODE_HANDOFF_2026-05-29.md
+docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md
 docs/EXECUTION_PROGRESS_2026-05-29.md
 docs/COMPACT_RESUME_CHECKPOINT.md
 docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md
@@ -124,5 +126,5 @@ Recommended next move for opencode:
 ## One-Sentence Continue Prompt
 
 ```text
-请在 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow 的 branch plan-a-hermes-file-contract-mvp 上继续开发：先阅读 docs/OPENCODE_HANDOFF_2026-05-29.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md 和 Hermes Plan A 文件。Plan A Task 1-9 已完成，Plan B 已完成，Plan C-1 已完成，Plan C-2 已完成，Plan C-3 已完成至 Task 5 文档（2026-05-31），Task 6 final verification 待执行。下一步先继续 C-3 Task 6 final verification（完整 pytest、spec review、code-quality review），不要先确认新的后续开发范围。本地 input.scs 示例禁止提交到仓库。
+请在 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow 的 branch plan-a-hermes-file-contract-mvp 上继续开发：先阅读 docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/OPENCODE_HANDOFF_2026-05-29.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md 和 Hermes Plan A 文件。Plan A Task 1-9 已完成，Plan B 已完成，Plan C-1 已完成，Plan C-2 已完成，Plan C-3 已完成至 Task 5 文档（2026-05-31），Task 6 final verification 待执行。下一步先继续 C-3 Task 6 final verification（完整 pytest、spec review、code-quality review），不要先确认新的后续开发范围。本地 input.scs 示例禁止提交到仓库。
 ```
