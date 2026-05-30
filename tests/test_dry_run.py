@@ -149,3 +149,48 @@ tran tran stop=10n
 
     assert failed_report.status == PassFail.FAIL
     assert not (project_dir / "runs" / "dry_run" / "input.scs").exists()
+
+
+def test_run_dry_run_constraint_result_false_still_checks_evaluability(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_project_with_template(
+        tmp_path,
+        """simulator lang=spectre
+parameters FN={{FN}} WN={{WN}} FP={{FP}} WP={{WP}}
+tran tran stop=10n
+""",
+    )
+    metrics_path = project_dir / "config" / "metrics.yaml"
+    metrics_text = metrics_path.read_text(encoding="utf-8")
+    metrics_path.write_text(
+        metrics_text.replace('value: "80 ps"', 'value: "0 ps"', 1),
+        encoding="utf-8",
+    )
+
+    report = run_dry_run(project_dir)
+
+    assert report.status == PassFail.PASS
+    assert report.constraints_ok is True
+    assert report.issues == []
+
+
+def test_run_dry_run_does_not_write_optimizer_artifacts(tmp_path: Path) -> None:
+    project_dir = _create_project_with_template(
+        tmp_path,
+        """simulator lang=spectre
+parameters FN={{FN}} WN={{WN}} FP={{FP}} WP={{WP}}
+tran tran stop=10n
+""",
+    )
+
+    report = run_dry_run(project_dir)
+
+    assert report.status == PassFail.PASS
+    assert (project_dir / "runs" / "dry_run" / "input.scs").exists()
+    assert not (project_dir / "ledger" / ".dry_run_write_probe").exists()
+    assert not (project_dir / "state" / ".dry_run_write_probe").exists()
+    assert not (project_dir / "ledger" / "experiment_ledger.jsonl").exists()
+    assert not (project_dir / "state" / "optimizer_state.json").exists()
+    assert not (project_dir / "state" / "best_candidate.json").exists()
+    assert not (project_dir / "state" / "health_check.json").exists()
