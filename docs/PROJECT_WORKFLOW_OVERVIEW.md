@@ -8,6 +8,7 @@
 - Plan B mock optimization loop 已完成并提交。
 - Plan C C-1 netlist template contract 已完成并提交。
 - Plan C C-2 dry-run candidate renderer 已完成并通过最终 review gate。
+- Plan C C-3 execution package preflight readiness 已完成：生成的 execution package 将 Maestro export 分配给执行 agent，Hermes 拥有 `prepare-netlist`、`dry-run`、`preflight-health` 和 `approve`。
 - 顶层 broad plan 已对齐当前路线：Hermes 负责 deterministic preflight，执行 agent 负责 Maestro export 和 approval 之后的真实 Spectre/optimizer 执行。
 - 下一步需要先确认新的后续开发范围。
 - `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example` 下的真实 `input.scs` 示例只作为本地参考，不能提交进仓库。
@@ -18,7 +19,7 @@
 
 `virtuoso-bridge-lite` 仍然是 Virtuoso/Spectre 能力层：它负责提供和 Cadence 工具交互的 skill、脚本和桥接能力。`ic-auto-opt-workflow` 则是它上面的一层流程约束：定义 YAML 合同、验证合同、生成执行包、准备 netlist 模板、读取 preflight report、控制首次真实仿真的 supervisor approval，并为未来真实优化循环提供状态和 ledger 结构。
 
-当前路线明确把 `prepare-netlist` 和 `dry-run` 放在 Hermes deterministic preflight 内，而不是让执行 agent 每次在 execution package 中重新编写 `render_netlist.py` 或 `dry_run.py`。执行 agent 的边界保留在工具侧动作：Maestro export、真实 Spectre run、真实 optimizer loop 和真实 metric extraction。
+责任划分已明确：执行 agent 负责导出或放置 `input.scs`；Hermes 拥有 `package`、`prepare-netlist`、`dry-run`、`preflight-health` 和 `approve`；执行 agent 仅在 `approve_first_real_run` 之后运行首次真实 Spectre。
 
 ```mermaid
 flowchart TD
@@ -27,24 +28,24 @@ flowchart TD
     C --> D[hermes-workflow validate]
     D --> E{合同是否有效}
     E -- 否 --> C
-    E -- 是 --> F[从 Maestro 导出 input.scs]
-    F --> G[hermes-workflow prepare-netlist]
-    G --> H[template.scs: 只包含获批变量占位符]
-    H --> I[hermes-workflow dry-run]
-    I --> J[dry_run_report.json + dry-run input.scs]
-    D --> K[hermes-workflow package]
+    E -- 是 --> K[hermes-workflow package]
     K --> L[execution_package + EXECUTION_TASK.md]
     L --> M[执行 agent]
-    M --> N[preflight reports + health state]
-    J --> O[hermes-workflow approve]
-    N --> O
-    O --> P{主管是否批准首次真实运行}
-    P -- hold --> Q[修复合同 / preflight 问题]
-    Q --> C
-    P -- approve --> R[未来真实 Spectre/Virtuoso run]
-    R --> S[未来真实 optimizer loop + ledger]
-    D --> T[hermes-workflow mock-run]
-    T --> U[离线 mock ledger/state]
+    M --> F[导出或放置 netlists/exported/input.scs]
+    F --> G[hermes-workflow prepare-netlist]
+    G --> H[template.scs + netlist_preparation_report.json]
+    H --> I[hermes-workflow dry-run]
+    I --> J[dry_run_report.json + dry-run input.scs]
+    J --> N[hermes-workflow preflight-health]
+    N --> O[state/health_check.json]
+    O --> P[hermes-workflow approve]
+    P --> Q{主管是否批准首次真实运行}
+    Q -- hold --> R[修复合同 / preflight 问题]
+    R --> C
+    Q -- approve --> S[未来真实 Spectre/Virtuoso run]
+    S --> T[未来真实 optimizer loop + ledger]
+    D --> U[hermes-workflow mock-run]
+    U --> V[离线 mock ledger/state]
 ```
 
 ## 2. 已开发内容在工作流中的位置
@@ -56,6 +57,11 @@ flowchart TD
 
 - `src/hermes_workflow/validate.py`
   负责加载并验证五个 YAML。它不仅验证单文件 schema，也验证跨文件引用，例如 objective 表达式中的 metric 名称、变量 range、单位一致性、netlist 路径安全边界等。
+
+### Preflight health 层
+
+- `src/hermes_workflow/health.py`
+  对应 Plan C C-3。它在首次真实运行审批前写入 `state/health_check.json`，并在发现 pre-approval real-run artifacts 时 fail closed，让 `approve` 继续通过机器可读 health report 拒绝流程。
 
 ### 项目生成与执行包层
 
@@ -103,10 +109,7 @@ flowchart TD
 
 - `src/hermes_workflow/cli.py`
   当前提供：
-  `init`、`validate`、`prepare-netlist`、`package`、`approve`、`mock-run`。
-
-- C-2 已新增：
-  `dry-run`。
+  `init`、`validate`、`prepare-netlist`、`dry-run`、`preflight-health`、`package`、`approve`、`mock-run`。
 
 ### Review gate 工具层
 
@@ -158,10 +161,16 @@ projects/bridge_test_inv/netlists/exported/input.scs
 hermes-workflow prepare-netlist projects/bridge_test_inv
 ```
 
-执行 deterministic dry-run：
+执��� deterministic dry-run：
 
 ```bash
 hermes-workflow dry-run projects/bridge_test_inv
+```
+
+执行 preflight health 检查：
+
+```bash
+hermes-workflow preflight-health projects/bridge_test_inv
 ```
 
 生成给执行 agent 的执行包：

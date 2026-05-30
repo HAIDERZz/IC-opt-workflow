@@ -40,6 +40,9 @@ Current execution state:
 - Plan C-2 implementation plan exists: `5441972 docs: plan dry-run candidate renderer`.
 - The historical broad plan has been aligned to the current route: Hermes owns deterministic preflight; the execution agent owns Maestro export and post-approval real execution.
 - C-2 dry-run candidate renderer is complete and reviewed. Final verification: `pytest -q` passed, 159 tests; `ruff check .` passed; local-only smoke passed.
+- C-3 execution package preflight readiness design spec exists: `a60b229 docs: design preflight readiness contract`.
+- C-3 implementation plan exists: `docs/superpowers/plans/2026-05-30-execution-package-preflight-readiness.md`.
+- C-3 is complete through Task 5 documentation as of 2026-05-31. Final verification (full pytest) pending Task 6.
 - Real `input.scs` examples under `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example` are local-only references and must not be committed.
 
 ## Files Already Read
@@ -63,8 +66,10 @@ Current execution state:
 - Active Plan C spec: `ic-auto-opt-workflow/docs/superpowers/specs/2026-05-30-netlist-template-contract-design.md`
 - Active C-2 design spec: `ic-auto-opt-workflow/docs/superpowers/specs/2026-05-30-dry-run-candidate-renderer-design.md`
 - Active C-2 implementation plan: `ic-auto-opt-workflow/docs/superpowers/plans/2026-05-30-dry-run-candidate-renderer.md`
+- Active C-3 design spec: `ic-auto-opt-workflow/docs/superpowers/specs/2026-05-30-execution-package-preflight-readiness-design.md`
+- Active C-3 implementation plan: `ic-auto-opt-workflow/docs/superpowers/plans/2026-05-30-execution-package-preflight-readiness.md`
 
-Plan A, Plan B, Plan C C-1, and Plan C C-2 are complete. Confirm the next scope before starting additional Plan C work.
+Plan A, Plan B, Plan C C-1, Plan C C-2, and Plan C C-3 are complete after Task 6 final verification. Confirm the next scope before starting additional Plan C work.
 
 ## Confirmed Plan A Scope
 

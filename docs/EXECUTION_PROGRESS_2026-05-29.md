@@ -479,6 +479,47 @@ Next resume point:
 - Plan C-2 is complete.
 - Next follow-up scope should be confirmed before starting additional Plan C work.
 
+## Plan C-3: Execution Package Preflight Readiness
+
+Status: complete as of 2026-05-31.
+
+Spec:
+
+- `docs/superpowers/specs/2026-05-30-execution-package-preflight-readiness-design.md`
+
+Implementation plan:
+
+- `docs/superpowers/plans/2026-05-30-execution-package-preflight-readiness.md`
+
+Commits:
+
+- `362f34c fix: align execution package preflight contract`
+- `adb3f4a fix: clarify execution task templating ownership`
+- `caf2175 feat: write preflight health reports`
+- `5bae3c1 test: cover optimizer state preflight artifact`
+- `ded8d11 feat: add preflight health cli`
+- `79df214 test: cover preapproval readiness flow`
+- `900dcf2 fix: harden preapproval flow tests`
+
+Implemented:
+
+- Generated `EXECUTION_TASK.md` now tells the execution agent to export or place `netlists/exported/input.scs` and wait for Hermes deterministic preflight.
+- `src/hermes_workflow/health.py` writes `state/health_check.json` for preflight readiness.
+- `hermes-workflow preflight-health PROJECT_DIR` writes a healthy report or a fail-closed error report when pre-approval real-run artifacts exist.
+- `approve` wording no longer refers to Claude preflight reports.
+- CLI integration coverage now proves the no-real-execution flow can reach `approve_first_real_run`.
+
+Verification:
+
+- `pytest tests/test_cli.py tests/test_approvals.py tests/test_health.py tests/test_package.py -v`: passed, 37 tests.
+- `ruff check .`: passed.
+- Full pytest will be run in final Task 6.
+
+Next recommended action:
+
+- Plan C-3 is complete.
+- Next Plan C scope should be confirmed before adding real Spectre execution or optimizer-loop integration.
+
 ## Resume Prompt
 
 ```text
@@ -488,5 +529,5 @@ Next resume point:
 3. ic-auto-opt-workflow/docs/COMPACT_RESUME_CHECKPOINT.md
 4. ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。请先阅读 docs/OPENCODE_HANDOFF_2026-05-29.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md。Hermes File Contract MVP 的 Plan A Task 1-9 已完成；Plan B mock optimization loop 已完成；Plan C C-1 netlist template contract 已完成；Plan C C-2 dry-run candidate renderer 已完成并通过最终 spec/code-quality review gate、`pytest -q` 159 passed、`ruff check .` passed、本地真实 deck smoke passed。下一步请先向用户确认新的后续开发范围，并为该范围新建或刷新 scoped plan。不要提交或复制本地真实 input.scs 示例。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。请先阅读 docs/OPENCODE_HANDOFF_2026-05-29.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md。Hermes File Contract MVP 的 Plan A Task 1-9 已完成；Plan B mock optimization loop 已完成；Plan C C-1 netlist template contract 已完成；Plan C C-2 dry-run candidate renderer 已完成；Plan C C-3 execution package preflight readiness 已完成。下一步请先向用户确认新的后续开发范围，并为该范围新建或刷新 scoped plan。不要提交或复制本地真实 input.scs 示例。
 ```
