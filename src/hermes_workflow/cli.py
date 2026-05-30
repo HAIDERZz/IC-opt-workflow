@@ -7,6 +7,7 @@ import typer
 from hermes_workflow import __version__
 from hermes_workflow.approvals import decide_first_real_run
 from hermes_workflow.mock_optimizer import run_mock_optimization
+from hermes_workflow.netlists import prepare_netlist
 from hermes_workflow.package import (
     TemplateError,
     build_execution_package,
@@ -73,6 +74,28 @@ def validate_command(
     typer.echo(report.format())
     if not report.ok:
         raise typer.Exit(code=1)
+
+
+@app.command("prepare-netlist")
+def prepare_netlist_command(
+    project_dir: Annotated[
+        Path,
+        typer.Argument(help="Project directory with exported netlists/input.scs."),
+    ],
+) -> None:
+    try:
+        report = prepare_netlist(project_dir)
+    except (OSError, ValueError) as exc:
+        _exit_with_error(exc)
+    if report.status.value == "pass":
+        typer.echo("netlist preparation passed")
+        return
+
+    typer.echo("netlist preparation failed")
+    for issue in report.issues:
+        typer.echo(issue)
+    typer.echo("report: reports/netlist_preparation_report.json")
+    raise typer.Exit(code=1)
 
 
 @app.command("package")

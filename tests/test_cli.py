@@ -111,3 +111,36 @@ def test_cli_mock_run_reports_domain_error_without_traceback(tmp_path: Path) -> 
     assert result.exit_code == 1
     assert isinstance(result.exception, SystemExit)
     assert "Traceback" not in result.output
+
+
+def test_cli_prepare_netlist_writes_template_and_report(tmp_path: Path) -> None:
+    project_dir = tmp_path / "bridge_test_inv"
+    runner.invoke(app, ["init", str(project_dir)])
+    (project_dir / "netlists" / "exported" / "input.scs").write_text(
+        """simulator lang=spectre
+parameters temperature=27 FN=4 FP=4 WN=0.6u WP=1.2u
+tran tran stop=10n
+""",
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(app, ["prepare-netlist", str(project_dir)])
+
+    assert result.exit_code == 0
+    assert "netlist preparation passed" in result.stdout
+    assert (project_dir / "netlists" / "templates" / "template.scs").exists()
+    assert (project_dir / "reports" / "netlist_preparation_report.json").exists()
+
+
+def test_cli_prepare_netlist_reports_failure_without_traceback(tmp_path: Path) -> None:
+    project_dir = tmp_path / "bridge_test_inv"
+    runner.invoke(app, ["init", str(project_dir)])
+
+    result = runner.invoke(app, ["prepare-netlist", str(project_dir)])
+
+    assert result.exit_code == 1
+    assert isinstance(result.exception, SystemExit)
+    assert "netlist preparation failed" in result.stdout
+    assert "exported input.scs is missing" in result.stdout
+    assert "reports/netlist_preparation_report.json" in result.stdout
+    assert "Traceback" not in result.output
