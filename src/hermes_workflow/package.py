@@ -100,7 +100,7 @@ Created at UTC: `{manifest_payload["created_at_utc"]}`
 
 ## Scope
 
-Use `virtuoso-bridge-lite` skills to prepare the project-local execution files. Do not run a real Spectre optimization before Hermes approval.
+Use `virtuoso-bridge-lite` skills only for tool-side actions. Inspect or export the configured Maestro testbench, then export or place the Spectre deck at `netlists/exported/input.scs`. Do not run deterministic preflight or a real Spectre optimization before Hermes approval.
 
 ## Testbench
 
@@ -136,12 +136,32 @@ Only template these variables in the exported Spectre deck: {variable_names}
 - Candidate-level parallel jobs: `{bundle.spectre.spectre.parallel_jobs}`
 - Per-candidate timeout seconds: `{bundle.spectre.spectre.timeout_s}`
 
+## Execution Agent Responsibilities
+
+- Preserve Maestro setup: analyses, model includes, simulator options, save options, corners, constraints, objective, variable bounds, and variable step sizes.
+- Export or place the Spectre deck at `netlists/exported/input.scs`.
+- Do not template variables directly.
+- Do not write `reports/netlist_preparation_report.json`.
+- Do not write `reports/dry_run_report.json`.
+- Do not write `state/health_check.json`.
+- Stop after export and wait for Hermes deterministic preflight.
+
+## Hermes Preflight Commands
+
+Hermes will run these commands from the supervisor side:
+
+```bash
+hermes-workflow prepare-netlist PROJECT_DIR
+hermes-workflow dry-run PROJECT_DIR
+hermes-workflow preflight-health PROJECT_DIR
+hermes-workflow approve PROJECT_DIR
+```
+
 ## Safety Rules
 
 - Do not modify Maestro setup.
 - Do not change analysis statements, model includes, simulator options, save options, constraints, objective, variable bounds, or variable step sizes.
-- Template only approved variables.
-- Write `reports/netlist_preparation_report.json`, `reports/dry_run_report.json`, `reports/review_report.md`, and `state/health_check.json`.
+- Template only approved variables when Hermes prepares `template.scs`.
 - Wait for `supervisor_instruction.json` before the first real Spectre run.
 
 ## Immutable Config Hashes

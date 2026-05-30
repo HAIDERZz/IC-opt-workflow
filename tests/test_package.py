@@ -162,3 +162,32 @@ def test_build_execution_package_writes_execution_task(tmp_path: Path) -> None:
         "Wait for `supervisor_instruction.json` before the first real Spectre run"
         in task_text
     )
+    assert "Export or place the Spectre deck at `netlists/exported/input.scs`" in task_text
+    assert "Do not write `reports/netlist_preparation_report.json`" in task_text
+    assert "Do not write `reports/dry_run_report.json`" in task_text
+    assert "Do not write `state/health_check.json`" in task_text
+    assert "hermes-workflow prepare-netlist PROJECT_DIR" in task_text
+    assert "hermes-workflow dry-run PROJECT_DIR" in task_text
+    assert "hermes-workflow preflight-health PROJECT_DIR" in task_text
+    assert "hermes-workflow approve PROJECT_DIR" in task_text
+    assert "Write `reports/netlist_preparation_report.json`" not in task_text
+
+
+def test_build_execution_package_keeps_preflight_report_manifest_paths(
+    tmp_path: Path,
+) -> None:
+    project_dir = tmp_path / "bridge_test_inv"
+    create_project_from_template(project_dir)
+
+    build_execution_package(project_dir, created_at_utc="2026-05-28T00:00:00Z")
+
+    manifest_payload = json.loads(
+        (project_dir / "execution_package" / "execution_manifest.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert manifest_payload["required_preflight_reports"] == [
+        "reports/netlist_preparation_report.json",
+        "reports/dry_run_report.json",
+        "state/health_check.json",
+    ]
