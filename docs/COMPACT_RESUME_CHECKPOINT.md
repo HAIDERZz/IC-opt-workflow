@@ -32,7 +32,9 @@ Current execution state:
 - Plan C Task 1 complete and reviewed: `1ab42e1 feat: prepare spectre netlist templates`.
 - Plan C Task 2 complete and reviewed: `6ce3e69 fix: support continued spectre parameters`.
 - Plan C Task 3 complete and reviewed: `8e59ac9 fix: report unsafe netlist templating failures`.
-- Current pause point: stop before Plan C Task 4. Resume with `docs/superpowers/plans/2026-05-30-netlist-template-contract.md` Task 4.
+- Plan C Task 4 complete and reviewed: `04fa358 feat: add prepare netlist cli`.
+- Plan C Task 5 complete: full tests, ruff, and local-only real deck smoke passed.
+- Current resume point: Plan C Task 6. Resume with `docs/superpowers/plans/2026-05-30-netlist-template-contract.md` Task 6.
 - Real `input.scs` examples under `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example` are local-only references and must not be committed.
 
 ## Files Already Read
@@ -55,7 +57,7 @@ Current execution state:
 - Active Plan C follow-up plan: `ic-auto-opt-workflow/docs/superpowers/plans/2026-05-30-netlist-template-contract.md`
 - Active Plan C spec: `ic-auto-opt-workflow/docs/superpowers/specs/2026-05-30-netlist-template-contract-design.md`
 
-Plan A is complete. If resuming current development, continue Plan C from Task 4 unless the user explicitly changes scope.
+Plan A is complete. If resuming current development, continue Plan C from Task 6 unless the user explicitly changes scope.
 
 ## Confirmed Plan A Scope
 

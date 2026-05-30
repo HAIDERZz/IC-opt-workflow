@@ -48,13 +48,14 @@ This plan implements only C-1:
 
 ## Execution Status
 
-Paused on 2026-05-30 after Task 3. Do not redo Tasks 1-3.
+Task 5 completed on 2026-05-30. Do not redo Tasks 1-5.
 
 - Task 1 complete and reviewed: `1ab42e1 feat: prepare spectre netlist templates`.
 - Task 2 complete and reviewed: `6ce3e69 fix: support continued spectre parameters`.
 - Task 3 complete and reviewed: `8e59ac9 fix: report unsafe netlist templating failures`.
-- Next resume point: Task 4, CLI Command.
-- Latest targeted verification: `pytest tests/test_netlists.py -v` passed, 6 tests; `ruff check src/hermes_workflow/netlists.py tests/test_netlists.py` passed.
+- Task 4 complete and reviewed: `04fa358 feat: add prepare netlist cli`.
+- Task 5 verification complete: `pytest -q` passed, 146 tests; `ruff check .` passed; local-only smoke under `/tmp/hermes_plan_c_smoke` passed for all four real deck examples.
+- Next resume point: Task 6, Review Gate And Final Verification.
 
 ---
 

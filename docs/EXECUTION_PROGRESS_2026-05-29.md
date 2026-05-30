@@ -344,7 +344,7 @@ Next recommended action: hand off from focused Plan A into a new, user-confirmed
 
 ## Plan C: Netlist Template Contract
 
-Status: paused after Task 3 on 2026-05-30. Do not start Task 4 until the user resumes.
+Status: Task 5 completed on 2026-05-30. Continue with Task 6 final review gate.
 
 Plan files:
 
@@ -358,17 +358,22 @@ Commits:
 - `1ab42e1 feat: prepare spectre netlist templates`
 - `6ce3e69 fix: support continued spectre parameters`
 - `8e59ac9 fix: report unsafe netlist templating failures`
+- `04fa358 feat: add prepare netlist cli`
 
 Completed:
 
 - Task 1: single-line top-level Spectre `parameters` assignment templating.
 - Task 2: backslash-continued `parameters` blocks and no instance-parameter templating.
 - Task 3: fail reports for missing exported input, missing approved variables, duplicate approved variables, and stale `template.scs` cleanup on failure.
+- Task 4: `hermes-workflow prepare-netlist` CLI command and CLI smoke tests.
+- Task 5: full verification, local-only real deck smoke in `/tmp`, and progress update.
 
 Implemented so far:
 
 - `src/hermes_workflow/netlists.py`
 - `tests/test_netlists.py`
+- `hermes-workflow prepare-netlist` in `src/hermes_workflow/cli.py`
+- CLI tests in `tests/test_cli.py`
 
 Verification:
 
@@ -380,12 +385,18 @@ Verification:
 - After Task 2: `ruff check src/hermes_workflow/netlists.py tests/test_netlists.py` passed.
 - After Task 3: `pytest tests/test_netlists.py -v` passed, 6 tests.
 - After Task 3: `ruff check src/hermes_workflow/netlists.py tests/test_netlists.py` passed.
+- After Task 4: `pytest tests/test_netlists.py tests/test_cli.py -v` passed, 16 tests.
+- After Task 4: `ruff check src/hermes_workflow/cli.py src/hermes_workflow/netlists.py tests/test_cli.py tests/test_netlists.py` passed.
+- During Task 5: `pytest -q` passed, 146 tests.
+- During Task 5: `ruff check .` passed.
+- During Task 5: local-only smoke under `/tmp/hermes_plan_c_smoke` passed for `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example/input.scs`, `input1.scs`, `input2.scs`, and `input3.scs`.
 
 Reviews:
 
 - Task 1 spec review: passed; Task 1 code-quality review: passed with no Critical or Important issues.
 - Task 2 spec review: passed; Task 2 code-quality review: passed with no Critical or Important issues.
 - Task 3 spec review: passed; Task 3 code-quality review: passed with no Critical or Important issues.
+- Task 4 spec review: passed; Task 4 code-quality review: passed with no Critical or Important issues.
 
 Important decisions:
 
@@ -396,10 +407,10 @@ Important decisions:
 
 Next resume point:
 
-- Continue with Plan C Task 4: CLI Command.
-- Do not redo Tasks 1-3.
+- Continue with Plan C Task 6: Review Gate And Final Verification.
+- Do not redo Tasks 1-5.
 - Do not copy real `input.scs` examples into the repository.
-- After Task 4, continue Task 5 local-only real deck smoke/progress note, then Task 6 final review gate.
+- Run final full-suite verification and Claude review gates for `51253fe..HEAD`.
 
 ## Resume Prompt
 
