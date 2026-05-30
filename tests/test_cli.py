@@ -144,3 +144,36 @@ def test_cli_prepare_netlist_reports_failure_without_traceback(tmp_path: Path) -
     assert "exported input.scs is missing" in result.stdout
     assert "reports/netlist_preparation_report.json" in result.stdout
     assert "Traceback" not in result.output
+
+
+def test_cli_dry_run_writes_candidate_and_report(tmp_path: Path) -> None:
+    project_dir = tmp_path / "bridge_test_inv"
+    runner.invoke(app, ["init", str(project_dir)])
+    (project_dir / "netlists" / "templates" / "template.scs").write_text(
+        """simulator lang=spectre
+parameters FN={{FN}} WN={{WN}} FP={{FP}} WP={{WP}}
+tran tran stop=10n
+""",
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(app, ["dry-run", str(project_dir)])
+
+    assert result.exit_code == 0
+    assert "dry run passed" in result.stdout
+    assert (project_dir / "runs" / "dry_run" / "input.scs").exists()
+    assert (project_dir / "reports" / "dry_run_report.json").exists()
+
+
+def test_cli_dry_run_reports_failure_without_traceback(tmp_path: Path) -> None:
+    project_dir = tmp_path / "bridge_test_inv"
+    runner.invoke(app, ["init", str(project_dir)])
+
+    result = runner.invoke(app, ["dry-run", str(project_dir)])
+
+    assert result.exit_code == 1
+    assert isinstance(result.exception, SystemExit)
+    assert "dry run failed" in result.stdout
+    assert "template.scs is missing: netlists/templates/template.scs" in result.stdout
+    assert "reports/dry_run_report.json" in result.stdout
+    assert "Traceback" not in result.output

@@ -6,6 +6,7 @@ import typer
 
 from hermes_workflow import __version__
 from hermes_workflow.approvals import decide_first_real_run
+from hermes_workflow.dry_run import run_dry_run
 from hermes_workflow.mock_optimizer import run_mock_optimization
 from hermes_workflow.netlists import prepare_netlist
 from hermes_workflow.package import (
@@ -95,6 +96,28 @@ def prepare_netlist_command(
     for issue in report.issues:
         typer.echo(issue)
     typer.echo("report: reports/netlist_preparation_report.json")
+    raise typer.Exit(code=1)
+
+
+@app.command("dry-run")
+def dry_run_command(
+    project_dir: Annotated[
+        Path,
+        typer.Argument(help="Project directory with netlists/templates/template.scs."),
+    ],
+) -> None:
+    try:
+        report = run_dry_run(project_dir)
+    except (OSError, ValueError) as exc:
+        _exit_with_error(exc)
+    if report.status.value == "pass":
+        typer.echo("dry run passed")
+        return
+
+    typer.echo("dry run failed")
+    for issue in report.issues:
+        typer.echo(issue)
+    typer.echo("report: reports/dry_run_report.json")
     raise typer.Exit(code=1)
 
 
