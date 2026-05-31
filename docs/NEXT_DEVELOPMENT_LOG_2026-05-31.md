@@ -5,10 +5,10 @@
 - Repository: `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow`
 - Branch: `plan-a-hermes-file-contract-mvp`
 - Current scope: Plan C-3, execution package preflight readiness
-- Current status: complete through Task 5 documentation as of 2026-05-31
-- Next required action: C-3 Task 6 final verification
+- Current status: Plan C-3 complete and reviewed as of 2026-05-31
+- Next required action: confirm the next Plan C scope before new implementation
 
-Do not confirm a new Plan C scope before Task 6 is complete.
+C-3 Task 6 final verification is complete. Do not start additional Plan C implementation until the next scope is explicitly confirmed.
 
 ## Completed Scope
 
@@ -16,7 +16,7 @@ Do not confirm a new Plan C scope before Task 6 is complete.
 - Plan B mock optimization loop: complete.
 - Plan C C-1 netlist template contract: complete.
 - Plan C C-2 dry-run candidate renderer: complete.
-- Plan C C-3 Task 1-5: complete.
+- Plan C C-3 execution package preflight readiness: complete and reviewed.
 
 Plan C-3 added or aligned:
 
@@ -25,7 +25,8 @@ Plan C-3 added or aligned:
 - `hermes-workflow preflight-health PROJECT_DIR`: CLI wrapper around the health report writer.
 - Approval wording: generic preflight wording, no Claude-specific preflight wording.
 - End-to-end pre-approval regression coverage: `init -> package -> prepare-netlist -> dry-run -> preflight-health -> approve`.
-- Handoff and resume docs: updated to point to Task 6 final verification first.
+- Task 6 final verification and review gate: complete.
+- Code-quality hardening: missing preflight reports now reject structurally, package failures clean up partial execution packages, required preflight report paths have one source, and health best-candidate path handling is constant-backed.
 
 ## Important Commits
 
@@ -43,6 +44,7 @@ Plan C-3 implementation:
 - `ded8d11 feat: add preflight health cli`
 - `79df214 test: cover preapproval readiness flow`
 - `900dcf2 fix: harden preapproval flow tests`
+- `edb107f fix: harden preflight readiness gates`
 
 Plan C-3 handoff/docs cleanup:
 
@@ -55,47 +57,29 @@ Plan C-3 handoff/docs cleanup:
 - `d01d139 docs: clarify c3 final verification scope`
 - `f678b7c docs: refresh c3 handoff metadata`
 
-## Verification Already Run
+## Final Verification
 
-Task 5 controller verification:
+Task 6 final verification:
 
 ```bash
-pytest tests/test_cli.py tests/test_approvals.py tests/test_health.py tests/test_package.py -v
-# 37 passed
+pytest tests/test_approvals.py tests/test_package.py tests/test_reports.py tests/test_health.py -q
+# 28 passed
+
+pytest -q
+# 173 passed
 
 ruff check .
 # All checks passed
 ```
 
-Task 5 review gates:
+Final review gates:
 
-- Spec review: passed after documentation consistency fixes; no Critical or Important findings remain.
-- Code-quality review: passed after handoff metadata refresh; no Critical or Important findings remain.
-
-Full `pytest -q` is intentionally pending Task 6.
+- Final spec review: passed; no Critical or Important findings.
+- Final code-quality review: passed after `edb107f`; no Critical or Important findings.
 
 ## Next Task
 
-Run C-3 Task 6 from:
-
-```text
-docs/superpowers/plans/2026-05-30-execution-package-preflight-readiness.md
-```
-
-Task 6 checklist:
-
-1. Run full verification:
-
-```bash
-pytest -q
-ruff check .
-```
-
-2. Run final spec review for completed C-3.
-3. Run final code-quality review for completed C-3.
-4. Fix any Critical or Important findings.
-5. Update status docs from "complete through Task 5; Task 6 pending" to "C-3 complete" only after full verification and final review gates pass.
-6. Commit the final status update.
+Confirm the next Plan C scope before starting implementation. Recommended likely candidates remain real-run execution packaging, real Spectre runner integration, or optimizer-loop integration, but no new scope is locked in this log.
 
 ## Local Data Warning
 
@@ -110,5 +94,5 @@ are local reference material only. Do not copy or commit them into the repositor
 ## Resume Prompt
 
 ```text
-请继续 IC auto optimization workflow 的 Plan C-3 Task 6。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。先阅读 docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/OPENCODE_HANDOFF_2026-05-29.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md 和 docs/superpowers/plans/2026-05-30-execution-package-preflight-readiness.md。Plan A Task 1-9、Plan B、Plan C C-1、Plan C C-2 已完成；Plan C C-3 已完成至 Task 5 文档，Task 6 final verification 待执行。下一步先运行完整 pytest、ruff、final spec review、final code-quality review；不要先确认新的后续开发范围。不要提交本地真实 input.scs 示例。
+请继续 IC auto optimization workflow。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。先阅读 docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/OPENCODE_HANDOFF_2026-05-29.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md 和 docs/superpowers/plans/2026-05-30-execution-package-preflight-readiness.md。Plan A Task 1-9、Plan B、Plan C C-1、Plan C C-2、Plan C C-3 均已完成并通过 review gate；C-3 最终验证为 pytest -q 173 passed、ruff clean、final spec/code-quality review 无 Critical/Important。下一步先确认新的 Plan C 范围，再写 scoped plan，不要提交本地真实 input.scs 示例。
 ```

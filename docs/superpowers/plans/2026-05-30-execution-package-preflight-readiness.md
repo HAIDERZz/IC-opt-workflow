@@ -36,7 +36,7 @@ Do not commit or copy real `input.scs` examples from `/home/zzchen/Agent_virtuos
 
 ## Execution Status
 
-Status: complete through Task 5 documentation as of 2026-05-31; Task 6 final verification pending.
+Status: complete and reviewed as of 2026-05-31.
 
 Completed commits:
 
@@ -47,18 +47,20 @@ Completed commits:
 - Task 3: `ded8d11 feat: add preflight health cli`
 - Task 4: `79df214 test: cover preapproval readiness flow`
 - Task 4 fix: `900dcf2 fix: harden preapproval flow tests`
+- Task 6 fix: `edb107f fix: harden preflight readiness gates`
 - Task 5: `a4e2473 docs: record preflight readiness progress`
 - Task 5 follow-up: `bbbfcd7 docs: fill preflight readiness progress hash`
 
-Final verification (after Task 6):
+Final verification:
 
-- Full pytest will be run in Task 6.
+- `pytest tests/test_approvals.py tests/test_package.py tests/test_reports.py tests/test_health.py -q`: passed, 28 tests.
+- `pytest -q`: passed, 173 tests.
 - `ruff check .`: passed.
 
 Final reviews:
 
-- Final spec review: pending Task 6.
-- Final code-quality review: pending Task 6.
+- Final spec review: passed with no Critical or Important findings.
+- Final code-quality review: passed with no Critical or Important findings after `edb107f`.
 
 ## File Map
 
@@ -864,7 +866,7 @@ git commit -m "docs: record preflight readiness progress"
 **Files:**
 - No planned source changes unless final review finds Critical or Important issues.
 
-- [ ] **Step 1: Run full verification**
+- [x] **Step 1: Run full verification**
 
 Run:
 
@@ -875,7 +877,7 @@ ruff check .
 
 Expected: full pytest suite passes and ruff reports no issues.
 
-- [ ] **Step 2: Run final spec review**
+- [x] **Step 2: Run final spec review**
 
 Run:
 
@@ -885,7 +887,7 @@ claude -p "Review the completed C-3 implementation against docs/superpowers/spec
 
 Expected: no Critical or Important findings.
 
-- [ ] **Step 3: Run final code-quality review**
+- [x] **Step 3: Run final code-quality review**
 
 Run:
 
@@ -895,7 +897,7 @@ claude -p "Review the completed C-3 implementation diff for code quality, mainta
 
 Expected: no Critical or Important findings.
 
-- [ ] **Step 4: Fix review findings if needed**
+- [x] **Step 4: Fix review findings if needed**
 
 If a review returns Critical or Important findings, apply the smallest focused fix, then run:
 
@@ -911,7 +913,7 @@ git add src tests README.md docs
 git commit -m "fix: address preflight readiness review"
 ```
 
-- [ ] **Step 5: Confirm clean closeout**
+- [x] **Step 5: Confirm clean closeout**
 
 Run:
 

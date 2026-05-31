@@ -8,7 +8,7 @@ This note preserves the implementation state for continuing Plan A after context
 - Branch: `plan-a-hermes-file-contract-mvp`
 - Baseline branch: `master`
 - Baseline commit: `885e97f docs: capture workflow planning baseline`
-- Latest C-3 code commit before docs-only cleanup: `900dcf2 fix: harden preapproval flow tests`; docs cleanup continues through current HEAD
+- Latest C-3 code commit before docs-only cleanup: `edb107f fix: harden preflight readiness gates`; docs cleanup continues through current HEAD
 - Active plan: `docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md`
 - Execution method: `superpowers:subagent-driven-development`
 - Dependencies installed in active Python environment on 2026-05-29: `pytest`, `typer`, `pydantic`, `PyYAML`, `ruff`
@@ -340,7 +340,7 @@ Status: focused Plan A complete through Task 9.
 
 Focused Hermes Plan A ends at Task 9. There is no Task 10 in this Hermes File Contract MVP plan.
 
-Next recommended action (historical): hand off from focused Plan A into a new, user-confirmed development scope. This was superseded by later Plan C-3 status; current next action is C-3 Task 6 final verification. The new worker should read `docs/OPENCODE_HANDOFF_2026-05-29.md` first, avoid redoing Plan A Tasks 1-9, and proceed directly to C-3 Task 6 final verification before confirming any new scope.
+Next recommended action (historical): hand off from focused Plan A into a new, user-confirmed development scope. This was superseded by later Plan C-3 status; current next action is confirming the next Plan C scope. The new worker should read `docs/OPENCODE_HANDOFF_2026-05-29.md` first and avoid redoing completed Plan A/B/C work.
 
 ## Plan C: Netlist Template Contract
 
@@ -418,7 +418,7 @@ Next recommended action (historical):
 - Plan C C-1 is complete.
 - Do not copy real `input.scs` examples into the repository.
 - Next scope should be confirmed before starting a new Plan C follow-up task.
-- This was superseded by later Plan C-3 status; current next action is C-3 Task 6 final verification.
+- This was superseded by later Plan C-3 status; current next action is confirming the next Plan C scope.
 
 ## Plan C-2: Dry-Run Candidate Renderer
 
@@ -479,11 +479,11 @@ Next resume point (historical):
 
 - Plan C-2 is complete.
 - Next follow-up scope should be confirmed before starting additional Plan C work.
-- This was superseded by later Plan C-3 status; current next action is C-3 Task 6 final verification.
+- This was superseded by later Plan C-3 status; current next action is confirming the next Plan C scope.
 
 ## Plan C-3: Execution Package Preflight Readiness
 
-Status: complete through Task 5 documentation as of 2026-05-31; Task 6 final verification pending.
+Status: complete and reviewed as of 2026-05-31.
 
 Spec:
 
@@ -502,6 +502,7 @@ Commits:
 - `ded8d11 feat: add preflight health cli`
 - `79df214 test: cover preapproval readiness flow`
 - `900dcf2 fix: harden preapproval flow tests`
+- `edb107f fix: harden preflight readiness gates`
 - `a4e2473 docs: record preflight readiness progress`
 - `bbbfcd7 docs: fill preflight readiness progress hash`
 - `6befb7b docs: clarify preflight readiness resume state`
@@ -516,17 +517,20 @@ Implemented:
 - `hermes-workflow preflight-health PROJECT_DIR` writes a healthy report or a fail-closed error report when pre-approval real-run artifacts exist.
 - `approve` wording no longer refers to Claude preflight reports.
 - CLI integration coverage now proves the no-real-execution flow can reach `approve_first_real_run`.
+- Approval now rejects missing required preflight reports through a structured `reject_first_real_run` instruction instead of surfacing a raw filesystem error.
+- Execution package build failures now clean up partial `execution_package/` artifacts so a retry can succeed.
 
 Verification:
 
 - `pytest tests/test_cli.py tests/test_approvals.py tests/test_health.py tests/test_package.py -v`: passed, 37 tests.
 - `ruff check .`: passed.
-- Full pytest will be run in final Task 6.
+- `pytest tests/test_approvals.py tests/test_package.py tests/test_reports.py tests/test_health.py -q`: passed, 28 tests after Task 6 hardening.
+- `pytest -q`: passed, 173 tests.
 
 Next recommended action:
 
-- Plan C-3 is complete through Task 5 documentation.
-- Continue C-3 Task 6 final verification (full pytest, spec review, code-quality review) before confirming any new scope.
+- Plan C-3 is complete and reviewed.
+- Confirm the next Plan C scope before starting implementation.
 
 ## Resume Prompt
 
@@ -537,5 +541,5 @@ Next recommended action:
 3. ic-auto-opt-workflow/docs/COMPACT_RESUME_CHECKPOINT.md
 4. ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。请先阅读 docs/OPENCODE_HANDOFF_2026-05-29.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md。Hermes File Contract MVP 的 Plan A Task 1-9 已完成；Plan B mock optimization loop 已完成；Plan C C-1 netlist template contract 已完成；Plan C C-2 dry-run candidate renderer 已完成；Plan C C-3 execution package preflight readiness 已完成至 Task 5 文档，Task 6 final verification 待执行。下一步请先继续 C-3 Task 6 final verification（完整 pytest、spec review、code-quality review），不要先确认新的后续开发范围。不要提交或复制本地真实 input.scs 示例。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。请先阅读 docs/OPENCODE_HANDOFF_2026-05-29.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md。Hermes File Contract MVP 的 Plan A Task 1-9 已完成；Plan B mock optimization loop 已完成；Plan C C-1 netlist template contract 已完成；Plan C C-2 dry-run candidate renderer 已完成；Plan C C-3 execution package preflight readiness 已完成并通过最终 review gate。下一步请先确认新的 Plan C 范围并写 scoped plan。不要提交或复制本地真实 input.scs 示例。
 ```

@@ -1,6 +1,6 @@
-# Opencode Handoff 2026-05-29 (updated 2026-05-31 for C-3 Task 6)
+# Opencode Handoff 2026-05-29 (updated 2026-05-31 after C-3 completion)
 
-This handoff was originally dated 2026-05-29 and updated 2026-05-31 for C-3 Task 6 final verification. It summarizes the current `ic-auto-opt-workflow` state so opencode can continue development without replaying completed Plan A work.
+This handoff was originally dated 2026-05-29 and updated 2026-05-31 after C-3 final verification. It summarizes the current `ic-auto-opt-workflow` state so opencode can continue development without replaying completed work.
 
 ## Repository State
 
@@ -9,11 +9,11 @@ This handoff was originally dated 2026-05-29 and updated 2026-05-31 for C-3 Task
 - Focused plan: `docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md`
 - Historical planning context: `docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md`
 - Latest next-development log: `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`
-- Latest C-3 code commit before docs-only handoff cleanup: `900dcf2 fix: harden preapproval flow tests`; later docs commits exist through current HEAD
+- Latest C-3 code commit before docs-only handoff cleanup: `edb107f fix: harden preflight readiness gates`; later docs commits may exist through current HEAD
 
 ## Current Status
 
-Plan A (Hermes File Contract MVP) Task 1-9 complete. Plan B (mock optimization loop) complete. Plan C-1 (netlist template contract) complete. Plan C-2 (dry-run candidate renderer) complete. Plan C-3 (execution package preflight readiness) complete through Task 5 documentation as of 2026-05-31, with Task 6 final verification pending.
+Plan A (Hermes File Contract MVP) Task 1-9 complete. Plan B (mock optimization loop) complete. Plan C-1 (netlist template contract) complete. Plan C-2 (dry-run candidate renderer) complete. Plan C-3 (execution package preflight readiness) complete and reviewed as of 2026-05-31.
 
 Plan A completed scope:
 
@@ -41,22 +41,20 @@ Out of scope and not implemented:
 
 ## Verification And Reviews
 
-Latest verification before this handoff (targeted C-3 docs/task verification, pre-Task-6):
+Latest verification for C-3 closeout:
 
 ```bash
-pytest tests/test_cli.py tests/test_approvals.py tests/test_health.py tests/test_package.py -v
-# 37 passed
+pytest -q
+# 173 passed
 
 ruff check .
 # All checks passed
 ```
 
-Full `pytest -q` is pending Task 6 final verification.
+C-3 final review gates:
 
-Task 9 review gates at final code head:
-
-- Spec review: compliant with noted defensive extras.
-- Code-quality review: no Critical or Important issues.
+- Final spec review: no Critical or Important findings.
+- Final code-quality review: no Critical or Important findings after `edb107f`.
 
 Review tooling:
 
@@ -113,18 +111,18 @@ tests/
 
 ## Next Development Decision
 
-Plan A Task 1-9, Plan B, Plan C-1, and Plan C-2 are complete. Plan C-3 is complete through Task 5 documentation as of 2026-05-31; Task 6 final verification (full pytest, spec review, code-quality review) is pending.
+Plan A Task 1-9, Plan B, Plan C-1, Plan C-2, and Plan C-3 are complete and reviewed.
 
 Recommended next move for opencode:
 
-1. Treat Plan A Task 1-9, Plan B, Plan C-1, and Plan C-2 as complete.
+1. Treat Plan A Task 1-9, Plan B, Plan C-1, Plan C-2, and Plan C-3 as complete.
 2. Do not rework completed modules unless a new review finding appears.
-3. Continue C-3 Task 6 final verification first. Do not confirm a new development scope before Task 6 is complete.
+3. Confirm the next Plan C development scope before starting implementation.
 4. Real `input.scs` examples under `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example` are local reference material only and must not be committed.
 5. Preflight-health state is tracked in `state/health_check.json` (see `src/hermes_workflow/health.py` and `hermes-workflow preflight-health` CLI).
 
 ## One-Sentence Continue Prompt
 
 ```text
-请在 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow 的 branch plan-a-hermes-file-contract-mvp 上继续开发：先阅读 docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/OPENCODE_HANDOFF_2026-05-29.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md 和 Hermes Plan A 文件。Plan A Task 1-9 已完成，Plan B 已完成，Plan C-1 已完成，Plan C-2 已完成，Plan C-3 已完成至 Task 5 文档（2026-05-31），Task 6 final verification 待执行。下一步先继续 C-3 Task 6 final verification（完整 pytest、spec review、code-quality review），不要先确认新的后续开发范围。本地 input.scs 示例禁止提交到仓库。
+请在 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow 的 branch plan-a-hermes-file-contract-mvp 上继续开发：先阅读 docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/OPENCODE_HANDOFF_2026-05-29.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md 和 Hermes Plan A 文件。Plan A Task 1-9、Plan B、Plan C-1、Plan C-2、Plan C-3 均已完成并通过 review gate；C-3 最终验证为 pytest -q 173 passed、ruff clean、final spec/code-quality review 无 Critical/Important。下一步先确认新的 Plan C 范围并写 scoped plan。本地 input.scs 示例禁止提交到仓库。
 ```

@@ -43,7 +43,8 @@ Current execution state:
 - C-2 dry-run candidate renderer is complete and reviewed. Final verification: `pytest -q` passed, 159 tests; `ruff check .` passed; local-only smoke passed.
 - C-3 execution package preflight readiness design spec exists: `a60b229 docs: design preflight readiness contract`.
 - C-3 implementation plan exists: `docs/superpowers/plans/2026-05-30-execution-package-preflight-readiness.md`.
-- C-3 is complete through Task 5 documentation as of 2026-05-31. Task 6 final verification includes full pytest, spec review, and code-quality review.
+- C-3 is complete and reviewed as of 2026-05-31. Final verification: `pytest -q` passed, 173 tests; `ruff check .` passed; final spec and code-quality reviews passed with no Critical or Important findings.
+- C-3 final code-quality hardening commit: `edb107f fix: harden preflight readiness gates`.
 - Real `input.scs` examples under `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example` are local-only references and must not be committed.
 
 ## Files Already Read
@@ -70,7 +71,7 @@ Current execution state:
 - Active C-3 design spec: `ic-auto-opt-workflow/docs/superpowers/specs/2026-05-30-execution-package-preflight-readiness-design.md`
 - Active C-3 implementation plan: `ic-auto-opt-workflow/docs/superpowers/plans/2026-05-30-execution-package-preflight-readiness.md`
 
-Plan A, Plan B, Plan C C-1, and Plan C C-2 are complete. Plan C C-3 is complete through Task 5 documentation as of 2026-05-31 with Task 6 final verification pending. Continue C-3 Task 6 final verification before confirming any new scope.
+Plan A, Plan B, Plan C C-1, Plan C C-2, and Plan C C-3 are complete. Confirm the next scope before starting additional Plan C work.
 
 ## Confirmed Plan A Scope
 
@@ -331,9 +332,9 @@ optimizer:
 
 ## Next Step
 
-Plan A, Plan B, Plan C C-1, and Plan C C-2 are complete. Plan C C-3 is complete through Task 5 documentation as of 2026-05-31.
+Plan A, Plan B, Plan C C-1, Plan C C-2, and Plan C C-3 are complete as of 2026-05-31.
 
-Current next step: C-3 Task 6 final verification (full pytest, spec review, code-quality review) before confirming any new scope. Do not redo Plan A Tasks 1-9 unless new review feedback appears.
+Current next step: confirm the next Plan C scope before starting implementation. Do not redo Plan A Tasks 1-9 or completed Plan B/C modules unless new review feedback appears.
 
 Read the handoff files first:
 
@@ -354,5 +355,5 @@ Use this prompt after compact:
 4. ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md
 5. 如需背景，再读 ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。Plan A Task 1-9 已完成并通过 spec/code-quality review gate、pytest 和 ruff；Plan B mock optimization loop 完成并已提交；Plan C C-1 netlist template contract 完成并已提交；Plan C C-2 dry-run candidate renderer 完成并已提交；Plan C C-3 execution package preflight readiness 已完成至 Task 5 文档，Task 6 final verification 待执行。下一步请先继续 C-3 Task 6 final verification（完整 pytest、spec review、code-quality review），不要先确认新的后续开发范围。真实 input.scs 示例在 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example 下，仅供本地参考，请勿将其提交到仓库。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。Plan A Task 1-9 已完成并通过 spec/code-quality review gate、pytest 和 ruff；Plan B mock optimization loop 完成并已提交；Plan C C-1 netlist template contract 完成并已提交；Plan C C-2 dry-run candidate renderer 完成并已提交；Plan C C-3 execution package preflight readiness 已完成并通过最终 review gate，最终验证为 pytest -q 173 passed、ruff clean、final spec/code-quality review 无 Critical/Important。下一步请先确认新的 Plan C 范围并写 scoped plan。真实 input.scs 示例在 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example 下，仅供本地参考，请勿将其提交到仓库。
 ```
