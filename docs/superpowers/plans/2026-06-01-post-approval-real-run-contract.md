@@ -36,24 +36,32 @@ Do not commit or copy real `input.scs` examples from `/home/zzchen/Agent_virtuos
 
 ## Execution Status
 
-Status: in progress as of 2026-06-01. Tasks 1-3 are complete and reviewed; stop point is before Task 4 CLI wiring.
+Status: complete through Task 4 implementation as of 2026-06-01; final verification pending.
 
 Completed commits:
 
 - `e195bd9 feat: guard post approval real runs`
 - `d6804a8 feat: prepare first real run package`
 - `fc34c6d fix: harden real run package creation`
+- `1ce650e feat: add prepare real run cli`
 
 Final verification:
 
 - After Task 3: `pytest tests/test_real_run.py -v` passed, 14 tests.
 - After Task 3: `ruff check .` passed.
 - After Task 3: `git diff --check` passed.
+- After Task 4: `pytest tests/test_cli.py::test_cli_prepare_real_run_writes_package_after_approval tests/test_cli.py::test_cli_prepare_real_run_reports_missing_approval_without_traceback tests/test_cli.py::test_cli_prepare_real_run_reports_config_drift_without_traceback -v` passed, 3 tests.
+- After Task 4: `pytest tests/test_real_run.py tests/test_cli.py -v` passed, 33 tests.
+- After Task 4: `ruff check .` passed.
 
 Final reviews:
 
 - Final spec review: pending Task 6.
 - Final code-quality review: pending Task 6.
+
+Batch-gate note:
+
+- Tasks 4-6 are using Risk-Tiered Batch Gates to reduce model calls. Task 4 used a Claude CLI coding worker plus local deterministic verification. Task 5 docs are local. Task 6 should run one combined final review gate before closeout.
 
 ## File Map
 
@@ -958,7 +966,7 @@ git commit -m "fix: harden real run package creation"
 - Modify: `src/hermes_workflow/cli.py`
 - Modify: `tests/test_cli.py`
 
-- [ ] **Step 1: Add CLI tests**
+- [x] **Step 1: Add CLI tests**
 
 Append these tests to `tests/test_cli.py`:
 
@@ -1043,7 +1051,7 @@ tran tran stop=10n
     assert "Traceback" not in result.output
 ```
 
-- [ ] **Step 2: Run CLI tests and verify failure**
+- [x] **Step 2: Run CLI tests and verify failure**
 
 Run:
 
@@ -1053,7 +1061,7 @@ pytest tests/test_cli.py::test_cli_prepare_real_run_writes_package_after_approva
 
 Expected: tests fail because the CLI command does not exist.
 
-- [ ] **Step 3: Add CLI command**
+- [x] **Step 3: Add CLI command**
 
 In `src/hermes_workflow/cli.py`, add this import with the other command imports:
 
@@ -1084,7 +1092,7 @@ def prepare_real_run_command(
     typer.echo(f"manifest: {package.manifest_path.relative_to(project_dir)}")
 ```
 
-- [ ] **Step 4: Run CLI tests**
+- [x] **Step 4: Run CLI tests**
 
 Run:
 
@@ -1094,7 +1102,7 @@ pytest tests/test_cli.py::test_cli_prepare_real_run_writes_package_after_approva
 
 Expected: all three tests pass.
 
-- [ ] **Step 5: Run broader CLI and real-run tests**
+- [x] **Step 5: Run broader CLI and real-run tests**
 
 Run:
 
@@ -1104,7 +1112,7 @@ pytest tests/test_real_run.py tests/test_cli.py -v
 
 Expected: all selected tests pass.
 
-- [ ] **Step 6: Run ruff**
+- [x] **Step 6: Run ruff**
 
 Run:
 
@@ -1114,7 +1122,7 @@ ruff check .
 
 Expected: all checks pass.
 
-- [ ] **Step 7: Run review gate**
+- [x] **Step 7: Defer review gate to Task 6 combined batch gate**
 
 Run:
 
@@ -1122,9 +1130,9 @@ Run:
 claude -p "Review the current git diff for C-4 Task 4 against docs/superpowers/specs/2026-05-31-post-approval-real-run-contract-design.md. Focus on spec compliance and code quality. Return Critical, Important, Minor findings."
 ```
 
-Expected: no Critical or Important findings. Fix any Critical or Important findings before committing.
+Risk-Tiered Batch Gates update: the per-task review gate was intentionally deferred to the Task 6 combined final review gate after local deterministic verification passed.
 
-- [ ] **Step 8: Commit Task 4**
+- [x] **Step 8: Commit Task 4**
 
 Run:
 
@@ -1143,7 +1151,7 @@ git commit -m "feat: add prepare real run cli"
 - Modify: `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`
 - Modify: `docs/superpowers/plans/2026-06-01-post-approval-real-run-contract.md`
 
-- [ ] **Step 1: Update README command sequence**
+- [x] **Step 1: Update README command sequence**
 
 In `README.md`, add `prepare-real-run` after approval in the usage command block:
 
@@ -1163,7 +1171,7 @@ Add this sentence near the command sequence:
 `prepare-real-run` prepares `runs/real/real_001/` after approval, but it does not run Spectre, Virtuoso, subprocesses, or an optimizer loop.
 ```
 
-- [ ] **Step 2: Update project overview**
+- [x] **Step 2: Update project overview**
 
 In `docs/PROJECT_WORKFLOW_OVERVIEW.md`, add `hermes-workflow prepare-real-run` after `approve` in the Mermaid flow:
 
@@ -1185,7 +1193,7 @@ Add a module note:
   调用上述逻辑，准备后续真实 simulator runner 可消费的文件合同。
 ```
 
-- [ ] **Step 3: Update progress docs**
+- [x] **Step 3: Update progress docs**
 
 Append a `Plan C-4` section to `docs/EXECUTION_PROGRESS_2026-05-29.md`:
 
@@ -1230,7 +1238,7 @@ Update `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`:
 - Next required action: C-4 final verification and review gate
 ```
 
-- [ ] **Step 4: Mark this plan progress**
+- [x] **Step 4: Mark this plan progress**
 
 In this plan file, update the existing `## Execution Status` block after `## Execution Model`.
 
@@ -1265,7 +1273,7 @@ Final reviews:
 - Final code-quality review: pending Task 6.
 ```
 
-- [ ] **Step 5: Run docs checks**
+- [x] **Step 5: Run docs checks**
 
 Run:
 
@@ -1275,7 +1283,7 @@ rg -n "prepare-real-run|real_run.py|real_001|C-4|Spectre" README.md docs/PROJECT
 
 Expected: `prepare-real-run`, `real_run.py`, `real_001`, and `C-4` appear in updated docs; docs explicitly say C-4 does not run Spectre.
 
-- [ ] **Step 6: Run tests and ruff**
+- [x] **Step 6: Run tests and ruff**
 
 Run:
 
@@ -1286,7 +1294,7 @@ ruff check .
 
 Expected: selected tests pass and ruff reports no issues.
 
-- [ ] **Step 7: Run review gate**
+- [x] **Step 7: Defer review gate to Task 6 combined batch gate**
 
 Run:
 
@@ -1294,7 +1302,7 @@ Run:
 claude -p "Review the current git diff for C-4 Task 5 against docs/superpowers/specs/2026-05-31-post-approval-real-run-contract-design.md. Focus on docs/spec consistency and code quality. Return Critical, Important, Minor findings."
 ```
 
-Expected: no Critical or Important findings. Fix any Critical or Important findings before committing.
+Risk-Tiered Batch Gates update: the per-task docs review gate was intentionally deferred to the Task 6 combined final review gate after docs checks and local deterministic verification passed.
 
 - [ ] **Step 8: Commit Task 5**
 

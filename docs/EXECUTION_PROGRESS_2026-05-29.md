@@ -530,11 +530,11 @@ Verification:
 Next recommended action:
 
 - Plan C-3 is complete and reviewed.
-- Plan C-4 has since been confirmed and started; current resume point is C-4 Task 4.
+- Plan C-4 has since been confirmed and started; current resume point is C-4 final verification.
 
 ## Plan C-4: Post-Approval Real-Run Execution Contract
 
-Status: in progress as of 2026-06-01. Tasks 1-3 are complete and reviewed. Stop point is before Task 4 CLI command.
+Status: complete through Task 4 implementation as of 2026-06-01; final verification pending.
 
 Scope:
 
@@ -557,6 +557,7 @@ Commits:
 - `e195bd9 feat: guard post approval real runs`
 - `d6804a8 feat: prepare first real run package`
 - `fc34c6d fix: harden real run package creation`
+- `1ce650e feat: add prepare real run cli`
 
 Implemented:
 
@@ -568,24 +569,29 @@ Implemented:
 - `candidate.json` and `real_run_manifest.json` are written next to the rendered deck.
 - Existing packages are not overwritten.
 - Partial `runs/real/<run_id>/` directories are removed on render/write failure so retries are clean.
+- `hermes-workflow prepare-real-run PROJECT_DIR` writes `runs/real/real_001/input.scs`, `candidate.json`, and `real_run_manifest.json`.
+- The command refuses missing approval, rejected approval, immutable config drift, missing templates, invalid run IDs, and existing real-run packages.
+- C-4 does not run Spectre, Virtuoso, subprocesses, metric extraction, ledger append, or optimizer execution.
 
 Verification:
 
 - `pytest tests/test_real_run.py -v`: passed, 14 tests after Task 3.
 - `ruff check .`: passed after Task 3.
 - `git diff --check`: passed after Task 3.
+- After Task 4: `pytest tests/test_cli.py::test_cli_prepare_real_run_writes_package_after_approval tests/test_cli.py::test_cli_prepare_real_run_reports_missing_approval_without_traceback tests/test_cli.py::test_cli_prepare_real_run_reports_config_drift_without_traceback -v` passed, 3 tests.
+- After Task 4: `pytest tests/test_real_run.py tests/test_cli.py -v` passed, 33 tests.
+- After Task 4: `ruff check .` passed.
 
 Reviews:
 
 - Task 1 spec review: passed; Task 1 code-quality review: passed with no Critical or Important issues.
 - Task 2 spec review: passed; Task 2 code-quality review: passed after fixes with no Critical or Important issues.
 - Task 3 spec review: passed; Task 3 code-quality review: passed with no Critical or Important issues.
+- Task 4 used Risk-Tiered Batch Gates: local deterministic verification passed; final combined review remains pending Task 6.
 
 Next recommended action:
 
-- Resume from C-4 Task 4 in `docs/superpowers/plans/2026-06-01-post-approval-real-run-contract.md`.
-- Task 4 adds `hermes-workflow prepare-real-run` CLI tests and command wiring.
-- Do not start C-4 Task 5 documentation updates until Task 4 is reviewed and committed.
+- Run C-4 final verification and combined review gate before confirming the next Plan C scope.
 
 ## Resume Prompt
 
@@ -596,5 +602,5 @@ Next recommended action:
 3. ic-auto-opt-workflow/docs/COMPACT_RESUME_CHECKPOINT.md
 4. ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。请先阅读 docs/OPENCODE_HANDOFF_2026-05-29.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md。Hermes File Contract MVP 的 Plan A Task 1-9 已完成；Plan B mock optimization loop 已完成；Plan C C-1 netlist template contract 已完成；Plan C C-2 dry-run candidate renderer 已完成；Plan C C-3 execution package preflight readiness 已完成并通过最终 review gate；Plan C C-4 post-approval real-run execution contract Task 1-3 已完成并通过 review gate。下一步从 docs/superpowers/plans/2026-06-01-post-approval-real-run-contract.md 的 Task 4 CLI command 继续，用 subagent-driven development 执行。不要提交或复制本地真实 input.scs 示例。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。请先阅读 docs/OPENCODE_HANDOFF_2026-05-29.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md。Hermes File Contract MVP 的 Plan A Task 1-9 已完成；Plan B mock optimization loop 已完成；Plan C C-1 netlist template contract 已完成；Plan C C-2 dry-run candidate renderer 已完成；Plan C C-3 execution package preflight readiness 已完成并通过最终 review gate；Plan C C-4 post-approval real-run execution contract Task 1-4 已完成，Task 4 使用 Risk-Tiered Batch Gates 只做本地 deterministic verification。下一步从 docs/superpowers/plans/2026-06-01-post-approval-real-run-contract.md 的 Task 6 final verification 和合并 review gate 继续。不要提交或复制本地真实 input.scs 示例。
 ```

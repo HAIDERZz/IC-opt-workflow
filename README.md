@@ -15,6 +15,8 @@ hermes-workflow prepare-netlist projects/bridge_test_inv
 hermes-workflow dry-run projects/bridge_test_inv
 hermes-workflow preflight-health projects/bridge_test_inv
 hermes-workflow approve projects/bridge_test_inv
+hermes-workflow prepare-real-run projects/bridge_test_inv
 ```
 
 The `approve` command only approves the first real run when config validation, Hermes netlist preparation, Hermes dry-run, and Hermes-written preflight health all pass.
+`prepare-real-run` prepares `runs/real/real_001/` after approval, but it does not run Spectre, Virtuoso, subprocesses, or an optimizer loop.

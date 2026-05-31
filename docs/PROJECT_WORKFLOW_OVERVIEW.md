@@ -9,9 +9,9 @@
 - Plan C C-1 netlist template contract 已完成并提交。
 - Plan C C-2 dry-run candidate renderer 已完成并通过最终 review gate。
 - Plan C C-3 execution package preflight readiness 已完成并通过最终 review gate：生成的 execution package 将 Maestro export 分配给执行 agent，Hermes 拥有 `prepare-netlist`、`dry-run`、`preflight-health` 和 `approve`。
-- Plan C C-4 post-approval real-run execution contract 已完成 Task 1-3：Hermes 已具备 post-approval guard、immutable config drift guard、first real-run package rendering、candidate/manifest 写入、overwrite refusal 和失败清理测试覆盖。C-4 只准备真实 run package，不运行 Spectre。
+- Plan C C-4 post-approval real-run execution contract 已完成 Task 1-4：Hermes 已具备 post-approval guard、immutable config drift guard、first real-run package rendering、candidate/manifest 写入、overwrite refusal、失败清理测试覆盖，以及 `hermes-workflow prepare-real-run` CLI。C-4 只准备真实 run package，不运行 Spectre。
 - 顶层 broad plan 已对齐当前路线：Hermes 负责 deterministic preflight，执行 agent 负责 Maestro export 和 approval 之后的真实 Spectre/optimizer 执行。
-- 下一步：从 `docs/superpowers/plans/2026-06-01-post-approval-real-run-contract.md` 的 C-4 Task 4 开始执行，接入 `hermes-workflow prepare-real-run` CLI。
+- 下一步：执行 C-4 final verification 和合并 review gate；通过后再确认下一个 Plan C 范围。
 - `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example` 下的真实 `input.scs` 示例只作为本地参考，不能提交进仓库。
 
 ## 1. 项目概览
@@ -43,7 +43,9 @@ flowchart TD
     P --> Q{主管是否批准首次真实运行}
     Q -- hold --> R[修复合同 / preflight 问题]
     R --> C
-    Q -- approve --> S[未来真实 Spectre/Virtuoso run]
+    Q -- approve --> W[hermes-workflow prepare-real-run]
+    W --> X[runs/real/real_001 package]
+    X --> S[未来真实 Spectre/Virtuoso run]
     S --> T[未来真实 optimizer loop + ledger]
     D --> U[hermes-workflow mock-run]
     U --> V[离线 mock ledger/state]
@@ -105,10 +107,13 @@ flowchart TD
   C-4 设计文档，定义 approval 之后、真实 Spectre runner 之前的文件合同边界：Hermes 只准备 first real-run package，不启动 Spectre/Virtuoso/subprocess/optimizer loop。
 
 - `docs/superpowers/plans/2026-06-01-post-approval-real-run-contract.md`
-  C-4 implementation plan。当前 Task 1-3 已完成并通过 review gate，下一步是 Task 4 CLI command。
+  C-4 implementation plan。当前 Task 1-4 已完成，下一步是 final verification 和合并 review gate。
 
 - `src/hermes_workflow/real_run.py`
   验证 `supervisor_instruction.json` 已批准首次真实运行，校验 immutable config hash 未漂移，从 `template.scs` 渲染 lower-bound first real candidate，写入 `runs/real/<run_id>/input.scs`、`candidate.json` 和 `real_run_manifest.json`，并在失败时清理 partial run directory。
+
+- `hermes-workflow prepare-real-run`
+  调用上述逻辑，准备后续真实 simulator runner 可消费的文件合同。它不运行 Spectre。
 
 ### Mock optimization 测试层
 
@@ -121,7 +126,7 @@ flowchart TD
 
 - `src/hermes_workflow/cli.py`
   当前提供：
-  `init`、`validate`、`prepare-netlist`、`dry-run`、`preflight-health`、`package`、`approve`、`mock-run`。
+  `init`、`validate`、`prepare-netlist`、`dry-run`、`preflight-health`、`package`、`approve`、`prepare-real-run`、`mock-run`。
 
 ### Review gate 工具层
 
@@ -204,6 +209,14 @@ Hermes 读取 preflight reports 并给出 supervisor decision：
 ```bash
 hermes-workflow approve projects/bridge_test_inv
 ```
+
+批准后准备 first real-run package：
+
+```bash
+hermes-workflow prepare-real-run projects/bridge_test_inv
+```
+
+`prepare-real-run` 会写入 `runs/real/real_001/`，但不会运行 Spectre、Virtuoso、subprocess 或 optimizer loop。
 
 如果只想离线测试流程，不跑 Virtuoso/Spectre：
 

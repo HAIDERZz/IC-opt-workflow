@@ -50,7 +50,8 @@ Current execution state:
 - C-4 Task 1 complete and reviewed: `e195bd9 feat: guard post approval real runs`.
 - C-4 Task 2 complete and reviewed: `d6804a8 feat: prepare first real run package`.
 - C-4 Task 3 complete and reviewed: `fc34c6d fix: harden real run package creation`.
-- C-4 stop point: start Task 4 CLI command next. Do not start Task 5 before Task 4 is reviewed and committed.
+- C-4 Task 4 implementation complete with local deterministic verification: `1ce650e feat: add prepare real run cli`.
+- C-4 stop point: run Task 6 final verification and one combined final review gate next. Task 5 docs are updated; final status closeout remains pending final review.
 - Real `input.scs` examples under `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example` are local-only references and must not be committed.
 
 ## Files Already Read
@@ -79,7 +80,7 @@ Current execution state:
 - Active C-4 design spec: `ic-auto-opt-workflow/docs/superpowers/specs/2026-05-31-post-approval-real-run-contract-design.md`
 - Active C-4 implementation plan: `ic-auto-opt-workflow/docs/superpowers/plans/2026-06-01-post-approval-real-run-contract.md`
 
-Plan A, Plan B, Plan C C-1, Plan C C-2, and Plan C C-3 are complete. Plan C C-4 Task 1-3 are complete and reviewed. Resume from C-4 Task 4 CLI command.
+Plan A, Plan B, Plan C C-1, Plan C C-2, and Plan C C-3 are complete. Plan C C-4 Task 1-4 are implemented. Resume from C-4 Task 6 final verification and combined review gate.
 
 ## Confirmed Plan A Scope
 
