@@ -194,8 +194,9 @@ Expected rejection messages:
 - Missing instruction: `supervisor instruction is missing`
 - Malformed instruction JSON: `supervisor instruction is invalid`
 - Wrong decision: `first real run is not approved`
+- Missing or empty approved hashes: `supervisor instruction is missing approved_config_hashes`
 
-If the instruction contains `approved_config_hashes`, those hashes must match the manifest hashes. A mismatch is a hard failure.
+The instruction must contain a non-empty `approved_config_hashes` object. Those hashes must match the manifest hashes. A missing, empty, or mismatched object is a hard failure.
 
 The function should not call `decide_first_real_run()` itself. Approval is an explicit previous workflow step.
 
@@ -293,7 +294,7 @@ Fail before writing files when:
 - `supervisor_instruction.json` is missing.
 - `supervisor_instruction.json` is malformed.
 - Supervisor decision is not `approve_first_real_run`.
-- Approved config hashes are missing.
+- Approved config hashes are missing or empty.
 - Current config hash differs from approved hash.
 - `template.scs` is missing.
 - Run ID is invalid.

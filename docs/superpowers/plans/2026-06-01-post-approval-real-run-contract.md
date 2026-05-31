@@ -135,7 +135,7 @@ def test_prepare_real_run_rejects_missing_supervisor_instruction(
     _write_template(project_dir)
 
     with pytest.raises(FileNotFoundError, match="supervisor instruction is missing"):
-        prepare_real_run(project_dir, created_at_utc="2026-05-31T00:20:00Z")
+        prepare_real_run(project_dir)
 
     assert not (project_dir / "runs" / "real").exists()
 
@@ -162,7 +162,7 @@ def test_prepare_real_run_rejects_reject_instruction(tmp_path: Path) -> None:
     _write_template(project_dir)
 
     with pytest.raises(ValueError, match="first real run is not approved"):
-        prepare_real_run(project_dir, created_at_utc="2026-05-31T00:20:00Z")
+        prepare_real_run(project_dir)
 
     assert not (project_dir / "runs" / "real").exists()
 
@@ -178,7 +178,7 @@ def test_prepare_real_run_rejects_missing_execution_manifest(
     )
 
     with pytest.raises(FileNotFoundError, match="execution manifest is missing"):
-        prepare_real_run(project_dir, created_at_utc="2026-05-31T00:20:00Z")
+        prepare_real_run(project_dir)
 
     assert not (project_dir / "runs" / "real").exists()
 
@@ -196,7 +196,75 @@ def test_prepare_real_run_rejects_config_drift_after_approval(
     )
 
     with pytest.raises(ValueError, match="immutable config drift detected: config/variables.yaml"):
-        prepare_real_run(project_dir, created_at_utc="2026-05-31T00:20:00Z")
+        prepare_real_run(project_dir)
+
+    assert not (project_dir / "runs" / "real").exists()
+
+
+def test_prepare_real_run_rejects_instruction_missing_approved_hashes(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_project(tmp_path)
+    build_execution_package(project_dir, created_at_utc="2026-05-31T00:00:00Z")
+    (project_dir / "supervisor_instruction.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "1.0",
+                "created_at_utc": "2026-05-31T00:10:00Z",
+                "decision": "approve_first_real_run",
+                "reason": "approved without hashes",
+                "allowed_actions": ["run_standalone_spectre_optimizer"],
+                "forbidden_actions": [],
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    _write_template(project_dir)
+
+    with pytest.raises(
+        ValueError,
+        match="supervisor instruction is missing approved_config_hashes",
+    ):
+        prepare_real_run(project_dir)
+
+    assert not (project_dir / "runs" / "real").exists()
+
+
+def test_prepare_real_run_rejects_instruction_hash_mismatch(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_project(tmp_path)
+    manifest = build_execution_package(
+        project_dir,
+        created_at_utc="2026-05-31T00:00:00Z",
+    )
+    approved_hashes = dict(manifest.payload["immutable_config_files"])
+    approved_hashes["config/variables.yaml"] = "not-the-approved-hash"
+    (project_dir / "supervisor_instruction.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "1.0",
+                "created_at_utc": "2026-05-31T00:10:00Z",
+                "decision": "approve_first_real_run",
+                "reason": "approved with wrong hashes",
+                "allowed_actions": ["run_standalone_spectre_optimizer"],
+                "forbidden_actions": [],
+                "approved_config_hashes": approved_hashes,
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    _write_template(project_dir)
+
+    with pytest.raises(
+        ValueError,
+        match="supervisor approved config hashes do not match execution manifest",
+    ):
+        prepare_real_run(project_dir)
 
     assert not (project_dir / "runs" / "real").exists()
 ```
@@ -206,7 +274,7 @@ def test_prepare_real_run_rejects_config_drift_after_approval(
 Run:
 
 ```bash
-pytest tests/test_real_run.py::test_prepare_real_run_rejects_missing_supervisor_instruction tests/test_real_run.py::test_prepare_real_run_rejects_reject_instruction tests/test_real_run.py::test_prepare_real_run_rejects_missing_execution_manifest tests/test_real_run.py::test_prepare_real_run_rejects_config_drift_after_approval -v
+pytest tests/test_real_run.py::test_prepare_real_run_rejects_missing_supervisor_instruction tests/test_real_run.py::test_prepare_real_run_rejects_reject_instruction tests/test_real_run.py::test_prepare_real_run_rejects_missing_execution_manifest tests/test_real_run.py::test_prepare_real_run_rejects_config_drift_after_approval tests/test_real_run.py::test_prepare_real_run_rejects_instruction_missing_approved_hashes tests/test_real_run.py::test_prepare_real_run_rejects_instruction_hash_mismatch -v
 ```
 
 Expected: import fails because `hermes_workflow.real_run` does not exist.
@@ -221,7 +289,6 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass
-from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 
 from hermes_workflow.package import sha256_file
@@ -250,7 +317,6 @@ def prepare_real_run(
     project_dir: Path,
     *,
     run_id: str | None = None,
-    created_at_utc: str | None = None,
 ) -> RealRunPackage:
     project_dir = Path(project_dir)
     selected_run_id = _validate_run_id(run_id or DEFAULT_RUN_ID)
@@ -308,10 +374,12 @@ def _assert_approved(instruction: dict) -> None:
 
 def _approved_hashes(manifest: dict, instruction: dict) -> dict[str, str]:
     manifest_hashes = manifest.get("immutable_config_files")
-    if not isinstance(manifest_hashes, dict):
+    if not isinstance(manifest_hashes, dict) or not manifest_hashes:
         raise ValueError("execution manifest is missing immutable_config_files")
     instruction_hashes = instruction.get("approved_config_hashes")
-    if instruction_hashes is not None and instruction_hashes != manifest_hashes:
+    if not isinstance(instruction_hashes, dict) or not instruction_hashes:
+        raise ValueError("supervisor instruction is missing approved_config_hashes")
+    if instruction_hashes != manifest_hashes:
         raise ValueError("supervisor approved config hashes do not match execution manifest")
     return {str(path): str(digest) for path, digest in manifest_hashes.items()}
 
@@ -330,10 +398,6 @@ def _project_path(bundle: ContractBundle, relative_path: str) -> Path:
     if path.is_absolute() or ".." in path.parts:
         raise ValueError(f"real-run path must be project-relative and safe: {relative_path}")
     return bundle.project_dir / Path(*path.parts)
-
-
-def _utc_now() -> str:
-    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 ```
 
 - [ ] **Step 4: Run tests and verify current result**
@@ -341,10 +405,10 @@ def _utc_now() -> str:
 Run:
 
 ```bash
-pytest tests/test_real_run.py::test_prepare_real_run_rejects_missing_supervisor_instruction tests/test_real_run.py::test_prepare_real_run_rejects_reject_instruction tests/test_real_run.py::test_prepare_real_run_rejects_missing_execution_manifest tests/test_real_run.py::test_prepare_real_run_rejects_config_drift_after_approval -v
+pytest tests/test_real_run.py::test_prepare_real_run_rejects_missing_supervisor_instruction tests/test_real_run.py::test_prepare_real_run_rejects_reject_instruction tests/test_real_run.py::test_prepare_real_run_rejects_missing_execution_manifest tests/test_real_run.py::test_prepare_real_run_rejects_config_drift_after_approval tests/test_real_run.py::test_prepare_real_run_rejects_instruction_missing_approved_hashes tests/test_real_run.py::test_prepare_real_run_rejects_instruction_hash_mismatch -v
 ```
 
-Expected: all four tests pass. The implementation still raises `NotImplementedError` only after guard checks pass, which none of these tests reach.
+Expected: all six tests pass. The implementation still raises `NotImplementedError` only after guard checks pass, which none of these tests reach.
 
 - [ ] **Step 5: Run ruff**
 
@@ -484,8 +548,20 @@ In `src/hermes_workflow/real_run.py`, add these imports near the top:
 
 ```python
 import shutil
+from datetime import UTC, datetime
 
 from hermes_workflow.dry_run import PLACEHOLDER_RE, UNRESOLVED_PLACEHOLDER_RE
+```
+
+Update the `prepare_real_run()` signature to accept deterministic timestamps for tests:
+
+```python
+def prepare_real_run(
+    project_dir: Path,
+    *,
+    run_id: str | None = None,
+    created_at_utc: str | None = None,
+) -> RealRunPackage:
 ```
 
 Then replace the `raise NotImplementedError("real run package rendering is implemented in Task 2")` line in `prepare_real_run()` with:
@@ -623,6 +699,13 @@ def _build_manifest(
             "change_objective_or_constraints",
         ],
     }
+```
+
+Add `_utc_now()` near the bottom of the module:
+
+```python
+def _utc_now() -> str:
+    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 ```
 
 - [ ] **Step 4: Run success tests**
