@@ -5,8 +5,8 @@
 - Repository: `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow`
 - Branch: `plan-a-hermes-file-contract-mvp`
 - Current scope: Plan C-4, post-approval real-run execution contract
-- Current status: C-4 scope confirmed; design spec created
-- Next required action: review C-4 design spec, then write C-4 implementation plan
+- Current status: C-4 design spec and implementation plan created
+- Next required action: start C-4 Task 1 with subagent-driven development
 
 C-3 Task 6 final verification is complete. C-4 is confirmed as a contract-only first real-run package; it must not run Spectre, Virtuoso, subprocesses, or the optimizer loop.
 
@@ -17,7 +17,7 @@ C-3 Task 6 final verification is complete. C-4 is confirmed as a contract-only f
 - Plan C C-1 netlist template contract: complete.
 - Plan C C-2 dry-run candidate renderer: complete.
 - Plan C C-3 execution package preflight readiness: complete and reviewed.
-- Plan C C-4 post-approval real-run execution contract: design spec created.
+- Plan C C-4 post-approval real-run execution contract: design spec and implementation plan created.
 
 Plan C-3 added or aligned:
 
@@ -61,6 +61,7 @@ Plan C-3 handoff/docs cleanup:
 Plan C-4 design:
 
 - `docs/superpowers/specs/2026-05-31-post-approval-real-run-contract-design.md`
+- `docs/superpowers/plans/2026-06-01-post-approval-real-run-contract.md`
 
 ## Final Verification
 
@@ -84,7 +85,7 @@ Final review gates:
 
 ## Next Task
 
-Review `docs/superpowers/specs/2026-05-31-post-approval-real-run-contract-design.md`. If approved, write the C-4 implementation plan before touching source code.
+Start C-4 Task 1 from `docs/superpowers/plans/2026-06-01-post-approval-real-run-contract.md` using `superpowers:subagent-driven-development`.
 
 ## Local Data Warning
 
@@ -99,5 +100,5 @@ are local reference material only. Do not copy or commit them into the repositor
 ## Resume Prompt
 
 ```text
-请继续 IC auto optimization workflow。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。先阅读 docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/OPENCODE_HANDOFF_2026-05-29.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md。Plan A Task 1-9、Plan B、Plan C C-1、Plan C C-2、Plan C C-3 均已完成并通过 review gate；C-4 已确认为 contract-only first real-run package，设计 spec 是 docs/superpowers/specs/2026-05-31-post-approval-real-run-contract-design.md。下一步先 review C-4 spec；确认后写 C-4 implementation plan，不要先改源码，不要提交本地真实 input.scs 示例。
+请继续 IC auto optimization workflow。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。先阅读 docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/OPENCODE_HANDOFF_2026-05-29.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md。Plan A Task 1-9、Plan B、Plan C C-1、Plan C C-2、Plan C C-3 均已完成并通过 review gate；C-4 已确认为 contract-only first real-run package，设计 spec 是 docs/superpowers/specs/2026-05-31-post-approval-real-run-contract-design.md，implementation plan 是 docs/superpowers/plans/2026-06-01-post-approval-real-run-contract.md。下一步从 C-4 Task 1 开始，用 subagent-driven development 执行；不要提交本地真实 input.scs 示例。
 ```

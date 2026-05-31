@@ -9,9 +9,9 @@
 - Plan C C-1 netlist template contract 已完成并提交。
 - Plan C C-2 dry-run candidate renderer 已完成并通过最终 review gate。
 - Plan C C-3 execution package preflight readiness 已完成并通过最终 review gate：生成的 execution package 将 Maestro export 分配给执行 agent，Hermes 拥有 `prepare-netlist`、`dry-run`、`preflight-health` 和 `approve`。
-- Plan C C-4 post-approval real-run execution contract 已确认范围并写入设计 spec：`docs/superpowers/specs/2026-05-31-post-approval-real-run-contract-design.md`。C-4 只准备真实 run package，不运行 Spectre。
+- Plan C C-4 post-approval real-run execution contract 已确认范围，并写入 design spec 与 implementation plan。C-4 只准备真实 run package，不运行 Spectre。
 - 顶层 broad plan 已对齐当前路线：Hermes 负责 deterministic preflight，执行 agent 负责 Maestro export 和 approval 之后的真实 Spectre/optimizer 执行。
-- 下一步：review C-4 design spec，确认后写 implementation plan。
+- 下一步：从 `docs/superpowers/plans/2026-06-01-post-approval-real-run-contract.md` 的 C-4 Task 1 开始执行。
 - `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example` 下的真实 `input.scs` 示例只作为本地参考，不能提交进仓库。
 
 ## 1. 项目概览
