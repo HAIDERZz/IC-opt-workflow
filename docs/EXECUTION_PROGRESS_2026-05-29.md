@@ -530,7 +530,62 @@ Verification:
 Next recommended action:
 
 - Plan C-3 is complete and reviewed.
-- Confirm the next Plan C scope before starting implementation.
+- Plan C-4 has since been confirmed and started; current resume point is C-4 Task 4.
+
+## Plan C-4: Post-Approval Real-Run Execution Contract
+
+Status: in progress as of 2026-06-01. Tasks 1-3 are complete and reviewed. Stop point is before Task 4 CLI command.
+
+Scope:
+
+- Contract-only first real-run package.
+- Hermes prepares `runs/real/<run_id>/input.scs`, `candidate.json`, and `real_run_manifest.json`.
+- Hermes must not run Spectre, Virtuoso, subprocesses, or the optimizer loop.
+
+Spec:
+
+- `docs/superpowers/specs/2026-05-31-post-approval-real-run-contract-design.md`
+
+Implementation plan:
+
+- `docs/superpowers/plans/2026-06-01-post-approval-real-run-contract.md`
+
+Commits:
+
+- `0f64570 docs: design post approval real run contract`
+- `e6512cc docs: plan post approval real run contract`
+- `e195bd9 feat: guard post approval real runs`
+- `d6804a8 feat: prepare first real run package`
+- `fc34c6d fix: harden real run package creation`
+
+Implemented:
+
+- `src/hermes_workflow/real_run.py` validates `supervisor_instruction.json` and requires `approve_first_real_run`.
+- Real-run preparation verifies instruction `approved_config_hashes` exactly match `execution_manifest.json` immutable config hashes.
+- Current immutable config files are re-hashed before package creation to detect approval-time drift.
+- The first real-run candidate is deterministic lower-bound data from `variables.yaml`.
+- `template.scs` is rendered into `runs/real/<run_id>/input.scs` without using a general template engine.
+- `candidate.json` and `real_run_manifest.json` are written next to the rendered deck.
+- Existing packages are not overwritten.
+- Partial `runs/real/<run_id>/` directories are removed on render/write failure so retries are clean.
+
+Verification:
+
+- `pytest tests/test_real_run.py -v`: passed, 14 tests after Task 3.
+- `ruff check .`: passed after Task 3.
+- `git diff --check`: passed after Task 3.
+
+Reviews:
+
+- Task 1 spec review: passed; Task 1 code-quality review: passed with no Critical or Important issues.
+- Task 2 spec review: passed; Task 2 code-quality review: passed after fixes with no Critical or Important issues.
+- Task 3 spec review: passed; Task 3 code-quality review: passed with no Critical or Important issues.
+
+Next recommended action:
+
+- Resume from C-4 Task 4 in `docs/superpowers/plans/2026-06-01-post-approval-real-run-contract.md`.
+- Task 4 adds `hermes-workflow prepare-real-run` CLI tests and command wiring.
+- Do not start C-4 Task 5 documentation updates until Task 4 is reviewed and committed.
 
 ## Resume Prompt
 
@@ -541,5 +596,5 @@ Next recommended action:
 3. ic-auto-opt-workflow/docs/COMPACT_RESUME_CHECKPOINT.md
 4. ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。请先阅读 docs/OPENCODE_HANDOFF_2026-05-29.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md。Hermes File Contract MVP 的 Plan A Task 1-9 已完成；Plan B mock optimization loop 已完成；Plan C C-1 netlist template contract 已完成；Plan C C-2 dry-run candidate renderer 已完成；Plan C C-3 execution package preflight readiness 已完成并通过最终 review gate。下一步请先确认新的 Plan C 范围并写 scoped plan。不要提交或复制本地真实 input.scs 示例。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。请先阅读 docs/OPENCODE_HANDOFF_2026-05-29.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md。Hermes File Contract MVP 的 Plan A Task 1-9 已完成；Plan B mock optimization loop 已完成；Plan C C-1 netlist template contract 已完成；Plan C C-2 dry-run candidate renderer 已完成；Plan C C-3 execution package preflight readiness 已完成并通过最终 review gate；Plan C C-4 post-approval real-run execution contract Task 1-3 已完成并通过 review gate。下一步从 docs/superpowers/plans/2026-06-01-post-approval-real-run-contract.md 的 Task 4 CLI command 继续，用 subagent-driven development 执行。不要提交或复制本地真实 input.scs 示例。
 ```

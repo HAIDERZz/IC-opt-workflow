@@ -36,15 +36,19 @@ Do not commit or copy real `input.scs` examples from `/home/zzchen/Agent_virtuos
 
 ## Execution Status
 
-Status: planned as of 2026-06-01. Implementation has not started.
+Status: in progress as of 2026-06-01. Tasks 1-3 are complete and reviewed; stop point is before Task 4 CLI wiring.
 
 Completed commits:
 
-- None yet.
+- `e195bd9 feat: guard post approval real runs`
+- `d6804a8 feat: prepare first real run package`
+- `fc34c6d fix: harden real run package creation`
 
 Final verification:
 
-- Pending implementation.
+- After Task 3: `pytest tests/test_real_run.py -v` passed, 14 tests.
+- After Task 3: `ruff check .` passed.
+- After Task 3: `git diff --check` passed.
 
 Final reviews:
 
@@ -122,7 +126,7 @@ If a task needs another helper, add it near these functions and keep it determin
 - Create: `src/hermes_workflow/real_run.py`
 - Create: `tests/test_real_run.py`
 
-- [ ] **Step 1: Write failing guard tests**
+- [x] **Step 1: Write failing guard tests**
 
 Create `tests/test_real_run.py` with the shared helpers above and these tests:
 
@@ -269,7 +273,7 @@ def test_prepare_real_run_rejects_instruction_hash_mismatch(
     assert not (project_dir / "runs" / "real").exists()
 ```
 
-- [ ] **Step 2: Run tests and verify failure**
+- [x] **Step 2: Run tests and verify failure**
 
 Run:
 
@@ -279,7 +283,7 @@ pytest tests/test_real_run.py::test_prepare_real_run_rejects_missing_supervisor_
 
 Expected: import fails because `hermes_workflow.real_run` does not exist.
 
-- [ ] **Step 3: Create the guard implementation**
+- [x] **Step 3: Create the guard implementation**
 
 Create `src/hermes_workflow/real_run.py` with this initial implementation:
 
@@ -400,7 +404,7 @@ def _project_path(bundle: ContractBundle, relative_path: str) -> Path:
     return bundle.project_dir / Path(*path.parts)
 ```
 
-- [ ] **Step 4: Run tests and verify current result**
+- [x] **Step 4: Run tests and verify current result**
 
 Run:
 
@@ -410,7 +414,7 @@ pytest tests/test_real_run.py::test_prepare_real_run_rejects_missing_supervisor_
 
 Expected: all six tests pass. The implementation still raises `NotImplementedError` only after guard checks pass, which none of these tests reach.
 
-- [ ] **Step 5: Run ruff**
+- [x] **Step 5: Run ruff**
 
 Run:
 
@@ -420,7 +424,7 @@ ruff check .
 
 Expected: all checks pass.
 
-- [ ] **Step 6: Run review gate**
+- [x] **Step 6: Run review gate**
 
 Run:
 
@@ -430,7 +434,7 @@ claude -p "Review the current git diff for C-4 Task 1 against docs/superpowers/s
 
 Expected: no Critical or Important findings. Fix any Critical or Important findings before committing.
 
-- [ ] **Step 7: Commit Task 1**
+- [x] **Step 7: Commit Task 1**
 
 Run:
 
@@ -445,7 +449,7 @@ git commit -m "feat: guard post approval real runs"
 - Modify: `src/hermes_workflow/real_run.py`
 - Modify: `tests/test_real_run.py`
 
-- [ ] **Step 1: Add success-path tests**
+- [x] **Step 1: Add success-path tests**
 
 Append these tests to `tests/test_real_run.py`:
 
@@ -532,7 +536,7 @@ def test_prepare_real_run_accepts_valid_custom_run_id(tmp_path: Path) -> None:
     assert manifest["rendered_input_scs"] == "runs/real/real_007/input.scs"
 ```
 
-- [ ] **Step 2: Run tests and verify failure**
+- [x] **Step 2: Run tests and verify failure**
 
 Run:
 
@@ -542,7 +546,7 @@ pytest tests/test_real_run.py::test_prepare_real_run_writes_first_real_run_packa
 
 Expected: both tests fail with `NotImplementedError`.
 
-- [ ] **Step 3: Implement package rendering**
+- [x] **Step 3: Implement package rendering**
 
 In `src/hermes_workflow/real_run.py`, add these imports near the top:
 
@@ -708,7 +712,7 @@ def _utc_now() -> str:
     return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 ```
 
-- [ ] **Step 4: Run success tests**
+- [x] **Step 4: Run success tests**
 
 Run:
 
@@ -718,7 +722,7 @@ pytest tests/test_real_run.py::test_prepare_real_run_writes_first_real_run_packa
 
 Expected: both tests pass.
 
-- [ ] **Step 5: Run all current real-run tests**
+- [x] **Step 5: Run all current real-run tests**
 
 Run:
 
@@ -728,7 +732,7 @@ pytest tests/test_real_run.py -v
 
 Expected: all current real-run tests pass.
 
-- [ ] **Step 6: Run ruff**
+- [x] **Step 6: Run ruff**
 
 Run:
 
@@ -738,7 +742,7 @@ ruff check .
 
 Expected: all checks pass.
 
-- [ ] **Step 7: Run review gate**
+- [x] **Step 7: Run review gate**
 
 Run:
 
@@ -748,7 +752,7 @@ claude -p "Review the current git diff for C-4 Task 2 against docs/superpowers/s
 
 Expected: no Critical or Important findings. Fix any Critical or Important findings before committing.
 
-- [ ] **Step 8: Commit Task 2**
+- [x] **Step 8: Commit Task 2**
 
 Run:
 
@@ -763,7 +767,7 @@ git commit -m "feat: prepare first real run package"
 - Modify: `src/hermes_workflow/real_run.py`
 - Modify: `tests/test_real_run.py`
 
-- [ ] **Step 1: Add hardening tests**
+- [x] **Step 1: Add hardening tests**
 
 Append these tests to `tests/test_real_run.py`:
 
@@ -845,7 +849,7 @@ def test_prepare_real_run_cleans_partial_run_directory_on_write_failure(
     assert package.manifest_path.exists()
 ```
 
-- [ ] **Step 2: Run hardening tests and verify result**
+- [x] **Step 2: Run hardening tests and verify result**
 
 Run:
 
@@ -855,7 +859,7 @@ pytest tests/test_real_run.py::test_prepare_real_run_rejects_invalid_run_id test
 
 Expected: all five tests pass.
 
-- [ ] **Step 3: Confirm hardening implementation**
+- [x] **Step 3: Confirm hardening implementation**
 
 Confirm `src/hermes_workflow/real_run.py` contains this run-id validator:
 
@@ -909,7 +913,7 @@ Confirm the cleanup wrapper around all writes is:
         raise
 ```
 
-- [ ] **Step 4: Run all real-run tests**
+- [x] **Step 4: Run all real-run tests**
 
 Run:
 
@@ -919,7 +923,7 @@ pytest tests/test_real_run.py -v
 
 Expected: all real-run tests pass.
 
-- [ ] **Step 5: Run ruff**
+- [x] **Step 5: Run ruff**
 
 Run:
 
@@ -929,7 +933,7 @@ ruff check .
 
 Expected: all checks pass.
 
-- [ ] **Step 6: Run review gate**
+- [x] **Step 6: Run review gate**
 
 Run:
 
@@ -939,7 +943,7 @@ claude -p "Review the current git diff for C-4 Task 3 against docs/superpowers/s
 
 Expected: no Critical or Important findings. Fix any Critical or Important findings before committing.
 
-- [ ] **Step 7: Commit Task 3**
+- [x] **Step 7: Commit Task 3**
 
 Run:
 

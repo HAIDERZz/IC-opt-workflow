@@ -2,16 +2,16 @@
 
 ## 当前项目节点
 
-截至 2026-05-31：
+截至 2026-06-01：
 
 - Plan A Hermes File Contract MVP 已完成到 Task 9。Hermes 部分没有 Plan A Task 10。
 - Plan B mock optimization loop 已完成并提交。
 - Plan C C-1 netlist template contract 已完成并提交。
 - Plan C C-2 dry-run candidate renderer 已完成并通过最终 review gate。
 - Plan C C-3 execution package preflight readiness 已完成并通过最终 review gate：生成的 execution package 将 Maestro export 分配给执行 agent，Hermes 拥有 `prepare-netlist`、`dry-run`、`preflight-health` 和 `approve`。
-- Plan C C-4 post-approval real-run execution contract 已确认范围，并写入 design spec 与 implementation plan。C-4 只准备真实 run package，不运行 Spectre。
+- Plan C C-4 post-approval real-run execution contract 已完成 Task 1-3：Hermes 已具备 post-approval guard、immutable config drift guard、first real-run package rendering、candidate/manifest 写入、overwrite refusal 和失败清理测试覆盖。C-4 只准备真实 run package，不运行 Spectre。
 - 顶层 broad plan 已对齐当前路线：Hermes 负责 deterministic preflight，执行 agent 负责 Maestro export 和 approval 之后的真实 Spectre/optimizer 执行。
-- 下一步：从 `docs/superpowers/plans/2026-06-01-post-approval-real-run-contract.md` 的 C-4 Task 1 开始执行。
+- 下一步：从 `docs/superpowers/plans/2026-06-01-post-approval-real-run-contract.md` 的 C-4 Task 4 开始执行，接入 `hermes-workflow prepare-real-run` CLI。
 - `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example` 下的真实 `input.scs` 示例只作为本地参考，不能提交进仓库。
 
 ## 1. 项目概览
@@ -98,6 +98,17 @@ flowchart TD
 
 - `src/hermes_workflow/dry_run.py`
   渲染一个 lower-bound candidate，检查 placeholder、mock metric、objective、constraint evaluability、`ledger/` 和 `state/` writability，并写入 `reports/dry_run_report.json`。
+
+### Post-approval real-run package 层
+
+- `docs/superpowers/specs/2026-05-31-post-approval-real-run-contract-design.md`
+  C-4 设计文档，定义 approval 之后、真实 Spectre runner 之前的文件合同边界：Hermes 只准备 first real-run package，不启动 Spectre/Virtuoso/subprocess/optimizer loop。
+
+- `docs/superpowers/plans/2026-06-01-post-approval-real-run-contract.md`
+  C-4 implementation plan。当前 Task 1-3 已完成并通过 review gate，下一步是 Task 4 CLI command。
+
+- `src/hermes_workflow/real_run.py`
+  验证 `supervisor_instruction.json` 已批准首次真实运行，校验 immutable config hash 未漂移，从 `template.scs` 渲染 lower-bound first real candidate，写入 `runs/real/<run_id>/input.scs`、`candidate.json` 和 `real_run_manifest.json`，并在失败时清理 partial run directory。
 
 ### Mock optimization 测试层
 

@@ -1,7 +1,7 @@
 # Compact Resume Checkpoint
 
 Date: 2026-05-28
-Last updated: 2026-05-31
+Last updated: 2026-06-01
 
 This checkpoint preserves the planning state for continuing after context compaction.
 
@@ -45,6 +45,12 @@ Current execution state:
 - C-3 implementation plan exists: `docs/superpowers/plans/2026-05-30-execution-package-preflight-readiness.md`.
 - C-3 is complete and reviewed as of 2026-05-31. Final verification: `pytest -q` passed, 173 tests; `ruff check .` passed; final spec and code-quality reviews passed with no Critical or Important findings.
 - C-3 final code-quality hardening commit: `edb107f fix: harden preflight readiness gates`.
+- C-4 post-approval real-run execution contract design spec exists: `docs/superpowers/specs/2026-05-31-post-approval-real-run-contract-design.md`.
+- C-4 implementation plan exists: `docs/superpowers/plans/2026-06-01-post-approval-real-run-contract.md`.
+- C-4 Task 1 complete and reviewed: `e195bd9 feat: guard post approval real runs`.
+- C-4 Task 2 complete and reviewed: `d6804a8 feat: prepare first real run package`.
+- C-4 Task 3 complete and reviewed: `fc34c6d fix: harden real run package creation`.
+- C-4 stop point: start Task 4 CLI command next. Do not start Task 5 before Task 4 is reviewed and committed.
 - Real `input.scs` examples under `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example` are local-only references and must not be committed.
 
 ## Files Already Read
@@ -70,8 +76,10 @@ Current execution state:
 - Active C-2 implementation plan: `ic-auto-opt-workflow/docs/superpowers/plans/2026-05-30-dry-run-candidate-renderer.md`
 - Active C-3 design spec: `ic-auto-opt-workflow/docs/superpowers/specs/2026-05-30-execution-package-preflight-readiness-design.md`
 - Active C-3 implementation plan: `ic-auto-opt-workflow/docs/superpowers/plans/2026-05-30-execution-package-preflight-readiness.md`
+- Active C-4 design spec: `ic-auto-opt-workflow/docs/superpowers/specs/2026-05-31-post-approval-real-run-contract-design.md`
+- Active C-4 implementation plan: `ic-auto-opt-workflow/docs/superpowers/plans/2026-06-01-post-approval-real-run-contract.md`
 
-Plan A, Plan B, Plan C C-1, Plan C C-2, and Plan C C-3 are complete. Confirm the next scope before starting additional Plan C work.
+Plan A, Plan B, Plan C C-1, Plan C C-2, and Plan C C-3 are complete. Plan C C-4 Task 1-3 are complete and reviewed. Resume from C-4 Task 4 CLI command.
 
 ## Confirmed Plan A Scope
 
