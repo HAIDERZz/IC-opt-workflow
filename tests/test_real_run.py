@@ -310,3 +310,83 @@ def test_prepare_real_run_rejects_placeholder_candidate_values(
         prepare_real_run(project_dir, created_at_utc="2026-05-31T00:20:00Z")
 
     assert not (project_dir / "runs" / "real" / "real_001").exists()
+
+
+def test_prepare_real_run_rejects_invalid_run_id(tmp_path: Path) -> None:
+    project_dir = _create_project(tmp_path)
+    _approve_project(project_dir)
+    _write_template(project_dir)
+
+    with pytest.raises(ValueError, match=r"run_id must match real_\[0-9\]\{3\}: run_1"):
+        prepare_real_run(project_dir, run_id="run_1")
+
+    assert not (project_dir / "runs" / "real").exists()
+
+
+def test_prepare_real_run_rejects_missing_template(tmp_path: Path) -> None:
+    project_dir = _create_project(tmp_path)
+    _approve_project(project_dir)
+
+    with pytest.raises(
+        FileNotFoundError,
+        match="template.scs is missing: netlists/templates/template.scs",
+    ):
+        prepare_real_run(project_dir, created_at_utc="2026-05-31T00:20:00Z")
+
+    assert not (project_dir / "runs" / "real").exists()
+
+
+def test_prepare_real_run_rejects_unexpected_template_variable(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_project(tmp_path)
+    _approve_project(project_dir)
+    _write_template(
+        project_dir,
+        """simulator lang=spectre
+parameters FN={{FN}} WN={{WN}} FP={{FP}} WP={{WP}} EXTRA={{EXTRA}}
+tran tran stop=10n
+""",
+    )
+
+    with pytest.raises(ValueError, match="unexpected template variables: EXTRA"):
+        prepare_real_run(project_dir, created_at_utc="2026-05-31T00:20:00Z")
+
+    assert not (project_dir / "runs" / "real" / "real_001").exists()
+
+
+def test_prepare_real_run_refuses_existing_package(tmp_path: Path) -> None:
+    project_dir = _create_project(tmp_path)
+    _approve_project(project_dir)
+    _write_template(project_dir)
+    prepare_real_run(project_dir, created_at_utc="2026-05-31T00:20:00Z")
+
+    with pytest.raises(FileExistsError, match="real run package already exists"):
+        prepare_real_run(project_dir, created_at_utc="2026-05-31T00:21:00Z")
+
+
+def test_prepare_real_run_cleans_partial_run_directory_on_write_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    project_dir = _create_project(tmp_path)
+    _approve_project(project_dir)
+    _write_template(project_dir)
+
+    original_write_text = Path.write_text
+
+    def failing_write_text(self: Path, data: str, *args, **kwargs):
+        if self.name == "candidate.json":
+            raise OSError("simulated candidate write failure")
+        return original_write_text(self, data, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "write_text", failing_write_text)
+
+    with pytest.raises(OSError, match="simulated candidate write failure"):
+        prepare_real_run(project_dir, created_at_utc="2026-05-31T00:20:00Z")
+
+    assert not (project_dir / "runs" / "real" / "real_001").exists()
+
+    monkeypatch.undo()
+    package = prepare_real_run(project_dir, created_at_utc="2026-05-31T00:21:00Z")
+    assert package.manifest_path.exists()
