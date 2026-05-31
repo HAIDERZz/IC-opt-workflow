@@ -505,8 +505,8 @@ def test_prepare_real_run_writes_first_real_run_package(tmp_path: Path) -> None:
         "engine": "spectre_x",
         "preset": "ax",
         "output_format": "psfascii",
-        "parallel_jobs": 1,
-        "timeout_s": 600,
+        "parallel_jobs": 10,
+        "timeout_s": 3600,
     }
     assert "modify_maestro_setup" in manifest["forbidden_actions"]
     assert not (project_dir / "ledger" / "experiment_ledger.jsonl").exists()

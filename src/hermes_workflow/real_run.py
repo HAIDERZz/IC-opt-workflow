@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 
+from hermes_workflow.dry_run import PLACEHOLDER_RE, UNRESOLVED_PLACEHOLDER_RE
 from hermes_workflow.package import sha256_file
 from hermes_workflow.validate import ContractBundle, assert_valid_project
 
@@ -31,6 +34,7 @@ def prepare_real_run(
     project_dir: Path,
     *,
     run_id: str | None = None,
+    created_at_utc: str | None = None,
 ) -> RealRunPackage:
     project_dir = Path(project_dir)
     selected_run_id = _validate_run_id(run_id or DEFAULT_RUN_ID)
@@ -46,7 +50,58 @@ def prepare_real_run(
     if manifest_path.exists():
         raise FileExistsError(f"real run package already exists: {manifest_path}")
 
-    raise NotImplementedError("real run package rendering is implemented in Task 2")
+    template_relative = bundle.project_config.netlist.template_scs
+    template_path = _project_path(bundle, template_relative)
+    if not template_path.exists():
+        raise FileNotFoundError(f"template.scs is missing: {template_relative}")
+
+    candidate = _lower_bound_candidate(bundle, selected_run_id)
+    rendered_relative = f"{REAL_RUN_ROOT}/{selected_run_id}/input.scs"
+    candidate_relative = f"{REAL_RUN_ROOT}/{selected_run_id}/candidate.json"
+    rendered_path = _project_path(bundle, rendered_relative)
+    candidate_path = _project_path(bundle, candidate_relative)
+
+    try:
+        run_dir.mkdir(parents=True, exist_ok=True)
+        rendered_text = _render_template(
+            template_path.read_text(encoding="utf-8"),
+            candidate["parameters"],
+        )
+        rendered_path.write_text(rendered_text, encoding="utf-8")
+        candidate_path.write_text(
+            json.dumps(candidate, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        manifest_payload = _build_manifest(
+            bundle,
+            selected_run_id,
+            created_at_utc or _utc_now(),
+            instruction,
+            approved_hashes,
+            template_relative,
+            rendered_relative,
+            candidate_relative,
+            template_path,
+            rendered_path,
+        )
+        manifest_path.write_text(
+            json.dumps(manifest_payload, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+    except Exception:
+        if run_dir.exists():
+            shutil.rmtree(run_dir, ignore_errors=True)
+        raise
+
+    return RealRunPackage(
+        run_id=selected_run_id,
+        run_dir=run_dir,
+        rendered_input_scs=rendered_path,
+        candidate_path=candidate_path,
+        manifest_path=manifest_path,
+        candidate_payload=candidate,
+        manifest_payload=manifest_payload,
+    )
 
 
 def _validate_run_id(run_id: str) -> str:
@@ -111,3 +166,99 @@ def _project_path(bundle: ContractBundle, relative_path: str) -> Path:
             f"real-run path must be project-relative and safe: {relative_path}"
         )
     return bundle.project_dir / Path(*path.parts)
+
+
+def _lower_bound_candidate(bundle: ContractBundle, run_id: str) -> dict:
+    return {
+        "schema_version": "1.0",
+        "candidate_id": run_id,
+        "source": "lower_bound_first_real_run",
+        "parameters": {
+            variable.name: variable.lower for variable in bundle.variables.variables
+        },
+    }
+
+
+def _render_template(template_text: str, candidate: dict[str, str]) -> str:
+    approved_names = set(candidate)
+    placeholder_values = sorted(
+        name for name, value in candidate.items() if UNRESOLVED_PLACEHOLDER_RE.search(value)
+    )
+    if placeholder_values:
+        raise ValueError(
+            "candidate parameter values must not contain placeholders: "
+            + ", ".join(placeholder_values)
+        )
+
+    seen_names = {match.group("name") for match in PLACEHOLDER_RE.finditer(template_text)}
+    unexpected = sorted(seen_names - approved_names)
+    missing = sorted(approved_names - seen_names)
+    if missing:
+        raise ValueError(
+            "template is missing placeholders for approved variables: "
+            + ", ".join(missing)
+        )
+    if unexpected:
+        raise ValueError("unexpected template variables: " + ", ".join(unexpected))
+
+    rendered = template_text
+    for name, value in candidate.items():
+        rendered = rendered.replace(f"{{{{{name}}}}}", value)
+
+    unresolved = sorted(
+        {match.group(0) for match in UNRESOLVED_PLACEHOLDER_RE.finditer(rendered)}
+    )
+    if unresolved:
+        raise ValueError(
+            "rendered real-run deck still contains unresolved placeholders: "
+            + ", ".join(unresolved)
+        )
+    return rendered
+
+
+def _build_manifest(
+    bundle: ContractBundle,
+    run_id: str,
+    created_at_utc: str,
+    instruction: dict,
+    approved_hashes: dict[str, str],
+    template_relative: str,
+    rendered_relative: str,
+    candidate_relative: str,
+    template_path: Path,
+    rendered_path: Path,
+) -> dict:
+    spectre = bundle.spectre.spectre
+    return {
+        "schema_version": "1.0",
+        "run_id": run_id,
+        "project_name": bundle.project_config.project.name,
+        "created_at_utc": created_at_utc,
+        "status": "prepared",
+        "supervisor_decision": instruction["decision"],
+        "template_scs": template_relative,
+        "rendered_input_scs": rendered_relative,
+        "candidate_file": candidate_relative,
+        "candidate_id": run_id,
+        "candidate_source": "lower_bound_first_real_run",
+        "approved_config_hashes": approved_hashes,
+        "template_sha256": sha256_file(template_path),
+        "rendered_input_sha256": sha256_file(rendered_path),
+        "spectre": {
+            "engine": spectre.engine,
+            "preset": spectre.preset.value,
+            "output_format": spectre.output_format,
+            "parallel_jobs": spectre.parallel_jobs,
+            "timeout_s": spectre.timeout_s,
+        },
+        "forbidden_actions": [
+            "modify_maestro_setup",
+            "modify_immutable_config_files",
+            "change_variable_bounds",
+            "change_objective_or_constraints",
+        ],
+    }
+
+
+def _utc_now() -> str:
+    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")

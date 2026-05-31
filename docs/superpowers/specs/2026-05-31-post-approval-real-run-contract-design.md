@@ -163,8 +163,8 @@ The candidate parameters are strings, preserving the same value formatting used 
     "engine": "spectre_x",
     "preset": "ax",
     "output_format": "psfascii",
-    "parallel_jobs": 1,
-    "timeout_s": 600
+    "parallel_jobs": 10,
+    "timeout_s": 3600
   },
   "forbidden_actions": [
     "modify_maestro_setup",
