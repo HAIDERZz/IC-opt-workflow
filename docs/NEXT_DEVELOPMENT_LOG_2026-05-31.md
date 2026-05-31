@@ -4,11 +4,11 @@
 
 - Repository: `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow`
 - Branch: `plan-a-hermes-file-contract-mvp`
-- Current scope: Plan C-4, post-approval real-run execution contract
-- Current status: C-4 complete and reviewed
-- Next required action: confirm next Plan C scope
+- Current scope: Plan C-5, real-run result handoff contract
+- Current status: C-5 implementation plan ready; implementation not started
+- Next required action: execute C-5 Task 1 with Subagent-Driven development
 
-C-3 Task 6 final verification is complete. C-4 is confirmed as a contract-only first real-run package; it must not run Spectre, Virtuoso, subprocesses, or the optimizer loop. C-4 is now complete and reviewed.
+C-3 Task 6 final verification is complete. C-4 is confirmed as a contract-only first real-run package; it must not run Spectre, Virtuoso, subprocesses, or the optimizer loop. C-4 is now complete and reviewed. C-5 has a committed design spec and a ready implementation plan for validating the execution agent's returned `result_manifest.json` and declared artifacts.
 
 ## Completed Scope
 
@@ -18,6 +18,7 @@ C-3 Task 6 final verification is complete. C-4 is confirmed as a contract-only f
 - Plan C C-2 dry-run candidate renderer: complete.
 - Plan C C-3 execution package preflight readiness: complete and reviewed.
 - Plan C C-4 post-approval real-run execution contract: complete and reviewed.
+- Plan C C-5 real-run result handoff contract: design complete, implementation plan ready.
 
 Plan C-4 Task 1-4 added:
 
@@ -76,6 +77,12 @@ Plan C-4 implementation commits so far:
 - `fc34c6d fix: harden real run package creation`
 - `1ce650e feat: add prepare real run cli`
 - `f40966e docs: record real run package progress`
+- `a9bc98f docs: close real run package contract`
+
+Plan C-5 design and plan:
+
+- `ce4ce0d docs: design real run result handoff contract`
+- `docs/superpowers/plans/2026-06-01-real-run-result-handoff-contract.md`
 
 ## Final Verification
 
@@ -99,7 +106,7 @@ Final review gates:
 
 ## Next Task
 
-Confirm the next Plan C scope before adding Spectre subprocess execution, real metric extraction, or optimizer-loop integration. This session tried Risk-Tiered Batch Gates: Task 4 used local deterministic verification, Task 5 docs were local, and Task 6 used one combined final review gate instead of separate per-task reviews.
+Execute C-5 Task 1 from `docs/superpowers/plans/2026-06-01-real-run-result-handoff-contract.md`. C-5 should validate the returned real-run file contract only. After C-5, run C-5.5 dual-agent result handoff simulation before adding physical Spectre, Virtuoso, Hermes, or Claude CLI tool adapters.
 
 ## Local Data Warning
 
@@ -114,5 +121,5 @@ are local reference material only. Do not copy or commit them into the repositor
 ## Resume Prompt
 
 ```text
-请继续 IC auto optimization workflow。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。先阅读 docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/OPENCODE_HANDOFF_2026-05-29.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md。Plan A Task 1-9、Plan B、Plan C C-1、Plan C C-2、Plan C C-3 均已完成并通过 review gate；C-4 post-approval real-run execution contract 已完成并通过 final verification 与合并 review gate。下一步先确认新的 Plan C 范围；不要提交本地真实 input.scs 示例。
+请继续 IC auto optimization workflow。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。先阅读 docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/specs/2026-06-01-real-run-result-handoff-contract-design.md、docs/superpowers/plans/2026-06-01-real-run-result-handoff-contract.md。Plan A Task 1-9、Plan B、Plan C C-1、C-2、C-3、C-4 均已完成并通过 review gate；C-5 design 已完成，implementation plan 已就绪但尚未开始。请用 Subagent-Driven 从 C-5 Task 1 开始执行；不要提交本地真实 input.scs 示例，不要进入真实 Spectre/Virtuoso/metric/optimizer loop 接入。
 ```

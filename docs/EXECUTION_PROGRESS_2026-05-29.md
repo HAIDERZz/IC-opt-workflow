@@ -595,7 +595,31 @@ Reviews:
 
 Next recommended action:
 
-- Confirm the next Plan C scope before adding Spectre subprocess execution, real metric extraction, or optimizer-loop integration.
+- C-5 has since been confirmed as the next Plan C scope.
+
+## Plan C-5: Real-Run Result Handoff Contract
+
+Status: design complete; implementation plan ready as of 2026-06-01.
+
+Scope:
+
+- Hermes validates `runs/real/<run_id>/result_manifest.json` after an execution agent consumes the C-4 first real-run package.
+- Hermes checks the prepared manifest, result manifest, candidate identity, rendered deck hash, and declared artifact paths.
+- Hermes writes `reports/real_run_check_report.json`.
+- C-5 does not run Spectre, run Virtuoso, parse real metrics, append ledger rows, or update optimizer state.
+
+Spec:
+
+- `docs/superpowers/specs/2026-06-01-real-run-result-handoff-contract-design.md`
+
+Implementation plan:
+
+- `docs/superpowers/plans/2026-06-01-real-run-result-handoff-contract.md`
+
+Next recommended action:
+
+- Execute C-5 Task 1 with Subagent-Driven development.
+- After C-5, run C-5.5 dual-agent result handoff simulation before adding real Hermes, Claude CLI, Spectre, Virtuoso, metric extraction, or optimizer-loop tool adapters.
 
 ## Resume Prompt
 
@@ -606,5 +630,5 @@ Next recommended action:
 3. ic-auto-opt-workflow/docs/COMPACT_RESUME_CHECKPOINT.md
 4. ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。请先阅读 docs/OPENCODE_HANDOFF_2026-05-29.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md。Hermes File Contract MVP 的 Plan A Task 1-9 已完成；Plan B mock optimization loop 已完成；Plan C C-1 netlist template contract 已完成；Plan C C-2 dry-run candidate renderer 已完成；Plan C C-3 execution package preflight readiness 已完成并通过最终 review gate；Plan C C-4 post-approval real-run execution contract 已完成并通过 final verification 与合并 review gate。下一步先确认新的 Plan C 范围；不要提交或复制本地真实 input.scs 示例。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。请先阅读 docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/specs/2026-06-01-real-run-result-handoff-contract-design.md、docs/superpowers/plans/2026-06-01-real-run-result-handoff-contract.md。Hermes File Contract MVP 的 Plan A Task 1-9 已完成；Plan B mock optimization loop 已完成；Plan C C-1 netlist template contract、C-2 dry-run candidate renderer、C-3 execution package preflight readiness、C-4 post-approval real-run execution contract 均已完成并通过 review gate。C-5 real-run result handoff contract 的 design spec 和 implementation plan 已就绪但尚未开始实现。下一步用 Subagent-Driven 从 C-5 Task 1 开始；不要提交或复制本地真实 input.scs 示例，不要进入真实 Spectre/Virtuoso/metric/optimizer loop 接入。
 ```
