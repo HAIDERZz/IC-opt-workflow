@@ -7,6 +7,13 @@ from pathlib import Path
 from pydantic import BaseModel, ConfigDict, Field
 
 
+REQUIRED_PREFLIGHT_REPORT_PATHS = (
+    "reports/netlist_preparation_report.json",
+    "reports/dry_run_report.json",
+    "state/health_check.json",
+)
+
+
 class StrictReport(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

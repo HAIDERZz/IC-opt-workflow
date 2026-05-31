@@ -7,10 +7,12 @@ from hermes_workflow.reports import HealthCheck, HealthStatus
 from hermes_workflow.validate import assert_valid_project
 
 
+BEST_CANDIDATE_PATH = "state/best_candidate.json"
+
 REAL_RUN_ARTIFACTS = (
     "ledger/experiment_ledger.jsonl",
     "state/optimizer_state.json",
-    "state/best_candidate.json",
+    BEST_CANDIDATE_PATH,
 )
 
 
@@ -29,8 +31,8 @@ def write_preflight_health(project_dir: Path) -> HealthCheck:
         real_run_started=bool(detected),
         current_evaluations=0,
         best_candidate_path=(
-            "state/best_candidate.json"
-            if (project_dir / "state" / "best_candidate.json").exists()
+            BEST_CANDIDATE_PATH
+            if (project_dir / BEST_CANDIDATE_PATH).exists()
             else None
         ),
         last_batch_id=None,

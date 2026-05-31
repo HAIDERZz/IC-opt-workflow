@@ -8,6 +8,7 @@ from hashlib import sha256
 from importlib import resources
 from pathlib import Path
 
+from hermes_workflow.reports import REQUIRED_PREFLIGHT_REPORT_PATHS
 from hermes_workflow.validate import ContractBundle, assert_valid_project
 
 
@@ -183,6 +184,29 @@ def build_execution_package(
     if manifest_path.exists():
         raise FileExistsError(f"execution package already exists: {manifest_path}")
 
+    try:
+        return _build_package_contents(
+            project_dir,
+            bundle,
+            execution_dir,
+            config_destination,
+            manifest_path,
+            created_at_utc,
+        )
+    except Exception:
+        if execution_dir.exists():
+            shutil.rmtree(execution_dir, ignore_errors=True)
+        raise
+
+
+def _build_package_contents(
+    project_dir: Path,
+    bundle: ContractBundle,
+    execution_dir: Path,
+    config_destination: Path,
+    manifest_path: Path,
+    created_at_utc: str | None,
+) -> ExecutionManifest:
     execution_dir.mkdir(parents=True, exist_ok=True)
     config_destination.mkdir(parents=True, exist_ok=True)
 
@@ -202,11 +226,7 @@ def build_execution_package(
         "created_at_utc": created_at,
         "source_project_dir": str(project_dir.resolve()),
         "immutable_config_files": immutable_hashes,
-        "required_preflight_reports": [
-            "reports/netlist_preparation_report.json",
-            "reports/dry_run_report.json",
-            "state/health_check.json",
-        ],
+        "required_preflight_reports": list(REQUIRED_PREFLIGHT_REPORT_PATHS),
     }
     manifest_path.write_text(
         json.dumps(payload, indent=2, sort_keys=True) + "\n",

@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from hermes_workflow.approvals import decide_first_real_run
 from hermes_workflow.package import build_execution_package, create_project_from_template
 from tests.report_helpers import write_json, write_pass_reports
@@ -154,3 +156,127 @@ def test_approval_gate_rejects_health_report_with_real_run_started(
         "pre-approval real-run artifact exists: ledger/experiment_ledger.jsonl"
         in instruction["reason"]
     )
+
+
+def test_approval_gate_rejects_missing_preflight_reports(tmp_path: Path) -> None:
+    project_dir = tmp_path / "bridge_test_inv"
+    create_project_from_template(project_dir)
+    build_execution_package(project_dir, created_at_utc="2026-05-28T00:00:00Z")
+
+    write_json(
+        project_dir / "reports" / "dry_run_report.json",
+        {
+            "schema_version": "1.0",
+            "status": "pass",
+            "rendered_candidate_scs": "runs/dry_run/input.scs",
+            "placeholder_check": {
+                "unresolved_placeholders": [],
+                "unexpected_template_variables": [],
+            },
+            "metrics_import_ok": True,
+            "mock_metrics_ok": True,
+            "objective_ok": True,
+            "constraints_ok": True,
+            "ledger_write_ok": True,
+            "state_write_ok": True,
+            "issues": [],
+        },
+    )
+
+    instruction = decide_first_real_run(
+        project_dir,
+        created_at_utc="2026-05-28T00:10:00Z",
+    )
+
+    assert instruction["decision"] == "reject_first_real_run"
+    assert "required preflight reports missing:" in instruction["reason"]
+    assert "reports/netlist_preparation_report.json" in instruction["reason"]
+    assert "state/health_check.json" in instruction["reason"]
+    assert "reports/dry_run_report.json" not in instruction["reason"]
+
+
+def test_approval_gate_rejects_missing_health_check(tmp_path: Path) -> None:
+    project_dir = tmp_path / "bridge_test_inv"
+    create_project_from_template(project_dir)
+    build_execution_package(project_dir, created_at_utc="2026-05-28T00:00:00Z")
+
+    write_json(
+        project_dir / "reports" / "netlist_preparation_report.json",
+        {
+            "schema_version": "1.0",
+            "status": "pass",
+            "exported_input_scs": "netlists/exported/input.scs",
+            "template_scs": "netlists/templates/template.scs",
+            "approved_variables_template_status": {
+                "FN": True,
+                "WN": True,
+                "FP": True,
+                "WP": True,
+            },
+            "analysis_statements": ["tran", "dc"],
+            "forbidden_setup_changes_detected": False,
+            "issues": [],
+        },
+    )
+    write_json(
+        project_dir / "reports" / "dry_run_report.json",
+        {
+            "schema_version": "1.0",
+            "status": "pass",
+            "rendered_candidate_scs": "runs/dry_run/input.scs",
+            "placeholder_check": {
+                "unresolved_placeholders": [],
+                "unexpected_template_variables": [],
+            },
+            "metrics_import_ok": True,
+            "mock_metrics_ok": True,
+            "objective_ok": True,
+            "constraints_ok": True,
+            "ledger_write_ok": True,
+            "state_write_ok": True,
+            "issues": [],
+        },
+    )
+
+    instruction = decide_first_real_run(
+        project_dir,
+        created_at_utc="2026-05-28T00:10:00Z",
+    )
+
+    assert instruction["decision"] == "reject_first_real_run"
+    assert "required preflight reports missing:" in instruction["reason"]
+    assert "state/health_check.json" in instruction["reason"]
+    assert "reports/netlist_preparation_report.json" not in instruction["reason"]
+
+
+def test_approval_gate_preserves_strict_loading_for_malformed_present_report(
+    tmp_path: Path,
+) -> None:
+    project_dir = tmp_path / "bridge_test_inv"
+    create_project_from_template(project_dir)
+    build_execution_package(project_dir, created_at_utc="2026-05-28T00:00:00Z")
+    (project_dir / "reports").mkdir(parents=True, exist_ok=True)
+    (project_dir / "reports" / "netlist_preparation_report.json").write_text(
+        "not-valid-json", encoding="utf-8"
+    )
+    (project_dir / "reports" / "dry_run_report.json").write_text("{}", encoding="utf-8")
+    (project_dir / "state").mkdir(parents=True, exist_ok=True)
+    (project_dir / "state" / "health_check.json").write_text("{}", encoding="utf-8")
+
+    with pytest.raises((json.JSONDecodeError, ValueError)):
+        decide_first_real_run(
+            project_dir,
+            created_at_utc="2026-05-28T00:10:00Z",
+        )
+
+
+def test_approval_gate_handles_missing_project_dir_for_instruction(
+    tmp_path: Path,
+) -> None:
+    project_dir = tmp_path / "nonexistent"
+    instruction = decide_first_real_run(
+        project_dir,
+        created_at_utc="2026-05-28T00:10:00Z",
+    )
+    assert instruction["decision"] == "reject_first_real_run"
+    assert (project_dir / "supervisor_instruction.json").exists()

@@ -200,3 +200,39 @@ def test_build_execution_package_keeps_preflight_report_manifest_paths(
         "reports/dry_run_report.json",
         "state/health_check.json",
     ]
+
+
+def test_build_execution_package_cleans_up_on_failure_and_retry_succeeds(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import shutil as _shutil
+
+    project_dir = tmp_path / "bridge_test_inv"
+    create_project_from_template(project_dir)
+
+    execution_dir = project_dir / "execution_package"
+    original_copy2 = _shutil.copy2
+
+    call_count = 0
+
+    def failing_copy2(src, dst, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 3:
+            raise OSError("simulated copy failure")
+        return original_copy2(src, dst, **kwargs)
+
+    monkeypatch.setattr(_shutil, "copy2", failing_copy2)
+
+    with pytest.raises(OSError, match="simulated copy failure"):
+        build_execution_package(project_dir, created_at_utc="2026-05-28T00:00:00Z")
+
+    assert not execution_dir.exists(), "execution_package should be cleaned up"
+
+    monkeypatch.undo()
+    manifest = build_execution_package(
+        project_dir, created_at_utc="2026-05-28T00:00:00Z"
+    )
+    assert manifest.path.exists()
+    for file_name in CONFIG_FILE_NAMES:
+        assert (execution_dir / "config" / file_name).exists()

@@ -4,7 +4,7 @@ import json
 from datetime import UTC, datetime
 from pathlib import Path
 
-from hermes_workflow.reports import load_preflight_reports
+from hermes_workflow.reports import REQUIRED_PREFLIGHT_REPORT_PATHS, load_preflight_reports
 from hermes_workflow.validate import validate_project_files
 
 
@@ -31,6 +31,15 @@ def decide_first_real_run(
 
     if not validation_report.ok:
         instruction = _reject(created_at, validation_report.format(), approved_hashes)
+        return _write_instruction(project_dir, instruction)
+
+    missing_reports = _missing_preflight_report_files(project_dir)
+    if missing_reports:
+        instruction = _reject(
+            created_at,
+            f"required preflight reports missing: {', '.join(missing_reports)}",
+            approved_hashes,
+        )
         return _write_instruction(project_dir, instruction)
 
     preflight = load_preflight_reports(project_dir)
@@ -85,8 +94,17 @@ def _load_approved_config_hashes(path: Path) -> tuple[dict[str, str], str | None
     return approved_hashes, None
 
 
+def _missing_preflight_report_files(project_dir: Path) -> list[str]:
+    return [
+        rel_path
+        for rel_path in REQUIRED_PREFLIGHT_REPORT_PATHS
+        if not (project_dir / rel_path).exists()
+    ]
+
+
 def _write_instruction(project_dir: Path, instruction: dict) -> dict:
     path = Path(project_dir) / "supervisor_instruction.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
         json.dumps(instruction, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
