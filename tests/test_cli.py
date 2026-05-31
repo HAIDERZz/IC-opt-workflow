@@ -259,3 +259,89 @@ tran tran stop=10n
     assert not (project_dir / "ledger" / "experiment_ledger.jsonl").exists()
     assert not (project_dir / "state" / "optimizer_state.json").exists()
     assert not (project_dir / "state" / "best_candidate.json").exists()
+
+
+def test_cli_prepare_real_run_writes_package_after_approval(
+    tmp_path: Path,
+) -> None:
+    project_dir = tmp_path / "bridge_test_inv"
+    assert runner.invoke(app, ["init", str(project_dir)]).exit_code == 0
+    assert runner.invoke(app, ["package", str(project_dir)]).exit_code == 0
+    (project_dir / "netlists" / "exported" / "input.scs").write_text(
+        """simulator lang=spectre
+parameters temperature=27 FN=4 FP=4 WN=0.6u WP=1.2u
+tran tran stop=10n
+""",
+        encoding="utf-8",
+    )
+    assert runner.invoke(app, ["prepare-netlist", str(project_dir)]).exit_code == 0
+    assert runner.invoke(app, ["dry-run", str(project_dir)]).exit_code == 0
+    assert runner.invoke(app, ["preflight-health", str(project_dir)]).exit_code == 0
+    assert runner.invoke(app, ["approve", str(project_dir)]).exit_code == 0
+
+    result = runner.invoke(app, ["prepare-real-run", str(project_dir)])
+
+    manifest_path = (
+        project_dir / "runs" / "real" / "real_001" / "real_run_manifest.json"
+    )
+    assert result.exit_code == 0
+    assert "real run package prepared" in result.stdout
+    assert "run: runs/real/real_001" in result.stdout
+    assert "manifest: runs/real/real_001/real_run_manifest.json" in result.stdout
+    assert manifest_path.exists()
+    assert (project_dir / "runs" / "real" / "real_001" / "input.scs").exists()
+
+
+def test_cli_prepare_real_run_reports_missing_approval_without_traceback(
+    tmp_path: Path,
+) -> None:
+    project_dir = tmp_path / "bridge_test_inv"
+    assert runner.invoke(app, ["init", str(project_dir)]).exit_code == 0
+    assert runner.invoke(app, ["package", str(project_dir)]).exit_code == 0
+    (project_dir / "netlists" / "templates" / "template.scs").write_text(
+        """simulator lang=spectre
+parameters FN={{FN}} WN={{WN}} FP={{FP}} WP={{WP}}
+tran tran stop=10n
+""",
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(app, ["prepare-real-run", str(project_dir)])
+
+    assert result.exit_code == 1
+    assert isinstance(result.exception, SystemExit)
+    assert "supervisor instruction is missing" in result.stdout
+    assert "Traceback" not in result.output
+
+
+def test_cli_prepare_real_run_reports_config_drift_without_traceback(
+    tmp_path: Path,
+) -> None:
+    project_dir = tmp_path / "bridge_test_inv"
+    assert runner.invoke(app, ["init", str(project_dir)]).exit_code == 0
+    assert runner.invoke(app, ["package", str(project_dir)]).exit_code == 0
+    (project_dir / "netlists" / "exported" / "input.scs").write_text(
+        """simulator lang=spectre
+parameters temperature=27 FN=4 FP=4 WN=0.6u WP=1.2u
+tran tran stop=10n
+""",
+        encoding="utf-8",
+    )
+    assert runner.invoke(app, ["prepare-netlist", str(project_dir)]).exit_code == 0
+    assert runner.invoke(app, ["dry-run", str(project_dir)]).exit_code == 0
+    assert runner.invoke(app, ["preflight-health", str(project_dir)]).exit_code == 0
+    assert runner.invoke(app, ["approve", str(project_dir)]).exit_code == 0
+    variables_path = project_dir / "config" / "variables.yaml"
+    variables_path.write_text(
+        variables_path.read_text(encoding="utf-8").replace(
+            'upper: "12"', 'upper: "14"', 1
+        ),
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(app, ["prepare-real-run", str(project_dir)])
+
+    assert result.exit_code == 1
+    assert isinstance(result.exception, SystemExit)
+    assert "immutable config drift detected: config/variables.yaml" in result.stdout
+    assert "Traceback" not in result.output

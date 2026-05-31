@@ -9,6 +9,7 @@ from hermes_workflow.approvals import decide_first_real_run
 from hermes_workflow.dry_run import run_dry_run
 from hermes_workflow.health import write_preflight_health
 from hermes_workflow.mock_optimizer import run_mock_optimization
+from hermes_workflow.real_run import prepare_real_run
 from hermes_workflow.netlists import prepare_netlist
 from hermes_workflow.package import (
     TemplateError,
@@ -172,6 +173,31 @@ def approve_command(
     typer.echo(instruction["decision"])
     if instruction["decision"] != "approve_first_real_run":
         raise typer.Exit(code=1)
+
+
+@app.command("prepare-real-run")
+def prepare_real_run_command(
+    project_dir: Annotated[
+        Path,
+        typer.Argument(
+            help="Project directory with approve_first_real_run instruction."
+        ),
+    ],
+    run_id: Annotated[
+        str | None,
+        typer.Option(
+            "--run-id",
+            help="Real-run package id such as real_001.",
+        ),
+    ] = None,
+) -> None:
+    try:
+        package = prepare_real_run(project_dir, run_id=run_id)
+    except (FileExistsError, FileNotFoundError, OSError, ValueError) as exc:
+        _exit_with_error(exc)
+    typer.echo("real run package prepared")
+    typer.echo(f"run: {package.run_dir.relative_to(project_dir)}")
+    typer.echo(f"manifest: {package.manifest_path.relative_to(project_dir)}")
 
 
 @app.command("mock-run")
