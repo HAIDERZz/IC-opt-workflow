@@ -5,10 +5,10 @@
 - Repository: `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow`
 - Branch: `plan-a-hermes-file-contract-mvp`
 - Current scope: Plan C-4, post-approval real-run execution contract
-- Current status: C-4 complete through Task 4 implementation
-- Next required action: C-4 final verification and combined review gate
+- Current status: C-4 complete and reviewed
+- Next required action: confirm next Plan C scope
 
-C-3 Task 6 final verification is complete. C-4 is confirmed as a contract-only first real-run package; it must not run Spectre, Virtuoso, subprocesses, or the optimizer loop. C-4 Task 1-4 now implement and harden the library-side real-run package creation path plus CLI wiring.
+C-3 Task 6 final verification is complete. C-4 is confirmed as a contract-only first real-run package; it must not run Spectre, Virtuoso, subprocesses, or the optimizer loop. C-4 is now complete and reviewed.
 
 ## Completed Scope
 
@@ -17,7 +17,7 @@ C-3 Task 6 final verification is complete. C-4 is confirmed as a contract-only f
 - Plan C C-1 netlist template contract: complete.
 - Plan C C-2 dry-run candidate renderer: complete.
 - Plan C C-3 execution package preflight readiness: complete and reviewed.
-- Plan C C-4 post-approval real-run execution contract: complete through Task 4 implementation; final verification pending.
+- Plan C C-4 post-approval real-run execution contract: complete and reviewed.
 
 Plan C-4 Task 1-4 added:
 
@@ -75,6 +75,7 @@ Plan C-4 implementation commits so far:
 - `d6804a8 feat: prepare first real run package`
 - `fc34c6d fix: harden real run package creation`
 - `1ce650e feat: add prepare real run cli`
+- `f40966e docs: record real run package progress`
 
 ## Final Verification
 
@@ -98,7 +99,7 @@ Final review gates:
 
 ## Next Task
 
-Run C-4 final verification from `docs/superpowers/plans/2026-06-01-post-approval-real-run-contract.md`. This session is trying Risk-Tiered Batch Gates: Task 4 used local deterministic verification, and Task 6 should run one combined final review gate instead of separate per-task reviews.
+Confirm the next Plan C scope before adding Spectre subprocess execution, real metric extraction, or optimizer-loop integration. This session tried Risk-Tiered Batch Gates: Task 4 used local deterministic verification, Task 5 docs were local, and Task 6 used one combined final review gate instead of separate per-task reviews.
 
 ## Local Data Warning
 
@@ -113,5 +114,5 @@ are local reference material only. Do not copy or commit them into the repositor
 ## Resume Prompt
 
 ```text
-请继续 IC auto optimization workflow。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。先阅读 docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/OPENCODE_HANDOFF_2026-05-29.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md。Plan A Task 1-9、Plan B、Plan C C-1、Plan C C-2、Plan C C-3 均已完成并通过 review gate；C-4 已确认为 contract-only first real-run package，设计 spec 是 docs/superpowers/specs/2026-05-31-post-approval-real-run-contract-design.md，implementation plan 是 docs/superpowers/plans/2026-06-01-post-approval-real-run-contract.md。C-4 Task 1-4 已完成，提交为 e195bd9、d6804a8、fc34c6d、1ce650e。当前流程正在试用 Risk-Tiered Batch Gates；下一步从 C-4 Task 6 final verification 和一次合并 review gate 继续；不要提交本地真实 input.scs 示例。
+请继续 IC auto optimization workflow。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。先阅读 docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/OPENCODE_HANDOFF_2026-05-29.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md。Plan A Task 1-9、Plan B、Plan C C-1、Plan C C-2、Plan C C-3 均已完成并通过 review gate；C-4 post-approval real-run execution contract 已完成并通过 final verification 与合并 review gate。下一步先确认新的 Plan C 范围；不要提交本地真实 input.scs 示例。
 ```

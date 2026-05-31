@@ -530,11 +530,11 @@ Verification:
 Next recommended action:
 
 - Plan C-3 is complete and reviewed.
-- Plan C-4 has since been confirmed and started; current resume point is C-4 final verification.
+- Plan C-4 has since been confirmed, completed, and reviewed.
 
 ## Plan C-4: Post-Approval Real-Run Execution Contract
 
-Status: complete through Task 4 implementation as of 2026-06-01; final verification pending.
+Status: complete and reviewed as of 2026-06-01.
 
 Scope:
 
@@ -558,6 +558,7 @@ Commits:
 - `d6804a8 feat: prepare first real run package`
 - `fc34c6d fix: harden real run package creation`
 - `1ce650e feat: add prepare real run cli`
+- `f40966e docs: record real run package progress`
 
 Implemented:
 
@@ -575,6 +576,8 @@ Implemented:
 
 Verification:
 
+- `pytest -q`: passed, 190 tests.
+- `ruff check .`: passed.
 - `pytest tests/test_real_run.py -v`: passed, 14 tests after Task 3.
 - `ruff check .`: passed after Task 3.
 - `git diff --check`: passed after Task 3.
@@ -587,11 +590,12 @@ Reviews:
 - Task 1 spec review: passed; Task 1 code-quality review: passed with no Critical or Important issues.
 - Task 2 spec review: passed; Task 2 code-quality review: passed after fixes with no Critical or Important issues.
 - Task 3 spec review: passed; Task 3 code-quality review: passed with no Critical or Important issues.
-- Task 4 used Risk-Tiered Batch Gates: local deterministic verification passed; final combined review remains pending Task 6.
+- Task 4 used Risk-Tiered Batch Gates: local deterministic verification passed; final combined review completed in Task 6.
+- Combined final spec/code-quality review: passed with no Critical or Important findings; ready to close C-4.
 
 Next recommended action:
 
-- Run C-4 final verification and combined review gate before confirming the next Plan C scope.
+- Confirm the next Plan C scope before adding Spectre subprocess execution, real metric extraction, or optimizer-loop integration.
 
 ## Resume Prompt
 
@@ -602,5 +606,5 @@ Next recommended action:
 3. ic-auto-opt-workflow/docs/COMPACT_RESUME_CHECKPOINT.md
 4. ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。请先阅读 docs/OPENCODE_HANDOFF_2026-05-29.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md。Hermes File Contract MVP 的 Plan A Task 1-9 已完成；Plan B mock optimization loop 已完成；Plan C C-1 netlist template contract 已完成；Plan C C-2 dry-run candidate renderer 已完成；Plan C C-3 execution package preflight readiness 已完成并通过最终 review gate；Plan C C-4 post-approval real-run execution contract Task 1-4 已完成，Task 4 使用 Risk-Tiered Batch Gates 只做本地 deterministic verification。下一步从 docs/superpowers/plans/2026-06-01-post-approval-real-run-contract.md 的 Task 6 final verification 和合并 review gate 继续。不要提交或复制本地真实 input.scs 示例。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。请先阅读 docs/OPENCODE_HANDOFF_2026-05-29.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md。Hermes File Contract MVP 的 Plan A Task 1-9 已完成；Plan B mock optimization loop 已完成；Plan C C-1 netlist template contract 已完成；Plan C C-2 dry-run candidate renderer 已完成；Plan C C-3 execution package preflight readiness 已完成并通过最终 review gate；Plan C C-4 post-approval real-run execution contract 已完成并通过 final verification 与合并 review gate。下一步先确认新的 Plan C 范围；不要提交或复制本地真实 input.scs 示例。
 ```

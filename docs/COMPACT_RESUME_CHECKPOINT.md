@@ -51,7 +51,9 @@ Current execution state:
 - C-4 Task 2 complete and reviewed: `d6804a8 feat: prepare first real run package`.
 - C-4 Task 3 complete and reviewed: `fc34c6d fix: harden real run package creation`.
 - C-4 Task 4 implementation complete with local deterministic verification: `1ce650e feat: add prepare real run cli`.
-- C-4 stop point: run Task 6 final verification and one combined final review gate next. Task 5 docs are updated; final status closeout remains pending final review.
+- C-4 documentation progress update complete: `f40966e docs: record real run package progress`.
+- C-4 complete and reviewed. Final verification: `pytest -q` passed with 190 tests; `ruff check .` passed; combined final spec/code-quality review passed with no Critical or Important findings.
+- C-4 stop point: confirm the next Plan C scope before adding Spectre subprocess execution, real metric extraction, or optimizer-loop integration.
 - Real `input.scs` examples under `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example` are local-only references and must not be committed.
 
 ## Files Already Read
@@ -80,7 +82,7 @@ Current execution state:
 - Active C-4 design spec: `ic-auto-opt-workflow/docs/superpowers/specs/2026-05-31-post-approval-real-run-contract-design.md`
 - Active C-4 implementation plan: `ic-auto-opt-workflow/docs/superpowers/plans/2026-06-01-post-approval-real-run-contract.md`
 
-Plan A, Plan B, Plan C C-1, Plan C C-2, and Plan C C-3 are complete. Plan C C-4 Task 1-4 are implemented. Resume from C-4 Task 6 final verification and combined review gate.
+Plan A, Plan B, Plan C C-1, Plan C C-2, Plan C C-3, and Plan C C-4 are complete. Confirm the next Plan C scope before new implementation.
 
 ## Confirmed Plan A Scope
 

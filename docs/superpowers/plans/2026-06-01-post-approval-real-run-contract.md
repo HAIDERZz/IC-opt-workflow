@@ -36,7 +36,7 @@ Do not commit or copy real `input.scs` examples from `/home/zzchen/Agent_virtuos
 
 ## Execution Status
 
-Status: complete through Task 4 implementation as of 2026-06-01; final verification pending.
+Status: complete and reviewed as of 2026-06-01.
 
 Completed commits:
 
@@ -44,9 +44,12 @@ Completed commits:
 - `d6804a8 feat: prepare first real run package`
 - `fc34c6d fix: harden real run package creation`
 - `1ce650e feat: add prepare real run cli`
+- `f40966e docs: record real run package progress`
 
 Final verification:
 
+- `pytest -q` passed, 190 tests.
+- `ruff check .` passed.
 - After Task 3: `pytest tests/test_real_run.py -v` passed, 14 tests.
 - After Task 3: `ruff check .` passed.
 - After Task 3: `git diff --check` passed.
@@ -56,12 +59,11 @@ Final verification:
 
 Final reviews:
 
-- Final spec review: pending Task 6.
-- Final code-quality review: pending Task 6.
+- Combined final spec/code-quality review: passed with no Critical or Important findings.
 
 Batch-gate note:
 
-- Tasks 4-6 are using Risk-Tiered Batch Gates to reduce model calls. Task 4 used a Claude CLI coding worker plus local deterministic verification. Task 5 docs are local. Task 6 should run one combined final review gate before closeout.
+- Tasks 4-6 used Risk-Tiered Batch Gates to reduce model calls. Task 4 used a Claude CLI coding worker plus local deterministic verification. Task 5 docs were local. Task 6 ran one combined final review gate before closeout.
 
 ## File Map
 
@@ -1200,7 +1202,7 @@ Append a `Plan C-4` section to `docs/EXECUTION_PROGRESS_2026-05-29.md`:
 ```markdown
 ## Plan C-4: Post-Approval Real-Run Execution Contract
 
-Status: complete through Task 4 implementation as of 2026-06-01; final verification pending.
+Status: complete and reviewed as of 2026-06-01.
 
 Spec:
 
@@ -1219,7 +1221,7 @@ Implemented:
 
 Next recommended action:
 
-- Run C-4 final verification and review gate before confirming the next Plan C scope.
+- Confirm the next Plan C scope before adding Spectre subprocess execution, real metric extraction, or optimizer-loop integration.
 ```
 
 Update `docs/COMPACT_RESUME_CHECKPOINT.md` latest checkpoint bullets:
@@ -1227,15 +1229,15 @@ Update `docs/COMPACT_RESUME_CHECKPOINT.md` latest checkpoint bullets:
 ```markdown
 - C-4 post-approval real-run execution contract design spec exists: `0f64570 docs: design post approval real run contract`.
 - C-4 implementation plan exists: `docs/superpowers/plans/2026-06-01-post-approval-real-run-contract.md`.
-- C-4 is complete through Task 4 implementation; final verification remains pending.
+- C-4 is complete and reviewed.
 ```
 
 Update `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`:
 
 ```markdown
 - Current scope: Plan C-4, post-approval real-run execution contract
-- Current status: complete through Task 4 implementation
-- Next required action: C-4 final verification and review gate
+- Current status: complete and reviewed
+- Next required action: confirm next Plan C scope
 ```
 
 - [x] **Step 4: Mark this plan progress**
@@ -1253,7 +1255,7 @@ Then replace the existing `## Execution Status` block with this shape. Copy the 
 ```markdown
 ## Execution Status
 
-Status: complete through Task 4 implementation as of 2026-06-01; final verification pending.
+Status: complete and reviewed as of 2026-06-01.
 
 Completed commits:
 
@@ -1269,8 +1271,7 @@ Verification:
 
 Final reviews:
 
-- Final spec review: pending Task 6.
-- Final code-quality review: pending Task 6.
+- Combined final spec/code-quality review passed with no Critical or Important findings.
 ```
 
 - [x] **Step 5: Run docs checks**
@@ -1304,7 +1305,7 @@ claude -p "Review the current git diff for C-4 Task 5 against docs/superpowers/s
 
 Risk-Tiered Batch Gates update: the per-task docs review gate was intentionally deferred to the Task 6 combined final review gate after docs checks and local deterministic verification passed.
 
-- [ ] **Step 8: Commit Task 5**
+- [x] **Step 8: Commit Task 5**
 
 Run:
 
@@ -1319,7 +1320,7 @@ git commit -m "docs: record real run package progress"
 - No planned source changes unless final review finds Critical or Important issues.
 - Modify status docs only after final verification and reviews pass.
 
-- [ ] **Step 1: Run full verification**
+- [x] **Step 1: Run full verification**
 
 Run:
 
@@ -1330,7 +1331,7 @@ ruff check .
 
 Expected: full pytest suite passes and ruff reports no issues.
 
-- [ ] **Step 2: Run final spec review**
+- [x] **Step 2: Run combined final spec/code-quality review**
 
 Run:
 
@@ -1338,9 +1339,9 @@ Run:
 claude -p "Review the completed C-4 implementation against docs/superpowers/specs/2026-05-31-post-approval-real-run-contract-design.md. Focus only on spec compliance. Return Critical, Important, Minor findings and say whether it is ready to proceed."
 ```
 
-Expected: no Critical or Important findings.
+Risk-Tiered Batch Gates update: replaced separate final spec and code-quality reviews with one combined final review gate. Result: no Critical or Important findings; ready to close C-4.
 
-- [ ] **Step 3: Run final code-quality review**
+- [x] **Step 3: Combined review covered final code-quality review**
 
 Run:
 
@@ -1348,9 +1349,9 @@ Run:
 claude -p "Review the completed C-4 implementation diff for code quality, maintainability, error handling, test coverage, and behavior regressions. Return Critical, Important, Minor findings and say whether it is ready to proceed."
 ```
 
-Expected: no Critical or Important findings.
+Risk-Tiered Batch Gates update: covered by the combined final review gate in Step 2.
 
-- [ ] **Step 4: Fix review findings if needed**
+- [x] **Step 4: Fix review findings if needed**
 
 If a review returns Critical or Important findings, apply the smallest focused fix, then run:
 
@@ -1366,7 +1367,7 @@ git add src tests README.md docs
 git commit -m "fix: address real run package review"
 ```
 
-- [ ] **Step 5: Update C-4 status docs**
+- [x] **Step 5: Update C-4 status docs**
 
 After full verification and final reviews pass, update:
 
@@ -1388,7 +1389,7 @@ Set the next recommended action to:
 Confirm the next Plan C scope before adding Spectre subprocess execution, real metric extraction, or optimizer-loop integration.
 ```
 
-- [ ] **Step 6: Commit final status update**
+- [x] **Step 6: Commit final status update**
 
 Run:
 
