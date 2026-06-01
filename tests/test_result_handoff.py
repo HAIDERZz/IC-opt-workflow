@@ -259,6 +259,27 @@ def test_check_real_run_reports_malformed_result_manifest(tmp_path: Path) -> Non
     assert "result manifest is invalid" in report.issues
 
 
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"started_at_utc": "2026-06-01T00:30:00.123Z"},
+        {"completed_at_utc": "2026-06-01T00:31:00+00:00"},
+        {"simulator": {"engine": "spectre_x", "preset": "ax"}},
+    ],
+)
+def test_check_real_run_reports_invalid_manifest_shape(
+    tmp_path: Path,
+    overrides: dict,
+) -> None:
+    project_dir, _package = _prepare_real_run_project(tmp_path)
+    _write_result_handoff(project_dir, overrides=overrides)
+
+    report = check_real_run(project_dir)
+
+    assert report.status == RealRunCheckStatus.FAIL
+    assert "result manifest is invalid" in report.issues
+
+
 def test_check_real_run_reports_prepared_input_hash_drift(tmp_path: Path) -> None:
     project_dir, _package = _prepare_real_run_project(tmp_path)
     _write_result_handoff(project_dir)

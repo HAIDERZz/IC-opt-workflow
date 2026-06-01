@@ -4,7 +4,7 @@ import json
 import re
 from pathlib import Path, PurePosixPath
 
-from pydantic import BaseModel, ConfigDict, ValidationError
+from pydantic import BaseModel, ConfigDict, ValidationError, field_validator
 
 from hermes_workflow.package import sha256_file
 from hermes_workflow.reports import (
@@ -17,9 +17,18 @@ from hermes_workflow.validate import ContractBundle, assert_valid_project
 
 
 RUN_ID_RE = re.compile(r"^real_[0-9]{3}$")
+UTC_TIMESTAMP_RE = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$")
 DEFAULT_RUN_ID = "real_001"
 REAL_RUN_ROOT = "runs/real"
 REPORT_RELATIVE = "reports/real_run_check_report.json"
+
+
+class ResultSimulator(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    engine: str
+    preset: str
+    command_label: str
 
 
 class ResultManifest(BaseModel):
@@ -31,12 +40,19 @@ class ResultManifest(BaseModel):
     status: RealRunResultStatus
     started_at_utc: str
     completed_at_utc: str
-    simulator: dict
+    simulator: ResultSimulator
     prepared_input_scs: str
     prepared_input_sha256: str
     log_file: str
     artifact_files: list[str]
     notes: str | None = None
+
+    @field_validator("started_at_utc", "completed_at_utc")
+    @classmethod
+    def _validate_utc_timestamp(cls, value: str) -> str:
+        if not UTC_TIMESTAMP_RE.match(value):
+            raise ValueError("timestamp must use UTC ISO format without microseconds")
+        return value
 
 
 def check_real_run(project_dir: Path, *, run_id: str | None = None) -> RealRunCheckReport:
