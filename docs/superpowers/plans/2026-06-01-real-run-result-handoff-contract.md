@@ -1184,7 +1184,7 @@ git commit -m "feat: add real run handoff cli"
 - Modify: `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`
 - Modify: `docs/superpowers/plans/2026-06-01-real-run-result-handoff-contract.md`
 
-- [ ] **Step 1: Update README command sequence**
+- [x] **Step 1: Update README command sequence**
 
 Add `check-real-run` after `prepare-real-run` and after the external execution note. The sequence should read:
 
@@ -1209,7 +1209,7 @@ Spectre, parse simulator databases, compute real metrics, append ledger rows, or
 advance optimizer state.
 ```
 
-- [ ] **Step 2: Update workflow overview**
+- [x] **Step 2: Update workflow overview**
 
 In `docs/PROJECT_WORKFLOW_OVERVIEW.md`, add this route:
 
@@ -1239,7 +1239,7 @@ returned result package, and one supervisor/Hermes-observer role checks whether
 the file contract prevents unsafe or ambiguous behavior.
 ```
 
-- [ ] **Step 3: Update progress and checkpoint docs**
+- [x] **Step 3: Update progress and checkpoint docs**
 
 In `docs/EXECUTION_PROGRESS_2026-05-29.md`, add a C-5 section with:
 
@@ -1273,11 +1273,11 @@ In `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`, update the current node:
 - Next required action: execute C-5 Task 1 with Subagent-Driven development
 ```
 
-- [ ] **Step 4: Mark Task 5 progress in this plan**
+- [x] **Step 4: Mark Task 5 progress in this plan**
 
 Change the C-5 plan task status bullets completed by this docs task from unchecked to checked. Keep future task checkboxes unchanged.
 
-- [ ] **Step 5: Verify docs diff**
+- [x] **Step 5: Verify docs diff**
 
 Run:
 
@@ -1291,7 +1291,7 @@ Expected:
 no output
 ```
 
-- [ ] **Step 6: Commit Task 5**
+- [x] **Step 6: Commit Task 5**
 
 Run:
 

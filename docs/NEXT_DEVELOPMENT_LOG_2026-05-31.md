@@ -5,10 +5,10 @@
 - Repository: `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow`
 - Branch: `plan-a-hermes-file-contract-mvp`
 - Current scope: Plan C-5, real-run result handoff contract
-- Current status: C-5 implementation plan ready; implementation not started
-- Next required action: execute C-5 Task 1 with Subagent-Driven development
+- Current status: C-5 Task 1-4 implementation complete; docs/final verification pending
+- Next required action: complete C-5 Task 5-6
 
-C-3 Task 6 final verification is complete. C-4 is confirmed as a contract-only first real-run package; it must not run Spectre, Virtuoso, subprocesses, or the optimizer loop. C-4 is now complete and reviewed. C-5 has a committed design spec and a ready implementation plan for validating the execution agent's returned `result_manifest.json` and declared artifacts.
+C-3 Task 6 final verification is complete. C-4 is confirmed as a contract-only first real-run package; it must not run Spectre, Virtuoso, subprocesses, or the optimizer loop. C-4 is now complete and reviewed. C-5 now validates the execution agent's returned `result_manifest.json` and declared artifacts without running Spectre or parsing metrics.
 
 ## Completed Scope
 
@@ -18,7 +18,7 @@ C-3 Task 6 final verification is complete. C-4 is confirmed as a contract-only f
 - Plan C C-2 dry-run candidate renderer: complete.
 - Plan C C-3 execution package preflight readiness: complete and reviewed.
 - Plan C C-4 post-approval real-run execution contract: complete and reviewed.
-- Plan C C-5 real-run result handoff contract: design complete, implementation plan ready.
+- Plan C C-5 real-run result handoff contract: Task 1-4 implementation complete; final verification pending.
 
 Plan C-4 Task 1-4 added:
 
@@ -84,6 +84,14 @@ Plan C-5 design and plan:
 - `ce4ce0d docs: design real run result handoff contract`
 - `docs/superpowers/plans/2026-06-01-real-run-result-handoff-contract.md`
 
+Plan C-5 implementation commits so far:
+
+- `55ec944 feat: add real run check report models`
+- `ced01cc feat: validate real run result handoff`
+- `72d1696 fix: harden real run handoff validation`
+- `414d61f fix: validate real run result manifest shape`
+- `8272b04 feat: add real run handoff cli`
+
 ## Final Verification
 
 Task 6 final verification:
@@ -106,7 +114,7 @@ Final review gates:
 
 ## Next Task
 
-Execute C-5 Task 1 from `docs/superpowers/plans/2026-06-01-real-run-result-handoff-contract.md`. C-5 should validate the returned real-run file contract only. After C-5, run C-5.5 dual-agent result handoff simulation before adding physical Spectre, Virtuoso, Hermes, or Claude CLI tool adapters.
+Complete C-5 Task 5-6 from `docs/superpowers/plans/2026-06-01-real-run-result-handoff-contract.md`. C-5 should validate the returned real-run file contract only. After C-5, run C-5.5 dual-agent result handoff simulation before adding physical Spectre, Virtuoso, Hermes, or Claude CLI tool adapters.
 
 ## Local Data Warning
 
@@ -121,5 +129,5 @@ are local reference material only. Do not copy or commit them into the repositor
 ## Resume Prompt
 
 ```text
-请继续 IC auto optimization workflow。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。先阅读 docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/specs/2026-06-01-real-run-result-handoff-contract-design.md、docs/superpowers/plans/2026-06-01-real-run-result-handoff-contract.md。Plan A Task 1-9、Plan B、Plan C C-1、C-2、C-3、C-4 均已完成并通过 review gate；C-5 design 已完成，implementation plan 已就绪但尚未开始。请用 Subagent-Driven 从 C-5 Task 1 开始执行；不要提交本地真实 input.scs 示例，不要进入真实 Spectre/Virtuoso/metric/optimizer loop 接入。
+请继续 IC auto optimization workflow。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。先阅读 docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/specs/2026-06-01-real-run-result-handoff-contract-design.md、docs/superpowers/plans/2026-06-01-real-run-result-handoff-contract.md。Plan A Task 1-9、Plan B、Plan C C-1、C-2、C-3、C-4 均已完成并通过 review gate；C-5 Task 1-4 implementation 已完成，当前需要完成 Task 5-6 的 docs/final verification/review。不要提交本地真实 input.scs 示例，不要进入真实 Spectre/Virtuoso/metric/optimizer loop 接入。
 ```

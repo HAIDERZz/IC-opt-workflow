@@ -599,7 +599,7 @@ Next recommended action:
 
 ## Plan C-5: Real-Run Result Handoff Contract
 
-Status: design complete; implementation plan ready as of 2026-06-01.
+Status: Task 1-4 implementation complete as of 2026-06-01; final verification/review pending.
 
 Scope:
 
@@ -616,9 +616,41 @@ Implementation plan:
 
 - `docs/superpowers/plans/2026-06-01-real-run-result-handoff-contract.md`
 
+Commits so far:
+
+- `ce4ce0d docs: design real run result handoff contract`
+- `081cc65 docs: plan real run result handoff contract`
+- `55ec944 feat: add real run check report models`
+- `b928cc5 docs: mark c5 task 1 complete`
+- `ced01cc feat: validate real run result handoff`
+- `3d5802b docs: mark c5 task 2 complete`
+- `72d1696 fix: harden real run handoff validation`
+- `414d61f fix: validate real run result manifest shape`
+- `c9983df docs: mark c5 task 3 complete`
+- `8272b04 feat: add real run handoff cli`
+- `fadc22c docs: mark c5 task 4 complete`
+
+Implemented so far:
+
+- `src/hermes_workflow/reports.py` defines strict real-run check report models.
+- `src/hermes_workflow/result_handoff.py` validates returned `result_manifest.json`, prepared package identity, prepared input hash, simulator/timestamp shape, and artifact path safety.
+- `reports/real_run_check_report.json` is written for pass/fail result handoff checks when project config can be loaded.
+- `hermes-workflow check-real-run PROJECT_DIR` prints pass/fail output and expected failures without tracebacks.
+- Sanitized tests cover valid succeeded/failed handoffs, missing/malformed manifests, identity mismatches, invalid status, invalid manifest shape, prepared input drift, unsafe paths, missing artifacts, and CLI output.
+
+Task 1-4 verification:
+
+- `pytest tests/test_result_handoff.py::test_real_run_check_report_schema_accepts_pass_report tests/test_result_handoff.py::test_real_run_check_report_schema_rejects_unknown_fields -v`: passed, 2 tests.
+- `pytest tests/test_result_handoff.py::test_check_real_run_accepts_valid_succeeded_handoff tests/test_result_handoff.py::test_check_real_run_accepts_valid_failed_handoff -v`: passed, 2 tests.
+- `pytest tests/test_result_handoff.py -v`: passed, 19 tests.
+- `pytest tests/test_real_run.py tests/test_result_handoff.py -v`: passed, 33 tests.
+- `pytest tests/test_cli.py::test_cli_check_real_run_reports_success tests/test_cli.py::test_cli_check_real_run_reports_failure_without_traceback -v`: passed, 2 tests.
+- `pytest tests/test_result_handoff.py tests/test_cli.py -v`: passed, 40 tests.
+- `ruff check .`: passed.
+
 Next recommended action:
 
-- Execute C-5 Task 1 with Subagent-Driven development.
+- Complete C-5 Task 5 docs/progress update and Task 6 final verification/review.
 - After C-5, run C-5.5 dual-agent result handoff simulation before adding real Hermes, Claude CLI, Spectre, Virtuoso, metric extraction, or optimizer-loop tool adapters.
 
 ## Resume Prompt
@@ -630,5 +662,5 @@ Next recommended action:
 3. ic-auto-opt-workflow/docs/COMPACT_RESUME_CHECKPOINT.md
 4. ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。请先阅读 docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/specs/2026-06-01-real-run-result-handoff-contract-design.md、docs/superpowers/plans/2026-06-01-real-run-result-handoff-contract.md。Hermes File Contract MVP 的 Plan A Task 1-9 已完成；Plan B mock optimization loop 已完成；Plan C C-1 netlist template contract、C-2 dry-run candidate renderer、C-3 execution package preflight readiness、C-4 post-approval real-run execution contract 均已完成并通过 review gate。C-5 real-run result handoff contract 的 design spec 和 implementation plan 已就绪但尚未开始实现。下一步用 Subagent-Driven 从 C-5 Task 1 开始；不要提交或复制本地真实 input.scs 示例，不要进入真实 Spectre/Virtuoso/metric/optimizer loop 接入。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。请先阅读 docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/specs/2026-06-01-real-run-result-handoff-contract-design.md、docs/superpowers/plans/2026-06-01-real-run-result-handoff-contract.md。Hermes File Contract MVP 的 Plan A Task 1-9 已完成；Plan B mock optimization loop 已完成；Plan C C-1 netlist template contract、C-2 dry-run candidate renderer、C-3 execution package preflight readiness、C-4 post-approval real-run execution contract 均已完成并通过 review gate。C-5 real-run result handoff contract 已完成 Task 1-4 implementation，当前处于 docs/final verification 阶段。下一步完成 C-5 Task 5-6；不要提交或复制本地真实 input.scs 示例，不要进入真实 Spectre/Virtuoso/metric/optimizer loop 接入。
 ```

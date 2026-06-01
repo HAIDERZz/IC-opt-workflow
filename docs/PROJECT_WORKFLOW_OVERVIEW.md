@@ -10,8 +10,9 @@
 - Plan C C-2 dry-run candidate renderer 已完成并通过最终 review gate。
 - Plan C C-3 execution package preflight readiness 已完成并通过最终 review gate：生成的 execution package 将 Maestro export 分配给执行 agent，Hermes 拥有 `prepare-netlist`、`dry-run`、`preflight-health` 和 `approve`。
 - Plan C C-4 post-approval real-run execution contract 已完成并通过合并 final review gate：Hermes 已具备 post-approval guard、immutable config drift guard、first real-run package rendering、candidate/manifest 写入、overwrite refusal、失败清理测试覆盖，以及 `hermes-workflow prepare-real-run` CLI。C-4 只准备真实 run package，不运行 Spectre。
+- Plan C C-5 real-run result handoff contract 已完成 Task 1-4：Hermes 已具备 returned `result_manifest.json` 验证、prepared input hash attestation、artifact path safety check、`reports/real_run_check_report.json` 写入，以及 `hermes-workflow check-real-run` CLI。C-5 不运行 Spectre，不解析真实指标，不写 optimizer ledger/state。
 - 顶层 broad plan 已对齐当前路线：Hermes 负责 deterministic preflight，执行 agent 负责 Maestro export 和 approval 之后的真实 Spectre/optimizer 执行。
-- 下一步：确认下一个 Plan C 范围；不要在未确认范围前加入 Spectre subprocess execution、real metric extraction 或 optimizer-loop integration。
+- 下一步：完成 C-5 final verification 和 C-5.5 dual-agent result handoff simulation，再进入真实工具 adapter。
 - `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example` 下的真实 `input.scs` 示例只作为本地参考，不能提交进仓库。
 
 ## 1. 项目概览
@@ -45,8 +46,10 @@ flowchart TD
     R --> C
     Q -- approve --> W[hermes-workflow prepare-real-run]
     W --> X[runs/real/real_001 package]
-    X --> S[未来真实 Spectre/Virtuoso run]
-    S --> T[未来真实 optimizer loop + ledger]
+    X --> S[执行 agent 外部运行 Spectre]
+    S --> Y[写入 result_manifest.json + artifacts]
+    Y --> Z[hermes-workflow check-real-run]
+    Z --> T[未来 metric extraction + optimizer loop + ledger]
     D --> U[hermes-workflow mock-run]
     U --> V[离线 mock ledger/state]
 ```
@@ -77,7 +80,7 @@ flowchart TD
 ### Preflight report 与主管审批层
 
 - `src/hermes_workflow/reports.py`
-  定义 netlist preparation、dry run、health check 三类 report 的严格模型，并通过 `load_preflight_reports()` 聚合 readiness message。
+  定义 netlist preparation、dry run、health check、real-run result handoff report 的严格模型，并通过 `load_preflight_reports()` 聚合 readiness message。
 
 - `src/hermes_workflow/approvals.py`
   根据 config、preflight reports 和 health state 生成 supervisor instruction。只有所有前置检查通过时，才会给出首次真实运行批准。
@@ -115,6 +118,20 @@ flowchart TD
 - `hermes-workflow prepare-real-run`
   调用上述逻辑，准备后续真实 simulator runner 可消费的文件合同。它不运行 Spectre。
 
+### Real-run result handoff 层
+
+- `docs/superpowers/specs/2026-06-01-real-run-result-handoff-contract-design.md`
+  C-5 设计文档，定义执行 agent 消费 first real-run package 之后返回给 Hermes 的文件合同：`result_manifest.json`、sanitized logs/artifacts、prepared input hash attestation 和 artifact path safety。
+
+- `docs/superpowers/plans/2026-06-01-real-run-result-handoff-contract.md`
+  C-5 implementation plan。当前 Task 1-4 已完成，final verification 和 C-5.5 simulation gate 待执行。
+
+- `src/hermes_workflow/result_handoff.py`
+  验证 `runs/real/<run_id>/result_manifest.json` 是否匹配 C-4 的 `real_run_manifest.json` 和 `candidate.json`，确认 `input.scs` hash 未漂移，拒绝 absolute/path traversal/out-of-run artifact paths，并写入 `reports/real_run_check_report.json`。
+
+- `hermes-workflow check-real-run`
+  调用上述逻辑，报告 returned handoff pass/fail。它不启动 Spectre，不解析 simulator database，不计算真实 metric，不写 ledger 或 optimizer state。
+
 ### Mock optimization 测试层
 
 - `src/hermes_workflow/mock_optimizer.py`
@@ -126,7 +143,7 @@ flowchart TD
 
 - `src/hermes_workflow/cli.py`
   当前提供：
-  `init`、`validate`、`prepare-netlist`、`dry-run`、`preflight-health`、`package`、`approve`、`prepare-real-run`、`mock-run`。
+  `init`、`validate`、`prepare-netlist`、`dry-run`、`preflight-health`、`package`、`approve`、`prepare-real-run`、`check-real-run`、`mock-run`。
 
 ### Review gate 工具层
 
@@ -218,6 +235,22 @@ hermes-workflow prepare-real-run projects/bridge_test_inv
 
 `prepare-real-run` 会写入 `runs/real/real_001/`，但不会运行 Spectre、Virtuoso、subprocess 或 optimizer loop。
 
+执行 agent 在 Hermes 外部运行准备好的 deck 后，写入：
+
+```text
+projects/bridge_test_inv/runs/real/real_001/result_manifest.json
+projects/bridge_test_inv/runs/real/real_001/spectre.log
+projects/bridge_test_inv/runs/real/real_001/artifacts/*
+```
+
+Hermes 验证返回文件合同：
+
+```bash
+hermes-workflow check-real-run projects/bridge_test_inv
+```
+
+`check-real-run` 只验证 returned file contract。它不启动 Spectre，不解析真实仿真结果，不计算真实 metric，不写 ledger 或 optimizer state。
+
 如果只想离线测试流程，不跑 Virtuoso/Spectre：
 
 ```bash
@@ -225,6 +258,8 @@ hermes-workflow mock-run projects/bridge_test_inv --max-evaluations 4
 ```
 
 未来真实运行接入后，真实 Spectre/Virtuoso run 应该放在 `approve` 之后，并继续通过同一套 schema、ledger、state、report 结构写入可审计结果。
+
+C-5.5 应在真实工具 adapter 前验证双 agent 行为：一个模拟 execution-agent 写 returned result package，另一个模拟 Hermes/supervisor 只相信 `check-real-run` 的机器可读报告。
 
 ## 4. 能否严格约束主管 agent 和执行 agent 的行为
 
