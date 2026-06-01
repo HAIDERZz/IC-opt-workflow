@@ -989,7 +989,7 @@ git commit -m "fix: harden real run handoff validation"
 - Modify: `src/hermes_workflow/cli.py`
 - Modify: `tests/test_cli.py`
 
-- [ ] **Step 1: Add CLI tests**
+- [x] **Step 1: Add CLI tests**
 
 Append this code to `tests/test_cli.py`:
 
@@ -1075,7 +1075,7 @@ def test_cli_check_real_run_reports_failure_without_traceback(tmp_path: Path) ->
     assert "Traceback" not in result.output
 ```
 
-- [ ] **Step 2: Run CLI tests and verify command is missing**
+- [x] **Step 2: Run CLI tests and verify command is missing**
 
 Run:
 
@@ -1089,7 +1089,7 @@ Expected:
 Error: No such command 'check-real-run'
 ```
 
-- [ ] **Step 3: Add CLI command**
+- [x] **Step 3: Add CLI command**
 
 Modify `src/hermes_workflow/cli.py`.
 
@@ -1134,7 +1134,7 @@ def check_real_run_command(
     raise typer.Exit(code=1)
 ```
 
-- [ ] **Step 4: Run CLI tests**
+- [x] **Step 4: Run CLI tests**
 
 Run:
 
@@ -1148,7 +1148,7 @@ Expected:
 2 passed
 ```
 
-- [ ] **Step 5: Run focused C-5 suite and lint**
+- [x] **Step 5: Run focused C-5 suite and lint**
 
 Run:
 
@@ -1165,7 +1165,7 @@ tests/test_cli.py ... passed
 All checks passed!
 ```
 
-- [ ] **Step 6: Commit Task 4**
+- [x] **Step 6: Commit Task 4**
 
 Run:
 
