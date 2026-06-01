@@ -29,6 +29,16 @@ class HealthStatus(StrEnum):
     ERROR = "error"
 
 
+class RealRunCheckStatus(StrEnum):
+    PASS = "pass"
+    FAIL = "fail"
+
+
+class RealRunResultStatus(StrEnum):
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+
+
 class NetlistPreparationReport(StrictReport):
     schema_version: str
     status: PassFail
@@ -66,6 +76,29 @@ class HealthCheck(StrictReport):
     current_evaluations: int = Field(ge=0)
     best_candidate_path: str | None
     last_batch_id: int | None
+    issues: list[str] = Field(default_factory=list)
+
+
+class RealRunCheckFlags(StrictReport):
+    prepared_manifest_ok: bool = False
+    candidate_ok: bool = False
+    result_manifest_ok: bool = False
+    prepared_input_hash_ok: bool = False
+    artifact_paths_ok: bool = False
+
+
+class RealRunCheckReport(StrictReport):
+    schema_version: str
+    status: RealRunCheckStatus
+    run_id: str
+    candidate_id: str | None
+    result_status: RealRunResultStatus | None
+    real_run_manifest: str
+    result_manifest: str
+    prepared_input_scs: str | None
+    log_file: str | None
+    artifact_files: list[str] = Field(default_factory=list)
+    checks: RealRunCheckFlags
     issues: list[str] = Field(default_factory=list)
 
 
