@@ -10,9 +10,9 @@
 - Plan C C-2 dry-run candidate renderer 已完成并通过最终 review gate。
 - Plan C C-3 execution package preflight readiness 已完成并通过最终 review gate：生成的 execution package 将 Maestro export 分配给执行 agent，Hermes 拥有 `prepare-netlist`、`dry-run`、`preflight-health` 和 `approve`。
 - Plan C C-4 post-approval real-run execution contract 已完成并通过合并 final review gate：Hermes 已具备 post-approval guard、immutable config drift guard、first real-run package rendering、candidate/manifest 写入、overwrite refusal、失败清理测试覆盖，以及 `hermes-workflow prepare-real-run` CLI。C-4 只准备真实 run package，不运行 Spectre。
-- Plan C C-5 real-run result handoff contract 已完成 Task 1-4：Hermes 已具备 returned `result_manifest.json` 验证、prepared input hash attestation、artifact path safety check、`reports/real_run_check_report.json` 写入，以及 `hermes-workflow check-real-run` CLI。C-5 不运行 Spectre，不解析真实指标，不写 optimizer ledger/state。
+- Plan C C-5 real-run result handoff contract 已完成并通过 final review gate：Hermes 已具备 returned `result_manifest.json` 验证、prepared input hash attestation、artifact path safety check、`reports/real_run_check_report.json` 写入，以及 `hermes-workflow check-real-run` CLI。C-5 不运行 Spectre，不解析真实指标，不写 optimizer ledger/state。
 - 顶层 broad plan 已对齐当前路线：Hermes 负责 deterministic preflight，执行 agent 负责 Maestro export 和 approval 之后的真实 Spectre/optimizer 执行。
-- 下一步：完成 C-5 final verification 和 C-5.5 dual-agent result handoff simulation，再进入真实工具 adapter。
+- 下一步：规划并执行 C-5.5 dual-agent result handoff simulation，再进入真实工具 adapter。
 - `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example` 下的真实 `input.scs` 示例只作为本地参考，不能提交进仓库。
 
 ## 1. 项目概览
@@ -124,7 +124,7 @@ flowchart TD
   C-5 设计文档，定义执行 agent 消费 first real-run package 之后返回给 Hermes 的文件合同：`result_manifest.json`、sanitized logs/artifacts、prepared input hash attestation 和 artifact path safety。
 
 - `docs/superpowers/plans/2026-06-01-real-run-result-handoff-contract.md`
-  C-5 implementation plan。当前 Task 1-4 已完成，final verification 和 C-5.5 simulation gate 待执行。
+  C-5 implementation plan。当前 C-5 已完成并通过 final verification/review gate，C-5.5 simulation gate 待执行。
 
 - `src/hermes_workflow/result_handoff.py`
   验证 `runs/real/<run_id>/result_manifest.json` 是否匹配 C-4 的 `real_run_manifest.json` 和 `candidate.json`，确认 `input.scs` hash 未漂移，拒绝 absolute/path traversal/out-of-run artifact paths，并写入 `reports/real_run_check_report.json`。

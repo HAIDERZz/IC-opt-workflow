@@ -1307,7 +1307,7 @@ git commit -m "docs: record real run result handoff progress"
 - Modify: `docs/COMPACT_RESUME_CHECKPOINT.md`
 - Modify: `docs/superpowers/plans/2026-06-01-real-run-result-handoff-contract.md`
 
-- [ ] **Step 1: Run focused verification**
+- [x] **Step 1: Run focused verification**
 
 Run:
 
@@ -1321,7 +1321,7 @@ Expected:
 all selected tests passed
 ```
 
-- [ ] **Step 2: Run full verification**
+- [x] **Step 2: Run full verification**
 
 Run:
 
@@ -1337,7 +1337,7 @@ all tests passed
 All checks passed!
 ```
 
-- [ ] **Step 3: Run one combined final review gate**
+- [x] **Step 3: Run one combined final review gate**
 
 Run:
 
@@ -1354,7 +1354,7 @@ No Important findings.
 
 Fix all Critical and Important findings before closing C-5. Minor findings may be recorded if they are intentionally deferred outside C-5 scope.
 
-- [ ] **Step 4: Record C-5.5 simulation scenarios**
+- [x] **Step 4: Record C-5.5 simulation scenarios**
 
 Append this section to `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`:
 
@@ -1382,7 +1382,7 @@ C-5.5 should not call real Spectre, real Virtuoso, real Hermes, or real Claude
 CLI. It is a workflow behavior validation gate before physical tool adapters.
 ```
 
-- [ ] **Step 5: Update checkpoint state**
+- [x] **Step 5: Update checkpoint state**
 
 In `docs/COMPACT_RESUME_CHECKPOINT.md`, mark:
 
@@ -1392,7 +1392,7 @@ In `docs/COMPACT_RESUME_CHECKPOINT.md`, mark:
 - Next recommended scope: C-5.5 dual-agent result handoff simulation gate before real tool adapters.
 ```
 
-- [ ] **Step 6: Commit closeout docs**
+- [x] **Step 6: Commit closeout docs**
 
 Run:
 
