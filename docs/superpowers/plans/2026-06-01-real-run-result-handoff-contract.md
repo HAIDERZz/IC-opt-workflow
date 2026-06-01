@@ -377,7 +377,7 @@ git commit -m "feat: add real run check report models"
 - Create: `src/hermes_workflow/result_handoff.py`
 - Modify: `tests/test_result_handoff.py`
 
-- [ ] **Step 1: Add sanitized result manifest helpers and success tests**
+- [x] **Step 1: Add sanitized result manifest helpers and success tests**
 
 Append this code to `tests/test_result_handoff.py`:
 
@@ -468,7 +468,7 @@ def test_check_real_run_accepts_valid_failed_handoff(tmp_path: Path) -> None:
     assert report.issues == []
 ```
 
-- [ ] **Step 2: Run success tests and verify the expected module failure**
+- [x] **Step 2: Run success tests and verify the expected module failure**
 
 Run:
 
@@ -482,7 +482,7 @@ Expected:
 ModuleNotFoundError: No module named 'hermes_workflow.result_handoff'
 ```
 
-- [ ] **Step 3: Implement the minimal success-path validator**
+- [x] **Step 3: Implement the minimal success-path validator**
 
 Create `src/hermes_workflow/result_handoff.py` with this code:
 
@@ -721,7 +721,7 @@ def _write_report(path: Path, report: RealRunCheckReport) -> None:
     )
 ```
 
-- [ ] **Step 4: Run success-path tests**
+- [x] **Step 4: Run success-path tests**
 
 Run:
 
@@ -735,7 +735,7 @@ Expected:
 2 passed
 ```
 
-- [ ] **Step 5: Run lint**
+- [x] **Step 5: Run lint**
 
 Run:
 
@@ -749,7 +749,7 @@ Expected:
 All checks passed!
 ```
 
-- [ ] **Step 6: Commit Task 2**
+- [x] **Step 6: Commit Task 2**
 
 Run:
 
