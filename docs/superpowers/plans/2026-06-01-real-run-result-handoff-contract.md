@@ -764,7 +764,7 @@ git commit -m "feat: validate real run result handoff"
 - Modify: `src/hermes_workflow/result_handoff.py`
 - Modify: `tests/test_result_handoff.py`
 
-- [ ] **Step 1: Add failure and safety tests**
+- [x] **Step 1: Add failure and safety tests**
 
 Append this code to `tests/test_result_handoff.py`:
 
@@ -892,7 +892,7 @@ def test_check_real_run_rejects_missing_declared_artifact(tmp_path: Path) -> Non
     assert report.checks.artifact_paths_ok is False
 ```
 
-- [ ] **Step 2: Run failure tests and observe at least one failure**
+- [x] **Step 2: Run failure tests and observe at least one failure**
 
 Run:
 
@@ -908,7 +908,7 @@ FAILED tests/test_result_handoff.py::test_check_real_run_reports_manifest_mismat
 
 The initial implementation may report Pydantic validation generically for invalid result status instead of the exact required issue.
 
-- [ ] **Step 3: Harden result manifest validation and issue collection**
+- [x] **Step 3: Harden result manifest validation and issue collection**
 
 Modify `src/hermes_workflow/result_handoff.py` so `_load_json` and result validation produce exact issue messages. Replace the `except ValidationError` block in `check_real_run()` with:
 
@@ -941,7 +941,7 @@ Update `_validate_cross_references()` to avoid duplicate hash mismatch messages:
 
 Keep the `prepared_input_scs` safe-path check even when the path mismatches the prepared manifest so unsafe input paths are still surfaced.
 
-- [ ] **Step 4: Run all result handoff tests**
+- [x] **Step 4: Run all result handoff tests**
 
 Run:
 
@@ -957,7 +957,7 @@ Expected:
 
 The exact count may be higher if implementation workers add small focused tests; all tests in this file must pass.
 
-- [ ] **Step 5: Run focused related tests and lint**
+- [x] **Step 5: Run focused related tests and lint**
 
 Run:
 
@@ -974,7 +974,7 @@ tests/test_result_handoff.py ... passed
 All checks passed!
 ```
 
-- [ ] **Step 6: Commit Task 3**
+- [x] **Step 6: Commit Task 3**
 
 Run:
 
