@@ -345,3 +345,84 @@ tran tran stop=10n
     assert isinstance(result.exception, SystemExit)
     assert "immutable config drift detected: config/variables.yaml" in result.stdout
     assert "Traceback" not in result.output
+
+
+def _prepare_cli_real_run(project_dir: Path) -> None:
+    assert runner.invoke(app, ["init", str(project_dir)]).exit_code == 0
+    assert runner.invoke(app, ["package", str(project_dir)]).exit_code == 0
+    (project_dir / "netlists" / "exported" / "input.scs").write_text(
+        """simulator lang=spectre
+parameters temperature=27 FN=4 FP=4 WN=0.6u WP=1.2u
+tran tran stop=10n
+""",
+        encoding="utf-8",
+    )
+    assert runner.invoke(app, ["prepare-netlist", str(project_dir)]).exit_code == 0
+    assert runner.invoke(app, ["dry-run", str(project_dir)]).exit_code == 0
+    assert runner.invoke(app, ["preflight-health", str(project_dir)]).exit_code == 0
+    assert runner.invoke(app, ["approve", str(project_dir)]).exit_code == 0
+    assert runner.invoke(app, ["prepare-real-run", str(project_dir)]).exit_code == 0
+
+
+def _write_cli_result_manifest(project_dir: Path) -> None:
+    run_dir = project_dir / "runs" / "real" / "real_001"
+    artifacts_dir = run_dir / "artifacts"
+    artifacts_dir.mkdir(parents=True, exist_ok=True)
+    (run_dir / "spectre.log").write_text("sanitized spectre log\n", encoding="utf-8")
+    (artifacts_dir / "psf_summary.txt").write_text(
+        "sanitized artifact summary\n",
+        encoding="utf-8",
+    )
+    prepared_manifest = json.loads(
+        (run_dir / "real_run_manifest.json").read_text(encoding="utf-8")
+    )
+    payload = {
+        "schema_version": "1.0",
+        "run_id": "real_001",
+        "candidate_id": prepared_manifest["candidate_id"],
+        "status": "succeeded",
+        "started_at_utc": "2026-06-01T00:30:00Z",
+        "completed_at_utc": "2026-06-01T00:31:00Z",
+        "simulator": {
+            "engine": "spectre_x",
+            "preset": "ax",
+            "command_label": "external_spectre_run",
+        },
+        "prepared_input_scs": prepared_manifest["rendered_input_scs"],
+        "prepared_input_sha256": prepared_manifest["rendered_input_sha256"],
+        "log_file": "runs/real/real_001/spectre.log",
+        "artifact_files": ["runs/real/real_001/artifacts/psf_summary.txt"],
+    }
+    (run_dir / "result_manifest.json").write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
+def test_cli_check_real_run_reports_success(tmp_path: Path) -> None:
+    project_dir = tmp_path / "bridge_test_inv"
+    _prepare_cli_real_run(project_dir)
+    _write_cli_result_manifest(project_dir)
+
+    result = runner.invoke(app, ["check-real-run", str(project_dir)])
+
+    assert result.exit_code == 0
+    assert "real run handoff check passed" in result.stdout
+    assert "run: runs/real/real_001" in result.stdout
+    assert "result: runs/real/real_001/result_manifest.json" in result.stdout
+    assert "report: reports/real_run_check_report.json" in result.stdout
+    assert (project_dir / "reports" / "real_run_check_report.json").exists()
+
+
+def test_cli_check_real_run_reports_failure_without_traceback(tmp_path: Path) -> None:
+    project_dir = tmp_path / "bridge_test_inv"
+    _prepare_cli_real_run(project_dir)
+
+    result = runner.invoke(app, ["check-real-run", str(project_dir)])
+
+    assert result.exit_code == 1
+    assert isinstance(result.exception, SystemExit)
+    assert "real run handoff check failed" in result.stdout
+    assert "result manifest is missing" in result.stdout
+    assert "report: reports/real_run_check_report.json" in result.stdout
+    assert "Traceback" not in result.output

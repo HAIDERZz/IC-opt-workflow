@@ -16,6 +16,7 @@ from hermes_workflow.package import (
     build_execution_package,
     create_project_from_template,
 )
+from hermes_workflow.result_handoff import check_real_run
 from hermes_workflow.validate import validate_project_files
 
 
@@ -198,6 +199,38 @@ def prepare_real_run_command(
     typer.echo("real run package prepared")
     typer.echo(f"run: {package.run_dir.relative_to(project_dir)}")
     typer.echo(f"manifest: {package.manifest_path.relative_to(project_dir)}")
+
+
+@app.command("check-real-run")
+def check_real_run_command(
+    project_dir: Annotated[
+        Path,
+        typer.Argument(help="Project directory with a returned real-run result manifest."),
+    ],
+    run_id: Annotated[
+        str | None,
+        typer.Option(
+            "--run-id",
+            help="Real-run package id such as real_001.",
+        ),
+    ] = None,
+) -> None:
+    try:
+        report = check_real_run(project_dir, run_id=run_id)
+    except (OSError, ValueError) as exc:
+        _exit_with_error(exc)
+    if report.status.value == "pass":
+        typer.echo("real run handoff check passed")
+        typer.echo(f"run: runs/real/{report.run_id}")
+        typer.echo(f"result: {report.result_manifest}")
+        typer.echo("report: reports/real_run_check_report.json")
+        return
+
+    typer.echo("real run handoff check failed")
+    for issue in report.issues:
+        typer.echo(issue)
+    typer.echo("report: reports/real_run_check_report.json")
+    raise typer.Exit(code=1)
 
 
 @app.command("mock-run")
