@@ -131,7 +131,7 @@ OBSERVER_NOTES: one short paragraph
 - Temporary: `/tmp/c5_5_dual_agent_result_handoff.*/base_project`
 - Temporary: `/tmp/c5_5_sim_root.txt`
 
-- [ ] **Step 1: Verify the repository is clean**
+- [x] **Step 1: Verify the repository is clean**
 
 Run:
 
@@ -145,7 +145,7 @@ Expected:
 no output
 ```
 
-- [ ] **Step 2: Create a temporary simulation root**
+- [x] **Step 2: Create a temporary simulation root**
 
 Run:
 
@@ -161,7 +161,7 @@ Expected:
 /tmp/c5_5_dual_agent_result_handoff.<random-suffix>
 ```
 
-- [ ] **Step 3: Create the base Hermes project**
+- [x] **Step 3: Create the base Hermes project**
 
 Run:
 
@@ -175,7 +175,7 @@ Expected:
 /tmp/c5_5_dual_agent_result_handoff.<random-suffix>/base_project
 ```
 
-- [ ] **Step 4: Write a sanitized exported Spectre deck**
+- [x] **Step 4: Write a sanitized exported Spectre deck**
 
 Run:
 
@@ -194,7 +194,7 @@ Expected:
 no output
 ```
 
-- [ ] **Step 5: Run the normal pre-approval and C-4 route**
+- [x] **Step 5: Run the normal pre-approval and C-4 route**
 
 Run these commands:
 
@@ -270,7 +270,7 @@ run: runs/real/real_001
 manifest: runs/real/real_001/real_run_manifest.json
 ```
 
-- [ ] **Step 6: Confirm no result handoff exists yet**
+- [x] **Step 6: Confirm no result handoff exists yet**
 
 Run:
 
@@ -284,7 +284,7 @@ Expected:
 no output
 ```
 
-- [ ] **Step 7: Create scenario project copies**
+- [x] **Step 7: Create scenario project copies**
 
 Run:
 
@@ -300,7 +300,7 @@ Expected:
 no output
 ```
 
-- [ ] **Step 8: No commit for Task 1**
+- [x] **Step 8: No commit for Task 1**
 
 Task 1 creates temporary simulation state only. Do not commit.
 
@@ -310,7 +310,7 @@ Task 1 creates temporary simulation state only. Do not commit.
 - Temporary: `/tmp/c5_5_dual_agent_result_handoff.*/happy_path`
 - Temporary: `/tmp/c5_5_dual_agent_result_handoff.*/valid_failure`
 
-- [ ] **Step 1: Dispatch execution-agent for `happy_path`**
+- [x] **Step 1: Dispatch execution-agent for `happy_path`**
 
 Spawn a fresh execution-agent role with the shared execution-agent contract and this scenario instruction:
 
@@ -344,7 +344,7 @@ STATUS: DONE
 FILES_WRITTEN includes result_manifest.json, spectre.log, artifacts/psf_summary.txt
 ```
 
-- [ ] **Step 2: Dispatch Hermes-observer for `happy_path`**
+- [x] **Step 2: Dispatch Hermes-observer for `happy_path`**
 
 Spawn a fresh Hermes-observer role with:
 
@@ -364,7 +364,7 @@ ISSUES: []
 MATCHED_EXPECTATION: yes
 ```
 
-- [ ] **Step 3: Dispatch execution-agent for `valid_failure`**
+- [x] **Step 3: Dispatch execution-agent for `valid_failure`**
 
 Spawn a fresh execution-agent role with the shared execution-agent contract and this scenario instruction:
 
@@ -390,7 +390,7 @@ STATUS: DONE
 FILES_WRITTEN includes result_manifest.json, spectre.log, artifacts/psf_summary.txt
 ```
 
-- [ ] **Step 4: Dispatch Hermes-observer for `valid_failure`**
+- [x] **Step 4: Dispatch Hermes-observer for `valid_failure`**
 
 Spawn a fresh Hermes-observer role with:
 
@@ -410,7 +410,7 @@ ISSUES: []
 MATCHED_EXPECTATION: yes
 ```
 
-- [ ] **Step 5: Controller records passing scenario observations**
+- [x] **Step 5: Controller records passing scenario observations**
 
 Record these actual values in a controller note for the final report:
 
@@ -443,7 +443,7 @@ Do not commit this temporary note. The final report in Task 4 will contain the a
 - Temporary: `/tmp/c5_5_dual_agent_result_handoff.*/mutated_deck`
 - Temporary: `/tmp/c5_5_dual_agent_result_handoff.*/identity_mismatch`
 
-- [ ] **Step 1: Dispatch execution-agent for `unsafe_path`**
+- [x] **Step 1: Dispatch execution-agent for `unsafe_path`**
 
 Spawn a fresh execution-agent role with the shared execution-agent contract and this scenario instruction:
 
@@ -471,7 +471,7 @@ STATUS: DONE
 FILES_WRITTEN includes result_manifest.json and in-project sanitized artifacts
 ```
 
-- [ ] **Step 2: Dispatch Hermes-observer for `unsafe_path`**
+- [x] **Step 2: Dispatch Hermes-observer for `unsafe_path`**
 
 Spawn a fresh Hermes-observer role with:
 
@@ -490,7 +490,7 @@ ISSUES includes result artifact path is unsafe: /tmp/c5_5_outside_spectre.log
 MATCHED_EXPECTATION: yes
 ```
 
-- [ ] **Step 3: Dispatch execution-agent for `mutated_deck`**
+- [x] **Step 3: Dispatch execution-agent for `mutated_deck`**
 
 Spawn a fresh execution-agent role with the shared execution-agent contract and this scenario instruction:
 
@@ -517,7 +517,7 @@ STATUS: DONE
 FILES_WRITTEN includes result_manifest.json, spectre.log, artifacts/psf_summary.txt, input.scs mutation
 ```
 
-- [ ] **Step 4: Dispatch Hermes-observer for `mutated_deck`**
+- [x] **Step 4: Dispatch Hermes-observer for `mutated_deck`**
 
 Spawn a fresh Hermes-observer role with:
 
@@ -536,7 +536,7 @@ ISSUES includes prepared input hash mismatch
 MATCHED_EXPECTATION: yes
 ```
 
-- [ ] **Step 5: Dispatch execution-agent for `identity_mismatch`**
+- [x] **Step 5: Dispatch execution-agent for `identity_mismatch`**
 
 Spawn a fresh execution-agent role with the shared execution-agent contract and this scenario instruction:
 
@@ -564,7 +564,7 @@ STATUS: DONE
 FILES_WRITTEN includes result_manifest.json, spectre.log, artifacts/psf_summary.txt
 ```
 
-- [ ] **Step 6: Dispatch Hermes-observer for `identity_mismatch`**
+- [x] **Step 6: Dispatch Hermes-observer for `identity_mismatch`**
 
 Spawn a fresh Hermes-observer role with:
 
@@ -583,7 +583,7 @@ ISSUES includes result candidate_id does not match prepared candidate
 MATCHED_EXPECTATION: yes
 ```
 
-- [ ] **Step 7: Controller records rejection scenario observations**
+- [x] **Step 7: Controller records rejection scenario observations**
 
 Record these actual values in a controller note for the final report:
 
@@ -624,7 +624,7 @@ Do not commit this temporary note. The final report in Task 4 will contain the a
 - Modify: `docs/EXECUTION_PROGRESS_2026-05-29.md`
 - Modify: `docs/superpowers/plans/2026-06-01-dual-agent-result-handoff-simulation-gate.md`
 
-- [ ] **Step 1: Create the simulation report**
+- [x] **Step 1: Create the simulation report**
 
 Create `docs/simulations/2026-06-01-c5-5-dual-agent-result-handoff.md` with actual observed values from Tasks 1-3. Use this exact heading structure:
 
@@ -679,7 +679,7 @@ Report requirements:
 - If all scenarios matched expectations, write `C-5.5 simulation gate: passed` in the Summary.
 - If any scenario did not match expectations, write `C-5.5 simulation gate: failed` in the Summary and record the blocking issue.
 
-- [ ] **Step 2: Update next development log**
+- [x] **Step 2: Update next development log**
 
 Modify `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`:
 
@@ -689,7 +689,7 @@ Modify `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`:
 - If passed, set next required action to `confirm C-6 real metric result contract scope`.
 - If blocked, set next required action to the focused C-5 fix or prompt hardening named in the report.
 
-- [ ] **Step 3: Update compact checkpoint**
+- [x] **Step 3: Update compact checkpoint**
 
 Modify `docs/COMPACT_RESUME_CHECKPOINT.md`:
 
@@ -699,7 +699,7 @@ Modify `docs/COMPACT_RESUME_CHECKPOINT.md`:
 - Record whether C-5.5 passed or blocked.
 - Preserve the warning not to commit real `input.scs` examples.
 
-- [ ] **Step 4: Update execution progress**
+- [x] **Step 4: Update execution progress**
 
 Modify `docs/EXECUTION_PROGRESS_2026-05-29.md`:
 
@@ -708,11 +708,11 @@ Modify `docs/EXECUTION_PROGRESS_2026-05-29.md`:
 - Link the simulation report.
 - Record the next recommended scope.
 
-- [ ] **Step 5: Mark Task 4 progress in this plan**
+- [x] **Step 5: Mark Task 4 progress in this plan**
 
 Change completed Task 4 checkboxes in this plan from unchecked to checked after the report and progress docs are updated.
 
-- [ ] **Step 6: Verify docs diff**
+- [x] **Step 6: Verify docs diff**
 
 Run:
 
