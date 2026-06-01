@@ -195,3 +195,129 @@ def test_check_real_run_accepts_valid_failed_handoff(tmp_path: Path) -> None:
     assert report.status == RealRunCheckStatus.PASS
     assert report.result_status == RealRunResultStatus.FAILED
     assert report.issues == []
+
+
+@pytest.mark.parametrize(
+    ("overrides", "expected_issue"),
+    [
+        (
+            {"run_id": "real_002"},
+            "result run_id does not match requested run_id",
+        ),
+        (
+            {"candidate_id": "other_candidate"},
+            "result candidate_id does not match prepared candidate",
+        ),
+        (
+            {"prepared_input_scs": "runs/real/real_001/other.scs"},
+            "result prepared_input_scs does not match prepared manifest",
+        ),
+        (
+            {"prepared_input_sha256": "not-the-prepared-hash"},
+            "prepared input hash mismatch",
+        ),
+        (
+            {"status": "unknown"},
+            "result status is invalid: unknown",
+        ),
+    ],
+)
+def test_check_real_run_reports_manifest_mismatches(
+    tmp_path: Path,
+    overrides: dict,
+    expected_issue: str,
+) -> None:
+    project_dir, _package = _prepare_real_run_project(tmp_path)
+    _write_result_handoff(project_dir, overrides=overrides)
+
+    report = check_real_run(project_dir)
+
+    assert report.status == RealRunCheckStatus.FAIL
+    assert expected_issue in report.issues
+    assert (project_dir / "reports" / "real_run_check_report.json").exists()
+
+
+def test_check_real_run_reports_missing_result_manifest(tmp_path: Path) -> None:
+    project_dir, _package = _prepare_real_run_project(tmp_path)
+
+    report = check_real_run(project_dir)
+
+    assert report.status == RealRunCheckStatus.FAIL
+    assert report.candidate_id is None
+    assert report.result_status is None
+    assert "result manifest is missing" in report.issues
+
+
+def test_check_real_run_reports_malformed_result_manifest(tmp_path: Path) -> None:
+    project_dir, _package = _prepare_real_run_project(tmp_path)
+    result_path = project_dir / "runs" / "real" / "real_001" / "result_manifest.json"
+    result_path.write_text("{", encoding="utf-8")
+
+    report = check_real_run(project_dir)
+
+    assert report.status == RealRunCheckStatus.FAIL
+    assert "result manifest is invalid" in report.issues
+
+
+def test_check_real_run_reports_prepared_input_hash_drift(tmp_path: Path) -> None:
+    project_dir, _package = _prepare_real_run_project(tmp_path)
+    _write_result_handoff(project_dir)
+    input_path = project_dir / "runs" / "real" / "real_001" / "input.scs"
+    input_path.write_text(
+        input_path.read_text(encoding="utf-8") + "\n// changed after prepare-real-run\n",
+        encoding="utf-8",
+    )
+
+    report = check_real_run(project_dir)
+
+    assert report.status == RealRunCheckStatus.FAIL
+    assert "prepared input hash mismatch" in report.issues
+    assert report.checks.prepared_input_hash_ok is False
+
+
+@pytest.mark.parametrize(
+    ("artifact_value", "expected_issue"),
+    [
+        ("/tmp/spectre.log", "result artifact path is unsafe: /tmp/spectre.log"),
+        (
+            "runs/real/real_001/../spectre.log",
+            "result artifact path is unsafe: runs/real/real_001/../spectre.log",
+        ),
+        (
+            "runs/real/real_002/spectre.log",
+            "result artifact path is unsafe: runs/real/real_002/spectre.log",
+        ),
+    ],
+)
+def test_check_real_run_rejects_unsafe_log_paths(
+    tmp_path: Path,
+    artifact_value: str,
+    expected_issue: str,
+) -> None:
+    project_dir, _package = _prepare_real_run_project(tmp_path)
+    _write_result_handoff(project_dir, overrides={"log_file": artifact_value})
+
+    report = check_real_run(project_dir)
+
+    assert report.status == RealRunCheckStatus.FAIL
+    assert expected_issue in report.issues
+    assert report.checks.artifact_paths_ok is False
+
+
+def test_check_real_run_rejects_missing_declared_artifact(tmp_path: Path) -> None:
+    project_dir, _package = _prepare_real_run_project(tmp_path)
+    _write_result_handoff(
+        project_dir,
+        overrides={
+            "artifact_files": ["runs/real/real_001/artifacts/missing.raw"],
+        },
+    )
+
+    report = check_real_run(project_dir)
+
+    assert (
+        "result artifact is missing: runs/real/real_001/artifacts/missing.raw"
+        in report.issues
+    )
+    assert report.status == RealRunCheckStatus.FAIL
+    assert report.checks.artifact_paths_ok is False

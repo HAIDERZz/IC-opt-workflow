@@ -68,7 +68,12 @@ def check_real_run(project_dir: Path, *, run_id: str | None = None) -> RealRunCh
             result = ResultManifest.model_validate(result_payload)
             checks.result_manifest_ok = True
         except ValidationError:
-            issues.append("result manifest is invalid")
+            invalid_status = result_payload.get("status")
+            allowed_statuses = {status.value for status in RealRunResultStatus}
+            if invalid_status not in allowed_statuses:
+                issues.append(f"result status is invalid: {invalid_status}")
+            else:
+                issues.append("result manifest is invalid")
 
     candidate_id: str | None = None
     result_status: RealRunResultStatus | None = None
@@ -125,13 +130,17 @@ def _validate_cross_references(
         issues.append("result candidate_id does not match candidate file")
     if result.prepared_input_scs != prepared.get("rendered_input_scs"):
         issues.append("result prepared_input_scs does not match prepared manifest")
-    if result.prepared_input_sha256 != prepared.get("rendered_input_sha256"):
+
+    hash_matches_manifest = result.prepared_input_sha256 == prepared.get(
+        "rendered_input_sha256"
+    )
+    if not hash_matches_manifest:
         issues.append("prepared input hash mismatch")
 
     prepared_path = _safe_run_path(bundle, run_id, result.prepared_input_scs, issues)
-    if prepared_path is not None:
+    if prepared_path is not None and hash_matches_manifest:
         expected_hash = str(prepared.get("rendered_input_sha256"))
-        if sha256_file(prepared_path) == expected_hash:
+        if prepared_path.exists() and sha256_file(prepared_path) == expected_hash:
             checks.prepared_input_hash_ok = True
         else:
             issues.append("prepared input hash mismatch")
