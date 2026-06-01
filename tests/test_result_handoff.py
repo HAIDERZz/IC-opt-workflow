@@ -15,6 +15,7 @@ from hermes_workflow.reports import (
     RealRunCheckStatus,
     RealRunResultStatus,
 )
+from hermes_workflow.result_handoff import check_real_run
 from tests.report_helpers import write_pass_reports
 
 
@@ -111,3 +112,86 @@ def test_real_run_check_report_schema_rejects_unknown_fields() -> None:
             issues=[],
             unexpected=True,
         )
+
+
+def _write_result_handoff(
+    project_dir: Path,
+    *,
+    status: str = "succeeded",
+    overrides: dict | None = None,
+) -> dict:
+    run_dir = project_dir / "runs" / "real" / "real_001"
+    artifacts_dir = run_dir / "artifacts"
+    artifacts_dir.mkdir(parents=True, exist_ok=True)
+    (run_dir / "spectre.log").write_text(
+        "sanitized spectre log\nanalysis completed\n",
+        encoding="utf-8",
+    )
+    (artifacts_dir / "psf_summary.txt").write_text(
+        "sanitized artifact summary\n",
+        encoding="utf-8",
+    )
+    prepared_manifest = _load_json(run_dir / "real_run_manifest.json")
+    payload = {
+        "schema_version": "1.0",
+        "run_id": "real_001",
+        "candidate_id": prepared_manifest["candidate_id"],
+        "status": status,
+        "started_at_utc": "2026-06-01T00:30:00Z",
+        "completed_at_utc": "2026-06-01T00:31:00Z",
+        "simulator": {
+            "engine": "spectre_x",
+            "preset": "ax",
+            "command_label": "external_spectre_run",
+        },
+        "prepared_input_scs": prepared_manifest["rendered_input_scs"],
+        "prepared_input_sha256": prepared_manifest["rendered_input_sha256"],
+        "log_file": "runs/real/real_001/spectre.log",
+        "artifact_files": ["runs/real/real_001/artifacts/psf_summary.txt"],
+        "notes": "sanitized fake execution result",
+    }
+    if overrides:
+        payload.update(overrides)
+    (run_dir / "result_manifest.json").write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return payload
+
+
+def test_check_real_run_accepts_valid_succeeded_handoff(tmp_path: Path) -> None:
+    project_dir, _package = _prepare_real_run_project(tmp_path)
+    _write_result_handoff(project_dir)
+
+    report = check_real_run(project_dir)
+
+    report_path = project_dir / "reports" / "real_run_check_report.json"
+    persisted = _load_json(report_path)
+    assert report.status == RealRunCheckStatus.PASS
+    assert report.result_status == RealRunResultStatus.SUCCEEDED
+    assert report.run_id == "real_001"
+    assert report.candidate_id == "real_001"
+    assert report.real_run_manifest == "runs/real/real_001/real_run_manifest.json"
+    assert report.result_manifest == "runs/real/real_001/result_manifest.json"
+    assert report.prepared_input_scs == "runs/real/real_001/input.scs"
+    assert report.log_file == "runs/real/real_001/spectre.log"
+    assert report.artifact_files == ["runs/real/real_001/artifacts/psf_summary.txt"]
+    assert report.checks.prepared_manifest_ok is True
+    assert report.checks.candidate_ok is True
+    assert report.checks.result_manifest_ok is True
+    assert report.checks.prepared_input_hash_ok is True
+    assert report.checks.artifact_paths_ok is True
+    assert report.issues == []
+    assert persisted["status"] == "pass"
+    assert persisted["result_status"] == "succeeded"
+
+
+def test_check_real_run_accepts_valid_failed_handoff(tmp_path: Path) -> None:
+    project_dir, _package = _prepare_real_run_project(tmp_path)
+    _write_result_handoff(project_dir, status="failed")
+
+    report = check_real_run(project_dir)
+
+    assert report.status == RealRunCheckStatus.PASS
+    assert report.result_status == RealRunResultStatus.FAILED
+    assert report.issues == []
