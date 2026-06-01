@@ -22,6 +22,9 @@ All final scenario outcomes matched expectations. The gate found no C-5 product-
 - `36a027a docs: record real run result handoff progress`
 - `3635dea docs: close real run result handoff contract`
 - `9e27775 docs: record dual agent result handoff simulation`
+- `84f719a docs: close dual agent result handoff simulation`
+
+This list captures the C-5/C-5.5 simulation evidence chain through closeout. Later documentation-only corrections may appear in git log without changing the simulation evidence.
 
 ## Scope
 
