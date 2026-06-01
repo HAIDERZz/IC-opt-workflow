@@ -159,7 +159,7 @@ Failure report shape:
 - Modify: `src/hermes_workflow/reports.py`
 - Create: `tests/test_result_handoff.py`
 
-- [ ] **Step 1: Write failing report model tests**
+- [x] **Step 1: Write failing report model tests**
 
 Create `tests/test_result_handoff.py` with this content:
 
@@ -279,7 +279,7 @@ def test_real_run_check_report_schema_rejects_unknown_fields() -> None:
         )
 ```
 
-- [ ] **Step 2: Run the model tests and verify the expected import failure**
+- [x] **Step 2: Run the model tests and verify the expected import failure**
 
 Run:
 
@@ -293,7 +293,7 @@ Expected:
 ImportError: cannot import name 'RealRunCheckFlags'
 ```
 
-- [ ] **Step 3: Add strict report models**
+- [x] **Step 3: Add strict report models**
 
 Append these models to `src/hermes_workflow/reports.py` after `HealthStatus` and before the existing report model classes:
 
@@ -334,7 +334,7 @@ class RealRunCheckReport(StrictReport):
     issues: list[str] = Field(default_factory=list)
 ```
 
-- [ ] **Step 4: Run the task tests**
+- [x] **Step 4: Run the task tests**
 
 Run:
 
@@ -348,7 +348,7 @@ Expected:
 2 passed
 ```
 
-- [ ] **Step 5: Run lint**
+- [x] **Step 5: Run lint**
 
 Run:
 
@@ -362,7 +362,7 @@ Expected:
 All checks passed!
 ```
 
-- [ ] **Step 6: Commit Task 1**
+- [x] **Step 6: Commit Task 1**
 
 Run:
 
