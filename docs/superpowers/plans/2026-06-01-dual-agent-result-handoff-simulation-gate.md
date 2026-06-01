@@ -726,7 +726,7 @@ Expected:
 no output
 ```
 
-- [ ] **Step 7: Commit Task 4**
+- [x] **Step 7: Commit Task 4**
 
 Run:
 
@@ -742,7 +742,7 @@ git commit -m "docs: record dual agent result handoff simulation"
 - Modify: `docs/COMPACT_RESUME_CHECKPOINT.md`
 - Modify: `docs/superpowers/plans/2026-06-01-dual-agent-result-handoff-simulation-gate.md`
 
-- [ ] **Step 1: Run full local verification**
+- [x] **Step 1: Run full local verification**
 
 Run:
 
@@ -770,7 +770,7 @@ Expected:
 All checks passed!
 ```
 
-- [ ] **Step 2: Run one combined docs/spec review**
+- [x] **Step 2: Run one combined docs/spec review**
 
 Run:
 
@@ -787,7 +787,7 @@ No Important findings.
 
 Fix Critical and Important findings before closing C-5.5. Record Minor findings as deferred if they do not block the simulation gate.
 
-- [ ] **Step 3: Update closeout docs**
+- [x] **Step 3: Update closeout docs**
 
 Modify `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md` and `docs/COMPACT_RESUME_CHECKPOINT.md` with:
 
@@ -797,11 +797,11 @@ C-5.5 final verification: pytest -q passed; ruff check . passed; combined docs/s
 
 Use the actual pytest count from Step 1.
 
-- [ ] **Step 4: Mark Task 5 progress in this plan**
+- [x] **Step 4: Mark Task 5 progress in this plan**
 
 Change completed Task 5 checkboxes in this plan from unchecked to checked.
 
-- [ ] **Step 5: Commit closeout docs**
+- [x] **Step 5: Commit closeout docs**
 
 Run:
 

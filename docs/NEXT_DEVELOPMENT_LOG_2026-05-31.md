@@ -6,7 +6,7 @@
 - Branch: `plan-a-hermes-file-contract-mvp`
 - Current scope: Plan C-5.5, dual-agent result handoff simulation gate
 - Current status: C-5.5 complete; simulation gate passed
-- Next required action: confirm C-6 real metric result contract scope
+- Next required action: confirm C-6 real metric result contract scope, including whether C-6.5 remains a separate metric-extraction simulation gate
 
 C-3 Task 6 final verification is complete. C-4 is confirmed as a contract-only first real-run package; it must not run Spectre, Virtuoso, subprocesses, or the optimizer loop. C-4 is now complete and reviewed. C-5 validates the execution agent's returned `result_manifest.json` and declared artifacts without running Spectre or parsing metrics. C-5.5 rehearsed the C-4/C-5 handoff with simulated execution-agent and Hermes-observer roles.
 
@@ -134,9 +134,21 @@ ruff check .
 # All checks passed
 ```
 
+C-5.5 final verification: `pytest -q` passed with 211 tests; `ruff check .` passed; combined docs/spec review passed with no Critical or Important findings.
+
+```bash
+pytest -q
+# 211 passed
+
+ruff check .
+# All checks passed
+```
+
+The first combined review found report-evidence gaps; the re-review found those addressed and only Task 5 bookkeeping remained. The closeout commit addresses that bookkeeping.
+
 ## Next Task
 
-Confirm C-6 real metric result contract scope before adding physical Spectre, Virtuoso, Hermes, Claude CLI tool adapters, ledger append, or optimizer state writes.
+Confirm C-6 real metric result contract scope before adding physical Spectre, Virtuoso, Hermes, Claude CLI tool adapters, ledger append, or optimizer state writes. C-6 planning should carry forward the C-5.5 finding that real execution-agent prompts/adapters need an exact result schema example, and it should decide whether C-6.5 remains a separate metric-extraction simulation gate.
 
 ## Completed C-5.5 Dual-Agent Result Handoff Simulation Gate
 
@@ -172,5 +184,5 @@ are local reference material only. Do not copy or commit them into the repositor
 ## Resume Prompt
 
 ```text
-请继续 IC auto optimization workflow。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。先阅读 docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/simulations/2026-06-01-c5-5-dual-agent-result-handoff.md。Plan A Task 1-9、Plan B、Plan C C-1、C-2、C-3、C-4、C-5 均已完成并通过 final verification/review gate。C-5.5 dual-agent result handoff simulation gate 已完成并通过。下一步确认 C-6 real metric result contract scope；不要提交本地真实 input.scs 示例，不要进入真实 Spectre/Virtuoso/optimizer loop 接入。
+请继续 IC auto optimization workflow。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。先阅读 docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/simulations/2026-06-01-c5-5-dual-agent-result-handoff.md。Plan A Task 1-9、Plan B、Plan C C-1、C-2、C-3、C-4、C-5 均已完成并通过 final verification/review gate。C-5.5 dual-agent result handoff simulation gate 已完成并通过。下一步确认 C-6 real metric result contract scope，并决定 C-6.5 是否保留为单独的 metric-extraction simulation gate；不要提交本地真实 input.scs 示例，不要进入真实 Spectre/Virtuoso/optimizer loop 接入。
 ```

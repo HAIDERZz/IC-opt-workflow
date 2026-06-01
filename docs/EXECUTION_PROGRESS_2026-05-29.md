@@ -702,7 +702,7 @@ Behavior finding:
 
 Next recommended action:
 
-- Confirm C-6 real metric result contract scope before adding real metric extraction, ledger append, optimizer state writes, or physical Spectre/Virtuoso adapters.
+- Confirm C-6 real metric result contract scope before adding real metric extraction, ledger append, optimizer state writes, or physical Spectre/Virtuoso adapters. C-6 planning should include an exact returned-result schema example for future execution-agent prompts/adapters and decide whether C-6.5 remains a separate metric-extraction simulation gate.
 
 ## Resume Prompt
 
@@ -713,5 +713,5 @@ Next recommended action:
 3. ic-auto-opt-workflow/docs/COMPACT_RESUME_CHECKPOINT.md
 4. ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。请先阅读 docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/simulations/2026-06-01-c5-5-dual-agent-result-handoff.md。Hermes File Contract MVP 的 Plan A Task 1-9 已完成；Plan B mock optimization loop 已完成；Plan C C-1 netlist template contract、C-2 dry-run candidate renderer、C-3 execution package preflight readiness、C-4 post-approval real-run execution contract、C-5 real-run result handoff contract 均已完成并通过 review gate。C-5.5 dual-agent result handoff simulation gate 已完成并通过。下一步确认 C-6 real metric result contract scope；不要提交或复制本地真实 input.scs 示例，不要进入真实 Spectre/Virtuoso/optimizer loop 接入。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。请先阅读 docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/simulations/2026-06-01-c5-5-dual-agent-result-handoff.md。Hermes File Contract MVP 的 Plan A Task 1-9 已完成；Plan B mock optimization loop 已完成；Plan C C-1 netlist template contract、C-2 dry-run candidate renderer、C-3 execution package preflight readiness、C-4 post-approval real-run execution contract、C-5 real-run result handoff contract 均已完成并通过 review gate。C-5.5 dual-agent result handoff simulation gate 已完成并通过。下一步确认 C-6 real metric result contract scope，并决定 C-6.5 是否保留为单独的 metric-extraction simulation gate；不要提交或复制本地真实 input.scs 示例，不要进入真实 Spectre/Virtuoso/optimizer loop 接入。
 ```

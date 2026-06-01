@@ -60,7 +60,8 @@ Current execution state:
 - C-5.5 dual-agent result handoff simulation gate design spec exists: `docs/superpowers/specs/2026-06-01-dual-agent-result-handoff-simulation-gate-design.md`.
 - C-5.5 implementation plan exists: `docs/superpowers/plans/2026-06-01-dual-agent-result-handoff-simulation-gate.md`.
 - C-5.5 simulation report exists: `docs/simulations/2026-06-01-c5-5-dual-agent-result-handoff.md`.
-- C-5.5 dual-agent result handoff simulation gate passed. The next action is to confirm C-6 real metric result contract scope. Do not implement real Spectre execution, real metric extraction, or optimizer-loop integration before C-6 scope is confirmed.
+- C-5.5 dual-agent result handoff simulation gate passed. The next action is to confirm C-6 real metric result contract scope, including whether C-6.5 remains a separate metric-extraction simulation gate. Do not implement real Spectre execution, real metric extraction, or optimizer-loop integration before C-6 scope is confirmed.
+- C-5.5 final verification: `pytest -q` passed with 211 tests; `ruff check .` passed; combined docs/spec review passed with no Critical or Important findings. The first combined review found report-evidence gaps; the re-review found those addressed and only Task 5 bookkeeping remained. The closeout commit addresses that bookkeeping.
 - Real `input.scs` examples under `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example` are local-only references and must not be committed.
 
 ## Files Already Read
@@ -357,7 +358,7 @@ optimizer:
 
 Plan A, Plan B, Plan C C-1, Plan C C-2, Plan C C-3, Plan C C-4, Plan C C-5, and Plan C C-5.5 are complete as of 2026-06-01.
 
-Current next step: confirm C-6 real metric result contract scope before real tool adapters, metric extraction, ledger append, or optimizer state writes. Do not redo Plan A Tasks 1-9 or completed Plan B/C modules unless new review feedback appears.
+Current next step: confirm C-6 real metric result contract scope before real tool adapters, metric extraction, ledger append, or optimizer state writes. C-6 planning should carry forward the exact-schema prompt finding from C-5.5 and decide whether C-6.5 remains a separate metric-extraction simulation gate. Do not redo Plan A Tasks 1-9 or completed Plan B/C modules unless new review feedback appears.
 
 Read the handoff files first:
 
@@ -378,5 +379,5 @@ Use this prompt after compact:
 4. ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md
 5. 如需背景，再读 ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。Plan A Task 1-9、Plan B mock optimization loop、Plan C C-1 netlist template contract、C-2 dry-run candidate renderer、C-3 execution package preflight readiness、C-4 post-approval real-run execution contract、C-5 real-run result handoff contract 均已完成并通过 review gate。C-5.5 dual-agent result handoff simulation gate 已完成并通过，报告在 docs/simulations/2026-06-01-c5-5-dual-agent-result-handoff.md。下一步请确认 C-6 real metric result contract scope 并写 scoped plan。真实 input.scs 示例在 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example 下，仅供本地参考，请勿将其提交到仓库。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。Plan A Task 1-9、Plan B mock optimization loop、Plan C C-1 netlist template contract、C-2 dry-run candidate renderer、C-3 execution package preflight readiness、C-4 post-approval real-run execution contract、C-5 real-run result handoff contract 均已完成并通过 review gate。C-5.5 dual-agent result handoff simulation gate 已完成并通过，报告在 docs/simulations/2026-06-01-c5-5-dual-agent-result-handoff.md。下一步请确认 C-6 real metric result contract scope 并写 scoped plan，同时决定 C-6.5 是否保留为单独的 metric-extraction simulation gate。真实 input.scs 示例在 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example 下，仅供本地参考，请勿将其提交到仓库。
 ```

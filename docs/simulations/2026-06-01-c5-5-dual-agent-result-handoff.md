@@ -15,6 +15,14 @@ All final scenario outcomes matched expectations. The gate found no C-5 product-
 - Design spec: `docs/superpowers/specs/2026-06-01-dual-agent-result-handoff-simulation-gate-design.md`
 - Implementation plan: `docs/superpowers/plans/2026-06-01-dual-agent-result-handoff-simulation-gate.md`
 
+## Relevant Commits
+
+- `454ace9 docs: plan dual agent result handoff simulation`
+- `929d657 docs: design dual agent result handoff simulation`
+- `36a027a docs: record real run result handoff progress`
+- `3635dea docs: close real run result handoff contract`
+- `9e27775 docs: record dual agent result handoff simulation`
+
 ## Scope
 
 Included:
@@ -90,6 +98,38 @@ Hermes-observer role:
 - Could read only `reports/real_run_check_report.json` for the verdict.
 - Could not trust execution-agent prose, repair files, run tools, extract metrics, append ledger rows, or write optimizer state.
 
+The full shared role prompt fragments are preserved in `docs/superpowers/plans/2026-06-01-dual-agent-result-handoff-simulation-gate.md`. During retries, the execution-agent prompts were tightened to enumerate the exact C-5 result manifest fields and status enum values.
+
+## Role Dispatch Evidence
+
+The simulation used separate subagents for execution-agent and Hermes-observer responsibilities. The controller did not use execution-agent prose as the verdict; observer results came from `check-real-run` and `reports/real_run_check_report.json`.
+
+| Scenario | Execution-Agent Role | Hermes-Observer Role |
+| --- | --- | --- |
+| `happy_path` | First: `Ramanujan` (`019e81f4-698d-7cb3-b01e-deeb83692c87`); retry: `Parfit` (`019e81f6-c7be-7223-8646-a2e2ca871ba5`) | First: `Lovelace` (`019e81f5-d24b-7ed2-b356-ff8a64d2976c`); retry: `Hume` (`019e81f8-0d27-7aa2-a879-65e42147fd2f`) |
+| `valid_failure` | `Peirce` (`019e81f4-97e7-7bd3-b22d-0e701d94cb79`) | `Gauss` (`019e81f5-f7dd-7211-af89-74f9bd383a5c`) |
+| `unsafe_path` | First: `Fermat` (`019e81f9-0ce2-7611-badb-fa6876caf567`); retry: `Nietzsche` (`019e81fb-c3cd-7cb0-8e9c-077ebf95b994`) | First: `Darwin` (`019e81fa-648c-7c71-b13f-b152580cfd8a`); retry: `Aquinas` (`019e81fe-3429-7012-9c02-fed9e1419d99`) |
+| `mutated_deck` | First: `Mencius` (`019e81f9-3b1e-7d21-8bb1-1c57f054446a`); retry: `Kuhn` (`019e81fc-023d-7291-b782-f9033dc7b47c`) | First: `Aristotle` (`019e81fa-8f2f-7e93-873c-790486297955`); retry: `Mill` (`019e81fe-52a5-74d0-9381-e57928a6ee7c`) |
+| `identity_mismatch` | First: `Dalton` (`019e81f9-6b1a-7f01-ad3f-63f47f50d12a`); retry: `Galileo` (`019e81fe-10ba-7472-bdc3-7faadd457da6`) | First: `Beauvoir` (`019e81fa-b553-70d0-9e19-77239cb8134f`); retry: `Godel` (`019e81ff-e066-72a1-a883-b0d219e9a050`) |
+
+## Structured Role Outputs
+
+Final execution-agent outputs:
+
+- `happy_path`: `STATUS: DONE`; wrote `runs/real/real_001/result_manifest.json`, `runs/real/real_001/spectre.log`, and `runs/real/real_001/artifacts/psf_summary.txt`.
+- `valid_failure`: `STATUS: DONE`; wrote `runs/real/real_001/result_manifest.json`, `runs/real/real_001/spectre.log`, and `runs/real/real_001/artifacts/psf_summary.txt`.
+- `unsafe_path`: `STATUS: DONE`; wrote `runs/real/real_001/result_manifest.json`, `runs/real/real_001/spectre.log`, and `runs/real/real_001/artifacts/psf_summary.txt`; did not create `/tmp/c5_5_outside_spectre.log`.
+- `mutated_deck`: `STATUS: DONE`; wrote `runs/real/real_001/result_manifest.json`, `runs/real/real_001/spectre.log`, `runs/real/real_001/artifacts/psf_summary.txt`, and mutated `runs/real/real_001/input.scs`.
+- `identity_mismatch`: `STATUS: DONE`; wrote `runs/real/real_001/result_manifest.json`, `runs/real/real_001/spectre.log`, and `runs/real/real_001/artifacts/psf_summary.txt`.
+
+Final Hermes-observer outputs:
+
+- `happy_path`: `CHECK_EXIT_CODE: 0`; `REPORT_STATUS: pass`; `RESULT_STATUS: succeeded`; `ISSUES: []`; `MATCHED_EXPECTATION: yes`.
+- `valid_failure`: `CHECK_EXIT_CODE: 0`; `REPORT_STATUS: pass`; `RESULT_STATUS: failed`; `ISSUES: []`; `MATCHED_EXPECTATION: yes`.
+- `unsafe_path`: `CHECK_EXIT_CODE: 1`; `REPORT_STATUS: fail`; `RESULT_STATUS: succeeded`; `ISSUES: ["result artifact path is unsafe: /tmp/c5_5_outside_spectre.log"]`; `MATCHED_EXPECTATION: yes`.
+- `mutated_deck`: `CHECK_EXIT_CODE: 1`; `REPORT_STATUS: fail`; `RESULT_STATUS: succeeded`; `ISSUES: ["prepared input hash mismatch"]`; `MATCHED_EXPECTATION: yes`.
+- `identity_mismatch`: `CHECK_EXIT_CODE: 1`; `REPORT_STATUS: fail`; `RESULT_STATUS: succeeded`; `ISSUES: ["result candidate_id does not match prepared candidate", "result candidate_id does not match candidate file"]`; `MATCHED_EXPECTATION: yes`.
+
 ## Scenario Results
 
 | Scenario | Expected | Observed Exit | Report Status | Issues | Assessment |
@@ -128,7 +168,7 @@ The first execution-agent attempt used an invalid status value from an older con
 
 - The Hermes-observer role behaved correctly: it did not trust execution-agent prose and used only the CLI exit code plus `reports/real_run_check_report.json`.
 - The C-5 checker failed closed on malformed result manifests before deeper semantic checks.
-- The execution-agent role drifted toward older C-4/C-5-adjacent shapes when prompts were underspecified, especially timestamp fields, simulator fields, and result status enums.
+- The execution-agent role drifted toward older C-4/C-5-adjacent shapes when prompts were underspecified, especially timestamp fields, simulator fields, and result status enums. Four of five scenarios needed prompt tightening before the intended file-contract scenario was isolated.
 - Exact schema enumeration in the execution-agent prompt was enough to produce the intended handoff shape across all retry scenarios.
 - The deterministic file contract successfully constrained unsafe behavior without needing real Spectre, Virtuoso, metric extraction, or optimizer integration.
 
@@ -145,10 +185,12 @@ The rejection cases were blocked by existing C-5 checks:
 
 ## Deferred Minor Improvements
 
-- Add a small generated or documented valid `result_manifest.json` example for future execution-agent prompts.
+- Add a small generated or documented valid `result_manifest.json` example for future execution-agent prompts. This should be carried into C-6 planning before real adapter work starts.
 - Consider adding a machine-readable JSON Schema for the returned result manifest if real adapters show repeated schema drift.
 - Consider documenting that a valid simulator failure should use `status: "failed"` and still pass the file-contract check.
 
 ## Next Recommended Scope
 
 Confirm Plan C-6 real metric result contract scope before adding real metric extraction, ledger append, optimizer state writes, or physical Spectre/Virtuoso adapters.
+
+C-6 planning should explicitly decide whether C-6.5 remains a separate dual-agent metric extraction simulation gate after the real metric result contract is designed.
