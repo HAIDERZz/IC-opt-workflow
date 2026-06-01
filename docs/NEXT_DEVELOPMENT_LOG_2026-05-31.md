@@ -4,9 +4,9 @@
 
 - Repository: `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow`
 - Branch: `plan-a-hermes-file-contract-mvp`
-- Current scope: Plan C-5, real-run result handoff contract
-- Current status: C-5 complete and reviewed
-- Next required action: plan and execute C-5.5 dual-agent result handoff simulation gate
+- Current scope: Plan C-5.5, dual-agent result handoff simulation gate
+- Current status: C-5.5 design and implementation plan ready; simulation not started
+- Next required action: execute C-5.5 implementation plan
 
 C-3 Task 6 final verification is complete. C-4 is confirmed as a contract-only first real-run package; it must not run Spectre, Virtuoso, subprocesses, or the optimizer loop. C-4 is now complete and reviewed. C-5 now validates the execution agent's returned `result_manifest.json` and declared artifacts without running Spectre or parsing metrics.
 
@@ -19,6 +19,7 @@ C-3 Task 6 final verification is complete. C-4 is confirmed as a contract-only f
 - Plan C C-3 execution package preflight readiness: complete and reviewed.
 - Plan C C-4 post-approval real-run execution contract: complete and reviewed.
 - Plan C C-5 real-run result handoff contract: complete and reviewed.
+- Plan C C-5.5 dual-agent result handoff simulation gate: design and implementation plan ready.
 
 Plan C-4 Task 1-4 added:
 
@@ -93,6 +94,11 @@ Plan C-5 implementation commits so far:
 - `8272b04 feat: add real run handoff cli`
 - `36a027a docs: record real run result handoff progress`
 
+Plan C-5.5 design and plan:
+
+- `929d657 docs: design dual agent result handoff simulation`
+- `docs/superpowers/plans/2026-06-01-dual-agent-result-handoff-simulation-gate.md`
+
 ## Final Verification
 
 Task 6 final verification:
@@ -129,7 +135,7 @@ ruff check .
 
 ## Next Task
 
-Plan and execute C-5.5 dual-agent result handoff simulation before adding physical Spectre, Virtuoso, Hermes, or Claude CLI tool adapters.
+Execute C-5.5 from `docs/superpowers/plans/2026-06-01-dual-agent-result-handoff-simulation-gate.md` before adding physical Spectre, Virtuoso, Hermes, or Claude CLI tool adapters.
 
 ## Planned C-5.5 Dual-Agent Result Handoff Simulation Gate
 
@@ -161,5 +167,5 @@ are local reference material only. Do not copy or commit them into the repositor
 ## Resume Prompt
 
 ```text
-请继续 IC auto optimization workflow。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。先阅读 docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/specs/2026-06-01-real-run-result-handoff-contract-design.md、docs/superpowers/plans/2026-06-01-real-run-result-handoff-contract.md。Plan A Task 1-9、Plan B、Plan C C-1、C-2、C-3、C-4、C-5 均已完成并通过 final verification/review gate。下一步规划并执行 C-5.5 dual-agent result handoff simulation gate；不要提交本地真实 input.scs 示例，不要进入真实 Spectre/Virtuoso/metric/optimizer loop 接入。
+请继续 IC auto optimization workflow。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。先阅读 docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/specs/2026-06-01-dual-agent-result-handoff-simulation-gate-design.md、docs/superpowers/plans/2026-06-01-dual-agent-result-handoff-simulation-gate.md。Plan A Task 1-9、Plan B、Plan C C-1、C-2、C-3、C-4、C-5 均已完成并通过 final verification/review gate。C-5.5 design 和 implementation plan 已就绪，simulation 尚未开始。下一步执行 C-5.5 implementation plan；不要提交本地真实 input.scs 示例，不要进入真实 Spectre/Virtuoso/metric/optimizer loop 接入。
 ```

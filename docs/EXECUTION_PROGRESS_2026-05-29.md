@@ -664,6 +664,30 @@ Next recommended action:
 
 - Run C-5.5 dual-agent result handoff simulation before adding real Hermes, Claude CLI, Spectre, Virtuoso, metric extraction, or optimizer-loop tool adapters.
 
+## Plan C-5.5: Dual-Agent Result Handoff Simulation Gate
+
+Status: design and implementation plan ready as of 2026-06-01; simulation not started.
+
+Scope:
+
+- Use simulated Codex roles for execution-agent and Hermes-observer.
+- Validate the C-4/C-5 role split in a temporary sanitized project.
+- Run five scenarios: happy path, valid simulator failure, unsafe path, mutated prepared deck, and identity mismatch.
+- Write `docs/simulations/2026-06-01-c5-5-dual-agent-result-handoff.md`.
+- Do not call real Spectre, real Virtuoso, real Claude CLI as execution agent, real Hermes service, metric extraction, ledger append, or optimizer state update.
+
+Spec:
+
+- `docs/superpowers/specs/2026-06-01-dual-agent-result-handoff-simulation-gate-design.md`
+
+Implementation plan:
+
+- `docs/superpowers/plans/2026-06-01-dual-agent-result-handoff-simulation-gate.md`
+
+Next recommended action:
+
+- Execute C-5.5 Task 1 from the implementation plan.
+
 ## Resume Prompt
 
 ```text
@@ -673,5 +697,5 @@ Next recommended action:
 3. ic-auto-opt-workflow/docs/COMPACT_RESUME_CHECKPOINT.md
 4. ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。请先阅读 docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/specs/2026-06-01-real-run-result-handoff-contract-design.md、docs/superpowers/plans/2026-06-01-real-run-result-handoff-contract.md。Hermes File Contract MVP 的 Plan A Task 1-9 已完成；Plan B mock optimization loop 已完成；Plan C C-1 netlist template contract、C-2 dry-run candidate renderer、C-3 execution package preflight readiness、C-4 post-approval real-run execution contract、C-5 real-run result handoff contract 均已完成并通过 review gate。下一步规划并执行 C-5.5 dual-agent result handoff simulation gate；不要提交或复制本地真实 input.scs 示例，不要进入真实 Spectre/Virtuoso/metric/optimizer loop 接入。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。请先阅读 docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/specs/2026-06-01-dual-agent-result-handoff-simulation-gate-design.md、docs/superpowers/plans/2026-06-01-dual-agent-result-handoff-simulation-gate.md。Hermes File Contract MVP 的 Plan A Task 1-9 已完成；Plan B mock optimization loop 已完成；Plan C C-1 netlist template contract、C-2 dry-run candidate renderer、C-3 execution package preflight readiness、C-4 post-approval real-run execution contract、C-5 real-run result handoff contract 均已完成并通过 review gate。C-5.5 design 和 implementation plan 已就绪，simulation 尚未开始。下一步执行 C-5.5 implementation plan；不要提交或复制本地真实 input.scs 示例，不要进入真实 Spectre/Virtuoso/metric/optimizer loop 接入。
 ```
