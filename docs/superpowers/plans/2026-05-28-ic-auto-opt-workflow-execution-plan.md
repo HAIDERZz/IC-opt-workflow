@@ -12,6 +12,7 @@
 
 ## Source Context Read
 
+- `ic-auto-opt-workflow/AGENTS.md`
 - `ic-auto-opt-workflow/PROJECT_STRUCTURE.md`
 - `ic-auto-opt-workflow/docs/HANDOFF_TO_LINUX_CODEX.md`
 - `virtuoso-bridge-lite/README.md`
@@ -19,6 +20,17 @@
 - `virtuoso-bridge-lite/skills/virtuoso/SKILL.md`
 - `virtuoso-bridge-lite/skills/spectre/SKILL.md`
 - `virtuoso-bridge-lite/skills/optimizer/SKILL.md`
+
+## Current Implementation Node
+
+As of 2026-06-03, focused Plan A, Plan B, and Plan C C-1 through C-9 are complete and reviewed. Plan C C-10 real-run failure/retry policy contract is in progress:
+
+- C-10 Task 1 recovery report schemas are complete and reviewed.
+- C-10 Task 2 deterministic recovery classifier is complete and reviewed.
+- C-10 Task 3 explicit supervisor recovery decisions and same-candidate retry package preparation are complete and reviewed.
+- C-10 Task 4 C-9 unresolved real-run guard has not started.
+
+Do not start C-11 local smoke or real tool/agent integration until C-10 passes review/final gate. Current resume guidance is in `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`, `docs/EXECUTION_PROGRESS_2026-05-29.md`, `docs/COMPACT_RESUME_CHECKPOINT.md`, and `AGENTS.md`.
 
 ## Current Route Alignment
 

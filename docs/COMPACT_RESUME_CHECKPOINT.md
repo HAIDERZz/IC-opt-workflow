@@ -13,6 +13,8 @@ Read this newer execution handoff first:
 
 ```text
 ic-auto-opt-workflow/docs/EXECUTION_PROGRESS_2026-05-29.md
+ic-auto-opt-workflow/docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md
+ic-auto-opt-workflow/AGENTS.md
 ```
 
 Current execution state:
@@ -90,6 +92,8 @@ Current execution state:
 - C-10 Task 2 recovery assessment classifier is complete and reviewed: `a9dc13a feat: classify real run recovery state`.
 - C-10 Task 3 recovery decisions and retry package writer is complete and reviewed: `c76f152 feat: prepare real run retry packages`.
 - C-10 Task 3 final verification: recovery tests passed with 36 tests; focused compatibility suite passed with 151 tests; focused ruff and `git diff --check` passed; spec and code-quality reviews passed with no remaining Critical or Important findings.
+- Route consistency audit after C-10 Task 3 found no technical-route drift. The C-10 design spec and implementation plan are aligned with Task 3 hardening: exact failed-input preservation, metric formula contract preservation, symlink/overwrite rejection, and contract-only boundaries.
+- Workspace-level agent constraints are recorded in `AGENTS.md`. Future agents must read it before continuing; it locks the role model, formula safety policy, per-task stop-and-report cadence, and coding guidelines.
 - C-10 Task 4 C-9 unresolved real-run guard has not started. Do not mark C-10 complete. The next executable step is C-10 Task 4, but wait for user confirmation before starting.
 - Current next action: stop at the Task 3 checkpoint and report status. After user confirmation, execute C-10 Task 4. Do not jump to C-11 local smoke or real tool/agent integration until C-10 implementation passes review/final gate.
 - Real `input.scs` examples under `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example` are local-only references and must not be committed.
@@ -406,8 +410,10 @@ Current next step: wait for user confirmation, then execute C-10 Task 4 from `do
 Read the handoff files first:
 
 ```text
+ic-auto-opt-workflow/AGENTS.md
 ic-auto-opt-workflow/docs/OPENCODE_HANDOFF_2026-05-29.md
 ic-auto-opt-workflow/docs/EXECUTION_PROGRESS_2026-05-29.md
+ic-auto-opt-workflow/docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md
 ```
 
 ## Resume Prompt
@@ -416,11 +422,12 @@ Use this prompt after compact:
 
 ```text
 请继续 IC auto optimization workflow。先阅读：
-1. ic-auto-opt-workflow/docs/OPENCODE_HANDOFF_2026-05-29.md
-2. ic-auto-opt-workflow/docs/EXECUTION_PROGRESS_2026-05-29.md
-3. ic-auto-opt-workflow/docs/COMPACT_RESUME_CHECKPOINT.md
-4. ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md
-5. 如需背景，再读 ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md
+1. ic-auto-opt-workflow/AGENTS.md
+2. ic-auto-opt-workflow/docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md
+3. ic-auto-opt-workflow/docs/EXECUTION_PROGRESS_2026-05-29.md
+4. ic-auto-opt-workflow/docs/COMPACT_RESUME_CHECKPOINT.md
+5. ic-auto-opt-workflow/docs/superpowers/plans/2026-06-02-real-run-failure-retry-policy-contract.md
+6. 如需背景，再读 ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md
 
 当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。Plan A Task 1-9、Plan B mock optimization loop、Plan C C-1 netlist template contract、C-2 dry-run candidate renderer、C-3 execution package preflight readiness、C-4 post-approval real-run execution contract、C-5 real-run result handoff contract、C-5.5 dual-agent result handoff simulation gate、C-6 Spectre + OCEAN metric result contract、C-7 Spectre + OCEAN execution adapter、C-8 real result ledger/state update、C-9 next real-run package contract 均已完成并通过 review/final gate。C-10 real-run failure/retry policy contract 的 design spec 和 implementation plan 已完成并提交；C-10 Task 1 recovery report schemas 已完成、reviewed，并提交为 104ef26；C-10 Task 2 recovery assessment classifier 已完成、reviewed，并提交为 a9dc13a；C-10 Task 3 recovery decisions and retry package writer 已完成、reviewed，并提交为 c76f152。下一步请等待用户确认后，使用 Subagent-Driven Development 从 docs/superpowers/plans/2026-06-02-real-run-failure-retry-policy-contract.md 的 Task 4 开始执行。每完成一个 Task 必须停下记录状态和报告，不要自动进入下一 Task。不要跳到 C-11 local smoke 或真实工具/agent 接入，直到 C-10 通过 review/final gate。Spectre + OCEAN backend 已通过工具链证据验证。不要让 agent 重写公式，metrics.yaml 中的公式必须是用户/项目批准的精确公式。真实 input.scs 示例在 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example 下，仅供本地参考，请勿将其提交到仓库。
 ```
