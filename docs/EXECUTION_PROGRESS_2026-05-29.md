@@ -909,7 +909,7 @@ Next recommended action:
 
 ## Plan C C-10 Real-Run Failure Retry Policy Contract
 
-Status: Task 3 recovery decisions and retry package writer complete and reviewed as of 2026-06-03; Task 4 C-9 unresolved real-run guard has not started.
+Status: Task 4 C-9 unresolved real-run guard complete and reviewed as of 2026-06-03; Task 5 CLI integration has not started.
 
 Spec:
 
@@ -927,7 +927,7 @@ Planned:
 - Add `real_run_recovery.py` to classify pending, invalid, failed, partial, metric-failed, recordable, already-recorded, retry-prepared, abandoned, and stopped real-run states. Complete in `a9dc13a feat: classify real run recovery state`.
 - Add explicit supervisor recovery decisions through `recovery_decision.json`. Complete in `c76f152 feat: prepare real run retry packages`.
 - Add retry package preparation for the same candidate using a new `run_id`, while preserving failed-run artifacts. Complete in `c76f152 feat: prepare real run retry packages`.
-- Add a C-9 unresolved-run guard so `prepare-next-real-run` cannot advance past unresolved pending/failed/partial/retry-prepared packages.
+- Add a C-9 unresolved-run guard so `prepare-next-real-run` cannot advance past unresolved pending/failed/partial/retry-prepared packages. Complete in `e6d19a5 feat: block next runs on unresolved real runs`.
 - Add CLI commands: `assess-real-run-recovery`, `prepare-real-run-retry`, and `resolve-real-run-failure`.
 
 Task 3 verification and review:
@@ -939,6 +939,18 @@ Task 3 verification and review:
 - Spec review passed after hardening parent/dangling symlink handling, exact failed-input preservation, metric formula contract comparison, and plan/design sync.
 - Code-quality review passed with no Critical, Important, or Minor findings.
 
+Task 4 verification and review:
+
+- `python3 -m pytest tests/test_next_real_run.py::test_prepare_next_real_run_refuses_unresolved_pending_package tests/test_next_real_run.py::test_prepare_next_real_run_refuses_unresolved_failed_package tests/test_next_real_run.py::test_prepare_next_real_run_continues_after_abandoned_candidate tests/test_next_real_run.py::test_prepare_next_real_run_refuses_symlinked_real_run_parent -q`: passed, 4 tests.
+- `python3 -m pytest tests/test_real_run_recovery.py::test_unresolved_guard_blocks_retry_prepared_decision tests/test_real_run_recovery.py::test_unresolved_guard_allows_c9_after_retry_is_recorded tests/test_real_run_recovery.py::test_unresolved_guard_allows_c9_after_retry_is_abandoned -q`: passed, 3 tests.
+- `python3 -m pytest tests/test_real_run_recovery.py::test_unresolved_guard_does_not_persist_checker_reports tests/test_next_real_run.py::test_prepare_next_real_run_refuses_invalid_ledger tests/test_next_real_run.py::test_prepare_next_real_run_refuses_coerced_ledger_types -q`: passed, 3 tests.
+- `python3 -m pytest tests/test_next_real_run.py tests/test_real_run_recovery.py tests/test_real_result_record.py -q`: passed, 83 tests.
+- `python3 -m pytest -q`: passed, 424 tests.
+- `python3 -m ruff check src tests tools`: passed.
+- `git diff --check`: passed.
+- Spec review passed after fixing retry resolution deadlocks. A retry-prepared source run now remains blocking while the retry is pending, but unblocks once the retry run is recorded or resolved abandoned.
+- Code-quality review passed after eliminating hidden checker report writes from the C-9 guard path and restoring direct ledger parser coverage in tests.
+
 Locked C-10 policy:
 
 - C-10 is contract-only.
@@ -948,8 +960,8 @@ Locked C-10 policy:
 
 Next required action:
 
-- Stop at the Task 3 checkpoint and report status.
-- After user confirmation, execute C-10 Task 4 from `docs/superpowers/plans/2026-06-02-real-run-failure-retry-policy-contract.md` using Subagent-Driven Development.
+- Stop at the Task 4 checkpoint and report status.
+- After user confirmation, execute C-10 Task 5 CLI Integration from `docs/superpowers/plans/2026-06-02-real-run-failure-retry-policy-contract.md` using Subagent-Driven Development.
 - After each C-10 task, stop, record status, report verification/review result, and wait for user confirmation before continuing.
 
 ## Locked Role Model
@@ -977,5 +989,5 @@ Do not use "Hermes agent" as a role name in future specs or plans. If older docu
 3. ic-auto-opt-workflow/docs/COMPACT_RESUME_CHECKPOINT.md
 4. ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。请先阅读 AGENTS.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md。Hermes File Contract MVP 的 Plan A Task 1-9 已完成；Plan B mock optimization loop 已完成；Plan C C-1/C-2/C-3/C-4/C-5/C-5.5/C-6/C-7/C-8/C-9 均已完成并通过相应 verification/review gate。C-10 real-run failure/retry policy contract 的 design spec 和 implementation plan 已完成并提交；C-10 Task 1 recovery report schemas 已完成、reviewed，并提交为 104ef26；C-10 Task 2 recovery assessment classifier 已完成、reviewed，并提交为 a9dc13a；C-10 Task 3 recovery decisions and retry package writer 已完成、reviewed，并提交为 c76f152。下一步请等待用户确认后，使用 Subagent-Driven Development 从 docs/superpowers/plans/2026-06-02-real-run-failure-retry-policy-contract.md 的 Task 4 开始执行。每完成一个 Task 必须停下记录状态和报告，不要自动进入下一 Task。不要跳到 C-11 local smoke 或真实工具/agent 接入，直到 C-10 通过 review/final gate。Spectre + OCEAN backend 已通过真实工具链证据验证。不要提交或复制本地真实 input.scs 示例，不要让 agent 重写公式，不要用 Python 解析 PSF 或重写 Calculator/OCEAN 公式。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。请先阅读 AGENTS.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md。Hermes File Contract MVP 的 Plan A Task 1-9 已完成；Plan B mock optimization loop 已完成；Plan C C-1/C-2/C-3/C-4/C-5/C-5.5/C-6/C-7/C-8/C-9 均已完成并通过相应 verification/review gate。C-10 real-run failure/retry policy contract 的 design spec 和 implementation plan 已完成并提交；C-10 Task 1 recovery report schemas 已完成、reviewed，并提交为 104ef26；C-10 Task 2 recovery assessment classifier 已完成、reviewed，并提交为 a9dc13a；C-10 Task 3 recovery decisions and retry package writer 已完成、reviewed，并提交为 c76f152；C-10 Task 4 C-9 unresolved real-run guard 已完成并通过 spec/code-quality review。下一步请等待用户确认后，使用 Subagent-Driven Development 从 docs/superpowers/plans/2026-06-02-real-run-failure-retry-policy-contract.md 的 Task 5 CLI Integration 开始执行。每完成一个 Task 必须停下记录状态和报告，不要自动进入下一 Task。不要跳到 C-11 local smoke 或真实工具/agent 接入，直到 C-10 通过 review/final gate。Spectre + OCEAN backend 已通过真实工具链证据验证。不要提交或复制本地真实 input.scs 示例，不要让 agent 重写公式，不要用 Python 解析 PSF 或重写 Calculator/OCEAN 公式。
 ```

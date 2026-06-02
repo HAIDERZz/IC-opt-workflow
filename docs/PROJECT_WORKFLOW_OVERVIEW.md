@@ -17,10 +17,10 @@
 - Plan C C-7 Spectre + OCEAN execution adapter 已完成并通过 final combined review gate：新增 execution-side adapter library、fake-runner orchestration、failure/overwrite safety、explicit `tools/run_spectre_ocean_adapter.py` entry point。自动测试使用 fake runner；真实 Cadence smoke 仍然只作为 local-only evidence。
 - Plan C C-8 real result ledger/state update 已完成并通过 final review gate：`hermes-workflow record-real-result` 在 `check-real-run` 和 `check-metric-results` 通过后，将 checked real metric result 写入 `ledger/experiment_ledger.jsonl`、`state/optimizer_state.json` 和 ledger-derived best candidate。C-8 仍是 contract-only，不运行真实工具，不解析 PSF，不重写公式，不生成下一候选。
 - Plan C C-9 next real-run package contract 已完成并通过 final review gate：`hermes-workflow prepare-next-real-run` 在 C-8 已记录 checked real result 之后，按 optimizer config 的 deterministic initialization sequence 选择下一唯一候选，生成新的 C-4/C-6-compatible real-run package。C-9 不运行真实工具，不调用 C-7 adapter，不写 ledger/state，不解析 PSF，不改写公式，并 fail-closed 拒绝 symlinked real-run directories。
-- Plan C C-10 real-run failure/retry policy contract 已完成 design spec 和 implementation plan；Task 1 recovery report schemas、Task 2 deterministic recovery classifier、Task 3 explicit supervisor recovery decisions and same-candidate retry package preparation 已完成并通过 review gate。Task 4 C-9 unresolved real-run guard 尚未开始；C-10 整体尚未完成。C-10 仍是 contract-only，不运行真实工具，不调用 C-7 adapter，不写 ledger/state，不解析 PSF，不改写公式。
+- Plan C C-10 real-run failure/retry policy contract 已完成 design spec 和 implementation plan；Task 1 recovery report schemas、Task 2 deterministic recovery classifier、Task 3 explicit supervisor recovery decisions and same-candidate retry package preparation、Task 4 C-9 unresolved real-run guard 均已完成并通过 review gate。Task 5 CLI Integration 尚未开始；C-10 整体尚未完成。C-10 仍是 contract-only，不运行真实工具，不调用 C-7 adapter，不写 ledger/state，不解析 PSF，不改写公式。
 - 角色模型已锁定在 `docs/ROLE_MODEL_AND_TERMINOLOGY.md`：主管 agent 负责规划、审批和读取 Hermes workflow report；Hermes workflow tooling 是 deterministic file-contract 与 validation 工具层；执行 agent 负责 Maestro export、approval 之后的 standalone Spectre、batch OCEAN metric extraction，以及后续被批准的 optimizer/tool-side 操作。
 - 仓库级 agent/coding 约束已写入 `AGENTS.md`：后续压缩上下文或更换 agent 时，必须先读取该文件，保持角色模型、contract-only 边界、公式安全和简洁外科式改动规则不漂移。
-- 下一步：等待用户确认后，按 Subagent-Driven Development 执行 C-10 Task 4。每完成一个 Task 必须停下记录状态和报告；不要进入 C-11 local smoke 或真实工具/agent 接入，直到 C-10 通过 review/final gate。
+- 下一步：等待用户确认后，按 Subagent-Driven Development 执行 C-10 Task 5 CLI Integration。每完成一个 Task 必须停下记录状态和报告；不要进入 C-11 local smoke 或真实工具/agent 接入，直到 C-10 通过 review/final gate。
 - `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example` 下的真实 `input.scs` 示例只作为本地参考，不能提交进仓库。
 
 ## 1. 项目概览
@@ -187,7 +187,7 @@ flowchart TD
   对应 Plan C C-10 Task 2-3。它提供 `assess_real_run_recovery()`、`prepare_real_run_retry()` 和 `resolve_real_run_failure()`：基于文件状态、既有 checker report 和 ledger state 对 pending/failed/partial/metric-failed/recordable/recorded/resolved run 做 deterministic classification；从 explicit supervisor decision 写入 `runs/real/<run_id>/recovery_decision.json`；为同一 `candidate_id` 准备新的 retry run package，并保留失败 run 的 `input.scs`、metric formula contract 和 evidence。它拒绝 retry target 覆盖、leaf/parent symlink、dangling decision symlink、公式合同不一致和超出 retry budget。
 
 - C-10 当前状态
-  Task 1-3 已完成并 reviewed。Task 4 尚未开始，将在 C-9 `prepare-next-real-run` 前加入 unresolved real-run guard；Task 5 计划补 CLI wiring；Task 6 计划完成 docs/final verification。C-10 完成前，不进入 C-11 local smoke 或真实工具/agent 接入。
+  Task 1-4 已完成并 reviewed。Task 4 已在 C-9 `prepare-next-real-run` 前加入 unresolved real-run guard：pending、failed、partial、metric-failed、retry-prepared、stopped、contract-invalid 或 recordable 但未记录的 real-run package 会阻塞 C-9；already-recorded 和 resolved-abandoned 会放行；retry-prepared source run 会等 retry run 被记录或 resolved abandoned 后放行。Task 5 计划补 CLI wiring；Task 6 计划完成 docs/final verification。C-10 完成前，不进入 C-11 local smoke 或真实工具/agent 接入。
 
 ### Spectre + OCEAN execution adapter 层
 
@@ -375,7 +375,7 @@ C-8 已把 checked real result 接入 optimizer ledger/state：`check-real-run -
 
 C-9 已把下一真实候选 package 接入 workflow：`record-real-result -> prepare-next-real-run -> C-7 execution adapter`。它使用 deterministic initialization sequence + strict dedupe 生成下一 package，但仍然不运行真实工具、不写 ledger/state。
 
-C-10 已完成 design spec 和 implementation plan，Task 1-3 已完成并 reviewed。它是进入真实工具 smoke 前的 failure/retry 安全层：failed/partial/pending real-run package 必须先被 deterministic recovery assessment 和 explicit supervisor decision 处理，C-9 才能继续推进。当前下一步是执行 C-10 Task 4，在 `prepare-next-real-run` 前加入 unresolved real-run guard；C-11 local smoke 应在 C-10 实现并通过 review/final gate 后再开始。
+C-10 已完成 design spec 和 implementation plan，Task 1-4 已完成并 reviewed。它是进入真实工具 smoke 前的 failure/retry 安全层：failed/partial/pending real-run package 必须先被 deterministic recovery assessment 和 explicit supervisor decision 处理，C-9 才能继续推进。当前下一步是执行 C-10 Task 5 CLI Integration；C-11 local smoke 应在 C-10 实现并通过 review/final gate 后再开始。
 
 ## 4. 能否严格约束主管 agent 和执行 agent 的行为
 
