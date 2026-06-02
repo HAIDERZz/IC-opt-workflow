@@ -86,8 +86,9 @@ Current execution state:
 - C-9 final verification: `python3 -m pytest -q` passed with 380 tests; `python3 -m ruff check src tests tools` passed; `git diff --check` produced no output.
 - C-10 real-run failure/retry policy contract design spec exists: `docs/superpowers/specs/2026-06-02-real-run-failure-retry-policy-contract-design.md` (`68c404a docs: design real run failure retry policy`).
 - C-10 implementation plan exists: `docs/superpowers/plans/2026-06-02-real-run-failure-retry-policy-contract.md` (`13d39e9 docs: plan real run failure retry policy`).
-- C-10 implementation has not started. Do not mark C-10 complete. The next executable step is C-10 Task 1: recovery report schemas, using Subagent-Driven Development and the risk-tiered review gates in the C-10 plan.
-- Current next action: execute C-10 Task 1. Do not jump to C-11 local smoke or real tool/agent integration until C-10 implementation passes review/final gate.
+- C-10 Task 1 recovery report schemas are complete and reviewed: `104ef26 feat: add real run recovery report schema`.
+- C-10 Task 2 recovery assessment classifier has not started. Do not mark C-10 complete. The next executable step is C-10 Task 2, but wait for user confirmation before starting.
+- Current next action: stop at the Task 1 checkpoint and report status. After user confirmation, execute C-10 Task 2. Do not jump to C-11 local smoke or real tool/agent integration until C-10 implementation passes review/final gate.
 - Real `input.scs` examples under `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example` are local-only references and must not be committed.
 
 ## Files Already Read
@@ -129,7 +130,7 @@ Current execution state:
 - Active C-10 design spec: `ic-auto-opt-workflow/docs/superpowers/specs/2026-06-02-real-run-failure-retry-policy-contract-design.md`
 - Active C-10 implementation plan: `ic-auto-opt-workflow/docs/superpowers/plans/2026-06-02-real-run-failure-retry-policy-contract.md`
 
-Plan A, Plan B, Plan C C-1, Plan C C-2, Plan C C-3, Plan C C-4, Plan C C-5, and Plan C C-5.5 are complete. C-5.5 passed the dual-agent simulation gate. C-6, C-7, C-8, and C-9 are complete and reviewed. C-10 is planned but not implemented.
+Plan A, Plan B, Plan C C-1, Plan C C-2, Plan C C-3, Plan C C-4, Plan C C-5, and Plan C C-5.5 are complete. C-5.5 passed the dual-agent simulation gate. C-6, C-7, C-8, and C-9 are complete and reviewed. C-10 Task 1 is complete and reviewed; C-10 Task 2 has not started.
 
 ## Confirmed Plan A Scope
 
@@ -395,9 +396,9 @@ optimizer:
 
 ## Next Step
 
-Plan A, Plan B, Plan C C-1, Plan C C-2, Plan C C-3, Plan C C-4, Plan C C-5, and Plan C C-5.5 are complete as of 2026-06-01. C-6, C-7, C-8, and C-9 are complete and reviewed as of 2026-06-02. C-10 design and implementation plan are complete as of 2026-06-02, but C-10 code implementation has not started.
+Plan A, Plan B, Plan C C-1, Plan C C-2, Plan C C-3, Plan C C-4, Plan C C-5, and Plan C C-5.5 are complete as of 2026-06-01. C-6, C-7, C-8, and C-9 are complete and reviewed as of 2026-06-02. C-10 design and implementation plan are complete as of 2026-06-02. C-10 Task 1 recovery report schemas are complete and reviewed as of 2026-06-03; C-10 Task 2 has not started.
 
-Current next step: execute C-10 Task 1 from `docs/superpowers/plans/2026-06-02-real-run-failure-retry-policy-contract.md` using Subagent-Driven Development. Do not redo Plan A Tasks 1-9 or completed Plan B/C modules unless new review feedback appears. Do not start C-11 local smoke or real tool/agent integration until C-10 passes review/final gate.
+Current next step: wait for user confirmation, then execute C-10 Task 2 from `docs/superpowers/plans/2026-06-02-real-run-failure-retry-policy-contract.md` using Subagent-Driven Development. After each C-10 task, stop, record status, report the verification/review result, and wait for user confirmation before continuing. Do not redo Plan A Tasks 1-9 or completed Plan B/C modules unless new review feedback appears. Do not start C-11 local smoke or real tool/agent integration until C-10 passes review/final gate.
 
 Read the handoff files first:
 
@@ -418,5 +419,5 @@ Use this prompt after compact:
 4. ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md
 5. 如需背景，再读 ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。Plan A Task 1-9、Plan B mock optimization loop、Plan C C-1 netlist template contract、C-2 dry-run candidate renderer、C-3 execution package preflight readiness、C-4 post-approval real-run execution contract、C-5 real-run result handoff contract、C-5.5 dual-agent result handoff simulation gate、C-6 Spectre + OCEAN metric result contract、C-7 Spectre + OCEAN execution adapter、C-8 real result ledger/state update、C-9 next real-run package contract 均已完成并通过 review/final gate。C-10 real-run failure/retry policy contract 的 design spec 和 implementation plan 已完成并提交，但代码实现尚未开始。下一步请使用 Subagent-Driven Development 从 docs/superpowers/plans/2026-06-02-real-run-failure-retry-policy-contract.md 的 Task 1 开始执行。不要跳到 C-11 local smoke 或真实工具/agent 接入，直到 C-10 通过 review/final gate。Spectre + OCEAN backend 已通过工具链证据验证。不要让 agent 重写公式，metrics.yaml 中的公式必须是用户/项目批准的精确公式。真实 input.scs 示例在 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example 下，仅供本地参考，请勿将其提交到仓库。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。Plan A Task 1-9、Plan B mock optimization loop、Plan C C-1 netlist template contract、C-2 dry-run candidate renderer、C-3 execution package preflight readiness、C-4 post-approval real-run execution contract、C-5 real-run result handoff contract、C-5.5 dual-agent result handoff simulation gate、C-6 Spectre + OCEAN metric result contract、C-7 Spectre + OCEAN execution adapter、C-8 real result ledger/state update、C-9 next real-run package contract 均已完成并通过 review/final gate。C-10 real-run failure/retry policy contract 的 design spec 和 implementation plan 已完成并提交；C-10 Task 1 recovery report schemas 已完成、reviewed，并提交为 104ef26。下一步请等待用户确认后，使用 Subagent-Driven Development 从 docs/superpowers/plans/2026-06-02-real-run-failure-retry-policy-contract.md 的 Task 2 开始执行。每完成一个 Task 必须停下记录状态和报告，不要自动进入下一 Task。不要跳到 C-11 local smoke 或真实工具/agent 接入，直到 C-10 通过 review/final gate。Spectre + OCEAN backend 已通过工具链证据验证。不要让 agent 重写公式，metrics.yaml 中的公式必须是用户/项目批准的精确公式。真实 input.scs 示例在 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example 下，仅供本地参考，请勿将其提交到仓库。
 ```

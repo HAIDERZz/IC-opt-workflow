@@ -909,7 +909,7 @@ Next recommended action:
 
 ## Plan C C-10 Real-Run Failure Retry Policy Contract
 
-Status: design spec and implementation plan complete as of 2026-06-02; code implementation has not started.
+Status: Task 1 recovery report schemas complete and reviewed as of 2026-06-03; Task 2 recovery assessment classifier has not started.
 
 Spec:
 
@@ -923,7 +923,7 @@ Implementation plan:
 
 Planned:
 
-- Add recovery report schemas for real-run recovery status, classification, allowed actions, and assessment reports.
+- Add recovery report schemas for real-run recovery status, classification, allowed actions, and assessment reports. Complete in `104ef26 feat: add real run recovery report schema`.
 - Add `real_run_recovery.py` to classify pending, invalid, failed, partial, metric-failed, recordable, already-recorded, retry-prepared, abandoned, and stopped real-run states.
 - Add explicit supervisor recovery decisions through `recovery_decision.json`.
 - Add retry package preparation for the same candidate using a new `run_id`, while preserving failed-run artifacts.
@@ -939,7 +939,9 @@ Locked C-10 policy:
 
 Next required action:
 
-- Execute C-10 Task 1 from `docs/superpowers/plans/2026-06-02-real-run-failure-retry-policy-contract.md` using Subagent-Driven Development.
+- Stop at the Task 1 checkpoint and report status.
+- After user confirmation, execute C-10 Task 2 from `docs/superpowers/plans/2026-06-02-real-run-failure-retry-policy-contract.md` using Subagent-Driven Development.
+- After each C-10 task, stop, record status, report verification/review result, and wait for user confirmation before continuing.
 
 ## Locked Role Model
 
@@ -966,5 +968,5 @@ Do not use "Hermes agent" as a role name in future specs or plans. If older docu
 3. ic-auto-opt-workflow/docs/COMPACT_RESUME_CHECKPOINT.md
 4. ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。请先阅读 docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md。Hermes File Contract MVP 的 Plan A Task 1-9 已完成；Plan B mock optimization loop 已完成；Plan C C-1/C-2/C-3/C-4/C-5/C-5.5/C-6/C-7/C-8/C-9 均已完成并通过相应 verification/review gate。C-10 real-run failure/retry policy contract 的 design spec 和 implementation plan 已完成并提交，但代码实现尚未开始。下一步请使用 Subagent-Driven Development 从 docs/superpowers/plans/2026-06-02-real-run-failure-retry-policy-contract.md 的 Task 1 开始执行。不要跳到 C-11 local smoke 或真实工具/agent 接入，直到 C-10 通过 review/final gate。Spectre + OCEAN backend 已通过真实工具链证据验证。不要提交或复制本地真实 input.scs 示例，不要让 agent 重写公式，不要用 Python 解析 PSF 或重写 Calculator/OCEAN 公式。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。请先阅读 docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md。Hermes File Contract MVP 的 Plan A Task 1-9 已完成；Plan B mock optimization loop 已完成；Plan C C-1/C-2/C-3/C-4/C-5/C-5.5/C-6/C-7/C-8/C-9 均已完成并通过相应 verification/review gate。C-10 real-run failure/retry policy contract 的 design spec 和 implementation plan 已完成并提交；C-10 Task 1 recovery report schemas 已完成、reviewed，并提交为 104ef26。下一步请等待用户确认后，使用 Subagent-Driven Development 从 docs/superpowers/plans/2026-06-02-real-run-failure-retry-policy-contract.md 的 Task 2 开始执行。每完成一个 Task 必须停下记录状态和报告，不要自动进入下一 Task。不要跳到 C-11 local smoke 或真实工具/agent 接入，直到 C-10 通过 review/final gate。Spectre + OCEAN backend 已通过真实工具链证据验证。不要提交或复制本地真实 input.scs 示例，不要让 agent 重写公式，不要用 Python 解析 PSF 或重写 Calculator/OCEAN 公式。
 ```
