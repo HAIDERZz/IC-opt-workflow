@@ -298,3 +298,81 @@ def test_record_real_result_rejects_missing_metric_manifest_without_writes(
     assert any("metric_result_manifest" in issue for issue in report.issues)
     _assert_no_optimizer_writes(project_dir)
     _assert_no_prerequisite_check_reports(project_dir)
+
+
+def test_record_real_result_writes_ledger_state_best_and_report(tmp_path: Path) -> None:
+    project_dir = _create_ready_project(tmp_path)
+    _write_valid_checked_result(project_dir)
+
+    report = record_real_result(
+        project_dir,
+        recorded_at_utc="2026-06-02T12:00:00Z",
+    )
+
+    assert report.status == RealResultRecordStatus.PASS
+    assert report.candidate_id == "real_001"
+    assert report.checks.real_run_check_ok is True
+    assert report.checks.metric_result_check_ok is True
+    assert report.checks.candidate_ok is True
+    assert report.checks.duplicate_ok is True
+    assert report.checks.objective_ok is True
+    assert report.checks.constraints_ok is True
+    assert report.checks.ledger_write_ok is True
+    assert report.checks.state_write_ok is True
+    assert report.issues == []
+
+    ledger_path = project_dir / "ledger" / "experiment_ledger.jsonl"
+    state_path = project_dir / "state" / "optimizer_state.json"
+    best_path = project_dir / "state" / "best_candidate.json"
+    report_path = project_dir / "reports" / "real_result_record_report.json"
+    assert ledger_path.exists()
+    assert state_path.exists()
+    assert best_path.exists()
+    assert report_path.exists()
+
+    row = json.loads(ledger_path.read_text(encoding="utf-8").strip())
+    assert row["candidate_id"] == "real_001"
+    assert row["run_id"] == "real_001"
+    assert row["result_source"] == "real"
+    assert row["result_manifest"] == "runs/real/real_001/result_manifest.json"
+    assert (
+        row["metric_result_manifest"]
+        == "runs/real/real_001/metrics/metric_result_manifest.json"
+    )
+    assert row["simulation_status"] == "real_pass"
+    assert row["batch_id"] == 1
+    assert row["timestamp_utc"] == "2026-06-02T12:00:00Z"
+    assert row["parameters"] == {
+        "FN": "2",
+        "WN": "0.3 um",
+        "FP": "2",
+        "WP": "0.3 um",
+    }
+    assert row["metrics"]["rise"] == pytest.approx(1.0e-12)
+    assert row["metrics"]["fall"] == pytest.approx(1.0e-12)
+    assert row["metrics"]["DC"] == pytest.approx(1.0e-6)
+    assert row["constraints_passed"] is True
+    assert row["objective"] == pytest.approx(2.0e-18)
+
+    state = _load_json(state_path)
+    assert state["current_evaluations"] == 1
+    assert state["best_candidate_id"] == "real_001"
+    assert state["status"] == "running"
+    assert state["started_at_utc"] == "2026-06-02T12:00:00Z"
+    assert state["updated_at_utc"] == "2026-06-02T12:00:00Z"
+
+    best = _load_json(best_path)
+    assert best["candidate_id"] == "real_001"
+    assert best["parameters"] == {
+        "FN": "2",
+        "WN": "0.3 um",
+        "FP": "2",
+        "WP": "0.3 um",
+    }
+    assert best["metrics"] == row["metrics"]
+    assert best["objective"] == pytest.approx(row["objective"])
+
+    persisted = _load_json(report_path)
+    assert persisted["status"] == "pass"
+    assert persisted["checks"]["ledger_write_ok"] is True
+    assert persisted["checks"]["state_write_ok"] is True

@@ -682,7 +682,7 @@ Update this task's checkboxes to `[x]` after verification and review gate approv
 - Modify: `tests/test_real_result_record.py`
 - Modify: `docs/superpowers/plans/2026-06-02-real-result-ledger-state-update.md`
 
-- [ ] **Step 1: Write success-path test**
+- [x] **Step 1: Write success-path test**
 
 Append:
 
@@ -732,7 +732,7 @@ def test_record_real_result_writes_ledger_state_best_and_report(tmp_path: Path) 
     }
 ```
 
-- [ ] **Step 2: Run test and verify failure**
+- [x] **Step 2: Run test and verify failure**
 
 Run:
 
@@ -742,7 +742,7 @@ python3 -m pytest tests/test_real_result_record.py::test_record_real_result_writ
 
 Expected: FAIL because success-path writing is not implemented.
 
-- [ ] **Step 3: Implement metric extraction and candidate loading**
+- [x] **Step 3: Implement metric extraction and candidate loading**
 
 In `real_result_record.py`, add:
 
@@ -815,7 +815,7 @@ def _checked_metric_values(
     return metrics
 ```
 
-- [ ] **Step 4: Implement success-path record assembly**
+- [x] **Step 4: Implement success-path record assembly**
 
 Inside `record_real_result()`, after both checkers pass:
 
@@ -865,7 +865,7 @@ def _next_batch_id(project_dir: Path, batch_size: int) -> int:
 
 For Task 3, `_count_valid_ledger_rows()` may return `0`; full duplicate and invalid-ledger handling comes in Task 4.
 
-- [ ] **Step 5: Implement state and best writes**
+- [x] **Step 5: Implement state and best writes**
 
 Add:
 
@@ -936,7 +936,7 @@ checks.state_write_ok = True
 
 The final implementation may reorder best/state after ledger as required by the spec; tests should verify the output, not internal order.
 
-- [ ] **Step 6: Run success-path test**
+- [x] **Step 6: Run success-path test**
 
 Run:
 
@@ -946,7 +946,7 @@ python3 -m pytest tests/test_real_result_record.py::test_record_real_result_writ
 
 Expected: PASS.
 
-- [ ] **Step 7: Run focused real-result tests**
+- [x] **Step 7: Run focused real-result tests**
 
 Run:
 
