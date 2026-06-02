@@ -81,7 +81,7 @@ Use `EMPTY_LEDGER_SHA256` only when the ledger file is absent. Normal C-9 usage 
 - Create: `tests/test_next_real_run.py`
 - Modify: `docs/superpowers/plans/2026-06-02-next-real-run-package-contract.md`
 
-- [ ] **Step 1: Write failing candidate-selection tests**
+- [x] **Step 1: Write failing candidate-selection tests**
 
 Create `tests/test_next_real_run.py`:
 
@@ -314,7 +314,7 @@ def test_prepare_next_real_run_refuses_when_max_evaluations_reached(
 
 The final max-evaluations test intentionally expects config drift because immutable config changes after approval must fail before optimizer policy evaluation.
 
-- [ ] **Step 2: Run tests and verify they fail for missing function**
+- [x] **Step 2: Run tests and verify they fail for missing function**
 
 Run:
 
@@ -324,7 +324,7 @@ python3 -m pytest tests/test_next_real_run.py -q
 
 Expected: import failure for `prepare_next_real_run`.
 
-- [ ] **Step 3: Add strict ledger/state helpers and a stub `prepare_next_real_run()`**
+- [x] **Step 3: Add strict ledger/state helpers and a stub `prepare_next_real_run()`**
 
 Modify `src/hermes_workflow/real_run.py` imports:
 
@@ -437,7 +437,7 @@ def prepare_next_real_run(
     raise ValueError("next candidate selection is not implemented")
 ```
 
-- [ ] **Step 4: Run tests and verify precondition tests pass up to the stub**
+- [x] **Step 4: Run tests and verify precondition tests pass up to the stub**
 
 Run:
 
@@ -447,14 +447,14 @@ python3 -m pytest tests/test_next_real_run.py -q
 
 Expected: some tests pass; remaining tests fail with `next candidate selection is not implemented` once later happy-path tests are added.
 
-- [ ] **Step 5: Commit Task 1**
+- [x] **Step 5: Commit Task 1**
 
 ```bash
 git add src/hermes_workflow/real_run.py tests/test_next_real_run.py docs/superpowers/plans/2026-06-02-next-real-run-package-contract.md
 git commit -m "feat: validate next real run preconditions"
 ```
 
-- [ ] **Step 6: Review gate**
+- [x] **Step 6: Review gate**
 
 Run:
 

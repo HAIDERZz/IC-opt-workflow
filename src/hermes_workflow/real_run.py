@@ -7,9 +7,12 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 
+from pydantic import ValidationError
+
 from hermes_workflow.dry_run import PLACEHOLDER_RE, UNRESOLVED_PLACEHOLDER_RE
 from hermes_workflow.metric_requests import build_metric_extraction_request
 from hermes_workflow.package import sha256_file
+from hermes_workflow.schemas import LedgerRow, OptimizerState
 from hermes_workflow.validate import ContractBundle, assert_valid_project
 
 
@@ -18,6 +21,11 @@ DEFAULT_RUN_ID = "real_001"
 REAL_RUN_ROOT = "runs/real"
 SUPERVISOR_INSTRUCTION = "supervisor_instruction.json"
 EXECUTION_MANIFEST = "execution_package/execution_manifest.json"
+LEDGER_PATH = "ledger/experiment_ledger.jsonl"
+OPTIMIZER_STATE_PATH = "state/optimizer_state.json"
+NEXT_CANDIDATE_SOURCE = "deterministic_initialization_sequence"
+NEXT_SELECTION_POLICY = "next_unique_from_optimizer_initialization_sequence"
+EMPTY_LEDGER_SHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 
 
 @dataclass(frozen=True)
@@ -126,6 +134,27 @@ def prepare_real_run(
     )
 
 
+def prepare_next_real_run(
+    project_dir: Path,
+    *,
+    run_id: str | None = None,
+    created_at_utc: str | None = None,
+) -> RealRunPackage:
+    project_dir = Path(project_dir)
+    if run_id is not None:
+        _validate_run_id(run_id)
+    manifest = _load_execution_manifest(project_dir)
+    instruction = _load_supervisor_instruction(project_dir)
+    _assert_approved(instruction)
+    approved_hashes = _approved_hashes(manifest, instruction)
+    _assert_config_hashes(project_dir, approved_hashes)
+    bundle = assert_valid_project(project_dir)
+    ledger_rows = _read_ledger_rows_or_raise(project_dir)
+    state = _load_optimizer_state_or_raise(project_dir)
+    _assert_optimizer_state_matches_bundle(bundle, state, ledger_rows)
+    raise ValueError("next candidate selection is not implemented")
+
+
 def _validate_run_id(run_id: str) -> str:
     if not RUN_ID_RE.match(run_id):
         raise ValueError(f"run_id must match real_[0-9]{{3}}: {run_id}")
@@ -153,6 +182,70 @@ def _load_json_object(path: Path, label: str) -> dict:
     if not isinstance(payload, dict):
         raise ValueError(f"{label} is invalid: expected JSON object")
     return payload
+
+
+def _read_ledger_rows_or_raise(project_dir: Path) -> list[LedgerRow]:
+    ledger_path = project_dir / LEDGER_PATH
+    if not ledger_path.exists():
+        raise ValueError("ledger is missing; record a checked real result first")
+    rows: list[LedgerRow] = []
+    for line_number, raw_line in enumerate(
+        ledger_path.read_text(encoding="utf-8").splitlines(),
+        1,
+    ):
+        if not raw_line.strip():
+            continue
+        try:
+            payload = json.loads(raw_line)
+            rows.append(LedgerRow.model_validate(payload))
+        except (json.JSONDecodeError, ValidationError) as exc:
+            raise ValueError(f"ledger row {line_number} is invalid: {exc}") from exc
+    if not rows:
+        raise ValueError("ledger has no recorded evaluations")
+    return rows
+
+
+def _load_optimizer_state_or_raise(project_dir: Path) -> OptimizerState:
+    state_path = project_dir / OPTIMIZER_STATE_PATH
+    if not state_path.exists():
+        raise ValueError("optimizer state is missing")
+    try:
+        payload = json.loads(state_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"optimizer state is invalid JSON: {exc.msg}") from exc
+    try:
+        return OptimizerState.model_validate(payload)
+    except ValidationError as exc:
+        raise ValueError(f"optimizer state is invalid: {exc}") from exc
+
+
+def _assert_optimizer_state_matches_bundle(
+    bundle: ContractBundle,
+    state: OptimizerState,
+    ledger_rows: list[LedgerRow],
+) -> None:
+    optimizer = bundle.optimizer.optimizer
+    checks = {
+        "algorithm": optimizer.algorithm.value,
+        "initialization": optimizer.initialization.value,
+        "max_evaluations": optimizer.max_evaluations,
+        "batch_size": optimizer.batch_size,
+        "random_seed": optimizer.random_seed,
+    }
+    for field_name, expected in checks.items():
+        actual = getattr(state, field_name)
+        if actual != expected:
+            raise ValueError(
+                f"optimizer state {field_name} disagrees with optimizer.yaml"
+            )
+    if state.status in {"completed", "stopped"}:
+        raise ValueError(f"optimizer state is {state.status}")
+    if state.current_evaluations != len(ledger_rows):
+        raise ValueError(
+            "optimizer state current_evaluations disagrees with ledger row count"
+        )
+    if state.current_evaluations >= optimizer.max_evaluations:
+        raise ValueError("optimizer maximum evaluations have already been reached")
 
 
 def _assert_approved(instruction: dict) -> None:
