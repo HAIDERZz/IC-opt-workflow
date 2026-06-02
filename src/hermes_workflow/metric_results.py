@@ -133,6 +133,7 @@ def check_metric_results(
     project_dir: Path,
     *,
     run_id: str | None = None,
+    persist_report: bool = True,
 ) -> MetricResultCheckReport:
     project_dir = Path(project_dir)
     selected_run_id = _validate_run_id(run_id or DEFAULT_RUN_ID)
@@ -142,7 +143,8 @@ def check_metric_results(
     default_request_relative = f"{run_relative}/{METRIC_REQUEST_NAME}"
     default_result_relative = f"{run_relative}/{METRIC_RESULT_MANIFEST_NAME}"
     report_path = _project_path(bundle, METRIC_RESULT_REPORT)
-    report_path.parent.mkdir(parents=True, exist_ok=True)
+    if persist_report:
+        report_path.parent.mkdir(parents=True, exist_ok=True)
 
     issues: list[str] = []
     checks = MetricResultCheckFlags()
@@ -225,7 +227,8 @@ def check_metric_results(
         checks=checks,
         issues=issues,
     )
-    report_path.write_text(report.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    if persist_report:
+        report_path.write_text(report.model_dump_json(indent=2) + "\n", encoding="utf-8")
     return report
 
 

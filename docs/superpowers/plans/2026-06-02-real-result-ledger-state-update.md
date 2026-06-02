@@ -327,10 +327,12 @@ Update this task's checkboxes to `[x]` after verification and review gate approv
 **Files:**
 
 - Create: `src/hermes_workflow/real_result_record.py`
+- Modify: `src/hermes_workflow/result_handoff.py`
+- Modify: `src/hermes_workflow/metric_results.py`
 - Modify: `tests/test_real_result_record.py`
 - Modify: `docs/superpowers/plans/2026-06-02-real-result-ledger-state-update.md`
 
-- [ ] **Step 1: Add sanitized project helpers**
+- [x] **Step 1: Add sanitized project helpers**
 
 Append these helpers to `tests/test_real_result_record.py`. Reuse C-6/C-7 fake handoff helpers rather than real tools:
 
@@ -488,11 +490,22 @@ def _write_valid_checked_result(project_dir: Path) -> None:
     assert check_real_run(project_dir).status == RealRunCheckStatus.PASS
 ```
 
-- [ ] **Step 2: Write failing precondition tests**
+- [x] **Step 2: Write failing precondition tests**
 
 Append:
 
 ```python
+def _assert_no_optimizer_writes(project_dir: Path) -> None:
+    assert not (project_dir / "ledger" / "experiment_ledger.jsonl").exists()
+    assert not (project_dir / "state" / "optimizer_state.json").exists()
+    assert not (project_dir / "state" / "best_candidate.json").exists()
+
+
+def _assert_no_prerequisite_check_reports(project_dir: Path) -> None:
+    assert not (project_dir / "reports" / "real_run_check_report.json").exists()
+    assert not (project_dir / "reports" / "metric_result_check_report.json").exists()
+
+
 def test_record_real_result_rejects_missing_result_manifest_without_writes(
     tmp_path: Path,
 ) -> None:
@@ -505,8 +518,8 @@ def test_record_real_result_rejects_missing_result_manifest_without_writes(
 
     assert report.status == RealResultRecordStatus.FAIL
     assert "result manifest is missing" in report.issues
-    assert not (project_dir / "ledger" / "experiment_ledger.jsonl").exists()
-    assert not (project_dir / "state" / "optimizer_state.json").exists()
+    _assert_no_optimizer_writes(project_dir)
+    _assert_no_prerequisite_check_reports(project_dir)
     persisted = _load_json(project_dir / "reports" / "real_result_record_report.json")
     assert persisted["status"] == "fail"
 
@@ -524,11 +537,11 @@ def test_record_real_result_rejects_missing_metric_manifest_without_writes(
 
     assert report.status == RealResultRecordStatus.FAIL
     assert any("metric result manifest" in issue for issue in report.issues)
-    assert not (project_dir / "ledger" / "experiment_ledger.jsonl").exists()
-    assert not (project_dir / "state" / "best_candidate.json").exists()
+    _assert_no_optimizer_writes(project_dir)
+    _assert_no_prerequisite_check_reports(project_dir)
 ```
 
-- [ ] **Step 3: Run tests and verify failure**
+- [x] **Step 3: Run tests and verify failure**
 
 Run:
 
@@ -538,7 +551,14 @@ python3 -m pytest tests/test_real_result_record.py::test_record_real_result_reje
 
 Expected: FAIL because `real_result_record` does not exist or `record_real_result()` is unimplemented.
 
-- [ ] **Step 4: Implement fail-closed skeleton**
+- [x] **Step 4: Implement fail-closed skeleton**
+
+Code-quality review tightened the write surface: `record_real_result()` should rerun
+`check_real_run()` and `check_metric_results()` using their in-memory results without
+refreshing prerequisite checker report files. Add a backwards-compatible
+`persist_report: bool = True` option to those checker functions and call them with
+`persist_report=False` from `record_real_result()`. Direct checker CLI behavior must
+remain unchanged.
 
 Create `src/hermes_workflow/real_result_record.py`:
 
@@ -628,7 +648,7 @@ def _write_report(project_dir: Path, report: RealResultRecordReport) -> Path:
     return report_path
 ```
 
-- [ ] **Step 5: Run precondition tests**
+- [x] **Step 5: Run precondition tests**
 
 Run:
 
@@ -638,7 +658,7 @@ python3 -m pytest tests/test_real_result_record.py::test_record_real_result_reje
 
 Expected: PASS.
 
-- [ ] **Step 6: Run checker integration tests**
+- [x] **Step 6: Run checker integration tests**
 
 Run:
 

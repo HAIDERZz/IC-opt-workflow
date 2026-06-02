@@ -65,7 +65,12 @@ class ResultManifest(BaseModel):
         return value
 
 
-def check_real_run(project_dir: Path, *, run_id: str | None = None) -> RealRunCheckReport:
+def check_real_run(
+    project_dir: Path,
+    *,
+    run_id: str | None = None,
+    persist_report: bool = True,
+) -> RealRunCheckReport:
     project_dir = Path(project_dir)
     selected_run_id = _validate_run_id(run_id or DEFAULT_RUN_ID)
     bundle = assert_valid_project(project_dir)
@@ -74,7 +79,8 @@ def check_real_run(project_dir: Path, *, run_id: str | None = None) -> RealRunCh
     prepared_relative = f"{run_relative}/real_run_manifest.json"
     result_relative = f"{run_relative}/result_manifest.json"
     report_path = _project_path(bundle, REPORT_RELATIVE)
-    report_path.parent.mkdir(parents=True, exist_ok=True)
+    if persist_report:
+        report_path.parent.mkdir(parents=True, exist_ok=True)
 
     issues: list[str] = []
     checks = RealRunCheckFlags()
@@ -135,7 +141,8 @@ def check_real_run(project_dir: Path, *, run_id: str | None = None) -> RealRunCh
         checks=checks,
         issues=issues,
     )
-    _write_report(report_path, report)
+    if persist_report:
+        _write_report(report_path, report)
     return report
 
 
