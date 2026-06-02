@@ -903,13 +903,14 @@ Locked C-9 policy:
 - It does not parse PSF, rewrite OCEAN formulas, check returned results, record ledger/state, or add failure-penalty rows.
 - The execution agent must still run C-7 after a prepared package exists, and the supervisor agent must still run `check-real-run`, `check-metric-results`, and `record-real-result`.
 
-Next recommended action:
+Historical next recommended action, superseded by C-10:
 
-- Choose failure/retry policy for failed real-run packages, or run a local smoke that chains C-9 -> C-7 -> C-8 on a known test cell.
+- C-10 failure/retry policy was selected and is now implemented through Task 5.
+- C-10 final gate has passed; next chain C-9 -> C-7 -> C-8 with one controlled C-10 failure/retry case in C-11 local smoke.
 
 ## Plan C C-10 Real-Run Failure Retry Policy Contract
 
-Status: implementation complete through Task 5 as of 2026-06-03; Task 6 docs/progress/final verification gate is in progress.
+Status: complete and reviewed as of 2026-06-03.
 
 Spec:
 
@@ -965,18 +966,26 @@ Full C-10 verification baseline after Task 5:
 - `python3 -m ruff check src tests tools`: passed.
 - `git diff --check`: passed.
 
+Task 6 final verification and review:
+
+- `python3 -m pytest tests/test_real_run_recovery.py tests/test_next_real_run.py tests/test_cli.py -q`: passed, 97 tests.
+- `python3 -m pytest -q`: passed, 434 tests.
+- `python3 -m ruff check src tests tools`: passed.
+- `git diff --check`: passed.
+- Final spec review initially found an unsafe artifact classification mismatch. The fix classifies both missing and unsafe declared result artifacts as `tool_result_partial`, matching the C-10 spec and preserving retry/stop actions.
+- Final code-quality review found that assessment reads could follow symlinked `recovery_decision.json` files. The fix rejects symlinked decision files in optional read paths and preflights decision targets before write-path assessment. Spec and code-quality re-reviews passed.
+
 Locked C-10 policy:
 
 - C-10 is contract-only.
 - It must not run Virtuoso, Spectre, OCEAN, SSH, Claude CLI, `virtuoso-bridge-lite`, or the C-7 adapter.
 - It must not parse PSF, rewrite OCEAN formulas, compute metrics in Python, write optimizer ledger/state, or add failure-penalty rows.
-- C-11 local smoke and real tool/agent integration must wait until C-10 implementation passes review/final gate.
+- C-10 final gate has passed. C-11 local smoke is now the next scope, but should stay local/fake controlled before direct real tool/agent integration.
 
 Next required action:
 
-- Complete C-10 Task 6 docs/progress/final verification and final combined review.
-- After C-10 final gate passes, enter C-11 local smoke: chain C-9 -> C-7 -> C-8 with one controlled C-10 failure/retry case.
-- Do not start C-11 local smoke or real tool/agent integration until C-10 final gate is complete.
+- Enter C-11 local smoke: chain C-9 -> C-7 -> C-8 with one controlled C-10 failure/retry case.
+- C-11 should remain a local/fake controlled smoke first; do not jump straight to real Virtuoso/Spectre/OCEAN/agent integration.
 
 ## Locked Role Model
 

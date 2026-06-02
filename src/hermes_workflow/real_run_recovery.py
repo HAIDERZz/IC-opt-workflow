@@ -182,6 +182,9 @@ def prepare_real_run_retry(
         raise ValueError("retry run_id must differ from failed run_id")
     if selected_retry_run_id is not None:
         _assert_retry_target_available(project_dir, selected_retry_run_id)
+    failed_run_dir = project_dir / REAL_RUN_ROOT / selected_failed_run_id
+    decision_path = failed_run_dir / RECOVERY_DECISION_NAME
+    _assert_decision_target_available(decision_path)
 
     assessment = assess_real_run_recovery(
         project_dir,
@@ -202,9 +205,6 @@ def prepare_real_run_retry(
 
     selected_retry_run_id = selected_retry_run_id or _next_unused_run_id(project_dir)
 
-    failed_run_dir = project_dir / REAL_RUN_ROOT / selected_failed_run_id
-    decision_path = failed_run_dir / RECOVERY_DECISION_NAME
-    _assert_decision_target_available(decision_path)
     retry_run_dir = _assert_retry_target_available(project_dir, selected_retry_run_id)
     retry_dir_existed = retry_run_dir.exists()
 
@@ -305,6 +305,9 @@ def resolve_real_run_failure(
         RealRunRecoveryAction.WAIT_FOR_EXECUTION,
     }:
         raise ValueError(f"{action.value} is not a recovery decision")
+    run_dir = project_dir / REAL_RUN_ROOT / selected_run_id
+    decision_path = run_dir / RECOVERY_DECISION_NAME
+    _assert_decision_target_available(decision_path)
 
     assessment = assess_real_run_recovery(
         project_dir,
@@ -316,9 +319,6 @@ def resolve_real_run_failure(
     if assessment.candidate_id is None:
         raise ValueError("run candidate_id is unknown")
 
-    run_dir = project_dir / REAL_RUN_ROOT / selected_run_id
-    decision_path = run_dir / RECOVERY_DECISION_NAME
-    _assert_decision_target_available(decision_path)
     payload = _decision_payload(
         project_dir,
         run_id=selected_run_id,
@@ -685,7 +685,10 @@ def _classify_real_run_check_failure(
 def _only_partial_artifact_issues(issues: list[str]) -> bool:
     if not issues:
         return False
-    return all(issue.startswith("result artifact is missing:") for issue in issues)
+    return all(
+        issue.startswith(("result artifact is missing:", "result artifact path is unsafe:"))
+        for issue in issues
+    )
 
 
 def _only_missing_metric_manifest(report: RealRunCheckReport) -> bool:
@@ -728,6 +731,8 @@ def _load_json(path: Path) -> dict:
 
 
 def _load_optional_json(path: Path) -> dict | None:
+    if path.is_symlink():
+        raise FileExistsError(f"recovery decision must not be a symlink: {path}")
     if not path.exists():
         return None
     return _load_json(path)

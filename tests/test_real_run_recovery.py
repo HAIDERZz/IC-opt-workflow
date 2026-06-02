@@ -400,7 +400,7 @@ def test_assess_recovery_classifies_invalid_result_handoff_as_contract_invalid(
     assert "result status is invalid" in " ".join(report.issues)
 
 
-def test_assess_recovery_classifies_unsafe_result_path_as_contract_invalid(
+def test_assess_recovery_classifies_unsafe_result_path_as_partial(
     tmp_path: Path,
 ) -> None:
     project_dir = _create_ready_project(tmp_path)
@@ -412,8 +412,12 @@ def test_assess_recovery_classifies_unsafe_result_path_as_contract_invalid(
 
     report = assess_real_run_recovery(project_dir, run_id="real_001")
 
-    assert report.status == RealRunRecoveryStatus.FAIL
-    assert report.classification == RealRunRecoveryClassification.CONTRACT_INVALID
+    assert report.status == RealRunRecoveryStatus.PASS
+    assert report.classification == RealRunRecoveryClassification.TOOL_RESULT_PARTIAL
+    assert report.allowed_actions == [
+        RealRunRecoveryAction.RETRY_SAME_CANDIDATE,
+        RealRunRecoveryAction.STOP_WORKFLOW,
+    ]
     assert "result artifact path is unsafe" in " ".join(report.issues)
 
 
@@ -480,6 +484,57 @@ def test_assess_recovery_classifies_valid_retry_decision_as_resolved(
     assert report.status == RealRunRecoveryStatus.PASS
     assert report.classification == RealRunRecoveryClassification.RESOLVED_RETRY_PREPARED
     assert report.allowed_actions == []
+
+
+def test_assess_recovery_refuses_symlinked_decision_file(tmp_path: Path) -> None:
+    project_dir = _create_ready_project(tmp_path)
+    _write_result_manifest(project_dir, status="failed")
+    decision_path = project_dir / "runs" / "real" / "real_001" / "recovery_decision.json"
+    outside_decision = tmp_path / "outside_decision.json"
+    _write_json(
+        outside_decision,
+        {
+            "decision": "abandon_candidate",
+        },
+    )
+    decision_path.symlink_to(outside_decision)
+
+    report = assess_real_run_recovery(project_dir, run_id="real_001")
+
+    assert report.status == RealRunRecoveryStatus.FAIL
+    assert report.classification == RealRunRecoveryClassification.CONTRACT_INVALID
+    assert "recovery decision must not be a symlink" in " ".join(report.issues)
+
+
+def test_assess_recovery_refuses_symlinked_retry_decision_file(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_project(tmp_path)
+    _write_json(
+        project_dir / "runs" / "real" / "real_001" / "recovery_decision.json",
+        {
+            "decision": "retry_same_candidate",
+            "retry_run_id": "real_002",
+        },
+    )
+    _write_manual_retry_package(project_dir)
+    retry_decision_path = (
+        project_dir / "runs" / "real" / "real_002" / "recovery_decision.json"
+    )
+    outside_decision = tmp_path / "outside_retry_decision.json"
+    _write_json(
+        outside_decision,
+        {
+            "decision": "abandon_candidate",
+        },
+    )
+    retry_decision_path.symlink_to(outside_decision)
+
+    report = assess_real_run_recovery(project_dir, run_id="real_001")
+
+    assert report.status == RealRunRecoveryStatus.FAIL
+    assert report.classification == RealRunRecoveryClassification.CONTRACT_INVALID
+    assert "recovery decision must not be a symlink" in " ".join(report.issues)
 
 
 def test_unresolved_guard_blocks_retry_prepared_decision(

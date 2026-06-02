@@ -97,8 +97,10 @@ Current execution state:
 - Route consistency audit after C-10 Task 4 found no technical-route drift. The C-10 design spec and implementation plan are aligned with Task 4: C-9 cannot advance past unresolved real runs, failed evidence remains preserved, C-10 remains contract-only, and C-10 still does not write optimizer ledger/state or call real tools.
 - Workspace-level agent constraints are recorded in `AGENTS.md`. Future agents must read it before continuing; it locks the role model, formula safety policy, per-task stop-and-report cadence, and coding guidelines.
 - C-10 Task 5 CLI Integration is complete and reviewed: `7994d83 feat: add real run recovery cli`. It adds `assess-real-run-recovery`, `prepare-real-run-retry`, and `resolve-real-run-failure` CLI commands, with report/issue output and no traceback on expected contract failures. A code-quality finding about stale recovery report output was fixed by printing report details only when the current command updates the recovery report.
-- C-10 Task 6 docs/progress/final verification is in progress. Do not mark C-10 final-gate complete until Task 6 full verification and final combined review pass.
-- Current next action: finish C-10 Task 6 docs/progress/final verification and final combined review. Do not jump to C-11 local smoke or real tool/agent integration until C-10 implementation passes review/final gate.
+- C-10 Task 6 docs/progress/final verification is complete and reviewed. Final verification passed with 434 tests, ruff clean, and `git diff --check` clean.
+- C-10 final review fixes: unsafe declared result artifacts now classify as `tool_result_partial` with retry/stop actions; symlinked `recovery_decision.json` files are rejected in assessment read paths and write-path preflights.
+- C-10 real-run failure/retry policy contract is complete and reviewed.
+- Current next action: start C-11 local smoke design/plan. Chain C-9 -> C-7 -> C-8 with one controlled C-10 failure/retry case. Keep C-11 local/fake controlled first; do not jump straight to real Virtuoso/Spectre/OCEAN/agent integration.
 - Real `input.scs` examples under `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example` are local-only references and must not be committed.
 
 ## Files Already Read
@@ -140,7 +142,7 @@ Current execution state:
 - Active C-10 design spec: `ic-auto-opt-workflow/docs/superpowers/specs/2026-06-02-real-run-failure-retry-policy-contract-design.md`
 - Active C-10 implementation plan: `ic-auto-opt-workflow/docs/superpowers/plans/2026-06-02-real-run-failure-retry-policy-contract.md`
 
-Plan A, Plan B, Plan C C-1, Plan C C-2, Plan C C-3, Plan C C-4, Plan C C-5, and Plan C C-5.5 are complete. C-5.5 passed the dual-agent simulation gate. C-6, C-7, C-8, and C-9 are complete and reviewed. C-10 Task 1, Task 2, Task 3, Task 4, and Task 5 are complete and reviewed; C-10 Task 6 is in progress.
+Plan A, Plan B, Plan C C-1, Plan C C-2, Plan C C-3, Plan C C-4, Plan C C-5, and Plan C C-5.5 are complete. C-5.5 passed the dual-agent simulation gate. C-6, C-7, C-8, C-9, and C-10 are complete and reviewed.
 
 ## Confirmed Plan A Scope
 
@@ -406,9 +408,9 @@ optimizer:
 
 ## Next Step
 
-Plan A, Plan B, Plan C C-1, Plan C C-2, Plan C C-3, Plan C C-4, Plan C C-5, and Plan C C-5.5 are complete as of 2026-06-01. C-6, C-7, C-8, and C-9 are complete and reviewed as of 2026-06-02. C-10 design and implementation plan are complete as of 2026-06-02. C-10 Task 1 recovery report schemas, C-10 Task 2 recovery assessment classifier, C-10 Task 3 recovery decisions/retry package writer, C-10 Task 4 C-9 unresolved real-run guard, and C-10 Task 5 CLI Integration are complete and reviewed as of 2026-06-03; C-10 Task 6 docs/progress/final verification is in progress.
+Plan A, Plan B, Plan C C-1, Plan C C-2, Plan C C-3, Plan C C-4, Plan C C-5, and Plan C C-5.5 are complete as of 2026-06-01. C-6, C-7, C-8, and C-9 are complete and reviewed as of 2026-06-02. C-10 real-run failure/retry policy contract is complete and reviewed as of 2026-06-03.
 
-Current next step: finish C-10 Task 6 docs/progress/final verification and final combined review from `docs/superpowers/plans/2026-06-02-real-run-failure-retry-policy-contract.md` using Subagent-Driven Development. Do not redo Plan A Tasks 1-9 or completed Plan B/C modules unless new review feedback appears. Do not start C-11 local smoke or real tool/agent integration until C-10 passes review/final gate.
+Current next step: start C-11 local smoke design/plan. Chain C-9 -> C-7 -> C-8 with one controlled C-10 failure/retry case. Keep C-11 local/fake controlled first; do not redo Plan A Tasks 1-9 or completed Plan B/C modules unless new review feedback appears.
 
 Read the handoff files first:
 
@@ -432,5 +434,5 @@ Use this prompt after compact:
 5. ic-auto-opt-workflow/docs/superpowers/plans/2026-06-02-real-run-failure-retry-policy-contract.md
 6. 如需背景，再读 ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。Plan A Task 1-9、Plan B mock optimization loop、Plan C C-1 netlist template contract、C-2 dry-run candidate renderer、C-3 execution package preflight readiness、C-4 post-approval real-run execution contract、C-5 real-run result handoff contract、C-5.5 dual-agent result handoff simulation gate、C-6 Spectre + OCEAN metric result contract、C-7 Spectre + OCEAN execution adapter、C-8 real result ledger/state update、C-9 next real-run package contract 均已完成并通过 review/final gate。C-10 real-run failure/retry policy contract 的 design spec 和 implementation plan 已完成并提交；C-10 Task 1 recovery report schemas 已完成、reviewed，并提交为 104ef26；C-10 Task 2 recovery assessment classifier 已完成、reviewed，并提交为 a9dc13a；C-10 Task 3 recovery decisions and retry package writer 已完成、reviewed，并提交为 c76f152；C-10 Task 4 C-9 unresolved real-run guard 已完成并通过 spec/code-quality review，提交为 e6d19a5；C-10 Task 5 CLI Integration 已完成并通过 spec/code-quality review，提交为 7994d83。下一步请继续 C-10 Task 6 docs/progress/final verification 和 final combined review。不要跳到 C-11 local smoke 或真实工具/agent 接入，直到 C-10 通过 review/final gate。Spectre + OCEAN backend 已通过工具链证据验证。不要让 agent 重写公式，metrics.yaml 中的公式必须是用户/项目批准的精确公式。真实 input.scs 示例在 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example 下，仅供本地参考，请勿将其提交到仓库。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。Plan A Task 1-9、Plan B mock optimization loop、Plan C C-1 netlist template contract、C-2 dry-run candidate renderer、C-3 execution package preflight readiness、C-4 post-approval real-run execution contract、C-5 real-run result handoff contract、C-5.5 dual-agent result handoff simulation gate、C-6 Spectre + OCEAN metric result contract、C-7 Spectre + OCEAN execution adapter、C-8 real result ledger/state update、C-9 next real-run package contract、C-10 real-run failure/retry policy contract 均已完成并通过 review/final gate。下一步请进入 C-11 local smoke design/plan：串联 C-9 -> C-7 -> C-8，并包含一个受控 C-10 failure/retry case。C-11 应先保持 local/fake controlled smoke，不要直接真实接入 Virtuoso/Spectre/OCEAN/agent。Spectre + OCEAN backend 已通过工具链证据验证。不要让 agent 重写公式，metrics.yaml 中的公式必须是用户/项目批准的精确公式。真实 input.scs 示例在 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example 下，仅供本地参考，请勿将其提交到仓库。
 ```

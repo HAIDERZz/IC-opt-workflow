@@ -4,17 +4,17 @@
 
 - Repository: `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow`
 - Branch: `plan-a-hermes-file-contract-mvp`
-- Current scope: Plan C C-10 real-run failure/retry policy implementation
-- Current status: C-10 Task 5 CLI Integration complete and reviewed; Task 6 docs/progress/final verification in progress
-- Next required action: complete C-10 Task 6 final verification and final combined review
+- Current scope: Plan C C-11 local smoke planning
+- Current status: C-10 real-run failure/retry policy complete and reviewed
+- Next required action: start C-11 local smoke design/plan for C-9 -> C-7 -> C-8 plus one controlled C-10 failure/retry case
 
-C-3 Task 6 final verification is complete. C-4 is confirmed as a contract-only first real-run package; it must not run Spectre, Virtuoso, subprocesses, or the optimizer loop. C-4 is now complete and reviewed. C-5 validates the execution agent's returned `result_manifest.json` and declared artifacts without running Spectre or parsing metrics. C-5.5 rehearsed the C-4/C-5 handoff with simulated execution-agent and Hermes-observer roles. After C-5.5, the project paused implementation to validate the real metric backend. Spectre + OCEAN is now confirmed as the backend route: standalone Spectre generates PSF, batch OCEAN opens the PSF and evaluates exact user/project-approved formulas, and Python only records OCEAN-produced scalar outputs and provenance. C-6 turned that route into deterministic file contracts and a Hermes validator without physical adapter wiring. C-7 added an explicit execution-side adapter and tool entry point while preserving the rule that Hermes workflow tooling still validates returned files after execution. C-8 records checked real metric results into optimizer ledger/state after `check-real-run` and `check-metric-results` pass, while preserving the contract-only boundary. C-9 prepares the next real-run package from strict ledger/state and deterministic optimizer initialization sequence, while still not running real tools or writing ledger/state. C-10 classifies failed/partial/pending real-run packages, writes explicit recovery decisions, prepares retry packages, and blocks C-9 from advancing while unresolved real-run packages exist. C-10 Task 1 added the recovery report schema contract. C-10 Task 2 added the deterministic recovery classifier. C-10 Task 3 added explicit supervisor recovery decisions and same-candidate retry package preparation using a new run id while preserving failed evidence. C-10 Task 4 added the C-9 unresolved real-run guard so `prepare-next-real-run` cannot silently skip pending, failed, partial, metric-failed, retry-prepared, stopped, or contract-invalid real-run packages. C-10 Task 5 added supervisor-facing CLI commands for recovery assessment, retry preparation, and failure resolution.
+C-3 Task 6 final verification is complete. C-4 is confirmed as a contract-only first real-run package; it must not run Spectre, Virtuoso, subprocesses, or the optimizer loop. C-4 is now complete and reviewed. C-5 validates the execution agent's returned `result_manifest.json` and declared artifacts without running Spectre or parsing metrics. C-5.5 rehearsed the C-4/C-5 handoff with simulated execution-agent and Hermes-observer roles. After C-5.5, the project paused implementation to validate the real metric backend. Spectre + OCEAN is now confirmed as the backend route: standalone Spectre generates PSF, batch OCEAN opens the PSF and evaluates exact user/project-approved formulas, and Python only records OCEAN-produced scalar outputs and provenance. C-6 turned that route into deterministic file contracts and a Hermes validator without physical adapter wiring. C-7 added an explicit execution-side adapter and tool entry point while preserving the rule that Hermes workflow tooling still validates returned files after execution. C-8 records checked real metric results into optimizer ledger/state after `check-real-run` and `check-metric-results` pass, while preserving the contract-only boundary. C-9 prepares the next real-run package from strict ledger/state and deterministic optimizer initialization sequence, while still not running real tools or writing ledger/state. C-10 classifies failed/partial/pending real-run packages, writes explicit recovery decisions, prepares retry packages, exposes supervisor-facing recovery CLI commands, and blocks C-9 from advancing while unresolved real-run packages exist. C-10 final review fixes aligned unsafe artifact classification with the spec and hardened symlinked recovery decision reads.
 
 ## Route Consistency Audit 2026-06-03
 
-Current audit result: no technical-route drift was found after C-10 Task 5. The C-10 design spec and implementation plan remain aligned with the implementation: failed `input.scs` is preserved literally for retry packages, approved OCEAN formula contracts are compared by text/hash and are not rewritten, retry targets and decision files reject symlink/overwrite hazards, CLI commands delegate to recovery logic only, and C-10 still does not write optimizer ledger/state or call real tools.
+Current audit result: no technical-route drift was found after C-10 final gate. The C-10 design spec and implementation plan remain aligned with the implementation: failed `input.scs` is preserved literally for retry packages, approved OCEAN formula contracts are compared by text/hash and are not rewritten, retry targets and decision files reject symlink/overwrite hazards, CLI commands delegate to recovery logic only, unsafe declared result artifacts classify as partial tool results, and C-10 still does not write optimizer ledger/state or call real tools.
 
-C-10 Task 4 review found and fixed two route-sensitive deadlocks: a retry-prepared source run no longer blocks forever after the retry run is recorded by C-8, and it no longer blocks forever after the retry run itself is resolved abandoned. Code-quality review also found and fixed hidden report writes from the guard path; `assert_no_unresolved_real_runs()` now keeps nested checker calls non-persistent when used as a C-9 guard. C-10 Task 5 review found and fixed stale recovery-report output for pre-assessment validation failures; CLI now prints report details only when the current command updates the recovery report.
+C-10 Task 4 review found and fixed two route-sensitive deadlocks: a retry-prepared source run no longer blocks forever after the retry run is recorded by C-8, and it no longer blocks forever after the retry run itself is resolved abandoned. Code-quality review also found and fixed hidden report writes from the guard path; `assert_no_unresolved_real_runs()` now keeps nested checker calls non-persistent when used as a C-9 guard. C-10 Task 5 review found and fixed stale recovery-report output for pre-assessment validation failures; CLI now prints report details only when the current command updates the recovery report. Final review found and fixed unsafe artifact classification and symlinked decision-read hardening.
 
 Workspace-level agent constraints now exist in `AGENTS.md`. Future agents should read it before code or docs changes; it locks the role model, contract-only boundaries, formula safety policy, per-task stop-and-report cadence, and the user's coding guidelines for explicit assumptions, simplicity, surgical changes, and verification-first execution.
 
@@ -33,7 +33,7 @@ Workspace-level agent constraints now exist in `AGENTS.md`. Future agents should
 - Plan C C-7 Spectre + OCEAN execution adapter: complete and reviewed.
 - Plan C C-8 real result ledger/state update: complete and reviewed.
 - Plan C C-9 next real-run package contract: complete and reviewed.
-- Plan C C-10 real-run failure/retry policy contract: Task 1 recovery report schemas complete and reviewed; Task 2 recovery assessment classifier complete and reviewed; Task 3 recovery decisions and retry package writer complete and reviewed; Task 4 C-9 unresolved real-run guard complete and reviewed; Task 5 CLI Integration complete and reviewed; Task 6 docs/progress/final verification in progress.
+- Plan C C-10 real-run failure/retry policy contract: complete and reviewed.
 
 ## Spectre + OCEAN Backend Decision
 
@@ -292,7 +292,7 @@ Planned implementation:
 - Task 3: recovery decisions and retry package writer. Complete and reviewed in `c76f152 feat: prepare real run retry packages`.
 - Task 4: C-9 unresolved real-run guard. Complete and reviewed in `e6d19a5 feat: block next runs on unresolved real runs`.
 - Task 5: CLI integration. Complete and reviewed in `7994d83 feat: add real run recovery cli`.
-- Task 6: docs, progress, final verification. In progress.
+- Task 6: docs, progress, final verification. Complete and reviewed.
 
 Task 3 verification and review:
 
@@ -320,15 +320,14 @@ Locked C-10 boundary:
 - C-10 is contract-only.
 - C-10 does not run Virtuoso, Spectre, OCEAN, SSH, Claude CLI, `virtuoso-bridge-lite`, or the C-7 adapter.
 - C-10 does not parse PSF, rewrite formulas, write optimizer ledger/state, or add failure-penalty rows.
-- C-11 local smoke and real tool/agent integration should wait until C-10 passes review/final gate.
+- C-10 final gate has passed. C-11 local smoke is now the next scope, but should stay local/fake controlled before direct real tool/agent integration.
 
 ## Next Task
 
-C-6, C-7, C-8, C-9, C-10 Task 1, C-10 Task 2, C-10 Task 3, C-10 Task 4, and C-10 Task 5 are closed. The workflow remains on a per-task stop-and-report cadence. Next:
+C-6, C-7, C-8, C-9, and C-10 are closed. The workflow remains on a per-task stop-and-report cadence. Next:
 
-- Complete C-10 Task 6 docs/progress/final verification and final combined review.
-- After C-10 final gate passes, move to C-11 local smoke chaining C-9 -> C-7 -> C-8 with one controlled C-10 failure/retry case.
-- Do not start C-11 local smoke or real tool/agent integration before C-10 final gate is complete.
+- Start C-11 local smoke design/plan: chain C-9 -> C-7 -> C-8 with one controlled C-10 failure/retry case.
+- C-11 should remain a local/fake controlled smoke first; do not jump straight to real Virtuoso/Spectre/OCEAN/agent integration.
 
 ## Completed C-5.5 Dual-Agent Result Handoff Simulation Gate
 
@@ -364,5 +363,5 @@ are local reference material only. Do not copy or commit them into the repositor
 ## Resume Prompt
 
 ```text
-请继续 IC auto optimization workflow。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。先阅读 AGENTS.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md。Plan A Task 1-9、Plan B、Plan C C-1、C-2、C-3、C-4、C-5、C-5.5、C-6、C-7、C-8、C-9 均已完成并通过 final verification/review gate。C-10 real-run failure/retry policy contract 的 design spec 和 implementation plan 已完成并提交；C-10 Task 1 recovery report schemas 已完成、reviewed，并提交为 104ef26；C-10 Task 2 recovery assessment classifier 已完成、reviewed，并提交为 a9dc13a；C-10 Task 3 recovery decisions and retry package writer 已完成、reviewed，并提交为 c76f152；C-10 Task 4 C-9 unresolved real-run guard 已完成并通过 spec/code-quality review，提交为 e6d19a5；C-10 Task 5 CLI Integration 已完成并通过 spec/code-quality review，提交为 7994d83。下一步请继续 C-10 Task 6 docs/progress/final verification 和 final combined review。不要跳到 C-11 local smoke 或真实工具/agent 接入，直到 C-10 通过 final gate。Spectre + OCEAN backend 已通过真实工具链证据验证。公式以 metrics.yaml 中用户/项目批准的精确表达式为准，不允许 agent 重写公式，不允许 Python 解析 PSF 或重写 Calculator/OCEAN 公式。
+请继续 IC auto optimization workflow。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。先阅读 AGENTS.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md。Plan A Task 1-9、Plan B、Plan C C-1、C-2、C-3、C-4、C-5、C-5.5、C-6、C-7、C-8、C-9、C-10 均已完成并通过 final verification/review gate。下一步进入 C-11 local smoke design/plan：串联 C-9 -> C-7 -> C-8，并包含一个受控 C-10 failure/retry case。C-11 应先保持 local/fake controlled smoke，不要直接真实接入 Virtuoso/Spectre/OCEAN/agent。Spectre + OCEAN backend 已通过真实工具链证据验证。公式以 metrics.yaml 中用户/项目批准的精确表达式为准，不允许 agent 重写公式，不允许 Python 解析 PSF 或重写 Calculator/OCEAN 公式。
 ```

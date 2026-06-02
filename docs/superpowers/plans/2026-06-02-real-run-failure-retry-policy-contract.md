@@ -2317,7 +2317,7 @@ git add docs/PROJECT_WORKFLOW_OVERVIEW.md docs/EXECUTION_PROGRESS_2026-05-29.md 
 git commit -m "docs: record real run recovery progress"
 ```
 
-- [ ] **Step 6: Final combined review**
+- [x] **Step 6: Final combined review**
 
 Run final spec and code-quality reviews focused on:
 
@@ -2335,9 +2335,27 @@ Check:
 - local OCEAN evidence files remain untracked and uncommitted
 ```
 
-- [ ] **Step 7: Mark C-10 complete in this plan**
+- [x] **Step 7: Mark C-10 complete in this plan**
 
 Update this plan's task checkboxes to complete and leave final verification command outputs in the task notes.
+
+Task 6 final notes:
+
+```bash
+python3 -m pytest tests/test_real_run_recovery.py tests/test_next_real_run.py tests/test_cli.py -q
+# 97 passed
+
+python3 -m pytest -q
+# 434 passed
+
+python3 -m ruff check src tests tools
+# All checks passed
+
+git diff --check
+# no output
+```
+
+Final spec review initially found that unsafe declared result artifact paths were classified as `contract_invalid`; this was fixed so missing or unsafe declared result artifacts classify as `tool_result_partial` with retry/stop actions. Final code-quality review found symlinked `recovery_decision.json` read paths; this was fixed by rejecting symlinked decision files during assessment reads and write-path preflights. Both re-reviews passed.
 
 ## Self-Review Checklist
 
