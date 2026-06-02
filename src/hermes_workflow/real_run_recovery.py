@@ -56,6 +56,10 @@ EXECUTION_EVIDENCE_NAMES = (
     "psf",
     "metrics",
 )
+RESOLVED_CLASSIFICATIONS = {
+    RealRunRecoveryClassification.ALREADY_RECORDED,
+    RealRunRecoveryClassification.RESOLVED_ABANDONED,
+}
 METRIC_FORMULA_CONTRACT_FIELDS = (
     "name",
     "unit",
@@ -101,7 +105,12 @@ def assess_real_run_recovery(
         report_path.parent.mkdir(parents=True, exist_ok=True)
 
     try:
-        assessment = _classify_run(project_dir, selected_run_id, run_dir)
+        assessment = _classify_run(
+            project_dir,
+            selected_run_id,
+            run_dir,
+            persist_reports=persist_report,
+        )
     except Exception as exc:
         assessment = _Assessment(
             classification=RealRunRecoveryClassification.CONTRACT_INVALID,
@@ -327,7 +336,40 @@ def resolve_real_run_failure(
     return assess_real_run_recovery(project_dir, run_id=selected_run_id)
 
 
-def _classify_run(project_dir: Path, run_id: str, run_dir: Path) -> _Assessment:
+def assert_no_unresolved_real_runs(project_dir: Path) -> None:
+    project_dir = Path(project_dir)
+    _assert_real_run_parent_dirs_are_not_symlinks(project_dir)
+    root = project_dir / REAL_RUN_ROOT
+    if not root.exists():
+        return
+    unresolved: list[str] = []
+    for run_dir in sorted(root.iterdir()):
+        if not RUN_ID_RE.match(run_dir.name):
+            continue
+        if run_dir.is_symlink():
+            raise FileExistsError(
+                f"real run directory must not be a symlink: {run_dir}"
+            )
+        if not run_dir.is_dir():
+            continue
+        report = assess_real_run_recovery(
+            project_dir,
+            run_id=run_dir.name,
+            persist_report=False,
+        )
+        if report.classification not in RESOLVED_CLASSIFICATIONS:
+            unresolved.append(f"{run_dir.name}:{report.classification.value}")
+    if unresolved:
+        raise ValueError("unresolved real run exists: " + ", ".join(unresolved))
+
+
+def _classify_run(
+    project_dir: Path,
+    run_id: str,
+    run_dir: Path,
+    *,
+    persist_reports: bool,
+) -> _Assessment:
     if not run_dir.exists():
         raise FileNotFoundError(f"real run directory is missing: {run_dir}")
     if run_dir.is_symlink():
@@ -370,7 +412,11 @@ def _classify_run(project_dir: Path, run_id: str, run_dir: Path) -> _Assessment:
 
     result_payload = _load_json(result_path)
     if result_payload.get("status") == "failed":
-        real_report = check_real_run(project_dir, run_id=run_id, persist_report=True)
+        real_report = check_real_run(
+            project_dir,
+            run_id=run_id,
+            persist_report=persist_reports,
+        )
         if (
             real_report.status != RealRunCheckStatus.PASS
             and not _only_missing_metric_manifest(real_report)
@@ -382,7 +428,11 @@ def _classify_run(project_dir: Path, run_id: str, run_dir: Path) -> _Assessment:
             [],
         )
 
-    real_report = check_real_run(project_dir, run_id=run_id, persist_report=True)
+    real_report = check_real_run(
+        project_dir,
+        run_id=run_id,
+        persist_report=persist_reports,
+    )
     if (
         real_report.status != RealRunCheckStatus.PASS
         and not _only_missing_metric_manifest(real_report)
@@ -397,7 +447,11 @@ def _classify_run(project_dir: Path, run_id: str, run_dir: Path) -> _Assessment:
             [],
         )
 
-    metric_report = check_metric_results(project_dir, run_id=run_id, persist_report=True)
+    metric_report = check_metric_results(
+        project_dir,
+        run_id=run_id,
+        persist_report=persist_reports,
+    )
     if metric_report.status != MetricResultCheckStatus.PASS:
         return _Assessment(
             RealRunRecoveryClassification.METRIC_RESULT_FAILED,
@@ -474,6 +528,15 @@ def _classify_resolved(
                 candidate_id,
                 retry_issues,
             )
+        if _ledger_has_run_or_candidate(project_dir, retry_run_id, candidate_id):
+            return _Assessment(
+                RealRunRecoveryClassification.ALREADY_RECORDED,
+                candidate_id,
+                [],
+            )
+        retry_decision = _load_optional_json(retry_dir / RECOVERY_DECISION_NAME)
+        if retry_decision is not None:
+            return _classify_resolved(project_dir, candidate_id, retry_decision)
         return _Assessment(
             RealRunRecoveryClassification.RESOLVED_RETRY_PREPARED,
             candidate_id,

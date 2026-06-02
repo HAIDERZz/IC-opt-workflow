@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
 from pathlib import Path
 
 import pytest
@@ -168,12 +169,13 @@ def _record_real_001(project_dir: Path) -> None:
 def test_prepare_next_real_run_refuses_before_recorded_result(tmp_path: Path) -> None:
     project_dir = _create_ready_project(tmp_path)
 
-    with pytest.raises(ValueError, match="ledger is missing"):
+    with pytest.raises(ValueError, match="unresolved real run exists"):
         prepare_next_real_run(project_dir)
 
 
 def test_prepare_next_real_run_refuses_invalid_ledger(tmp_path: Path) -> None:
     project_dir = _create_ready_project(tmp_path)
+    shutil.rmtree(project_dir / "runs" / "real")
     ledger_path = project_dir / "ledger" / "experiment_ledger.jsonl"
     ledger_path.parent.mkdir(parents=True, exist_ok=True)
     ledger_path.write_text("{not valid json}\n", encoding="utf-8")
@@ -187,6 +189,7 @@ def test_prepare_next_real_run_refuses_coerced_ledger_types(
 ) -> None:
     project_dir = _create_ready_project(tmp_path)
     _record_real_001(project_dir)
+    shutil.rmtree(project_dir / "runs" / "real")
     ledger_path = project_dir / "ledger" / "experiment_ledger.jsonl"
     row = json.loads(ledger_path.read_text(encoding="utf-8"))
     row["metrics"]["rise"] = "1.0e-12"
@@ -305,26 +308,25 @@ def test_prepare_next_real_run_refuses_existing_run_manifest_override(
     run_dir.mkdir(parents=True)
     _write_json(run_dir / "real_run_manifest.json", {"status": "prepared"})
 
-    with pytest.raises(FileExistsError, match="real run package already exists"):
+    with pytest.raises(ValueError, match="unresolved real run exists"):
         prepare_next_real_run(project_dir, run_id="real_002")
 
 
-def test_prepare_next_real_run_skips_existing_empty_run_directory(
+def test_prepare_next_real_run_refuses_existing_empty_run_directory(
     tmp_path: Path,
 ) -> None:
     project_dir = _create_ready_project(tmp_path)
     _record_real_001(project_dir)
     (project_dir / "runs" / "real" / "real_002").mkdir(parents=True)
 
-    package = prepare_next_real_run(
-        project_dir,
-        created_at_utc="2026-06-02T01:00:00Z",
-    )
+    with pytest.raises(ValueError, match="unresolved real run exists"):
+        prepare_next_real_run(
+            project_dir,
+            created_at_utc="2026-06-02T01:00:00Z",
+        )
 
-    assert package.run_id == "real_003"
 
-
-def test_prepare_next_real_run_skips_existing_manifest_directory_by_default(
+def test_prepare_next_real_run_refuses_existing_manifest_directory_by_default(
     tmp_path: Path,
 ) -> None:
     project_dir = _create_ready_project(tmp_path)
@@ -333,12 +335,11 @@ def test_prepare_next_real_run_skips_existing_manifest_directory_by_default(
     run_dir.mkdir(parents=True)
     _write_json(run_dir / "real_run_manifest.json", {"status": "prepared"})
 
-    package = prepare_next_real_run(
-        project_dir,
-        created_at_utc="2026-06-02T01:00:00Z",
-    )
-
-    assert package.run_id == "real_003"
+    with pytest.raises(ValueError, match="unresolved real run exists"):
+        prepare_next_real_run(
+            project_dir,
+            created_at_utc="2026-06-02T01:00:00Z",
+        )
 
 
 def test_prepare_next_real_run_refuses_non_empty_override_directory(
@@ -350,7 +351,7 @@ def test_prepare_next_real_run_refuses_non_empty_override_directory(
     run_dir.mkdir(parents=True)
     (run_dir / "partial.log").write_text("partial previous attempt\n", encoding="utf-8")
 
-    with pytest.raises(FileExistsError, match="real run directory is not empty"):
+    with pytest.raises(ValueError, match="unresolved real run exists"):
         prepare_next_real_run(project_dir, run_id="real_004")
 
     assert (run_dir / "partial.log").exists()
@@ -392,7 +393,24 @@ def test_prepare_next_real_run_refuses_symlink_run_directory_in_default_scan(
     assert not (outside_dir / "real_run_manifest.json").exists()
 
 
-def test_prepare_next_real_run_skips_already_prepared_candidate(
+def test_prepare_next_real_run_refuses_symlinked_real_run_parent(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_project(tmp_path)
+    _record_real_001(project_dir)
+    real_root = project_dir / "runs" / "real"
+    shutil.rmtree(real_root)
+    outside_real_root = tmp_path / "outside_real_root"
+    outside_real_root.mkdir()
+    real_root.symlink_to(outside_real_root, target_is_directory=True)
+
+    with pytest.raises(FileExistsError, match="parent directory must not be a symlink"):
+        prepare_next_real_run(project_dir)
+
+    assert not (outside_real_root / "real_002").exists()
+
+
+def test_prepare_next_real_run_refuses_already_prepared_candidate(
     tmp_path: Path,
 ) -> None:
     project_dir = _create_ready_project(tmp_path)
@@ -403,20 +421,80 @@ def test_prepare_next_real_run_skips_already_prepared_candidate(
     )
     assert first.run_id == "real_002"
 
-    second = prepare_next_real_run(
+    with pytest.raises(ValueError, match="unresolved real run exists"):
+        prepare_next_real_run(
+            project_dir,
+            created_at_utc="2026-06-02T01:00:00Z",
+        )
+
+
+def test_prepare_next_real_run_refuses_unresolved_pending_package(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_project(tmp_path)
+    _record_real_001(project_dir)
+    prepare_next_real_run(
         project_dir,
-        created_at_utc="2026-06-02T01:00:00Z",
+        run_id="real_002",
+        created_at_utc="2026-06-02T00:50:00Z",
     )
 
-    candidate = _load_json(second.candidate_path)
-    assert second.run_id == "real_003"
-    assert candidate["candidate_index"] == 2
-    assert candidate["parameters"] == {
-        "FN": "4",
-        "FP": "2",
-        "WN": "2.3 um",
-        "WP": "0.7 um",
-    }
+    with pytest.raises(ValueError, match="unresolved real run exists"):
+        prepare_next_real_run(project_dir)
+
+
+def test_prepare_next_real_run_refuses_unresolved_failed_package(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_project(tmp_path)
+    _record_real_001(project_dir)
+    prepare_next_real_run(
+        project_dir,
+        run_id="real_002",
+        created_at_utc="2026-06-02T00:50:00Z",
+    )
+    _write_result_manifest(project_dir, run_id="real_002")
+    result_path = project_dir / "runs" / "real" / "real_002" / "result_manifest.json"
+    result = _load_json(result_path)
+    result["status"] = "failed"
+    _write_json(result_path, result)
+
+    with pytest.raises(ValueError, match="unresolved real run exists"):
+        prepare_next_real_run(project_dir)
+
+
+def test_prepare_next_real_run_continues_after_abandoned_candidate(
+    tmp_path: Path,
+) -> None:
+    from hermes_workflow.real_run_recovery import resolve_real_run_failure
+
+    project_dir = _create_ready_project(tmp_path)
+    _record_real_001(project_dir)
+    prepare_next_real_run(
+        project_dir,
+        run_id="real_002",
+        created_at_utc="2026-06-02T00:50:00Z",
+    )
+    _write_result_manifest(project_dir, run_id="real_002")
+    result_path = project_dir / "runs" / "real" / "real_002" / "result_manifest.json"
+    result = _load_json(result_path)
+    result["status"] = "failed"
+    _write_json(result_path, result)
+    resolve_real_run_failure(
+        project_dir,
+        run_id="real_002",
+        decision="abandon_candidate",
+        reason="skip this candidate",
+        decided_at_utc="2026-06-02T01:00:00Z",
+    )
+
+    package = prepare_next_real_run(
+        project_dir,
+        run_id="real_003",
+        created_at_utc="2026-06-02T01:10:00Z",
+    )
+
+    assert package.run_id == "real_003"
 
 
 def test_next_real_run_package_can_be_checked_and_recorded_after_fake_result(
@@ -477,4 +555,4 @@ def test_prepare_next_real_run_cli_failure(tmp_path: Path) -> None:
     result = runner.invoke(app, ["prepare-next-real-run", str(project_dir)])
 
     assert result.exit_code == 1
-    assert "ledger is missing" in result.output
+    assert "unresolved real run exists" in result.output

@@ -90,6 +90,9 @@ def prepare_next_real_run(
     _assert_approved(instruction)
     approved_hashes = _approved_hashes(manifest, instruction)
     _assert_config_hashes(project_dir, approved_hashes)
+    from hermes_workflow.real_run_recovery import assert_no_unresolved_real_runs
+
+    assert_no_unresolved_real_runs(project_dir)
     bundle = assert_valid_project(project_dir)
     ledger_rows = _read_ledger_rows_or_raise(project_dir)
     state = _load_optimizer_state_or_raise(project_dir)

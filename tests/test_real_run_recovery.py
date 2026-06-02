@@ -14,9 +14,10 @@ from hermes_workflow.package import (
     sha256_file,
 )
 from hermes_workflow.real_result_record import record_real_result
-from hermes_workflow.real_run import prepare_real_run
+from hermes_workflow.real_run import prepare_next_real_run, prepare_real_run
 from hermes_workflow.real_run_recovery import (
     assess_real_run_recovery,
+    assert_no_unresolved_real_runs,
     prepare_real_run_retry,
     resolve_real_run_failure,
 )
@@ -479,6 +480,125 @@ def test_assess_recovery_classifies_valid_retry_decision_as_resolved(
     assert report.status == RealRunRecoveryStatus.PASS
     assert report.classification == RealRunRecoveryClassification.RESOLVED_RETRY_PREPARED
     assert report.allowed_actions == []
+
+
+def test_unresolved_guard_blocks_retry_prepared_decision(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_project(tmp_path)
+    _write_json(
+        project_dir / "runs" / "real" / "real_001" / "recovery_decision.json",
+        {
+            "decision": "retry_same_candidate",
+            "retry_run_id": "real_002",
+        },
+    )
+    _write_manual_retry_package(project_dir)
+
+    with pytest.raises(
+        ValueError,
+        match="real_001:resolved_retry_prepared",
+    ):
+        assert_no_unresolved_real_runs(project_dir)
+
+
+def test_unresolved_guard_does_not_persist_checker_reports(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_project(tmp_path)
+    _write_result_manifest(project_dir)
+    real_report_path = project_dir / "reports" / "real_run_check_report.json"
+    metric_report_path = project_dir / "reports" / "metric_result_check_report.json"
+    real_report_path.unlink(missing_ok=True)
+    metric_report_path.unlink(missing_ok=True)
+
+    with pytest.raises(ValueError, match="real_001:metric_result_missing"):
+        assert_no_unresolved_real_runs(project_dir)
+
+    assert not real_report_path.exists()
+    assert not metric_report_path.exists()
+
+
+def test_unresolved_guard_allows_c9_after_retry_is_recorded(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_project(tmp_path)
+    _record_real_001(project_dir)
+    prepare_next_real_run(
+        project_dir,
+        run_id="real_002",
+        created_at_utc="2026-06-02T00:50:00Z",
+    )
+    _write_result_manifest(project_dir, run_id="real_002", status="failed")
+    prepare_real_run_retry(
+        project_dir,
+        failed_run_id="real_002",
+        retry_run_id="real_003",
+        reason="retry failed execution",
+        decided_at_utc="2026-06-02T01:00:00Z",
+    )
+    _write_result_manifest(
+        project_dir,
+        run_id="real_003",
+        candidate_id="real_002",
+    )
+    _write_metric_result_manifest(
+        project_dir,
+        run_id="real_003",
+        candidate_id="real_002",
+    )
+    record_report = record_real_result(
+        project_dir,
+        run_id="real_003",
+        recorded_at_utc="2026-06-02T01:10:00Z",
+    )
+    assert record_report.status.value == "pass"
+
+    assert_no_unresolved_real_runs(project_dir)
+    package = prepare_next_real_run(
+        project_dir,
+        run_id="real_004",
+        created_at_utc="2026-06-02T01:20:00Z",
+    )
+
+    assert package.run_id == "real_004"
+
+
+def test_unresolved_guard_allows_c9_after_retry_is_abandoned(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_project(tmp_path)
+    _record_real_001(project_dir)
+    prepare_next_real_run(
+        project_dir,
+        run_id="real_002",
+        created_at_utc="2026-06-02T00:50:00Z",
+    )
+    _write_result_manifest(project_dir, run_id="real_002", status="failed")
+    prepare_real_run_retry(
+        project_dir,
+        failed_run_id="real_002",
+        retry_run_id="real_003",
+        reason="retry failed execution",
+        decided_at_utc="2026-06-02T01:00:00Z",
+    )
+    _write_result_manifest(project_dir, run_id="real_003", status="failed")
+    resolve_real_run_failure(
+        project_dir,
+        run_id="real_003",
+        decision="abandon_candidate",
+        reason="abandon after retry failure",
+        decided_at_utc="2026-06-02T01:10:00Z",
+    )
+
+    assert_no_unresolved_real_runs(project_dir)
+    package = prepare_next_real_run(
+        project_dir,
+        run_id="real_004",
+        created_at_utc="2026-06-02T01:20:00Z",
+    )
+
+    assert package.run_id == "real_004"
 
 
 def test_assess_recovery_rejects_retry_decision_symlink_target(

@@ -1800,7 +1800,7 @@ Check:
 - Modify: `tests/test_real_run_recovery.py`
 - Modify: `docs/superpowers/plans/2026-06-02-real-run-failure-retry-policy-contract.md`
 
-- [ ] **Step 1: Add failing C-9 guard tests**
+- [x] **Step 1: Add failing C-9 guard tests**
 
 Append to `tests/test_next_real_run.py`:
 
@@ -1877,7 +1877,7 @@ def test_prepare_next_real_run_continues_after_abandoned_candidate(
     assert package.run_id == "real_003"
 ```
 
-- [ ] **Step 2: Run guard tests and verify they fail**
+- [x] **Step 2: Run guard tests and verify they fail**
 
 Run:
 
@@ -1887,7 +1887,7 @@ python3 -m pytest tests/test_next_real_run.py::test_prepare_next_real_run_refuse
 
 Expected: tests fail because C-9 currently allows preparing another package while an unresolved package exists.
 
-- [ ] **Step 3: Add unresolved guard helper**
+- [x] **Step 3: Add unresolved guard helper**
 
 Append to `src/hermes_workflow/real_run_recovery.py`:
 
@@ -1924,7 +1924,7 @@ def assert_no_unresolved_real_runs(project_dir: Path) -> None:
         raise ValueError("unresolved real run exists: " + ", ".join(unresolved))
 ```
 
-- [ ] **Step 4: Call guard from C-9**
+- [x] **Step 4: Call guard from C-9**
 
 Modify `prepare_next_real_run()` in `src/hermes_workflow/real_run.py` after config hash validation and before reading the ledger:
 
@@ -1936,7 +1936,7 @@ Modify `prepare_next_real_run()` in `src/hermes_workflow/real_run.py` after conf
 
 Place the import inside the function to avoid a module import cycle.
 
-- [ ] **Step 5: Run guard tests and verify they pass**
+- [x] **Step 5: Run guard tests and verify they pass**
 
 Run:
 
@@ -1946,7 +1946,7 @@ python3 -m pytest tests/test_next_real_run.py::test_prepare_next_real_run_refuse
 
 Expected: 3 tests pass.
 
-- [ ] **Step 6: Run focused integration tests**
+- [x] **Step 6: Run focused integration tests**
 
 Run:
 
@@ -1957,14 +1957,14 @@ python3 -m ruff check src/hermes_workflow/real_run.py src/hermes_workflow/real_r
 
 Expected: all tests pass and ruff is clean.
 
-- [ ] **Step 7: Commit Task 4**
+- [x] **Step 7: Commit Task 4**
 
 ```bash
 git add src/hermes_workflow/real_run.py src/hermes_workflow/real_run_recovery.py tests/test_next_real_run.py tests/test_real_run_recovery.py docs/superpowers/plans/2026-06-02-real-run-failure-retry-policy-contract.md
 git commit -m "feat: block next runs on unresolved real runs"
 ```
 
-- [ ] **Step 8: Task 4 review gate**
+- [x] **Step 8: Task 4 review gate**
 
 Run spec and code-quality reviews focused on:
 
