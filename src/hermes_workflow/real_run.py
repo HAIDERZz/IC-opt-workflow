@@ -222,8 +222,7 @@ def _next_unused_run_id(project_dir: Path) -> str:
         for child in root.iterdir():
             if not child.is_dir() or not RUN_ID_RE.match(child.name):
                 continue
-            if (child / "candidate.json").exists():
-                used.add(int(child.name.removeprefix("real_")))
+            used.add(int(child.name.removeprefix("real_")))
 
     next_id = 2
     while next_id in used:
@@ -359,6 +358,8 @@ def _write_real_run_package(
     manifest_path = run_dir / "real_run_manifest.json"
     if manifest_path.exists():
         raise FileExistsError(f"real run package already exists: {manifest_path}")
+    if run_dir.exists() and any(run_dir.iterdir()):
+        raise FileExistsError(f"real run directory is not empty: {run_dir}")
 
     template_relative = bundle.project_config.netlist.template_scs
     template_path = _project_path(bundle, template_relative)
@@ -374,6 +375,7 @@ def _write_real_run_package(
     candidate_path = _project_path(bundle, candidate_relative)
     metric_request_path = _project_path(bundle, metric_request_relative)
 
+    created_run_dir = not run_dir.exists()
     try:
         run_dir.mkdir(parents=True, exist_ok=True)
         rendered_text = _render_template(
@@ -416,7 +418,7 @@ def _write_real_run_package(
             encoding="utf-8",
         )
     except Exception:
-        if run_dir.exists():
+        if created_run_dir and run_dir.exists():
             shutil.rmtree(run_dir, ignore_errors=True)
         raise
 

@@ -294,7 +294,9 @@ def test_prepare_next_real_run_refuses_real_001_override(tmp_path: Path) -> None
         prepare_next_real_run(project_dir, run_id="real_001")
 
 
-def test_prepare_next_real_run_refuses_existing_run_manifest(tmp_path: Path) -> None:
+def test_prepare_next_real_run_refuses_existing_run_manifest_override(
+    tmp_path: Path,
+) -> None:
     project_dir = _create_ready_project(tmp_path)
     _record_real_001(project_dir)
     run_dir = project_dir / "runs" / "real" / "real_002"
@@ -302,7 +304,54 @@ def test_prepare_next_real_run_refuses_existing_run_manifest(tmp_path: Path) -> 
     _write_json(run_dir / "real_run_manifest.json", {"status": "prepared"})
 
     with pytest.raises(FileExistsError, match="real run package already exists"):
-        prepare_next_real_run(project_dir)
+        prepare_next_real_run(project_dir, run_id="real_002")
+
+
+def test_prepare_next_real_run_skips_existing_empty_run_directory(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_project(tmp_path)
+    _record_real_001(project_dir)
+    (project_dir / "runs" / "real" / "real_002").mkdir(parents=True)
+
+    package = prepare_next_real_run(
+        project_dir,
+        created_at_utc="2026-06-02T01:00:00Z",
+    )
+
+    assert package.run_id == "real_003"
+
+
+def test_prepare_next_real_run_skips_existing_manifest_directory_by_default(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_project(tmp_path)
+    _record_real_001(project_dir)
+    run_dir = project_dir / "runs" / "real" / "real_002"
+    run_dir.mkdir(parents=True)
+    _write_json(run_dir / "real_run_manifest.json", {"status": "prepared"})
+
+    package = prepare_next_real_run(
+        project_dir,
+        created_at_utc="2026-06-02T01:00:00Z",
+    )
+
+    assert package.run_id == "real_003"
+
+
+def test_prepare_next_real_run_refuses_non_empty_override_directory(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_project(tmp_path)
+    _record_real_001(project_dir)
+    run_dir = project_dir / "runs" / "real" / "real_004"
+    run_dir.mkdir(parents=True)
+    (run_dir / "partial.log").write_text("partial previous attempt\n", encoding="utf-8")
+
+    with pytest.raises(FileExistsError, match="real run directory is not empty"):
+        prepare_next_real_run(project_dir, run_id="real_004")
+
+    assert (run_dir / "partial.log").exists()
 
 
 def test_prepare_next_real_run_skips_already_prepared_candidate(
