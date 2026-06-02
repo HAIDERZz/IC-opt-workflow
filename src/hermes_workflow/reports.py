@@ -54,6 +54,35 @@ class RealResultRecordStatus(StrEnum):
     FAIL = "fail"
 
 
+class RealRunRecoveryStatus(StrEnum):
+    PASS = "pass"
+    FAIL = "fail"
+
+
+class RealRunRecoveryClassification(StrEnum):
+    PENDING_EXECUTION = "pending_execution"
+    CONTRACT_INVALID = "contract_invalid"
+    TOOL_RESULT_MISSING = "tool_result_missing"
+    TOOL_RESULT_FAILED = "tool_result_failed"
+    TOOL_RESULT_PARTIAL = "tool_result_partial"
+    METRIC_RESULT_MISSING = "metric_result_missing"
+    METRIC_RESULT_FAILED = "metric_result_failed"
+    RECORDABLE_SUCCESS = "recordable_success"
+    ALREADY_RECORDED = "already_recorded"
+    RESOLVED_RETRY_PREPARED = "resolved_retry_prepared"
+    RESOLVED_ABANDONED = "resolved_abandoned"
+    RESOLVED_STOPPED = "resolved_stopped"
+
+
+class RealRunRecoveryAction(StrEnum):
+    RETRY_SAME_CANDIDATE = "retry_same_candidate"
+    ABANDON_CANDIDATE = "abandon_candidate"
+    STOP_WORKFLOW = "stop_workflow"
+    REVISE_CONTRACTS = "revise_contracts"
+    RECORD_RESULT = "record_result"
+    WAIT_FOR_EXECUTION = "wait_for_execution"
+
+
 class NetlistPreparationReport(StrictReport):
     schema_version: str
     status: PassFail
@@ -169,6 +198,24 @@ class RealResultRecordReport(StrictReport):
     optimizer_state_path: str
     best_candidate_path: str | None
     checks: RealResultRecordFlags
+    issues: list[str] = Field(default_factory=list)
+
+
+class RealRunRecoveryReport(StrictReport):
+    schema_version: str
+    status: RealRunRecoveryStatus
+    run_id: str
+    candidate_id: str | None
+    classification: RealRunRecoveryClassification
+    allowed_actions: list[RealRunRecoveryAction] = Field(default_factory=list)
+    recommended_action: RealRunRecoveryAction | None
+    attempt_number: int = Field(ge=1)
+    max_attempts_per_candidate: int = Field(ge=1)
+    retry_budget_remaining: int = Field(ge=0)
+    real_run_check_report: str
+    metric_result_check_report: str
+    ledger_path: str
+    recovery_decision: str | None
     issues: list[str] = Field(default_factory=list)
 
 

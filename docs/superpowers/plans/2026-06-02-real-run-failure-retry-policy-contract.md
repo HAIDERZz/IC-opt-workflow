@@ -91,7 +91,7 @@ Use existing constants from `real_run.py` and `metric_results.py` where practica
 - Create: `tests/test_real_run_recovery.py`
 - Modify: `docs/superpowers/plans/2026-06-02-real-run-failure-retry-policy-contract.md`
 
-- [ ] **Step 1: Write failing schema tests**
+- [x] **Step 1: Write failing schema tests**
 
 Create `tests/test_real_run_recovery.py` with imports and report schema tests:
 
@@ -171,7 +171,7 @@ def test_recovery_report_schema_forbids_unknown_fields() -> None:
         RealRunRecoveryReport.model_validate(payload)
 ```
 
-- [ ] **Step 2: Run schema tests and verify they fail**
+- [x] **Step 2: Run schema tests and verify they fail**
 
 Run:
 
@@ -181,7 +181,7 @@ python3 -m pytest tests/test_real_run_recovery.py::test_recovery_report_schema_a
 
 Expected: import failure for `RealRunRecoveryAction`, `RealRunRecoveryClassification`, `RealRunRecoveryReport`, and `RealRunRecoveryStatus`.
 
-- [ ] **Step 3: Add recovery enums and report model**
+- [x] **Step 3: Add recovery enums and report model**
 
 Modify `src/hermes_workflow/reports.py` after `RealResultRecordStatus`:
 
@@ -236,7 +236,7 @@ class RealRunRecoveryReport(StrictReport):
     issues: list[str] = Field(default_factory=list)
 ```
 
-- [ ] **Step 4: Run schema tests and verify they pass**
+- [x] **Step 4: Run schema tests and verify they pass**
 
 Run:
 
@@ -246,7 +246,7 @@ python3 -m pytest tests/test_real_run_recovery.py::test_recovery_report_schema_a
 
 Expected: 2 tests pass.
 
-- [ ] **Step 5: Run focused lint**
+- [x] **Step 5: Run focused lint**
 
 Run:
 
@@ -256,14 +256,14 @@ python3 -m ruff check src/hermes_workflow/reports.py tests/test_real_run_recover
 
 Expected: all checks pass.
 
-- [ ] **Step 6: Commit Task 1**
+- [x] **Step 6: Commit Task 1**
 
 ```bash
 git add src/hermes_workflow/reports.py tests/test_real_run_recovery.py docs/superpowers/plans/2026-06-02-real-run-failure-retry-policy-contract.md
 git commit -m "feat: add real run recovery report schema"
 ```
 
-- [ ] **Step 7: Task 1 review gate**
+- [x] **Step 7: Task 1 review gate**
 
 Run code-quality review focused on:
 
