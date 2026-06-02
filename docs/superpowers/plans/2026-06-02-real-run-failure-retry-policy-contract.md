@@ -1989,7 +1989,7 @@ Check:
 - Modify: `tests/test_cli.py`
 - Modify: `docs/superpowers/plans/2026-06-02-real-run-failure-retry-policy-contract.md`
 
-- [ ] **Step 1: Add failing CLI tests**
+- [x] **Step 1: Add failing CLI tests**
 
 Append to `tests/test_cli.py`:
 
@@ -2064,7 +2064,7 @@ def test_cli_prepare_real_run_retry_outputs_paths(tmp_path: Path) -> None:
     assert "decision: runs/real/real_001/recovery_decision.json" in result.output
 ```
 
-- [ ] **Step 2: Run CLI tests and verify they fail**
+- [x] **Step 2: Run CLI tests and verify they fail**
 
 Run:
 
@@ -2074,7 +2074,7 @@ python3 -m pytest tests/test_cli.py::test_cli_assess_real_run_recovery_reports_p
 
 Expected: Typer reports missing commands.
 
-- [ ] **Step 3: Add CLI imports**
+- [x] **Step 3: Add CLI imports**
 
 Modify `src/hermes_workflow/cli.py` imports:
 
@@ -2086,7 +2086,7 @@ from hermes_workflow.real_run_recovery import (
 )
 ```
 
-- [ ] **Step 4: Add CLI commands**
+- [x] **Step 4: Add CLI commands**
 
 Append commands after `prepare_next_real_run_command()` and before `check_real_run_command()`:
 
@@ -2189,7 +2189,7 @@ def resolve_real_run_failure_command(
     typer.echo(f"decision_file: runs/real/{report.run_id}/recovery_decision.json")
 ```
 
-- [ ] **Step 5: Run CLI tests and verify they pass**
+- [x] **Step 5: Run CLI tests and verify they pass**
 
 Run:
 
@@ -2199,7 +2199,7 @@ python3 -m pytest tests/test_cli.py::test_cli_assess_real_run_recovery_reports_p
 
 Expected: 3 tests pass.
 
-- [ ] **Step 6: Run focused CLI verification**
+- [x] **Step 6: Run focused CLI verification**
 
 Run:
 
@@ -2210,7 +2210,7 @@ python3 -m ruff check src/hermes_workflow/cli.py src/hermes_workflow/real_run_re
 
 Expected: all tests pass and ruff is clean.
 
-- [ ] **Step 7: Commit Task 5**
+- [x] **Step 7: Commit Task 5**
 
 ```bash
 git add src/hermes_workflow/cli.py tests/test_cli.py docs/superpowers/plans/2026-06-02-real-run-failure-retry-policy-contract.md

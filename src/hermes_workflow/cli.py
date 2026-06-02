@@ -17,6 +17,11 @@ from hermes_workflow.package import (
     create_project_from_template,
 )
 from hermes_workflow.real_run import prepare_next_real_run, prepare_real_run
+from hermes_workflow.real_run_recovery import (
+    assess_real_run_recovery,
+    prepare_real_run_retry,
+    resolve_real_run_failure,
+)
 from hermes_workflow.real_result_record import record_real_result
 from hermes_workflow.result_handoff import check_real_run
 from hermes_workflow.validate import validate_project_files
@@ -48,6 +53,36 @@ def main(
 
 def _exit_with_error(exc: Exception) -> NoReturn:
     typer.echo(str(exc))
+    raise typer.Exit(code=1)
+
+
+def _recovery_report_fingerprint(project_dir: Path) -> tuple[int, int] | None:
+    report_path = project_dir / "reports" / "real_run_recovery_report.json"
+    try:
+        stat = report_path.stat()
+    except OSError:
+        return None
+    return stat.st_mtime_ns, stat.st_size
+
+
+def _exit_with_recovery_report(
+    exc: Exception,
+    project_dir: Path,
+    previous_report: tuple[int, int] | None,
+) -> NoReturn:
+    typer.echo(str(exc))
+    report_path = project_dir / "reports" / "real_run_recovery_report.json"
+    if _recovery_report_fingerprint(project_dir) != previous_report:
+        typer.echo("report: reports/real_run_recovery_report.json")
+        try:
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            raise typer.Exit(code=1)
+        issues = report.get("issues")
+        if isinstance(issues, list):
+            for issue in issues:
+                if isinstance(issue, str):
+                    typer.echo(issue)
     raise typer.Exit(code=1)
 
 
@@ -227,6 +262,111 @@ def prepare_next_real_run_command(
     typer.echo(f"run: {package.run_dir.relative_to(project_dir)}")
     typer.echo(f"manifest: {package.manifest_path.relative_to(project_dir)}")
     typer.echo(f"candidate: {package.candidate_path.relative_to(project_dir)}")
+
+
+@app.command("assess-real-run-recovery")
+def assess_real_run_recovery_command(
+    project_dir: Annotated[
+        Path,
+        typer.Argument(help="Project directory with a real-run package."),
+    ],
+    run_id: Annotated[
+        str,
+        typer.Option("--run-id", help="Real-run package id such as real_002."),
+    ],
+) -> None:
+    try:
+        report = assess_real_run_recovery(project_dir, run_id=run_id)
+    except (FileExistsError, FileNotFoundError, OSError, ValueError) as exc:
+        _exit_with_error(exc)
+    typer.echo("real run recovery assessed")
+    typer.echo(f"run: runs/real/{report.run_id}")
+    typer.echo(f"classification: {report.classification.value}")
+    if report.recommended_action is not None:
+        typer.echo(f"recommended: {report.recommended_action.value}")
+    typer.echo("report: reports/real_run_recovery_report.json")
+    if report.status.value != "pass":
+        for issue in report.issues:
+            typer.echo(issue)
+        raise typer.Exit(code=1)
+
+
+@app.command("prepare-real-run-retry")
+def prepare_real_run_retry_command(
+    project_dir: Annotated[
+        Path,
+        typer.Argument(help="Project directory with a failed real-run package."),
+    ],
+    failed_run_id: Annotated[
+        str,
+        typer.Option("--failed-run-id", help="Failed real-run id such as real_002."),
+    ],
+    retry_run_id: Annotated[
+        str | None,
+        typer.Option("--retry-run-id", help="Optional retry real-run id."),
+    ] = None,
+    reason: Annotated[
+        str,
+        typer.Option("--reason", help="Supervisor reason for retry."),
+    ] = "supervisor requested retry",
+) -> None:
+    previous_report = _recovery_report_fingerprint(project_dir)
+    try:
+        retry = prepare_real_run_retry(
+            project_dir,
+            failed_run_id=failed_run_id,
+            retry_run_id=retry_run_id,
+            reason=reason,
+        )
+    except (FileExistsError, FileNotFoundError, OSError, ValueError) as exc:
+        _exit_with_recovery_report(exc, project_dir, previous_report)
+    typer.echo("real run retry package prepared")
+    typer.echo(f"failed run: runs/real/{retry.failed_run_id}")
+    typer.echo(f"retry run: runs/real/{retry.run_id}")
+    typer.echo(f"decision: {retry.decision_path.relative_to(project_dir)}")
+    typer.echo(f"manifest: {retry.package.manifest_path.relative_to(project_dir)}")
+
+
+@app.command("resolve-real-run-failure")
+def resolve_real_run_failure_command(
+    project_dir: Annotated[
+        Path,
+        typer.Argument(help="Project directory with a failed real-run package."),
+    ],
+    run_id: Annotated[
+        str,
+        typer.Option("--run-id", help="Real-run package id such as real_002."),
+    ],
+    decision: Annotated[
+        str,
+        typer.Option(
+            "--decision",
+            help=(
+                "Recovery decision: abandon_candidate, stop_workflow, "
+                "or revise_contracts."
+            ),
+        ),
+    ],
+    reason: Annotated[
+        str,
+        typer.Option("--reason", help="Supervisor reason for this decision."),
+    ],
+) -> None:
+    previous_report = _recovery_report_fingerprint(project_dir)
+    try:
+        report = resolve_real_run_failure(
+            project_dir,
+            run_id=run_id,
+            decision=decision,
+            reason=reason,
+        )
+    except (FileExistsError, FileNotFoundError, OSError, ValueError) as exc:
+        _exit_with_recovery_report(exc, project_dir, previous_report)
+    typer.echo("real run failure resolved")
+    typer.echo(f"run: runs/real/{report.run_id}")
+    typer.echo(f"decision: {decision}")
+    typer.echo(f"classification: {report.classification.value}")
+    typer.echo(f"decision_file: runs/real/{report.run_id}/recovery_decision.json")
 
 
 @app.command("check-real-run")

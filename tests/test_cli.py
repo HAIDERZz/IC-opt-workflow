@@ -526,3 +526,237 @@ def test_cli_record_real_result_reports_failure_without_traceback(
     assert "result manifest is missing" in result.stdout
     assert "report: reports/real_result_record_report.json" in result.stdout
     assert "Traceback" not in result.output
+
+
+def test_cli_assess_real_run_recovery_reports_pending(tmp_path: Path) -> None:
+    from tests.test_real_run_recovery import _create_ready_project
+
+    project_dir = _create_ready_project(tmp_path)
+
+    result = runner.invoke(
+        app,
+        ["assess-real-run-recovery", str(project_dir), "--run-id", "real_001"],
+    )
+
+    assert result.exit_code == 0
+    assert "real run recovery assessed" in result.output
+    assert "classification: pending_execution" in result.output
+    assert "report: reports/real_run_recovery_report.json" in result.output
+
+
+def test_cli_assess_real_run_recovery_reports_failure_without_traceback(
+    tmp_path: Path,
+) -> None:
+    from tests.test_real_run_recovery import _create_ready_project
+
+    project_dir = _create_ready_project(tmp_path)
+    (
+        project_dir
+        / "runs"
+        / "real"
+        / "real_001"
+        / "metric_extraction_request.json"
+    ).unlink()
+
+    result = runner.invoke(
+        app,
+        ["assess-real-run-recovery", str(project_dir), "--run-id", "real_001"],
+    )
+
+    assert result.exit_code == 1
+    assert isinstance(result.exception, SystemExit)
+    assert "real run recovery assessed" in result.output
+    assert "classification: contract_invalid" in result.output
+    assert "metric extraction request is missing" in result.output
+    assert "report: reports/real_run_recovery_report.json" in result.output
+    assert "Traceback" not in result.output
+
+
+def test_cli_resolve_real_run_failure_writes_abandon_decision(
+    tmp_path: Path,
+) -> None:
+    from tests.test_real_run_recovery import _create_ready_project, _write_result_manifest
+
+    project_dir = _create_ready_project(tmp_path)
+    _write_result_manifest(project_dir, status="failed")
+
+    result = runner.invoke(
+        app,
+        [
+            "resolve-real-run-failure",
+            str(project_dir),
+            "--run-id",
+            "real_001",
+            "--decision",
+            "abandon_candidate",
+            "--reason",
+            "skip failed candidate",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "real run failure resolved" in result.output
+    assert "decision: abandon_candidate" in result.output
+
+
+def test_cli_prepare_real_run_retry_outputs_paths(tmp_path: Path) -> None:
+    from tests.test_real_run_recovery import _create_ready_project, _write_result_manifest
+
+    project_dir = _create_ready_project(tmp_path)
+    _write_result_manifest(project_dir, status="failed")
+
+    result = runner.invoke(
+        app,
+        [
+            "prepare-real-run-retry",
+            str(project_dir),
+            "--failed-run-id",
+            "real_001",
+            "--retry-run-id",
+            "real_002",
+            "--reason",
+            "retry failed simulation",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "real run retry package prepared" in result.output
+    assert "failed run: runs/real/real_001" in result.output
+    assert "retry run: runs/real/real_002" in result.output
+    assert "decision: runs/real/real_001/recovery_decision.json" in result.output
+
+
+def test_cli_prepare_real_run_retry_reports_recovery_failure_without_traceback(
+    tmp_path: Path,
+) -> None:
+    from tests.test_real_run_recovery import _create_ready_project
+
+    project_dir = _create_ready_project(tmp_path)
+    (
+        project_dir
+        / "runs"
+        / "real"
+        / "real_001"
+        / "metric_extraction_request.json"
+    ).unlink()
+
+    result = runner.invoke(
+        app,
+        [
+            "prepare-real-run-retry",
+            str(project_dir),
+            "--failed-run-id",
+            "real_001",
+            "--reason",
+            "retry invalid package",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert isinstance(result.exception, SystemExit)
+    assert "retry_same_candidate is not allowed for this run" in result.output
+    assert "report: reports/real_run_recovery_report.json" in result.output
+    assert "metric extraction request is missing" in result.output
+    assert "Traceback" not in result.output
+
+
+def test_cli_resolve_real_run_failure_reports_recovery_failure_without_traceback(
+    tmp_path: Path,
+) -> None:
+    from tests.test_real_run_recovery import _create_ready_project
+
+    project_dir = _create_ready_project(tmp_path)
+    (
+        project_dir
+        / "runs"
+        / "real"
+        / "real_001"
+        / "metric_extraction_request.json"
+    ).unlink()
+
+    result = runner.invoke(
+        app,
+        [
+            "resolve-real-run-failure",
+            str(project_dir),
+            "--run-id",
+            "real_001",
+            "--decision",
+            "abandon_candidate",
+            "--reason",
+            "skip invalid package",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert isinstance(result.exception, SystemExit)
+    assert "abandon_candidate is not allowed for this run" in result.output
+    assert "report: reports/real_run_recovery_report.json" in result.output
+    assert "metric extraction request is missing" in result.output
+    assert "Traceback" not in result.output
+
+
+def test_cli_prepare_real_run_retry_does_not_print_stale_recovery_report(
+    tmp_path: Path,
+) -> None:
+    from tests.test_real_run_recovery import _create_ready_project
+
+    project_dir = _create_ready_project(tmp_path)
+    stale_result = runner.invoke(
+        app,
+        ["assess-real-run-recovery", str(project_dir), "--run-id", "real_001"],
+    )
+    assert stale_result.exit_code == 0
+
+    result = runner.invoke(
+        app,
+        [
+            "prepare-real-run-retry",
+            str(project_dir),
+            "--failed-run-id",
+            "real_001",
+            "--retry-run-id",
+            "real_001",
+            "--reason",
+            "invalid retry target",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert isinstance(result.exception, SystemExit)
+    assert "retry run_id must differ from failed run_id" in result.output
+    assert "report: reports/real_run_recovery_report.json" not in result.output
+    assert "Traceback" not in result.output
+
+
+def test_cli_resolve_real_run_failure_does_not_print_stale_recovery_report(
+    tmp_path: Path,
+) -> None:
+    from tests.test_real_run_recovery import _create_ready_project
+
+    project_dir = _create_ready_project(tmp_path)
+    stale_result = runner.invoke(
+        app,
+        ["assess-real-run-recovery", str(project_dir), "--run-id", "real_001"],
+    )
+    assert stale_result.exit_code == 0
+
+    result = runner.invoke(
+        app,
+        [
+            "resolve-real-run-failure",
+            str(project_dir),
+            "--run-id",
+            "real_001",
+            "--decision",
+            "not_a_decision",
+            "--reason",
+            "invalid decision",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert isinstance(result.exception, SystemExit)
+    assert "not_a_decision" in result.output
+    assert "report: reports/real_run_recovery_report.json" not in result.output
+    assert "Traceback" not in result.output
