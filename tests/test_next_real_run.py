@@ -5,8 +5,10 @@ import re
 from pathlib import Path
 
 import pytest
+from typer.testing import CliRunner
 
 from hermes_workflow.approvals import decide_first_real_run
+from hermes_workflow.cli import app
 from hermes_workflow.package import (
     build_execution_package,
     create_project_from_template,
@@ -416,3 +418,27 @@ def test_next_real_run_package_can_be_checked_and_recorded_after_fake_result(
     assert ledger_rows[1]["parameters"] == package.candidate_payload["parameters"]
     state = _load_json(project_dir / "state" / "optimizer_state.json")
     assert state["current_evaluations"] == 2
+
+
+def test_prepare_next_real_run_cli_success(tmp_path: Path) -> None:
+    project_dir = _create_ready_project(tmp_path)
+    _record_real_001(project_dir)
+    runner = CliRunner()
+
+    result = runner.invoke(app, ["prepare-next-real-run", str(project_dir)])
+
+    assert result.exit_code == 0
+    assert "next real run package prepared" in result.output
+    assert "run: runs/real/real_002" in result.output
+    assert "manifest: runs/real/real_002/real_run_manifest.json" in result.output
+    assert "candidate: runs/real/real_002/candidate.json" in result.output
+
+
+def test_prepare_next_real_run_cli_failure(tmp_path: Path) -> None:
+    project_dir = _create_ready_project(tmp_path)
+    runner = CliRunner()
+
+    result = runner.invoke(app, ["prepare-next-real-run", str(project_dir)])
+
+    assert result.exit_code == 1
+    assert "ledger is missing" in result.output

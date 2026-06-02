@@ -959,7 +959,7 @@ git commit -m "test: verify next real run handoff compatibility"
 - Modify: `tests/test_next_real_run.py`
 - Modify: `docs/superpowers/plans/2026-06-02-next-real-run-package-contract.md`
 
-- [ ] **Step 1: Add CLI tests**
+- [x] **Step 1: Add CLI tests**
 
 Append imports:
 
@@ -996,7 +996,7 @@ def test_prepare_next_real_run_cli_failure(tmp_path: Path) -> None:
     assert "ledger is missing" in result.output
 ```
 
-- [ ] **Step 2: Run CLI tests and verify they fail**
+- [x] **Step 2: Run CLI tests and verify they fail**
 
 Run:
 
@@ -1006,7 +1006,7 @@ python3 -m pytest tests/test_next_real_run.py::test_prepare_next_real_run_cli_su
 
 Expected: fail because the CLI command does not exist.
 
-- [ ] **Step 3: Wire CLI command**
+- [x] **Step 3: Wire CLI command**
 
 Modify `src/hermes_workflow/cli.py` import:
 
@@ -1043,7 +1043,7 @@ def prepare_next_real_run_command(
     typer.echo(f"candidate: {package.candidate_path.relative_to(project_dir)}")
 ```
 
-- [ ] **Step 4: Run medium-risk verification**
+- [x] **Step 4: Run medium-risk verification**
 
 Run:
 
@@ -1056,7 +1056,7 @@ git diff --check
 
 Expected: pass.
 
-- [ ] **Step 5: Commit Tasks 3-4 if Task 3 was not already committed**
+- [x] **Step 5: Commit Tasks 3-4 if Task 3 was not already committed**
 
 If Task 3 already has its own commit, commit only CLI changes:
 

@@ -16,7 +16,7 @@ from hermes_workflow.package import (
     build_execution_package,
     create_project_from_template,
 )
-from hermes_workflow.real_run import prepare_real_run
+from hermes_workflow.real_run import prepare_next_real_run, prepare_real_run
 from hermes_workflow.real_result_record import record_real_result
 from hermes_workflow.result_handoff import check_real_run
 from hermes_workflow.validate import validate_project_files
@@ -201,6 +201,32 @@ def prepare_real_run_command(
     typer.echo("real run package prepared")
     typer.echo(f"run: {package.run_dir.relative_to(project_dir)}")
     typer.echo(f"manifest: {package.manifest_path.relative_to(project_dir)}")
+
+
+@app.command("prepare-next-real-run")
+def prepare_next_real_run_command(
+    project_dir: Annotated[
+        Path,
+        typer.Argument(
+            help="Project directory with at least one recorded checked real result."
+        ),
+    ],
+    run_id: Annotated[
+        str | None,
+        typer.Option(
+            "--run-id",
+            help="Optional next real-run package id such as real_002.",
+        ),
+    ] = None,
+) -> None:
+    try:
+        package = prepare_next_real_run(project_dir, run_id=run_id)
+    except (FileExistsError, FileNotFoundError, OSError, ValueError) as exc:
+        _exit_with_error(exc)
+    typer.echo("next real run package prepared")
+    typer.echo(f"run: {package.run_dir.relative_to(project_dir)}")
+    typer.echo(f"manifest: {package.manifest_path.relative_to(project_dir)}")
+    typer.echo(f"candidate: {package.candidate_path.relative_to(project_dir)}")
 
 
 @app.command("check-real-run")
