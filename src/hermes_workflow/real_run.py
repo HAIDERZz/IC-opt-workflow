@@ -220,7 +220,10 @@ def _next_unused_run_id(project_dir: Path) -> str:
     used: set[int] = {1}
     if root.exists():
         for child in root.iterdir():
-            if not child.is_dir() or not RUN_ID_RE.match(child.name):
+            if not RUN_ID_RE.match(child.name):
+                continue
+            _assert_run_dir_is_not_symlink(child)
+            if not child.is_dir():
                 continue
             used.add(int(child.name.removeprefix("real_")))
 
@@ -248,7 +251,15 @@ def _prepared_candidate_keys(project_dir: Path) -> set[tuple[tuple[str, str], ..
     keys: set[tuple[tuple[str, str], ...]] = set()
     if not root.exists():
         return keys
-    for candidate_path in sorted(root.glob("real_[0-9][0-9][0-9]/candidate.json")):
+    for run_dir in sorted(root.iterdir()):
+        if not RUN_ID_RE.match(run_dir.name):
+            continue
+        _assert_run_dir_is_not_symlink(run_dir)
+        if not run_dir.is_dir():
+            continue
+        candidate_path = run_dir / "candidate.json"
+        if not candidate_path.exists():
+            continue
         payload = _load_json_object(candidate_path, "prepared candidate")
         parameters = payload.get("parameters")
         if not isinstance(parameters, dict) or not all(
@@ -296,6 +307,11 @@ def _sha256_existing_or_empty(path: Path) -> str:
     if not path.exists():
         return EMPTY_LEDGER_SHA256
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _assert_run_dir_is_not_symlink(run_dir: Path) -> None:
+    if run_dir.is_symlink():
+        raise FileExistsError(f"real run directory must not be a symlink: {run_dir}")
 
 
 def _assert_approved(instruction: dict) -> None:
@@ -355,6 +371,7 @@ def _write_real_run_package(
     manifest_extra: dict,
 ) -> RealRunPackage:
     run_dir = _project_path(bundle, f"{REAL_RUN_ROOT}/{selected_run_id}")
+    _assert_run_dir_is_not_symlink(run_dir)
     manifest_path = run_dir / "real_run_manifest.json"
     if manifest_path.exists():
         raise FileExistsError(f"real run package already exists: {manifest_path}")

@@ -356,6 +356,42 @@ def test_prepare_next_real_run_refuses_non_empty_override_directory(
     assert (run_dir / "partial.log").exists()
 
 
+def test_prepare_next_real_run_refuses_symlink_run_directory_override(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_project(tmp_path)
+    _record_real_001(project_dir)
+    outside_dir = tmp_path / "outside_real_004"
+    outside_dir.mkdir()
+    run_dir = project_dir / "runs" / "real" / "real_004"
+    run_dir.symlink_to(outside_dir, target_is_directory=True)
+
+    with pytest.raises(FileExistsError, match="real run directory must not be a symlink"):
+        prepare_next_real_run(project_dir, run_id="real_004")
+
+    assert not (outside_dir / "input.scs").exists()
+    assert not (outside_dir / "candidate.json").exists()
+    assert not (outside_dir / "real_run_manifest.json").exists()
+
+
+def test_prepare_next_real_run_refuses_symlink_run_directory_in_default_scan(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_project(tmp_path)
+    _record_real_001(project_dir)
+    outside_dir = tmp_path / "outside_real_002"
+    outside_dir.mkdir()
+    run_dir = project_dir / "runs" / "real" / "real_002"
+    run_dir.symlink_to(outside_dir, target_is_directory=True)
+
+    with pytest.raises(FileExistsError, match="real run directory must not be a symlink"):
+        prepare_next_real_run(project_dir)
+
+    assert not (outside_dir / "input.scs").exists()
+    assert not (outside_dir / "candidate.json").exists()
+    assert not (outside_dir / "real_run_manifest.json").exists()
+
+
 def test_prepare_next_real_run_skips_already_prepared_candidate(
     tmp_path: Path,
 ) -> None:
