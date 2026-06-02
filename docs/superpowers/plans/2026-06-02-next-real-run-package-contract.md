@@ -489,7 +489,7 @@ Check:
 - Modify: `tests/test_next_real_run.py`
 - Modify: `docs/superpowers/plans/2026-06-02-next-real-run-package-contract.md`
 
-- [ ] **Step 1: Add failing package-writing tests**
+- [x] **Step 1: Add failing package-writing tests**
 
 Append to `tests/test_next_real_run.py`:
 
@@ -584,7 +584,7 @@ def test_prepare_next_real_run_skips_already_prepared_candidate(tmp_path: Path) 
     }
 ```
 
-- [ ] **Step 2: Run tests and verify package tests fail on stub**
+- [x] **Step 2: Run tests and verify package tests fail on stub**
 
 Run:
 
@@ -594,7 +594,7 @@ python3 -m pytest tests/test_next_real_run.py -q
 
 Expected: new package tests fail with `next candidate selection is not implemented`.
 
-- [ ] **Step 3: Implement next run id and prepared candidate scanning**
+- [x] **Step 3: Implement next run id and prepared candidate scanning**
 
 Add to `src/hermes_workflow/real_run.py`:
 
@@ -644,7 +644,7 @@ def _prepared_candidate_keys(project_dir: Path) -> set[tuple[tuple[str, str], ..
     return keys
 ```
 
-- [ ] **Step 4: Implement candidate sequence selection**
+- [x] **Step 4: Implement candidate sequence selection**
 
 Add:
 
@@ -687,7 +687,7 @@ def _next_candidate_payload(
     }
 ```
 
-- [ ] **Step 5: Refactor package writing into a reusable helper**
+- [x] **Step 5: Refactor package writing into a reusable helper**
 
 Replace the body of `prepare_real_run()` after preconditions with:
 
@@ -795,7 +795,7 @@ def _write_real_run_package(
     )
 ```
 
-- [ ] **Step 6: Implement `prepare_next_real_run()` fully**
+- [x] **Step 6: Implement `prepare_next_real_run()` fully**
 
 Replace the Task 1 stub tail with:
 
@@ -838,7 +838,7 @@ def _sha256_existing_or_empty(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 ```
 
-- [ ] **Step 7: Run package tests**
+- [x] **Step 7: Run package tests**
 
 Run:
 
@@ -849,7 +849,7 @@ python3 -m pytest tests/test_real_run.py tests/test_next_real_run.py -q
 
 Expected: pass.
 
-- [ ] **Step 8: Commit Task 2**
+- [x] **Step 8: Commit Task 2**
 
 ```bash
 git add src/hermes_workflow/real_run.py tests/test_next_real_run.py docs/superpowers/plans/2026-06-02-next-real-run-package-contract.md

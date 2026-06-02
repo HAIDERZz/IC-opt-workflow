@@ -238,3 +238,95 @@ def test_prepare_next_real_run_refuses_when_max_evaluations_reached(
 
     with pytest.raises(ValueError, match="immutable config drift detected"):
         prepare_next_real_run(project_dir)
+
+
+def test_prepare_next_real_run_writes_real_002_package(tmp_path: Path) -> None:
+    project_dir = _create_ready_project(tmp_path)
+    _record_real_001(project_dir)
+
+    package = prepare_next_real_run(
+        project_dir,
+        created_at_utc="2026-06-02T00:50:00Z",
+    )
+
+    run_dir = project_dir / "runs" / "real" / "real_002"
+    candidate = _load_json(run_dir / "candidate.json")
+    manifest = _load_json(run_dir / "real_run_manifest.json")
+    metric_request = _load_json(run_dir / "metric_extraction_request.json")
+    rendered = (run_dir / "input.scs").read_text(encoding="utf-8")
+
+    assert package.run_id == "real_002"
+    assert package.run_dir == run_dir
+    assert "{{" not in rendered
+    assert "}}" not in rendered
+    assert candidate["candidate_id"] == "real_002"
+    assert candidate["source"] == "deterministic_initialization_sequence"
+    assert candidate["candidate_index"] == 1
+    assert candidate["parameters"] == {
+        "FN": "11",
+        "FP": "11",
+        "WN": "0.3 um",
+        "WP": "2.9 um",
+    }
+    assert manifest["run_id"] == "real_002"
+    assert manifest["candidate_id"] == "real_002"
+    assert manifest["candidate_source"] == "deterministic_initialization_sequence"
+    assert manifest["candidate_index"] == 1
+    assert manifest["selection_policy"] == (
+        "next_unique_from_optimizer_initialization_sequence"
+    )
+    assert manifest["previous_evaluations"] == 1
+    assert manifest["ledger_snapshot_sha256"]
+    assert manifest["optimizer_state_sha256"]
+    assert manifest["metric_extraction_request"] == (
+        "runs/real/real_002/metric_extraction_request.json"
+    )
+    assert metric_request["run_id"] == "real_002"
+    assert metric_request["candidate_id"] == "real_002"
+    assert not (project_dir / "ledger" / "experiment_ledger.jsonl.lock").exists()
+
+
+def test_prepare_next_real_run_refuses_real_001_override(tmp_path: Path) -> None:
+    project_dir = _create_ready_project(tmp_path)
+    _record_real_001(project_dir)
+
+    with pytest.raises(ValueError, match="prepare-next-real-run cannot target real_001"):
+        prepare_next_real_run(project_dir, run_id="real_001")
+
+
+def test_prepare_next_real_run_refuses_existing_run_manifest(tmp_path: Path) -> None:
+    project_dir = _create_ready_project(tmp_path)
+    _record_real_001(project_dir)
+    run_dir = project_dir / "runs" / "real" / "real_002"
+    run_dir.mkdir(parents=True)
+    _write_json(run_dir / "real_run_manifest.json", {"status": "prepared"})
+
+    with pytest.raises(FileExistsError, match="real run package already exists"):
+        prepare_next_real_run(project_dir)
+
+
+def test_prepare_next_real_run_skips_already_prepared_candidate(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_project(tmp_path)
+    _record_real_001(project_dir)
+    first = prepare_next_real_run(
+        project_dir,
+        created_at_utc="2026-06-02T00:50:00Z",
+    )
+    assert first.run_id == "real_002"
+
+    second = prepare_next_real_run(
+        project_dir,
+        created_at_utc="2026-06-02T01:00:00Z",
+    )
+
+    candidate = _load_json(second.candidate_path)
+    assert second.run_id == "real_003"
+    assert candidate["candidate_index"] == 2
+    assert candidate["parameters"] == {
+        "FN": "4",
+        "FP": "2",
+        "WN": "2.3 um",
+        "WP": "0.7 um",
+    }
