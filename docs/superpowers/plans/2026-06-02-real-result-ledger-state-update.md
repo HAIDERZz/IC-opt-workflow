@@ -1230,7 +1230,7 @@ Update this task's checkboxes to `[x]` after verification and review gate approv
 - Modify: `tests/test_cli.py`
 - Modify: `docs/superpowers/plans/2026-06-02-real-result-ledger-state-update.md`
 
-- [ ] **Step 1: Add CLI pass/fail tests**
+- [x] **Step 1: Add CLI pass/fail tests**
 
 Append to `tests/test_cli.py`:
 
@@ -1276,7 +1276,7 @@ def test_cli_record_real_result_reports_failure_without_traceback(
     assert "Traceback" not in result.output
 ```
 
-- [ ] **Step 2: Run tests and verify failure**
+- [x] **Step 2: Run tests and verify failure**
 
 Run:
 
@@ -1286,7 +1286,7 @@ python3 -m pytest tests/test_cli.py::test_cli_record_real_result_passes_for_vali
 
 Expected: FAIL because CLI command does not exist.
 
-- [ ] **Step 3: Add CLI command**
+- [x] **Step 3: Add CLI command**
 
 Modify `src/hermes_workflow/cli.py`:
 
@@ -1327,7 +1327,7 @@ def record_real_result_command(
     raise typer.Exit(code=1)
 ```
 
-- [ ] **Step 4: Run CLI tests**
+- [x] **Step 4: Run CLI tests**
 
 Run:
 
@@ -1337,7 +1337,7 @@ python3 -m pytest tests/test_cli.py::test_cli_record_real_result_passes_for_vali
 
 Expected: PASS.
 
-- [ ] **Step 5: Run related CLI/checker tests**
+- [x] **Step 5: Run related CLI/checker tests**
 
 Run:
 

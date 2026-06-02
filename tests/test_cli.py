@@ -485,3 +485,44 @@ def test_cli_check_metric_results_reports_failure_without_traceback(
     assert "result manifest is missing" in result.stdout
     assert "report: reports/metric_result_check_report.json" in result.stdout
     assert "Traceback" not in result.output
+
+
+def test_cli_record_real_result_passes_for_valid_checked_result(
+    tmp_path: Path,
+) -> None:
+    from tests.test_real_result_record import (
+        _create_ready_project,
+        _write_valid_checked_result,
+    )
+
+    project_dir = _create_ready_project(tmp_path)
+    _write_valid_checked_result(project_dir)
+
+    result = runner.invoke(
+        app,
+        ["record-real-result", str(project_dir), "--run-id", "real_001"],
+    )
+
+    assert result.exit_code == 0
+    assert "real result recorded" in result.stdout
+    assert "run: runs/real/real_001" in result.stdout
+    assert "ledger: ledger/experiment_ledger.jsonl" in result.stdout
+    assert "state: state/optimizer_state.json" in result.stdout
+    assert "report: reports/real_result_record_report.json" in result.stdout
+
+
+def test_cli_record_real_result_reports_failure_without_traceback(
+    tmp_path: Path,
+) -> None:
+    from tests.test_real_result_record import _create_ready_project
+
+    project_dir = _create_ready_project(tmp_path)
+
+    result = runner.invoke(app, ["record-real-result", str(project_dir)])
+
+    assert result.exit_code == 1
+    assert isinstance(result.exception, SystemExit)
+    assert "real result record failed" in result.stdout
+    assert "result manifest is missing" in result.stdout
+    assert "report: reports/real_result_record_report.json" in result.stdout
+    assert "Traceback" not in result.output

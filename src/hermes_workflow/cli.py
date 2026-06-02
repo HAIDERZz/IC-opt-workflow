@@ -17,6 +17,7 @@ from hermes_workflow.package import (
     create_project_from_template,
 )
 from hermes_workflow.real_run import prepare_real_run
+from hermes_workflow.real_result_record import record_real_result
 from hermes_workflow.result_handoff import check_real_run
 from hermes_workflow.validate import validate_project_files
 
@@ -264,6 +265,36 @@ def check_metric_results_command(
     for issue in report.issues:
         typer.echo(issue)
     typer.echo("report: reports/metric_result_check_report.json")
+    raise typer.Exit(code=1)
+
+
+@app.command("record-real-result")
+def record_real_result_command(
+    project_dir: Annotated[
+        Path,
+        typer.Argument(help="Project directory with checked real result artifacts."),
+    ],
+    run_id: Annotated[
+        str | None,
+        typer.Option("--run-id", help="Real-run package id such as real_001."),
+    ] = None,
+) -> None:
+    try:
+        report = record_real_result(project_dir, run_id=run_id)
+    except (OSError, ValueError) as exc:
+        _exit_with_error(exc)
+    if report.status.value == "pass":
+        typer.echo("real result recorded")
+        typer.echo(f"run: runs/real/{report.run_id}")
+        typer.echo(f"ledger: {report.ledger_path}")
+        typer.echo(f"state: {report.optimizer_state_path}")
+        typer.echo("report: reports/real_result_record_report.json")
+        return
+
+    typer.echo("real result record failed")
+    for issue in report.issues:
+        typer.echo(issue)
+    typer.echo("report: reports/real_result_record_report.json")
     raise typer.Exit(code=1)
 
 
