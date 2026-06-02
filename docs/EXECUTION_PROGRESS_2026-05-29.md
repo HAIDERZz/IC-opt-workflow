@@ -865,7 +865,7 @@ Locked C-8 policy:
 
 Next recommended action:
 
-- C-9 next real-run package contract is complete through implementation and review gate. Next, choose failure/retry policy or local smoke chaining C-9 -> C-7 -> C-8.
+- Historical after C-8/C-9: choose failure/retry policy or local smoke chaining C-9 -> C-7 -> C-8. This is now superseded by C-10 planning below; execute C-10 before C-11 local smoke.
 
 ## Plan C C-9 Next Real-Run Package Contract
 
@@ -907,6 +907,40 @@ Next recommended action:
 
 - Choose failure/retry policy for failed real-run packages, or run a local smoke that chains C-9 -> C-7 -> C-8 on a known test cell.
 
+## Plan C C-10 Real-Run Failure Retry Policy Contract
+
+Status: design spec and implementation plan complete as of 2026-06-02; code implementation has not started.
+
+Spec:
+
+- `docs/superpowers/specs/2026-06-02-real-run-failure-retry-policy-contract-design.md`
+- Commit: `68c404a docs: design real run failure retry policy`
+
+Implementation plan:
+
+- `docs/superpowers/plans/2026-06-02-real-run-failure-retry-policy-contract.md`
+- Commit: `13d39e9 docs: plan real run failure retry policy`
+
+Planned:
+
+- Add recovery report schemas for real-run recovery status, classification, allowed actions, and assessment reports.
+- Add `real_run_recovery.py` to classify pending, invalid, failed, partial, metric-failed, recordable, already-recorded, retry-prepared, abandoned, and stopped real-run states.
+- Add explicit supervisor recovery decisions through `recovery_decision.json`.
+- Add retry package preparation for the same candidate using a new `run_id`, while preserving failed-run artifacts.
+- Add a C-9 unresolved-run guard so `prepare-next-real-run` cannot advance past unresolved pending/failed/partial/retry-prepared packages.
+- Add CLI commands: `assess-real-run-recovery`, `prepare-real-run-retry`, and `resolve-real-run-failure`.
+
+Locked C-10 policy:
+
+- C-10 is contract-only.
+- It must not run Virtuoso, Spectre, OCEAN, SSH, Claude CLI, `virtuoso-bridge-lite`, or the C-7 adapter.
+- It must not parse PSF, rewrite OCEAN formulas, compute metrics in Python, write optimizer ledger/state, or add failure-penalty rows.
+- C-11 local smoke and real tool/agent integration must wait until C-10 implementation passes review/final gate.
+
+Next required action:
+
+- Execute C-10 Task 1 from `docs/superpowers/plans/2026-06-02-real-run-failure-retry-policy-contract.md` using Subagent-Driven Development.
+
 ## Locked Role Model
 
 Status: locked as of 2026-06-02.
@@ -932,5 +966,5 @@ Do not use "Hermes agent" as a role name in future specs or plans. If older docu
 3. ic-auto-opt-workflow/docs/COMPACT_RESUME_CHECKPOINT.md
 4. ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。请先阅读 docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md。Hermes File Contract MVP 的 Plan A Task 1-9 已完成；Plan B mock optimization loop 已完成；Plan C C-1/C-2/C-3/C-4/C-5/C-5.5/C-6/C-7/C-8/C-9 均已完成并通过相应 verification/review gate。下一步选择 failure/retry policy 或 local smoke chaining C-9 -> C-7 -> C-8。Spectre + OCEAN backend 已通过真实工具链证据验证。不要提交或复制本地真实 input.scs 示例，不要让 agent 重写公式，不要用 Python 解析 PSF 或重写 Calculator/OCEAN 公式。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。请先阅读 docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md。Hermes File Contract MVP 的 Plan A Task 1-9 已完成；Plan B mock optimization loop 已完成；Plan C C-1/C-2/C-3/C-4/C-5/C-5.5/C-6/C-7/C-8/C-9 均已完成并通过相应 verification/review gate。C-10 real-run failure/retry policy contract 的 design spec 和 implementation plan 已完成并提交，但代码实现尚未开始。下一步请使用 Subagent-Driven Development 从 docs/superpowers/plans/2026-06-02-real-run-failure-retry-policy-contract.md 的 Task 1 开始执行。不要跳到 C-11 local smoke 或真实工具/agent 接入，直到 C-10 通过 review/final gate。Spectre + OCEAN backend 已通过真实工具链证据验证。不要提交或复制本地真实 input.scs 示例，不要让 agent 重写公式，不要用 Python 解析 PSF 或重写 Calculator/OCEAN 公式。
 ```

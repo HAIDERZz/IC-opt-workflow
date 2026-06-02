@@ -17,8 +17,9 @@
 - Plan C C-7 Spectre + OCEAN execution adapter 已完成并通过 final combined review gate：新增 execution-side adapter library、fake-runner orchestration、failure/overwrite safety、explicit `tools/run_spectre_ocean_adapter.py` entry point。自动测试使用 fake runner；真实 Cadence smoke 仍然只作为 local-only evidence。
 - Plan C C-8 real result ledger/state update 已完成并通过 final review gate：`hermes-workflow record-real-result` 在 `check-real-run` 和 `check-metric-results` 通过后，将 checked real metric result 写入 `ledger/experiment_ledger.jsonl`、`state/optimizer_state.json` 和 ledger-derived best candidate。C-8 仍是 contract-only，不运行真实工具，不解析 PSF，不重写公式，不生成下一候选。
 - Plan C C-9 next real-run package contract 已完成并通过 final review gate：`hermes-workflow prepare-next-real-run` 在 C-8 已记录 checked real result 之后，按 optimizer config 的 deterministic initialization sequence 选择下一唯一候选，生成新的 C-4/C-6-compatible real-run package。C-9 不运行真实工具，不调用 C-7 adapter，不写 ledger/state，不解析 PSF，不改写公式，并 fail-closed 拒绝 symlinked real-run directories。
+- Plan C C-10 real-run failure/retry policy contract 已完成 design spec 和 implementation plan，但代码实现尚未开始：计划新增 recovery assessment、explicit supervisor recovery decision、same-candidate retry package、C-9 unresolved-run guard 和相关 CLI。C-10 仍是 contract-only，不运行真实工具，不调用 C-7 adapter，不写 ledger/state，不解析 PSF，不改写公式。
 - 角色模型已锁定在 `docs/ROLE_MODEL_AND_TERMINOLOGY.md`：主管 agent 负责规划、审批和读取 Hermes workflow report；Hermes workflow tooling 是 deterministic file-contract 与 validation 工具层；执行 agent 负责 Maestro export、approval 之后的 standalone Spectre、batch OCEAN metric extraction，以及后续被批准的 optimizer/tool-side 操作。
-- 下一步：选择 failure/retry policy 或本地 smoke 链接 C-9 -> C-7 -> C-8。
+- 下一步：按 Subagent-Driven Development 执行 C-10 Task 1。不要进入 C-11 local smoke 或真实工具/agent 接入，直到 C-10 通过 review/final gate。
 - `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example` 下的真实 `input.scs` 示例只作为本地参考，不能提交进仓库。
 
 ## 1. 项目概览
@@ -360,7 +361,9 @@ C-7 已将 physical tool boundary 接到 execution agent 侧：`supervisor agent
 
 C-8 已把 checked real result 接入 optimizer ledger/state：`check-real-run -> check-metric-results -> record-real-result`。它仍然保持 Hermes workflow tooling 的 contract-only 边界，只记录已由 OCEAN 计算并由 checker 验证的 scalar/provenance。
 
-C-9 已把下一真实候选 package 接入 workflow：`record-real-result -> prepare-next-real-run -> C-7 execution adapter`。它使用 deterministic initialization sequence + strict dedupe 生成下一 package，但仍然不运行真实工具、不写 ledger/state。下一步应选择 failure/retry policy 或本地 smoke 链接 C-9 -> C-7 -> C-8。
+C-9 已把下一真实候选 package 接入 workflow：`record-real-result -> prepare-next-real-run -> C-7 execution adapter`。它使用 deterministic initialization sequence + strict dedupe 生成下一 package，但仍然不运行真实工具、不写 ledger/state。
+
+C-10 已完成 design spec 和 implementation plan，但尚未实现。它是进入真实工具 smoke 前的 failure/retry 安全层：failed/partial/pending real-run package 必须先被 deterministic recovery assessment 和 explicit supervisor decision 处理，C-9 才能继续推进。下一步是执行 C-10 Task 1；C-11 local smoke 应在 C-10 实现并通过 review/final gate 后再开始。
 
 ## 4. 能否严格约束主管 agent 和执行 agent 的行为
 
