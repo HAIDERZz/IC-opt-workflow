@@ -85,7 +85,7 @@ Do not add `real_error` in C-8.
 - Modify: `tests/test_mock_optimizer.py`
 - Modify: `docs/superpowers/plans/2026-06-02-real-result-ledger-state-update.md`
 
-- [ ] **Step 1: Write failing schema tests**
+- [x] **Step 1: Write failing schema tests**
 
 Create `tests/test_real_result_record.py` with imports and initial tests:
 
@@ -211,7 +211,7 @@ def test_ledger_row_accepts_real_constraint_fail_status() -> None:
     assert row.simulation_status == "real_constraint_fail"
 ```
 
-- [ ] **Step 2: Run tests and verify failure**
+- [x] **Step 2: Run tests and verify failure**
 
 Run:
 
@@ -221,7 +221,7 @@ python3 -m pytest tests/test_real_result_record.py tests/test_mock_optimizer.py:
 
 Expected: FAIL because real ledger fields and real result report schemas do not exist yet.
 
-- [ ] **Step 3: Extend `LedgerRow`**
+- [x] **Step 3: Extend `LedgerRow`**
 
 Modify `src/hermes_workflow/schemas.py`:
 
@@ -263,7 +263,7 @@ class LedgerRow(StrictModel):
         return value
 ```
 
-- [ ] **Step 4: Add record report schemas**
+- [x] **Step 4: Add record report schemas**
 
 Modify `src/hermes_workflow/reports.py`:
 
@@ -296,7 +296,7 @@ class RealResultRecordReport(StrictReport):
     issues: list[str] = Field(default_factory=list)
 ```
 
-- [ ] **Step 5: Run focused tests**
+- [x] **Step 5: Run focused tests**
 
 Run:
 
@@ -306,7 +306,7 @@ python3 -m pytest tests/test_real_result_record.py tests/test_mock_optimizer.py:
 
 Expected: PASS.
 
-- [ ] **Step 6: Run shared schema/writer tests**
+- [x] **Step 6: Run shared schema/writer tests**
 
 Run:
 
@@ -1418,4 +1418,3 @@ Update this task's checkboxes to `[x]` after final verification and review appro
 - Backwards compatibility: Task 1 keeps existing mock ledger rows valid while adding optional real-result provenance.
 - Safety check: Task 2 and Task 4 verify no ledger/state writes happen on failed checks or duplicate attempts.
 - Next scope: C-9 next-candidate generation and failure/retry policy remain out of C-8.
-

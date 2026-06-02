@@ -153,7 +153,7 @@ def write_ledger_row(project_dir: Path, row: object) -> Path:
     ledger_dir.mkdir(parents=True, exist_ok=True)
     path = ledger_dir / "experiment_ledger.jsonl"
     with path.open("a", encoding="utf-8") as f:
-        f.write(row.model_dump_json() + "\n")
+        f.write(row.model_dump_json(exclude_none=True) + "\n")
     return path
 
 

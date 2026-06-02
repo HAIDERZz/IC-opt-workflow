@@ -59,17 +59,40 @@ def test_ledger_row_rejects_extra_fields() -> None:
 
 
 def test_ledger_row_rejects_invalid_simulation_status() -> None:
-    for bad_status in ("real_pass", "running", "completed", ""):
+    for bad_status in ("real_error", "running", "completed", ""):
         payload = {**VALID_LEDGER_ROW, "simulation_status": bad_status}
         with pytest.raises(ValidationError):
             LedgerRow.model_validate(payload)
 
 
 def test_ledger_row_accepts_all_valid_statuses() -> None:
-    for status in ("mock_pass", "mock_constraint_fail", "mock_error"):
+    for status in (
+        "mock_pass",
+        "mock_constraint_fail",
+        "mock_error",
+        "real_pass",
+        "real_constraint_fail",
+    ):
         payload = {**VALID_LEDGER_ROW, "simulation_status": status}
         row = LedgerRow.model_validate(payload)
         assert row.simulation_status == status
+
+
+def test_ledger_row_accepts_real_constraint_fail_status() -> None:
+    row = LedgerRow(
+        candidate_id="real_001",
+        parameters={"FN": "2"},
+        metrics={"rise": 1.0},
+        constraints_passed=False,
+        objective=1.0,
+        batch_id=1,
+        simulation_status="real_constraint_fail",
+        timestamp_utc="2026-06-02T12:00:00Z",
+        result_source="real",
+        run_id="real_001",
+    )
+
+    assert row.simulation_status == "real_constraint_fail"
 
 
 def test_ledger_row_rejects_bool_as_batch_id() -> None:
@@ -657,6 +680,38 @@ class TestWriteLedgerRow:
         assert parsed["candidate_id"] == "cand_001"
         assert parsed["objective"] == 52.0
 
+    def test_write_mock_ledger_row_omits_empty_real_result_fields(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        import json
+
+        project_dir = tmp_path / "test_project"
+        project_dir.mkdir()
+        row = LedgerRow(
+            candidate_id="cand_001",
+            parameters={"FN": "4", "WN": "1.0 um"},
+            metrics={"rise": 52.0},
+            constraints_passed=True,
+            objective=52.0,
+            batch_id=1,
+            simulation_status="mock_pass",
+            timestamp_utc="2026-05-29T12:00:00Z",
+        )
+
+        write_ledger_row(project_dir, row)
+
+        content = (
+            project_dir
+            / "ledger"
+            / "experiment_ledger.jsonl"
+        ).read_text(encoding="utf-8").strip()
+        parsed = json.loads(content)
+        assert "result_source" not in parsed
+        assert "run_id" not in parsed
+        assert "result_manifest" not in parsed
+        assert "metric_result_manifest" not in parsed
+
 
 class TestWriteOptimizerState:
     def test_write_optimizer_state_creates_file(self, tmp_path: Path) -> None:
@@ -955,4 +1010,8 @@ class TestRunMockOptimization:
             assert "objective" in row
             assert "batch_id" in row
             assert "simulation_status" in row
+            assert "result_source" not in row
+            assert "run_id" not in row
+            assert "result_manifest" not in row
+            assert "metric_result_manifest" not in row
             assert "timestamp_utc" in row

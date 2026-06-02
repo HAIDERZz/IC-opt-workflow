@@ -54,6 +54,11 @@ class ObjectiveDirection(StrEnum):
     MAXIMIZE = "maximize"
 
 
+class ResultSource(StrEnum):
+    MOCK = "mock"
+    REAL = "real"
+
+
 class OceanExpressionSource(StrEnum):
     USER_APPROVED = "user_approved"
     MAESTRO_OUTPUT_APPROVED = "maestro_output_approved"
@@ -280,11 +285,21 @@ class LedgerRow(StrictModel):
     batch_id: StrictInt
     simulation_status: str
     timestamp_utc: str
+    result_source: ResultSource | None = None
+    run_id: str | None = None
+    result_manifest: str | None = None
+    metric_result_manifest: str | None = None
 
     @field_validator("simulation_status")
     @classmethod
     def _status_is_recognized(cls, value: str) -> str:
-        allowed = {"mock_pass", "mock_constraint_fail", "mock_error"}
+        allowed = {
+            "mock_pass",
+            "mock_constraint_fail",
+            "mock_error",
+            "real_pass",
+            "real_constraint_fail",
+        }
         if value not in allowed:
             raise ValueError(f"simulation_status must be one of {allowed}")
         return value

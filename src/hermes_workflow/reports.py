@@ -49,6 +49,11 @@ class MetricResultStatus(StrEnum):
     FAILED = "failed"
 
 
+class RealResultRecordStatus(StrEnum):
+    PASS = "pass"
+    FAIL = "fail"
+
+
 class NetlistPreparationReport(StrictReport):
     schema_version: str
     status: PassFail
@@ -141,6 +146,29 @@ class MetricResultCheckReport(StrictReport):
     psf_dir: str | None
     metrics: dict[str, CheckedMetricResult] = Field(default_factory=dict)
     checks: MetricResultCheckFlags
+    issues: list[str] = Field(default_factory=list)
+
+
+class RealResultRecordFlags(StrictReport):
+    real_run_check_ok: bool = False
+    metric_result_check_ok: bool = False
+    candidate_ok: bool = False
+    duplicate_ok: bool = False
+    objective_ok: bool = False
+    constraints_ok: bool = False
+    ledger_write_ok: bool = False
+    state_write_ok: bool = False
+
+
+class RealResultRecordReport(StrictReport):
+    schema_version: str
+    status: RealResultRecordStatus
+    run_id: str
+    candidate_id: str | None
+    ledger_path: str
+    optimizer_state_path: str
+    best_candidate_path: str | None
+    checks: RealResultRecordFlags
     issues: list[str] = Field(default_factory=list)
 
 
