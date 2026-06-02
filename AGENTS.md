@@ -16,10 +16,20 @@ Do not use "Hermes agent" as a role name. In this project, Hermes means workflow
 
 ## Current Development Cadence
 
-- Follow the active plan and task number exactly.
-- For C-10, stop after each task is implemented, verified, reviewed, committed, and recorded.
-- Do not start the next task until the user confirms.
-- Do not jump to C-11 local smoke or real tool/agent integration until C-10 passes review/final gate.
+- Follow the active plan and task number exactly. Read this file, the active design spec, the active implementation plan, the current progress files, and the relevant top-level plan before changing code.
+- Use `superpowers:subagent-driven-development` for implementation-plan tasks when subagents are available. This project overrides the generic "continuous execution" guidance: stop after each task is implemented, verified, reviewed, committed, and recorded unless the user explicitly asks to run multiple tasks without stopping.
+- Use codegraph during Subagent-Driven work. Before implementation, use codegraph context/search/explore tools to locate the affected modules, symbols, and dependency paths. If codegraph is unavailable or stale, say so and use `rg`/file reads as the fallback.
+- Per task, dispatch or emulate fresh-role work in this order: implementation, spec-compliance review, code-quality review. Spec review must pass before code-quality review starts. Open review issues must be fixed and re-reviewed.
+- After each task, report the work to the user: what changed, which files changed, which verification commands ran, review-gate status, commits made, and any remaining risks or decisions.
+- After each task, update project node files before stopping:
+  - `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`
+  - `docs/EXECUTION_PROGRESS_2026-05-29.md`
+  - `docs/COMPACT_RESUME_CHECKPOINT.md`
+  - the active implementation plan checkboxes/status
+  - this file's `Current Development Cadence` section if the cadence, next task, role model, or handoff expectations changed
+- After each task, audit the current implementation against the top-level plan and the active spec. Record whether the route is still aligned or what changed.
+- If development reveals a plan/spec problem and the implementation must differ from the written plan, synchronize the active design spec, active implementation plan, and any affected top-level plan before claiming the task is complete. Do not leave code and planning documents divergent.
+- Do not start the next task until the user confirms. Do not jump to C-11 local smoke or real tool/agent integration until C-10 passes review/final gate.
 - Keep progress files aligned with implementation before context compaction.
 
 ## Contract Boundaries
