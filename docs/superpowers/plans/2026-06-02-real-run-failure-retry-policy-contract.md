@@ -1041,11 +1041,12 @@ Check:
 - Modify: `tests/test_real_run_recovery.py`
 - Modify: `docs/superpowers/plans/2026-06-02-real-run-failure-retry-policy-contract.md`
 
-- [ ] **Step 1: Add failing decision and retry tests**
+- [x] **Step 1: Add failing decision and retry tests**
 
 Append to `tests/test_real_run_recovery.py`:
 
 ```python
+from hermes_workflow.metric_requests import expression_sha256
 from hermes_workflow.real_run_recovery import (
     prepare_real_run_retry,
     resolve_real_run_failure,
@@ -1113,6 +1114,35 @@ def test_prepare_retry_preserves_rendered_input(tmp_path: Path) -> None:
     assert retry_text == original
 
 
+def test_prepare_retry_preserves_rendered_input_after_template_change(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_project(tmp_path)
+    _write_result_manifest(project_dir, status="failed")
+    original = (
+        project_dir / "runs" / "real" / "real_001" / "input.scs"
+    ).read_text(encoding="utf-8")
+    template_path = project_dir / "netlists" / "templates" / "template.scs"
+    template_path.write_text(
+        TEMPLATE_TEXT.replace("stop=10n", "stop=20n"),
+        encoding="utf-8",
+    )
+
+    prepare_real_run_retry(
+        project_dir,
+        failed_run_id="real_001",
+        retry_run_id="real_002",
+        reason="try once more",
+        decided_at_utc="2026-06-02T01:00:00Z",
+    )
+
+    retry_text = (
+        project_dir / "runs" / "real" / "real_002" / "input.scs"
+    ).read_text(encoding="utf-8")
+    assert retry_text == original
+    assert "stop=20n" not in retry_text
+
+
 def test_prepare_retry_refuses_existing_target(tmp_path: Path) -> None:
     project_dir = _create_ready_project(tmp_path)
     _write_result_manifest(project_dir, status="failed")
@@ -1129,6 +1159,23 @@ def test_prepare_retry_refuses_existing_target(tmp_path: Path) -> None:
         )
 
     assert (target / "leftover.txt").read_text(encoding="utf-8") == "old data\n"
+
+
+def test_prepare_retry_refuses_existing_empty_target(tmp_path: Path) -> None:
+    project_dir = _create_ready_project(tmp_path)
+    _write_result_manifest(project_dir, status="failed")
+    target = project_dir / "runs" / "real" / "real_002"
+    target.mkdir(parents=True)
+
+    with pytest.raises(FileExistsError, match="real run directory already exists"):
+        prepare_real_run_retry(
+            project_dir,
+            failed_run_id="real_001",
+            retry_run_id="real_002",
+            reason="try once more",
+        )
+
+    assert list(target.iterdir()) == []
 
 
 def test_prepare_retry_refuses_symlink_target(tmp_path: Path) -> None:
@@ -1148,6 +1195,96 @@ def test_prepare_retry_refuses_symlink_target(tmp_path: Path) -> None:
         )
 
     assert list(outside.iterdir()) == []
+
+
+def test_prepare_retry_refuses_symlinked_real_run_parent(tmp_path: Path) -> None:
+    project_dir = _create_ready_project(tmp_path)
+    _write_result_manifest(project_dir, status="failed")
+    real_root = project_dir / "runs" / "real"
+    outside_real_root = tmp_path / "outside_real_root"
+    real_root.rename(outside_real_root)
+    real_root.symlink_to(outside_real_root, target_is_directory=True)
+
+    with pytest.raises(FileExistsError, match="parent directory must not be a symlink"):
+        prepare_real_run_retry(
+            project_dir,
+            failed_run_id="real_001",
+            retry_run_id="real_002",
+            reason="try once more",
+        )
+
+    assert not (outside_real_root / "real_002").exists()
+
+
+def test_prepare_retry_refuses_symlinked_runs_parent(tmp_path: Path) -> None:
+    project_dir = _create_ready_project(tmp_path)
+    _write_result_manifest(project_dir, status="failed")
+    runs_root = project_dir / "runs"
+    outside_runs_root = tmp_path / "outside_runs_root"
+    runs_root.rename(outside_runs_root)
+    runs_root.symlink_to(outside_runs_root, target_is_directory=True)
+
+    with pytest.raises(FileExistsError, match="parent directory must not be a symlink"):
+        prepare_real_run_retry(
+            project_dir,
+            failed_run_id="real_001",
+            retry_run_id="real_002",
+            reason="try once more",
+        )
+
+    assert not (outside_runs_root / "real" / "real_002").exists()
+
+
+def test_prepare_retry_refuses_symlinked_decision_file(tmp_path: Path) -> None:
+    project_dir = _create_ready_project(tmp_path)
+    _write_result_manifest(project_dir, status="failed")
+    decision_path = project_dir / "runs" / "real" / "real_001" / "recovery_decision.json"
+    outside_decision = tmp_path / "outside_decision.json"
+    decision_path.symlink_to(outside_decision)
+
+    with pytest.raises(FileExistsError, match="recovery decision must not be a symlink"):
+        prepare_real_run_retry(
+            project_dir,
+            failed_run_id="real_001",
+            retry_run_id="real_002",
+            reason="try once more",
+        )
+
+    assert not outside_decision.exists()
+    assert not (project_dir / "runs" / "real" / "real_002").exists()
+
+
+def test_prepare_retry_requires_metric_formula_contract_to_match_failed_run(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_project(tmp_path)
+    _write_result_manifest(project_dir, status="failed")
+    run_dir = project_dir / "runs" / "real" / "real_001"
+    request_path = run_dir / "metric_extraction_request.json"
+    request = _load_json(request_path)
+    request["metrics"][0]["expression"] = 'value(VT("/OUT") 1n)'
+    request["metrics"][0]["expression_sha256"] = expression_sha256(
+        request["metrics"][0]["expression"]
+    )
+    _write_json(request_path, request)
+    manifest_path = run_dir / "real_run_manifest.json"
+    manifest = _load_json(manifest_path)
+    manifest["metric_extraction_request_sha256"] = sha256_file(request_path)
+    _write_json(manifest_path, manifest)
+
+    with pytest.raises(
+        ValueError,
+        match="retry metric formula contract does not match failed run",
+    ):
+        prepare_real_run_retry(
+            project_dir,
+            failed_run_id="real_001",
+            retry_run_id="real_002",
+            reason="try once more",
+        )
+
+    assert not (run_dir / "recovery_decision.json").exists()
+    assert not (project_dir / "runs" / "real" / "real_002").exists()
 
 
 def test_prepare_retry_refuses_third_attempt(tmp_path: Path) -> None:
@@ -1194,9 +1331,48 @@ def test_resolve_abandon_writes_decision_without_retry(tmp_path: Path) -> None:
     assert decision["decision"] == "abandon_candidate"
     assert "retry_run_id" not in decision
     assert report.classification == RealRunRecoveryClassification.RESOLVED_ABANDONED
+
+
+def test_resolve_failure_refuses_symlinked_runs_parent(tmp_path: Path) -> None:
+    project_dir = _create_ready_project(tmp_path)
+    _write_result_manifest(project_dir, status="failed")
+    runs_root = project_dir / "runs"
+    outside_runs_root = tmp_path / "outside_runs_root"
+    runs_root.rename(outside_runs_root)
+    runs_root.symlink_to(outside_runs_root, target_is_directory=True)
+
+    with pytest.raises(FileExistsError, match="parent directory must not be a symlink"):
+        resolve_real_run_failure(
+            project_dir,
+            run_id="real_001",
+            decision="abandon_candidate",
+            reason="candidate is not worth retrying",
+        )
+
+    assert not (
+        outside_runs_root / "real" / "real_001" / "recovery_decision.json"
+    ).exists()
+
+
+def test_resolve_failure_refuses_symlinked_decision_file(tmp_path: Path) -> None:
+    project_dir = _create_ready_project(tmp_path)
+    _write_result_manifest(project_dir, status="failed")
+    decision_path = project_dir / "runs" / "real" / "real_001" / "recovery_decision.json"
+    outside_decision = tmp_path / "outside_decision.json"
+    decision_path.symlink_to(outside_decision)
+
+    with pytest.raises(FileExistsError, match="recovery decision must not be a symlink"):
+        resolve_real_run_failure(
+            project_dir,
+            run_id="real_001",
+            decision="abandon_candidate",
+            reason="candidate is not worth retrying",
+        )
+
+    assert not outside_decision.exists()
 ```
 
-- [ ] **Step 2: Run new tests and verify they fail**
+- [x] **Step 2: Run new tests and verify they fail**
 
 Run:
 
@@ -1206,7 +1382,7 @@ python3 -m pytest tests/test_real_run_recovery.py::test_prepare_retry_writes_dec
 
 Expected: import failure for `prepare_real_run_retry` and `resolve_real_run_failure`.
 
-- [ ] **Step 3: Refactor `real_run.py` package writer for retry candidate identity**
+- [x] **Step 3: Refactor `real_run.py` package writer for retry candidate identity**
 
 Modify `_write_real_run_package()` in `src/hermes_workflow/real_run.py`:
 
@@ -1269,7 +1445,21 @@ Change the manifest field:
 
 Existing first-run and next-run behavior remains unchanged because their candidate payloads already use `candidate_id == run_id`.
 
-- [ ] **Step 4: Implement decision and retry functions**
+Also add a keyword-only `rendered_text_override: str | None = None` argument to `_write_real_run_package()`. Normal first-run and next-run calls leave it unset and continue rendering from the template. Retry calls pass the failed run's exact existing `input.scs` text so later template changes cannot alter the retry deck.
+
+Before creating a run directory, fail closed if `runs` or `runs/real` is a symlink:
+
+```python
+def _assert_real_run_parent_dirs_are_not_symlinks(project_dir: Path) -> None:
+    for relative_path in ("runs", REAL_RUN_ROOT):
+        path = project_dir / Path(*PurePosixPath(relative_path).parts)
+        if path.is_symlink():
+            raise FileExistsError(
+                f"real run parent directory must not be a symlink: {path}"
+            )
+```
+
+- [x] **Step 4: Implement decision and retry functions**
 
 Extend `src/hermes_workflow/real_run_recovery.py` imports:
 
@@ -1282,6 +1472,7 @@ from hermes_workflow.real_run import (
     _approved_hashes,
     _assert_approved,
     _assert_config_hashes,
+    _assert_real_run_parent_dirs_are_not_symlinks,
     _load_execution_manifest,
     _load_supervisor_instruction,
     _next_unused_run_id,
@@ -1292,6 +1483,21 @@ from hermes_workflow.real_run import (
 Add:
 
 ```python
+METRIC_FORMULA_CONTRACT_FIELDS = (
+    "name",
+    "unit",
+    "required_signals",
+    "result",
+    "expression",
+    "expression_sha256",
+    "expression_source",
+    "source_reference",
+    "expected_value_type",
+    "nil_policy",
+    "non_finite_policy",
+)
+
+
 @dataclass(frozen=True)
 class RealRunRetryPackage:
     run_id: str
@@ -1313,6 +1519,7 @@ def prepare_real_run_retry(
 ) -> RealRunRetryPackage:
     project_dir = Path(project_dir)
     selected_failed_run_id = _validate_run_id(failed_run_id)
+    _assert_real_run_parent_dirs_are_not_symlinks(project_dir)
     assessment = assess_real_run_recovery(
         project_dir,
         run_id=selected_failed_run_id,
@@ -1336,6 +1543,8 @@ def prepare_real_run_retry(
 
     failed_run_dir = project_dir / REAL_RUN_ROOT / selected_failed_run_id
     failed_candidate = _load_json(failed_run_dir / "candidate.json")
+    failed_input_text = _failed_rendered_input_text(failed_run_dir)
+    failed_metric_request = _load_json(failed_run_dir / "metric_extraction_request.json")
     failed_parameters = failed_candidate.get("parameters")
     if not isinstance(failed_parameters, dict) or not all(
         isinstance(key, str) and isinstance(value, str)
@@ -1347,8 +1556,7 @@ def prepare_real_run_retry(
         raise ValueError("failed run candidate_id is unknown")
 
     decision_path = failed_run_dir / RECOVERY_DECISION_NAME
-    if decision_path.exists():
-        raise FileExistsError(f"recovery decision already exists: {decision_path}")
+    _assert_decision_target_available(decision_path)
 
     decision_payload = _decision_payload(
         project_dir,
@@ -1383,11 +1591,17 @@ def prepare_real_run_retry(
             approved_hashes,
             manifest_extra={
                 "package_kind": "retry",
+                "candidate_source": "retry_same_candidate",
                 "retry_of_run_id": selected_failed_run_id,
                 "retry_attempt_number": assessment.attempt_number + 1,
                 "recovery_decision": _decision_relative(selected_failed_run_id),
                 "recovery_decision_sha256": sha256_file(decision_path),
             },
+            rendered_text_override=failed_input_text,
+        )
+        _assert_metric_formula_contract_preserved(
+            failed_metric_request,
+            package.metric_request_payload,
         )
     except Exception:
         decision_path.unlink(missing_ok=True)
@@ -1410,6 +1624,7 @@ def resolve_real_run_failure(
 ) -> RealRunRecoveryReport:
     project_dir = Path(project_dir)
     selected_run_id = _validate_run_id(run_id)
+    _assert_real_run_parent_dirs_are_not_symlinks(project_dir)
     action = RealRunRecoveryAction(decision)
     if action == RealRunRecoveryAction.RETRY_SAME_CANDIDATE:
         raise ValueError("use prepare_real_run_retry for retry_same_candidate")
@@ -1429,8 +1644,7 @@ def resolve_real_run_failure(
 
     run_dir = project_dir / REAL_RUN_ROOT / selected_run_id
     decision_path = run_dir / RECOVERY_DECISION_NAME
-    if decision_path.exists():
-        raise FileExistsError(f"recovery decision already exists: {decision_path}")
+    _assert_decision_target_available(decision_path)
     if assessment.candidate_id is None:
         raise ValueError("run candidate_id is unknown")
     payload = _decision_payload(
@@ -1480,11 +1694,56 @@ def _decision_payload(
     return payload
 
 
+def _failed_rendered_input_text(failed_run_dir: Path) -> str:
+    input_path = failed_run_dir / "input.scs"
+    if not input_path.exists():
+        raise FileNotFoundError(f"failed run rendered input is missing: {input_path}")
+    return input_path.read_text(encoding="utf-8")
+
+
+def _assert_decision_target_available(decision_path: Path) -> None:
+    if decision_path.is_symlink():
+        raise FileExistsError(
+            f"recovery decision must not be a symlink: {decision_path}"
+        )
+    if decision_path.exists():
+        raise FileExistsError(f"recovery decision already exists: {decision_path}")
+
+
+def _assert_metric_formula_contract_preserved(
+    failed_request: dict,
+    retry_request: dict,
+) -> None:
+    if _metric_formula_contract(failed_request) != _metric_formula_contract(
+        retry_request
+    ):
+        raise ValueError(
+            "retry metric formula contract does not match failed run"
+        )
+
+
+def _metric_formula_contract(request: dict) -> list[dict]:
+    metrics = request.get("metrics")
+    if not isinstance(metrics, list):
+        raise ValueError("metric extraction request metrics are invalid")
+    contract = []
+    for metric in metrics:
+        if not isinstance(metric, dict):
+            raise ValueError("metric extraction request metric is invalid")
+        contract.append(
+            {
+                field: metric.get(field)
+                for field in METRIC_FORMULA_CONTRACT_FIELDS
+            }
+        )
+    return contract
+
+
 def _utc_now() -> str:
     return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 ```
 
-- [ ] **Step 5: Run retry tests and verify they pass**
+- [x] **Step 5: Run retry tests and verify they pass**
 
 Run:
 
@@ -1494,7 +1753,7 @@ python3 -m pytest tests/test_real_run_recovery.py -q
 
 Expected: all recovery tests pass.
 
-- [ ] **Step 6: Run package compatibility tests**
+- [x] **Step 6: Run package compatibility tests**
 
 Run:
 
@@ -1505,14 +1764,14 @@ python3 -m ruff check src/hermes_workflow/real_run.py src/hermes_workflow/real_r
 
 Expected: all tests pass and ruff is clean.
 
-- [ ] **Step 7: Commit Task 3**
+- [x] **Step 7: Commit Task 3**
 
 ```bash
 git add src/hermes_workflow/real_run.py src/hermes_workflow/real_run_recovery.py tests/test_real_run_recovery.py docs/superpowers/plans/2026-06-02-real-run-failure-retry-policy-contract.md
 git commit -m "feat: prepare real run retry packages"
 ```
 
-- [ ] **Step 8: Task 3 review gate**
+- [x] **Step 8: Task 3 review gate**
 
 Run spec and code-quality reviews focused on:
 

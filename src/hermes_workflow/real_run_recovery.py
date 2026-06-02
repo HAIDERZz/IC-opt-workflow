@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 
 from pydantic import ValidationError
@@ -13,6 +15,17 @@ from hermes_workflow.metric_results import (
     check_metric_results,
 )
 from hermes_workflow.package import sha256_file
+from hermes_workflow.real_run import (
+    RealRunPackage,
+    _approved_hashes,
+    _assert_approved,
+    _assert_config_hashes,
+    _assert_real_run_parent_dirs_are_not_symlinks,
+    _load_execution_manifest,
+    _load_supervisor_instruction,
+    _next_unused_run_id,
+    _write_real_run_package,
+)
 from hermes_workflow.reports import (
     MetricResultCheckStatus,
     RealRunCheckStatus,
@@ -43,6 +56,19 @@ EXECUTION_EVIDENCE_NAMES = (
     "psf",
     "metrics",
 )
+METRIC_FORMULA_CONTRACT_FIELDS = (
+    "name",
+    "unit",
+    "required_signals",
+    "result",
+    "expression",
+    "expression_sha256",
+    "expression_source",
+    "source_reference",
+    "expected_value_type",
+    "nil_policy",
+    "non_finite_policy",
+)
 
 
 @dataclass(frozen=True)
@@ -50,6 +76,14 @@ class _Assessment:
     classification: RealRunRecoveryClassification
     candidate_id: str | None
     issues: list[str]
+
+
+@dataclass(frozen=True)
+class RealRunRetryPackage:
+    run_id: str
+    failed_run_id: str
+    decision_path: Path
+    package: RealRunPackage
 
 
 def assess_real_run_recovery(
@@ -121,6 +155,176 @@ def assess_real_run_recovery(
     if persist_report:
         _write_report(report_path, report)
     return report
+
+
+def prepare_real_run_retry(
+    project_dir: Path,
+    *,
+    failed_run_id: str,
+    retry_run_id: str | None = None,
+    reason: str,
+    decided_at_utc: str | None = None,
+) -> RealRunRetryPackage:
+    project_dir = Path(project_dir)
+    selected_failed_run_id = _validate_run_id(failed_run_id)
+    _assert_real_run_parent_dirs_are_not_symlinks(project_dir)
+    selected_retry_run_id = _validate_run_id(retry_run_id) if retry_run_id else None
+    if selected_retry_run_id == selected_failed_run_id:
+        raise ValueError("retry run_id must differ from failed run_id")
+    if selected_retry_run_id is not None:
+        _assert_retry_target_available(project_dir, selected_retry_run_id)
+
+    assessment = assess_real_run_recovery(
+        project_dir,
+        run_id=selected_failed_run_id,
+        persist_report=True,
+    )
+    if assessment.retry_budget_remaining <= 0:
+        raise ValueError("retry budget is exhausted")
+    if RealRunRecoveryAction.RETRY_SAME_CANDIDATE not in assessment.allowed_actions:
+        raise ValueError("retry_same_candidate is not allowed for this run")
+
+    manifest = _load_execution_manifest(project_dir)
+    instruction = _load_supervisor_instruction(project_dir)
+    _assert_approved(instruction)
+    approved_hashes = _approved_hashes(manifest, instruction)
+    _assert_config_hashes(project_dir, approved_hashes)
+    bundle = assert_valid_project(project_dir)
+
+    selected_retry_run_id = selected_retry_run_id or _next_unused_run_id(project_dir)
+
+    failed_run_dir = project_dir / REAL_RUN_ROOT / selected_failed_run_id
+    decision_path = failed_run_dir / RECOVERY_DECISION_NAME
+    _assert_decision_target_available(decision_path)
+    retry_run_dir = _assert_retry_target_available(project_dir, selected_retry_run_id)
+    retry_dir_existed = retry_run_dir.exists()
+
+    failed_candidate = _load_json(failed_run_dir / "candidate.json")
+    failed_input_text = _failed_rendered_input_text(failed_run_dir)
+    failed_metric_request = _load_json(failed_run_dir / "metric_extraction_request.json")
+    failed_parameters = failed_candidate.get("parameters")
+    if not isinstance(failed_parameters, dict) or not all(
+        isinstance(key, str) and isinstance(value, str)
+        for key, value in failed_parameters.items()
+    ):
+        raise ValueError("failed run candidate parameters are invalid")
+    candidate_id = assessment.candidate_id
+    if candidate_id is None:
+        raise ValueError("failed run candidate_id is unknown")
+
+    decided_at = decided_at_utc or _utc_now()
+    decision_payload = _decision_payload(
+        project_dir,
+        run_id=selected_failed_run_id,
+        candidate_id=candidate_id,
+        decision=RealRunRecoveryAction.RETRY_SAME_CANDIDATE,
+        reason=reason,
+        decided_at_utc=decided_at,
+        retry_run_id=selected_retry_run_id,
+        issues=assessment.issues,
+    )
+    decision_path.write_text(
+        json.dumps(decision_payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    retry_attempt_number = assessment.attempt_number + 1
+    retry_candidate = {
+        "schema_version": "1.0",
+        "candidate_id": candidate_id,
+        "source": "retry_same_candidate",
+        "candidate_index": failed_candidate.get("candidate_index"),
+        "parameters": failed_parameters,
+        "retry_of_run_id": selected_failed_run_id,
+        "retry_attempt_number": retry_attempt_number,
+        "recovery_decision": _decision_relative(selected_failed_run_id),
+    }
+    try:
+        package = _write_real_run_package(
+            bundle,
+            selected_retry_run_id,
+            retry_candidate,
+            decided_at,
+            instruction,
+            approved_hashes,
+            manifest_extra={
+                "candidate_source": "retry_same_candidate",
+                "package_kind": "retry",
+                "retry_of_run_id": selected_failed_run_id,
+                "retry_attempt_number": retry_attempt_number,
+                "recovery_decision": _decision_relative(selected_failed_run_id),
+                "recovery_decision_sha256": sha256_file(decision_path),
+            },
+            rendered_text_override=failed_input_text,
+        )
+        _assert_metric_formula_contract_preserved(
+            failed_metric_request,
+            package.metric_request_payload,
+        )
+    except Exception:
+        decision_path.unlink(missing_ok=True)
+        if (
+            not retry_dir_existed
+            and retry_run_dir.exists()
+            and not retry_run_dir.is_symlink()
+        ):
+            shutil.rmtree(retry_run_dir, ignore_errors=True)
+        raise
+    return RealRunRetryPackage(
+        run_id=selected_retry_run_id,
+        failed_run_id=selected_failed_run_id,
+        decision_path=decision_path,
+        package=package,
+    )
+
+
+def resolve_real_run_failure(
+    project_dir: Path,
+    *,
+    run_id: str,
+    decision: str,
+    reason: str,
+    decided_at_utc: str | None = None,
+) -> RealRunRecoveryReport:
+    project_dir = Path(project_dir)
+    selected_run_id = _validate_run_id(run_id)
+    _assert_real_run_parent_dirs_are_not_symlinks(project_dir)
+    action = RealRunRecoveryAction(decision)
+    if action == RealRunRecoveryAction.RETRY_SAME_CANDIDATE:
+        raise ValueError("use prepare_real_run_retry for retry_same_candidate")
+    if action in {
+        RealRunRecoveryAction.RECORD_RESULT,
+        RealRunRecoveryAction.WAIT_FOR_EXECUTION,
+    }:
+        raise ValueError(f"{action.value} is not a recovery decision")
+
+    assessment = assess_real_run_recovery(
+        project_dir,
+        run_id=selected_run_id,
+        persist_report=True,
+    )
+    if action not in assessment.allowed_actions:
+        raise ValueError(f"{action.value} is not allowed for this run")
+    if assessment.candidate_id is None:
+        raise ValueError("run candidate_id is unknown")
+
+    run_dir = project_dir / REAL_RUN_ROOT / selected_run_id
+    decision_path = run_dir / RECOVERY_DECISION_NAME
+    _assert_decision_target_available(decision_path)
+    payload = _decision_payload(
+        project_dir,
+        run_id=selected_run_id,
+        candidate_id=assessment.candidate_id,
+        decision=action,
+        reason=reason,
+        decided_at_utc=decided_at_utc or _utc_now(),
+        retry_run_id=None,
+        issues=assessment.issues,
+    )
+    decision_path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return assess_real_run_recovery(project_dir, run_id=selected_run_id)
 
 
 def _classify_run(project_dir: Path, run_id: str, run_dir: Path) -> _Assessment:
@@ -537,8 +741,98 @@ def _decision_relative(run_id: str) -> str:
     return f"{REAL_RUN_ROOT}/{run_id}/{RECOVERY_DECISION_NAME}"
 
 
+def _assert_retry_target_available(project_dir: Path, run_id: str) -> Path:
+    _assert_real_run_parent_dirs_are_not_symlinks(project_dir)
+    run_dir = project_dir / REAL_RUN_ROOT / run_id
+    if run_dir.is_symlink():
+        raise FileExistsError(f"real run directory must not be a symlink: {run_dir}")
+    if run_dir.exists() and any(run_dir.iterdir()):
+        raise FileExistsError(f"real run directory is not empty: {run_dir}")
+    if run_dir.exists():
+        raise FileExistsError(f"real run directory already exists: {run_dir}")
+    return run_dir
+
+
+def _assert_decision_target_available(decision_path: Path) -> None:
+    if decision_path.is_symlink():
+        raise FileExistsError(
+            f"recovery decision must not be a symlink: {decision_path}"
+        )
+    if decision_path.exists():
+        raise FileExistsError(f"recovery decision already exists: {decision_path}")
+
+
+def _failed_rendered_input_text(failed_run_dir: Path) -> str:
+    input_path = failed_run_dir / "input.scs"
+    if not input_path.exists():
+        raise FileNotFoundError(f"failed run rendered input is missing: {input_path}")
+    return input_path.read_text(encoding="utf-8")
+
+
+def _assert_metric_formula_contract_preserved(
+    failed_request: dict,
+    retry_request: dict,
+) -> None:
+    if _metric_formula_contract(failed_request) != _metric_formula_contract(
+        retry_request
+    ):
+        raise ValueError(
+            "retry metric formula contract does not match failed run"
+        )
+
+
+def _metric_formula_contract(request: dict) -> list[dict]:
+    metrics = request.get("metrics")
+    if not isinstance(metrics, list):
+        raise ValueError("metric extraction request metrics are invalid")
+    contract = []
+    for metric in metrics:
+        if not isinstance(metric, dict):
+            raise ValueError("metric extraction request metric is invalid")
+        contract.append(
+            {
+                field: metric.get(field)
+                for field in METRIC_FORMULA_CONTRACT_FIELDS
+            }
+        )
+    return contract
+
+
+def _decision_payload(
+    project_dir: Path,
+    *,
+    run_id: str,
+    candidate_id: str,
+    decision: RealRunRecoveryAction,
+    reason: str,
+    decided_at_utc: str,
+    retry_run_id: str | None,
+    issues: list[str],
+) -> dict:
+    report_path = project_dir / RECOVERY_REPORT
+    payload = {
+        "schema_version": DEFAULT_SCHEMA_VERSION,
+        "run_id": run_id,
+        "candidate_id": candidate_id,
+        "decision": decision.value,
+        "decided_at_utc": decided_at_utc,
+        "decided_by": "supervisor_agent",
+        "reason": reason,
+        "source_recovery_report": RECOVERY_REPORT,
+        "source_recovery_report_sha256": sha256_file(report_path),
+        "issues": issues,
+    }
+    if retry_run_id is not None:
+        payload["retry_run_id"] = retry_run_id
+    return payload
+
+
 def _write_report(path: Path, report: RealRunRecoveryReport) -> None:
     path.write_text(
         report.model_dump_json(indent=2) + "\n",
         encoding="utf-8",
     )
+
+
+def _utc_now() -> str:
+    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")

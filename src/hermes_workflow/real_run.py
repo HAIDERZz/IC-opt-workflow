@@ -369,7 +369,9 @@ def _write_real_run_package(
     approved_hashes: dict[str, str],
     *,
     manifest_extra: dict,
+    rendered_text_override: str | None = None,
 ) -> RealRunPackage:
+    _assert_real_run_parent_dirs_are_not_symlinks(bundle.project_dir)
     run_dir = _project_path(bundle, f"{REAL_RUN_ROOT}/{selected_run_id}")
     _assert_run_dir_is_not_symlink(run_dir)
     manifest_path = run_dir / "real_run_manifest.json"
@@ -395,19 +397,24 @@ def _write_real_run_package(
     created_run_dir = not run_dir.exists()
     try:
         run_dir.mkdir(parents=True, exist_ok=True)
-        rendered_text = _render_template(
-            template_path.read_text(encoding="utf-8"),
-            candidate["parameters"],
+        rendered_text = (
+            rendered_text_override
+            if rendered_text_override is not None
+            else _render_template(
+                template_path.read_text(encoding="utf-8"),
+                candidate["parameters"],
+            )
         )
         rendered_path.write_text(rendered_text, encoding="utf-8")
         candidate_path.write_text(
             json.dumps(candidate, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
+        candidate_id = str(candidate["candidate_id"])
         metric_request_payload = build_metric_extraction_request(
             bundle,
             run_id=selected_run_id,
-            candidate_id=selected_run_id,
+            candidate_id=candidate_id,
             prepared_input_scs=rendered_relative,
             prepared_input_sha256=sha256_file(rendered_path),
         )
@@ -418,6 +425,7 @@ def _write_real_run_package(
         manifest_payload = _build_manifest(
             bundle,
             selected_run_id,
+            candidate_id,
             created_at_utc,
             instruction,
             approved_hashes,
@@ -492,6 +500,7 @@ def _render_template(template_text: str, candidate: dict[str, str]) -> str:
 def _build_manifest(
     bundle: ContractBundle,
     run_id: str,
+    candidate_id: str,
     created_at_utc: str,
     instruction: dict,
     approved_hashes: dict[str, str],
@@ -516,7 +525,7 @@ def _build_manifest(
         "candidate_file": candidate_relative,
         "metric_extraction_request": metric_request_relative,
         "metric_extraction_request_sha256": sha256_file(metric_request_path),
-        "candidate_id": run_id,
+        "candidate_id": candidate_id,
         "candidate_source": "lower_bound_first_real_run",
         "approved_config_hashes": approved_hashes,
         "template_sha256": sha256_file(template_path),
@@ -535,6 +544,15 @@ def _build_manifest(
             "change_objective_or_constraints",
         ],
     }
+
+
+def _assert_real_run_parent_dirs_are_not_symlinks(project_dir: Path) -> None:
+    for relative_path in ("runs", REAL_RUN_ROOT):
+        path = project_dir / Path(*PurePosixPath(relative_path).parts)
+        if path.is_symlink():
+            raise FileExistsError(
+                f"real run parent directory must not be a symlink: {path}"
+            )
 
 
 def _utc_now() -> str:

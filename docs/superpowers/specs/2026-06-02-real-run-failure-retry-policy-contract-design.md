@@ -307,6 +307,12 @@ This is intentional:
 
 The retry package must preserve the exact rendered `input.scs` content and exact metric extraction request formulas for the candidate unless a later `revise_contracts` path explicitly changes project contracts before a new approval cycle.
 
+This preservation is literal file-contract preservation:
+
+- retry preparation copies the failed run's already-rendered `input.scs` content into the retry package instead of re-rendering from a possibly changed template file
+- retry preparation verifies the retry `metric_extraction_request.json` formula contract against the failed run's metric extraction request before accepting the retry package
+- `runs`, `runs/real`, and `runs/real/<retry_run_id>` must not be symlinks; parent-directory symlink traversal is a contract violation even when the retry leaf path itself is not a symlink
+
 ## Interaction With C-9
 
 C-10 should add an unresolved real-run guard before C-9 prepares another new candidate.
@@ -407,6 +413,7 @@ C-10 must fail closed and avoid writes when:
 - retry target run directory is a symlink
 - retry package write would overwrite existing artifacts
 - recovery decision already exists and no explicit future repair workflow is defined
+- `runs` or `runs/real` is a symlink
 - immutable config drift is detected
 
 When preparing a retry package, C-10 should prepare all payloads before creating final files. If a write fails, it should not leave a partial package that C-7 could execute.
