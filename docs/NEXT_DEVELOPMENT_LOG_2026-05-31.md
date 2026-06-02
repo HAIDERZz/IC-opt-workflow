@@ -254,7 +254,7 @@ Implemented:
 - `prepare_next_real_run()` selects the next unique candidate from the deterministic optimizer initialization sequence after C-8 records a checked real result.
 - `hermes-workflow prepare-next-real-run` writes the next C-4/C-6-compatible package under `runs/real/<run_id>/`.
 - C-9 deduplicates against strict ledger rows and already prepared run packages.
-- C-9 validates immutable config hashes, optimizer state consistency, ledger schema, max-evaluation bounds, run-id safety, overwrite safety, and partial run directory safety.
+- C-9 validates immutable config hashes, optimizer state consistency, ledger schema, max-evaluation bounds, run-id safety, overwrite safety, partial run directory safety, and symlinked real-run directory refusal.
 - Fake handoff coverage confirms `real_002` can flow through `check-real-run`, `check-metric-results`, and `record-real-result`.
 
 Still excluded:

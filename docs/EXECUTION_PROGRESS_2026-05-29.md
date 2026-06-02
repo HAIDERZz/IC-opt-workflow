@@ -893,7 +893,8 @@ Task verification:
 - Task 1 precondition gate: C-9 tests passed; C-4/C-8 related tests passed; ruff passed. Spec review approved. Code-quality review found a strict ledger coercion issue; it was fixed by strict finite ledger/best schema fields and re-reviewed as approved.
 - Task 2 package-writing gate: C-9/C-4/C-8 related tests passed; ruff passed. Spec review found partial run directory reuse; it was fixed so existing `real_###` directories are treated as used by default, explicit non-empty target directories fail closed, and existing partial contents are preserved. Spec re-review and code-quality review approved.
 - Tasks 3-4 integration/CLI gate: C-9, CLI, and real-result related tests passed; ruff passed. Batched spec and code-quality reviews approved.
-- Final verification: `python3 -m pytest -q` passed with 378 tests; `python3 -m ruff check src tests tools` passed; `git diff --check` produced no output.
+- Final review found one high-risk symlinked real-run directory issue. It was fixed so explicit `run_id`, default next-run scanning, and prepared-candidate scanning all reject symlinked `runs/real/real_###` directories before writes. Re-review approved.
+- Final verification: `python3 -m pytest -q` passed with 380 tests; `python3 -m ruff check src tests tools` passed; `git diff --check` produced no output.
 
 Locked C-9 policy:
 

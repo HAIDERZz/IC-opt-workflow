@@ -1120,7 +1120,7 @@ Implemented:
 - `prepare_next_real_run()` selects the next unique candidate from the deterministic optimizer initialization sequence after C-8 records a checked real result.
 - `hermes-workflow prepare-next-real-run` writes the next C-4/C-6-compatible package under `runs/real/<run_id>/`.
 - C-9 deduplicates against strict ledger rows and already prepared run packages.
-- C-9 validates immutable config hashes, optimizer state consistency, ledger schema, max-evaluation bounds, run-id safety, and overwrite safety.
+- C-9 validates immutable config hashes, optimizer state consistency, ledger schema, max-evaluation bounds, run-id safety, overwrite safety, partial run directory safety, and symlinked real-run directory refusal.
 
 Locked C-9 policy:
 
@@ -1172,14 +1172,14 @@ Expected:
 - ruff clean
 - no whitespace errors
 
-- [ ] **Step 6: Commit docs/progress**
+- [x] **Step 6: Commit docs/progress**
 
 ```bash
 git add docs/PROJECT_WORKFLOW_OVERVIEW.md docs/EXECUTION_PROGRESS_2026-05-29.md docs/COMPACT_RESUME_CHECKPOINT.md docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md docs/superpowers/plans/2026-06-02-next-real-run-package-contract.md
 git commit -m "docs: record next real run package progress"
 ```
 
-- [ ] **Step 7: Final combined review**
+- [x] **Step 7: Final combined review**
 
 Run code-quality review focused on:
 
@@ -1196,7 +1196,22 @@ Check:
 - untracked local OCEAN research/evidence files are not included
 ```
 
-- [ ] **Step 8: Mark C-9 complete in this plan**
+Final review result: approved after fixing symlinked `runs/real/real_###` handling. The fix rejects explicit symlink run directories before package writes, rejects symlinked `real_###` entries during default next-run scanning, and rejects symlinked run directories during prepared-candidate scanning.
+
+Final verification after review fix:
+
+```text
+python3 -m pytest -q
+380 passed
+
+python3 -m ruff check src tests tools
+All checks passed!
+
+git diff --check
+passed
+```
+
+- [x] **Step 8: Mark C-9 complete in this plan**
 
 Update this plan's task checkboxes to complete and leave the final verification command outputs in the task notes.
 

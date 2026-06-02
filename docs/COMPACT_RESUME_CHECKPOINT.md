@@ -82,8 +82,8 @@ Current execution state:
 - C-8 final verification after review fixes: `python3 -m pytest -q` passed with 362 tests; `python3 -m ruff check src tests tools` passed; `git diff --check` produced no output. Final re-review approved after ledger-derived best-candidate docs cleanup.
 - C-9 next real-run package contract design spec exists: `docs/superpowers/specs/2026-06-02-next-real-run-package-contract-design.md`.
 - C-9 implementation plan exists: `docs/superpowers/plans/2026-06-02-next-real-run-package-contract.md`.
-- C-9 is complete and reviewed. It adds `prepare_next_real_run()` and `hermes-workflow prepare-next-real-run`, selecting the next unique candidate from the deterministic initialization sequence after C-8 has recorded checked real results. C-9 remains contract-only and does not run real tools, call C-7, write ledger/state, parse PSF, or rewrite formulas.
-- C-9 final verification: `python3 -m pytest -q` passed with 378 tests; `python3 -m ruff check src tests tools` passed; `git diff --check` produced no output.
+- C-9 is complete and reviewed. It adds `prepare_next_real_run()` and `hermes-workflow prepare-next-real-run`, selecting the next unique candidate from the deterministic initialization sequence after C-8 has recorded checked real results. C-9 remains contract-only and does not run real tools, call C-7, write ledger/state, parse PSF, or rewrite formulas. Final review found and fixed a symlinked real-run directory issue; explicit run-id writes, default next-run scanning, and prepared-candidate scanning now fail closed on symlinked `real_###` directories.
+- C-9 final verification: `python3 -m pytest -q` passed with 380 tests; `python3 -m ruff check src tests tools` passed; `git diff --check` produced no output.
 - Current next action: choose failure/retry policy or local smoke chaining C-9 -> C-7 -> C-8.
 - Real `input.scs` examples under `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example` are local-only references and must not be committed.
 

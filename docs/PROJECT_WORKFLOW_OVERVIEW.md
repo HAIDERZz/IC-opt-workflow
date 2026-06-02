@@ -16,9 +16,9 @@
 - Plan C C-6 Spectre + OCEAN real metric result contract 已完成并通过 final combined review gate：`metrics.yaml` 支持精确批准的 OCEAN 公式，`prepare-real-run` 写入 `metric_extraction_request.json`，returned handoff 可引用 PSF/metric artifacts，`hermes-workflow check-metric-results` 验证公式身份、request hash、scalar 值和 artifact path。
 - Plan C C-7 Spectre + OCEAN execution adapter 已完成并通过 final combined review gate：新增 execution-side adapter library、fake-runner orchestration、failure/overwrite safety、explicit `tools/run_spectre_ocean_adapter.py` entry point。自动测试使用 fake runner；真实 Cadence smoke 仍然只作为 local-only evidence。
 - Plan C C-8 real result ledger/state update 已完成并通过 final review gate：`hermes-workflow record-real-result` 在 `check-real-run` 和 `check-metric-results` 通过后，将 checked real metric result 写入 `ledger/experiment_ledger.jsonl`、`state/optimizer_state.json` 和 ledger-derived best candidate。C-8 仍是 contract-only，不运行真实工具，不解析 PSF，不重写公式，不生成下一候选。
-- Plan C C-9 next real-run package contract 已完成并通过 Tasks 1-4 review gate：`hermes-workflow prepare-next-real-run` 在 C-8 已记录 checked real result 之后，按 optimizer config 的 deterministic initialization sequence 选择下一唯一候选，生成新的 C-4/C-6-compatible real-run package。C-9 不运行真实工具，不调用 C-7 adapter，不写 ledger/state，不解析 PSF，不改写公式。
+- Plan C C-9 next real-run package contract 已完成并通过 final review gate：`hermes-workflow prepare-next-real-run` 在 C-8 已记录 checked real result 之后，按 optimizer config 的 deterministic initialization sequence 选择下一唯一候选，生成新的 C-4/C-6-compatible real-run package。C-9 不运行真实工具，不调用 C-7 adapter，不写 ledger/state，不解析 PSF，不改写公式，并 fail-closed 拒绝 symlinked real-run directories。
 - 角色模型已锁定在 `docs/ROLE_MODEL_AND_TERMINOLOGY.md`：主管 agent 负责规划、审批和读取 Hermes workflow report；Hermes workflow tooling 是 deterministic file-contract 与 validation 工具层；执行 agent 负责 Maestro export、approval 之后的 standalone Spectre、batch OCEAN metric extraction，以及后续被批准的 optimizer/tool-side 操作。
-- 下一步：完成 C-9 final verification/review 后，选择 failure/retry policy 或本地 smoke 链接 C-9 -> C-7 -> C-8。
+- 下一步：选择 failure/retry policy 或本地 smoke 链接 C-9 -> C-7 -> C-8。
 - `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example` 下的真实 `input.scs` 示例只作为本地参考，不能提交进仓库。
 
 ## 1. 项目概览
