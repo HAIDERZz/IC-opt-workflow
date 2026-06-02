@@ -19,6 +19,7 @@ from pydantic import (
 SCHEMA_VERSION = "1.0"
 NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 NonEmptyStr = Annotated[str, Field(min_length=1)]
+StrictFiniteFloat = Annotated[float, Field(strict=True, allow_inf_nan=False)]
 
 
 class StrictModel(BaseModel):
@@ -279,9 +280,9 @@ class OptimizerConfig(StrictModel):
 class LedgerRow(StrictModel):
     candidate_id: str
     parameters: dict[str, str]
-    metrics: dict[str, float]
-    constraints_passed: bool
-    objective: float
+    metrics: dict[str, StrictFiniteFloat]
+    constraints_passed: StrictBool
+    objective: StrictFiniteFloat
     batch_id: StrictInt
     simulation_status: str
     timestamp_utc: str
@@ -308,9 +309,9 @@ class LedgerRow(StrictModel):
 class BestCandidate(StrictModel):
     candidate_id: str
     parameters: dict[str, str]
-    metrics: dict[str, float]
-    constraints_passed: bool
-    objective: float
+    metrics: dict[str, StrictFiniteFloat]
+    constraints_passed: StrictBool
+    objective: StrictFiniteFloat
     batch_id: StrictInt
     timestamp_utc: str
 

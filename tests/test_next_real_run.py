@@ -180,6 +180,22 @@ def test_prepare_next_real_run_refuses_invalid_ledger(tmp_path: Path) -> None:
         prepare_next_real_run(project_dir)
 
 
+def test_prepare_next_real_run_refuses_coerced_ledger_types(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_project(tmp_path)
+    _record_real_001(project_dir)
+    ledger_path = project_dir / "ledger" / "experiment_ledger.jsonl"
+    row = json.loads(ledger_path.read_text(encoding="utf-8"))
+    row["metrics"]["rise"] = "1.0e-12"
+    row["constraints_passed"] = "true"
+    row["objective"] = "2.0e-18"
+    ledger_path.write_text(json.dumps(row) + "\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="ledger row 1 is invalid"):
+        prepare_next_real_run(project_dir)
+
+
 def test_prepare_next_real_run_refuses_optimizer_state_drift(tmp_path: Path) -> None:
     project_dir = _create_ready_project(tmp_path)
     _record_real_001(project_dir)
