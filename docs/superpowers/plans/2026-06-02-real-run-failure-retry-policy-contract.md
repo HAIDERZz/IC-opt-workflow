@@ -287,7 +287,7 @@ Check:
 - Modify: `tests/test_real_run_recovery.py`
 - Modify: `docs/superpowers/plans/2026-06-02-real-run-failure-retry-policy-contract.md`
 
-- [ ] **Step 1: Add test fixture helpers**
+- [x] **Step 1: Add test fixture helpers**
 
 Append to `tests/test_real_run_recovery.py`:
 
@@ -477,7 +477,7 @@ def _record_real_001(project_dir: Path) -> None:
     assert report.status.value == "pass"
 ```
 
-- [ ] **Step 2: Add failing classification tests**
+- [x] **Step 2: Add failing classification tests**
 
 Append:
 
@@ -577,7 +577,7 @@ def test_assess_recovery_classifies_already_recorded(tmp_path: Path) -> None:
     assert report.allowed_actions == []
 ```
 
-- [ ] **Step 3: Run classification tests and verify they fail**
+- [x] **Step 3: Run classification tests and verify they fail**
 
 Run:
 
@@ -587,7 +587,7 @@ python3 -m pytest tests/test_real_run_recovery.py -q
 
 Expected: import failure for `hermes_workflow.real_run_recovery`.
 
-- [ ] **Step 4: Implement `real_run_recovery.py` classifier**
+- [x] **Step 4: Implement `real_run_recovery.py` classifier**
 
 Create `src/hermes_workflow/real_run_recovery.py`:
 
@@ -986,7 +986,7 @@ def _write_report(path: Path, report: RealRunRecoveryReport) -> None:
     )
 ```
 
-- [ ] **Step 5: Run classification tests and verify they pass**
+- [x] **Step 5: Run classification tests and verify they pass**
 
 Run:
 
@@ -996,7 +996,7 @@ python3 -m pytest tests/test_real_run_recovery.py -q
 
 Expected: schema and classification tests pass.
 
-- [ ] **Step 6: Run focused compatibility tests**
+- [x] **Step 6: Run focused compatibility tests**
 
 Run:
 
@@ -1007,14 +1007,14 @@ python3 -m ruff check src/hermes_workflow/reports.py src/hermes_workflow/real_ru
 
 Expected: all tests pass and ruff is clean.
 
-- [ ] **Step 7: Commit Task 2**
+- [x] **Step 7: Commit Task 2**
 
 ```bash
 git add src/hermes_workflow/real_run_recovery.py tests/test_real_run_recovery.py docs/superpowers/plans/2026-06-02-real-run-failure-retry-policy-contract.md
 git commit -m "feat: classify real run recovery state"
 ```
 
-- [ ] **Step 8: Task 2 review gate**
+- [x] **Step 8: Task 2 review gate**
 
 Run spec and code-quality reviews focused on:
 
