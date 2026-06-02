@@ -379,3 +379,40 @@ def test_prepare_next_real_run_skips_already_prepared_candidate(
         "WN": "2.3 um",
         "WP": "0.7 um",
     }
+
+
+def test_next_real_run_package_can_be_checked_and_recorded_after_fake_result(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_project(tmp_path)
+    _record_real_001(project_dir)
+    package = prepare_next_real_run(
+        project_dir,
+        created_at_utc="2026-06-02T00:50:00Z",
+    )
+    assert package.run_id == "real_002"
+
+    _write_result_manifest(project_dir, run_id="real_002")
+    _write_metric_result_manifest(project_dir, run_id="real_002")
+
+    real_report = check_real_run(project_dir, run_id="real_002")
+    assert real_report.status == RealRunCheckStatus.PASS
+    record_report = record_real_result(
+        project_dir,
+        run_id="real_002",
+        recorded_at_utc="2026-06-02T01:10:00Z",
+    )
+
+    assert record_report.status == RealResultRecordStatus.PASS
+    ledger_rows = [
+        json.loads(line)
+        for line in (project_dir / "ledger" / "experiment_ledger.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
+        if line.strip()
+    ]
+    assert [row["run_id"] for row in ledger_rows] == ["real_001", "real_002"]
+    assert ledger_rows[1]["candidate_id"] == "real_002"
+    assert ledger_rows[1]["parameters"] == package.candidate_payload["parameters"]
+    state = _load_json(project_dir / "state" / "optimizer_state.json")
+    assert state["current_evaluations"] == 2

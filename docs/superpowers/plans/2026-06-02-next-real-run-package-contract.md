@@ -890,7 +890,7 @@ Check:
 - Modify: `tests/test_next_real_run.py`
 - Modify: `docs/superpowers/plans/2026-06-02-next-real-run-package-contract.md`
 
-- [ ] **Step 1: Add fake C-7 compatibility test for `real_002`**
+- [x] **Step 1: Add fake C-7 compatibility test for `real_002`**
 
 Append:
 
@@ -932,7 +932,7 @@ def test_next_real_run_package_can_be_checked_and_recorded_after_fake_result(
     assert state["current_evaluations"] == 2
 ```
 
-- [ ] **Step 2: Run compatibility test**
+- [x] **Step 2: Run compatibility test**
 
 Run:
 
@@ -942,7 +942,7 @@ python3 -m pytest tests/test_next_real_run.py::test_next_real_run_package_can_be
 
 Expected: pass.
 
-- [ ] **Step 3: Commit Task 3**
+- [x] **Step 3: Commit Task 3**
 
 ```bash
 git add tests/test_next_real_run.py docs/superpowers/plans/2026-06-02-next-real-run-package-contract.md
