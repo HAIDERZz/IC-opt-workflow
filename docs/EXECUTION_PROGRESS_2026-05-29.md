@@ -427,7 +427,7 @@ Status: complete as of 2026-05-30.
 Route alignment:
 
 - The historical broad plan has been updated so current project files agree on the responsibility split.
-- Hermes owns deterministic preflight: validation, netlist preparation, dry-run rendering, packaging, and approval.
+- Hermes workflow tooling owns deterministic preflight: validation, netlist preparation, dry-run rendering, packaging, and approval.
 - The execution agent owns Maestro export and post-approval real Spectre/optimizer execution through `virtuoso-bridge-lite`.
 - `render_netlist.py` and `dry_run.py` inside the generated execution package are no longer the preferred route for preflight.
 
@@ -670,11 +670,11 @@ Status: complete as of 2026-06-01; simulation gate passed.
 
 Scope:
 
-- Use simulated Codex roles for execution-agent and Hermes-observer.
+- Use simulated Codex roles for execution-agent and Hermes workflow observer.
 - Validate the C-4/C-5 role split in a temporary sanitized project.
 - Run five scenarios: happy path, valid simulator failure, unsafe path, mutated prepared deck, and identity mismatch.
 - Write `docs/simulations/2026-06-01-c5-5-dual-agent-result-handoff.md`.
-- Do not call real Spectre, real Virtuoso, real Claude CLI as execution agent, real Hermes service, metric extraction, ledger append, or optimizer state update.
+- Do not call real Spectre, real Virtuoso, real Claude CLI as execution agent, a hypothetical Hermes service, metric extraction, ledger append, or optimizer state update.
 
 Spec:
 
@@ -700,9 +700,146 @@ Behavior finding:
 
 - Exact C-5 schema enumeration is needed in future execution-agent prompts or adapters. With loose prompts, simulated execution agents drifted toward older C-4/C-5-adjacent manifest shapes; Hermes still failed closed through the deterministic checker.
 
+## Spectre + OCEAN Toolchain Evidence
+
+Status: complete as of 2026-06-01.
+
+Purpose:
+
+- Resolve the metric-backend uncertainty before continuing Plan C.
+- Reject the unsafe route where an agent reads Calculator formulas and reimplements them in Python.
+- Validate that standalone Spectre plus batch OCEAN can be the authoritative metric extraction path.
+
+Evidence directories:
+
+- `docs/toolchain_evidence/2026-06-01-spectre-ocean-bridge-smoke/`
+- `docs/toolchain_evidence/2026-06-01-pss-pac-directplot-ocean-probe/`
+
+Findings:
+
+- Transient/DC inverter case:
+  - Maestro point-level PSF opened in `ocean -nograph`.
+  - Standalone Spectre replay PSF opened in `ocean -nograph`.
+  - OCEAN scalar values for `rise`, `fall`, and `DC` matched between Maestro PSF and standalone replay.
+- PSS/PAC/PNoise mixer case:
+  - Target cell: `Virtuoso_Bridge_test/Mixer_PSS_CG_Noise`.
+  - Maestro point-level PSF opened in `ocean -nograph`.
+  - Standalone Spectre replay completed with `0 errors, 7 warnings, and 9 notices`.
+  - OCEAN scalar values for `BW` and `MAX_GAIN` matched between Maestro PSF and standalone replay.
+  - `drplPacVolGnExpDen` is callable in batch OCEAN in this environment.
+
+Locked policy:
+
+- `metrics.yaml` formulas are authoritative contract inputs.
+- Formula discovery from Maestro/ADE is allowed only as a draft/audit helper; the user/project must approve the exact executable expression before real execution.
+- Do not rewrite formulas across dialects. If the approved formula uses `vh`, evaluate `vh`; if it uses `drplPacVolGnExpDen`, evaluate `drplPacVolGnExpDen`.
+- Python must not parse PSF waveform data.
+- Python must not reimplement OCEAN/Calculator formulas.
+- Python may invoke batch OCEAN and parse already-produced scalar/text outputs and logs.
+
+## Plan C C-6 Spectre + OCEAN Metric Result Contract
+
+Status: complete and reviewed as of 2026-06-02.
+
+Spec:
+
+- `docs/superpowers/specs/2026-06-01-spectre-ocean-real-metric-result-contract-design.md`
+
+Implementation plan:
+
+- `docs/superpowers/plans/2026-06-02-spectre-ocean-real-metric-result-contract.md`
+
+Implemented:
+
+- `metrics.yaml` can carry exact approved OCEAN formula blocks.
+- `spectre.yaml` accepts `psfxl`; C-6 real metric request generation requires an OCEAN-ready format.
+- `prepare-real-run` writes `runs/real/<run_id>/metric_extraction_request.json` and records its SHA-256 in `real_run_manifest.json`.
+- Returned `result_manifest.json` can reference `result_data` PSF artifacts and `metric_result_manifest.json`.
+- `src/hermes_workflow/metric_results.py` validates returned OCEAN scalar manifests against the prepared request without reading PSF, parsing waveform data, or recomputing formulas.
+- `hermes-workflow check-metric-results PROJECT_DIR` writes `reports/metric_result_check_report.json` and surfaces expected failures without tracebacks.
+
+Task verification so far:
+
+- Task 1 final local verification: `pytest tests/test_validate.py tests/test_package.py -q` passed, 30 tests; `pytest tests/test_mock_optimizer.py tests/test_dry_run.py -q` passed, 89 tests; `ruff check src tests` passed.
+- Task 2 final local verification: `pytest tests/test_real_run.py tests/test_validate.py tests/test_package.py -q` passed, 48 tests; `ruff check src tests` passed.
+- Task 3 final local verification: `pytest tests/test_result_handoff.py tests/test_real_run.py -q` passed, 46 tests; `ruff check src tests` passed.
+- Task 4 high-risk gate: spec re-review and code-quality review approved. Final local verification: `pytest tests/test_metric_results.py -q` passed, 48 tests; `pytest tests/test_metric_results.py tests/test_result_handoff.py tests/test_real_run.py -q` passed, 94 tests; `ruff check src tests` passed.
+- Task 5 CLI integration local verification: `pytest tests/test_cli.py -q` passed, 23 tests; `pytest tests/test_cli.py tests/test_metric_results.py tests/test_result_handoff.py tests/test_real_run.py -q` passed, 117 tests.
+- Task 6 full verification before final review: `pytest -q` passed, 282 tests; `ruff check src tests tools` passed; `git diff --check` passed.
+- Task 6 final combined review gate: approved with no Critical, Important, or Minor findings.
+
+Locked C-6 policy:
+
+- `metrics.yaml` approved OCEAN formulas are the only executable formula source.
+- Formula discovery from Maestro/ADE remains draft/audit only until approved into `metrics.yaml`.
+- Hermes must not run Spectre, run OCEAN, parse PSF, parse waveform data, translate formulas, append optimizer ledger rows, or update optimizer state in C-6.
+- Python may validate JSON contract files, hashes, finite scalar values, and artifact paths.
+
+Still excluded:
+
+- running Spectre from Hermes
+- running OCEAN from Hermes
+- parsing PSF in Python
+- computing Calculator/OCEAN formulas in Python
+- optimizer ledger/state updates
+
 Next recommended action:
 
-- Confirm C-6 real metric result contract scope before adding real metric extraction, ledger append, optimizer state writes, or physical Spectre/Virtuoso adapters. C-6 planning should include an exact returned-result schema example for future execution-agent prompts/adapters and decide whether C-6.5 remains a separate metric-extraction simulation gate.
+- C-7 Task 6 final verification and combined review are complete.
+- Next C-8 should append ledger rows and update optimizer state from checked metric results.
+
+## Plan C C-7 Spectre + OCEAN Execution Adapter
+
+Status: complete and reviewed as of 2026-06-02.
+
+Spec:
+
+- `docs/superpowers/specs/2026-06-02-spectre-ocean-execution-adapter-design.md`
+
+Implementation plan:
+
+- `docs/superpowers/plans/2026-06-02-spectre-ocean-execution-adapter.md`
+
+Implemented:
+
+- `src/hermes_workflow/execution_adapters/spectre_ocean.py` loads approved real-run packages, verifies preconditions, generates exact-formula OCEAN replay scripts, runs through an injectable command runner, parses only `metrics/ocean_scalars.tsv`, and writes C-5/C-6-compatible result artifacts.
+- Failure handling distinguishes Spectre failure from OCEAN/metric failure. Spectre failure writes a structurally valid failed `result_manifest.json` and skips OCEAN. OCEAN failure keeps Spectre handoff status succeeded while failing `metric_result_manifest.json`.
+- Overwrite and safety hardening reject existing result artifacts unless `allow_overwrite=True`, reject adapter-owned output symlinks, and declare only existing artifacts in `result_manifest.json`.
+- `tools/run_spectre_ocean_adapter.py` is the explicit execution-side entry point. It is not a Hermes validator and is not registered as a `hermes-workflow` CLI command.
+- Automated tests use fake runners and monkeypatching only. No test invokes real Spectre, real OCEAN, real Virtuoso, SSH, Claude CLI as execution agent, or network.
+
+Task verification:
+
+- Task 1 context/precondition gate: adapter tests passed; ruff passed; spec and code-quality reviews approved.
+- Task 2 OCEAN replay/TSV parsing gate: adapter tests passed; ruff passed; spec and code-quality reviews approved after strict TSV/control-character hardening.
+- Task 3 fake runner success/manifest writing gate: adapter/C-5/C-6 tests passed; ruff passed; spec and code-quality reviews approved after OCEAN log path and output-dir symlink fixes.
+- Task 4 failure/overwrite/safety gate: adapter/C-5/C-6 tests passed; ruff passed; spec and code-quality reviews approved after artifact declaration and file-level symlink fixes.
+- Task 5 execution-side tool entry point local verification: `pytest tests/test_spectre_ocean_adapter.py -q` passed; `ruff check src/hermes_workflow/execution_adapters tests/test_spectre_ocean_adapter.py tools/run_spectre_ocean_adapter.py` passed.
+- Task 6 docs/progress/full verification/final review gate complete. First final review found three path/failure-log blockers; fixes made OCEAN run from the project root with project-relative replay/log paths, directed Spectre to `psf/spectre.out`, and converted malformed scalar TSV after zero OCEAN exit into structured failed metric artifacts. Re-review approved with no findings.
+- Final verification: `python3 -m pytest tests/test_spectre_ocean_adapter.py -q` passed with 55 tests; `python3 -m pytest -q` passed with 337 tests; `python3 -m ruff check src tests tools` passed; `git diff --check` produced no output.
+
+Locked C-7 policy:
+
+- The supervisor agent must still run `check-real-run` and `check-metric-results` after the adapter returns. Adapter success alone is not workflow success.
+- The adapter may invoke physical tools only through its explicit execution-side entry point after `prepare-real-run`.
+- Python still must not parse PSF or reimplement Calculator/OCEAN formulas.
+- Automated tests must continue to use fake runners; real Cadence smoke remains local-only evidence.
+
+## Locked Role Model
+
+Status: locked as of 2026-06-02.
+
+Reference:
+
+- `docs/ROLE_MODEL_AND_TERMINOLOGY.md`
+
+Definitions:
+
+- Supervisor agent: the planning and decision-making agent. It uses Hermes workflow tooling, reads machine-readable reports, approves or rejects progression, and must not run real Spectre/OCEAN directly.
+- Hermes workflow tooling: this repository's deterministic file-contract and validation layer. It owns schema validation, preflight, approval files, real-run package preparation, handoff checks, metric-result checks, and reports. It is not a local LLM agent.
+- Execution agent: the tool-side agent that operates Virtuoso/Spectre/OCEAN through approved packages and adapter boundaries. It may be implemented by Claude CLI, another agent runtime, a scripted worker, or future `virtuoso-bridge-lite` adapter code.
+
+Do not use "Hermes agent" as a role name in future specs or plans. If older documents mention Hermes in that sense, treat it as superseded by this role model.
 
 ## Resume Prompt
 
@@ -713,5 +850,5 @@ Next recommended action:
 3. ic-auto-opt-workflow/docs/COMPACT_RESUME_CHECKPOINT.md
 4. ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。请先阅读 docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/simulations/2026-06-01-c5-5-dual-agent-result-handoff.md。Hermes File Contract MVP 的 Plan A Task 1-9 已完成；Plan B mock optimization loop 已完成；Plan C C-1 netlist template contract、C-2 dry-run candidate renderer、C-3 execution package preflight readiness、C-4 post-approval real-run execution contract、C-5 real-run result handoff contract 均已完成并通过 review gate。C-5.5 dual-agent result handoff simulation gate 已完成并通过。下一步确认 C-6 real metric result contract scope，并决定 C-6.5 是否保留为单独的 metric-extraction simulation gate；不要提交或复制本地真实 input.scs 示例，不要进入真实 Spectre/Virtuoso/optimizer loop 接入。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。请先阅读 docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/specs/2026-06-02-spectre-ocean-execution-adapter-design.md、docs/superpowers/plans/2026-06-02-spectre-ocean-execution-adapter.md。Hermes File Contract MVP 的 Plan A Task 1-9 已完成；Plan B mock optimization loop 已完成；Plan C C-1/C-2/C-3/C-4/C-5/C-5.5/C-6/C-7 均已完成并通过相应 verification/review gate。Spectre + OCEAN backend 已通过真实工具链证据验证。下一步进入 C-8 optimizer ledger/state update，或按用户要求补 C-7 local Cadence smoke / SSH execution profile。不要提交或复制本地真实 input.scs 示例，不要让 agent 重写公式，不要用 Python 解析 PSF 或重写 Calculator/OCEAN 公式。
 ```

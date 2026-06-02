@@ -303,7 +303,8 @@ Confirmed rules:
 - Do not expose ADE-style Spectre/APS accuracy settings such as `Do not override`, `Liberal`, `Moderate`, or `Conservative` in the first version.
 - The runner maps `preset: ax` to the existing `virtuoso-bridge-lite` call `spectre_mode_args("ax")`, which emits CLI args `+preset=ax +mt`.
 - The `+mt` argument enables Spectre multithreading for each simulation task. The first version does not expose thread count; when no count is given, thread allocation is left to Spectre, the Cadence environment, and host policy.
-- `output_format` must be `psfascii` because the current parser path reads PSF ASCII into `SimulationResult.data`.
+- Historical Plan A implementation used `output_format: psfascii` because the old parser path read PSF ASCII into `SimulationResult.data`.
+- Current route update: after the 2026-06-01 Spectre + OCEAN toolchain evidence, real metric extraction should use an OCEAN-readable PSF format and let batch OCEAN compute approved formulas. C-6 must update or extend this schema intentionally; do not treat the Plan A `psfascii` constraint as the final real-run backend policy.
 - `parallel_jobs` is candidate-level concurrency and must be at least `1`.
 - `timeout_s` is per-candidate Spectre timeout, must be positive, and must be explicitly provided by the user/upstream Hermes config. Do not rely on a hidden default because pre-layout and post-layout simulation runtime can differ by orders of magnitude.
 - Real-run code should check the Spectre license when `require_license_check` is true.

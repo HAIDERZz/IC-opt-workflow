@@ -4,9 +4,9 @@
 
 **Goal:** Build the upper Hermes workflow layer for Maestro-exported Spectre deck optimization while treating `virtuoso-bridge-lite` as the lower tool/skill dependency.
 
-**Architecture:** Hermes owns user-facing project files, schema validation, deterministic preflight, execution package creation, approval gates, report/state inspection, and final reporting. Deterministic preflight includes safe netlist preparation and dry-run candidate rendering because those steps are contract checks that must be reproducible and reviewable before any real simulator action. The execution agent owns tool-side actions: Maestro deck export through `virtuoso-bridge-lite`, project-local metric extraction for real results, and post-approval Spectre/optimizer execution through the existing `virtuoso`, `spectre`, and `optimizer` skills. The workflow is file-contract driven and never depends on chat history.
+**Architecture:** The supervisor agent owns planning, user-facing decisions, formula approval, and workflow progression. Hermes workflow tooling owns deterministic file contracts, schema validation, preflight, execution package creation, approval files, report/state inspection, and final reporting. Deterministic preflight includes safe netlist preparation and dry-run candidate rendering because those steps are contract checks that must be reproducible and reviewable before any real simulator action. The execution agent owns tool-side actions: Maestro deck export through `virtuoso-bridge-lite`, post-approval standalone Spectre execution, batch OCEAN metric extraction from PSF results, and optimizer execution through approved adapter boundaries. The workflow is file-contract driven and never depends on chat history.
 
-**Tech Stack:** Python 3.11+, `pydantic>=2`, `PyYAML`, `typer`, `pytest`, `ruff`, local dependency on sibling `../virtuoso-bridge-lite`, Cadence/Virtuoso/Spectre only behind explicit dry-run and approval gates.
+**Tech Stack:** Python 3.11+, `pydantic>=2`, `PyYAML`, `typer`, `pytest`, `ruff`, local dependency on sibling `../virtuoso-bridge-lite`, Cadence/Virtuoso/Spectre/OCEAN only behind explicit dry-run and approval gates.
 
 ---
 
@@ -24,7 +24,11 @@
 
 This broad plan was originally drafted with some preflight runner scripts living inside the generated execution package. The current accepted route, confirmed after focused Plan A and Plan C, supersedes that detail:
 
-- Hermes owns deterministic preflight:
+- The role model is locked in `docs/ROLE_MODEL_AND_TERMINOLOGY.md`:
+  - `supervisor agent` is the planning and decision-making agent.
+  - `Hermes workflow tooling` is the deterministic file-contract and validation layer.
+  - `execution agent` is the tool-side agent that operates Virtuoso/Spectre/OCEAN through approved boundaries.
+- Hermes workflow tooling owns deterministic preflight:
   - `hermes-workflow validate`
   - `hermes-workflow prepare-netlist`
   - planned `hermes-workflow dry-run`
@@ -34,19 +38,47 @@ This broad plan was originally drafted with some preflight runner scripts living
   - inspect/export Maestro deck through `virtuoso-bridge-lite`
   - copy or place exported `input.scs`
   - run real Spectre only after `approve_first_real_run`
-  - execute the real optimizer loop and metric extraction after approval
+  - invoke batch OCEAN on generated PSF results to compute user-approved metric formulas
+  - execute the real optimizer loop after result contracts pass
 - Project-local runner scripts such as `render_netlist.py` and `dry_run.py` are no longer the preferred route for preflight. The corresponding behavior is implemented or planned as Hermes modules:
   - `src/hermes_workflow/netlists.py`
   - `src/hermes_workflow/dry_run.py`
 - The project template keeps `src/.gitkeep` as a future extension area, not as the source of deterministic preflight behavior.
 - The placeholder syntax is `{{VARIABLE_NAME}}`, not the early draft `@@NAME@@`.
 
+## Latest Toolchain Evidence: Spectre + OCEAN Route
+
+As of 2026-06-01, the standalone Spectre + batch OCEAN backend is the confirmed metric route for the next development scope.
+
+Evidence:
+
+- Transient/DC inverter path: Maestro-generated point-level PSF opened in batch OCEAN; standalone Spectre replay produced matching OCEAN scalar values for `rise`, `fall`, and `DC`.
+- PSS/PAC/PNoise mixer path: Maestro-generated point-level PSF opened in batch OCEAN; standalone Spectre replay produced matching OCEAN scalar values for `BW` and `MAX_GAIN`.
+- Evidence directories:
+  - `docs/toolchain_evidence/2026-06-01-spectre-ocean-bridge-smoke/`
+  - `docs/toolchain_evidence/2026-06-01-pss-pac-directplot-ocean-probe/`
+
+Confirmed backend contract:
+
+```text
+Maestro/ADE exports or provides input.scs
+-> Hermes templates only approved top-level Spectre parameters
+-> Hermes prepares approved real-run package
+-> execution agent runs standalone Spectre
+-> execution agent invokes batch OCEAN on the generated PSF
+-> OCEAN evaluates exact user/project-approved formulas
+-> Python records scalar outputs and provenance only
+```
+
+Metric formulas remain authoritative contract inputs. A tool may read formulas from Maestro outputs to draft a contract, but generated formulas require user/project approval before execution. Do not rewrite formulas across dialects such as `vh(...)` and `drplPacVolGnExpDen(...)`; if the approved formula uses `drpl`, evaluate `drpl`, and if it uses `vh`, evaluate `vh`.
+
 ## Hard Constraints
 
 - Do not reimplement `virtuoso-bridge-lite` skills or duplicate bridge internals.
 - Do not modify Maestro simulation setup: analyses, model includes, save/output settings, simulator options, and corners remain sourced from exported `input.scs`.
 - Template only user-approved variables, using `{{VARIABLE_NAME}}` markers in `template.scs`.
-- Do not build a generic Maestro calculator parser for MVP; Hermes stores formulas and required signals, and later execution-side metric adapters compare real results against those contracts.
+- Do not build a generic Maestro calculator parser for MVP. Hermes stores exact user/project-approved formulas and required result expectations. Python may invoke OCEAN and parse already-produced scalar/text outputs, but must not parse PSF data directly or reimplement Calculator/OCEAN formulas.
+- Do not let agents rewrite metric formulas across dialects. Formula discovery from Maestro/ADE is allowed only as a draft/audit source; the executable formula must be locked in the file contract before real execution.
 - Do not run real Spectre or optimizer before Hermes deterministic preflight artifacts pass and Hermes writes approval.
 - Persist all state in files: configs, execution manifest, reports, ledger, optimizer state, health, escalation, and final summary.
 - Treat the `Claude-cli-skill` interface as an external adapter boundary. The first implementation verifies file contracts before wiring the real invocation path.
@@ -213,9 +245,11 @@ objective:
 spectre:
   mode: ax
   parallel_jobs: 10
-  output_format: psfascii
+  output_format: psfxl
   require_license_check: true
 ```
+
+Note: `psfascii` was the original Plan A parser-era placeholder. The confirmed Spectre + OCEAN route should use an OCEAN-readable PSF format; current toolchain evidence used `psfxl`. C-6 must update or extend the schema and fixtures explicitly instead of relying on the old Plan A default.
 
 ```yaml
 optimizer:
@@ -968,9 +1002,9 @@ git add src/hermes_workflow/netlists.py src/hermes_workflow/cli.py tests/test_ne
 git commit -m "feat: constrain exported spectre netlist templating"
 ```
 
-## Task 12: Spectre Runner Template After Approval
+## Task 12: Spectre + OCEAN Runner Contract After Approval
 
-**Current route:** future work. This remains execution-agent/tool-side integration and should not be implemented as part of Hermes deterministic preflight.
+**Current route:** historical broad-plan placeholder, superseded by focused Plan C C-4/C-5/C-6 decomposition. C-4 now prepares a contract-only real-run package, C-5 validates the returned result handoff, and C-6 is the next scope for a real metric result contract centered on standalone Spectre plus batch OCEAN. Do not implement project-template `run_candidate.py`/`optimization_loop.py` as deterministic Hermes preflight.
 
 **Files:**
 - Modify: `src/hermes_workflow/templates/spectre_maestro_project/src/run_candidate.py`
@@ -979,13 +1013,16 @@ git commit -m "feat: constrain exported spectre netlist templating"
 
 - [ ] **Step 1: Write approval enforcement tests**
 
-Tests assert:
+Future tests should assert the execution-side contract, not a Hermes preflight runner:
 
 ```text
 run_candidate refuses real mode when supervisor_instruction.json is missing
 run_candidate refuses real mode when action is reject_first_real_run
 run_candidate allows real mode only when action is approve_first_real_run
-real mode imports SpectreSimulator lazily inside the approved path
+real mode runs standalone Spectre only from a C-4 prepared package
+real mode invokes batch OCEAN on the produced PSF
+real mode evaluates exact approved metric formulas without Python PSF parsing
+real mode writes a C-5/C-6-compatible result manifest with metric provenance
 ```
 
 - [ ] **Step 2: Run tests and confirm failure**
@@ -996,19 +1033,15 @@ Expected: FAIL until runner guard exists.
 
 - [ ] **Step 3: Implement Spectre runner template**
 
-Real runner must follow the `spectre` skill core pattern:
+The physical adapter may use `virtuoso-bridge-lite` Spectre helpers or a generated shell script, but the result backend must follow the confirmed OCEAN route:
 
-```python
-from virtuoso_bridge.spectre.runner import SpectreSimulator, spectre_mode_args
-
-sim = SpectreSimulator.from_env(
-    spectre_args=spectre_mode_args(spectre_mode),
-    work_dir=str(work_dir),
-)
-result = sim.run_simulation(str(rendered_netlist_path), {})
+```text
+source Cadence environment
+spectre -64 input.scs ... -format psfxl -raw <psf_dir>
+ocean -nograph -replay <metric_probe.ocn> -log <metric_probe.log>
 ```
 
-The implementation must serialize `result.ok`, `result.data`, `result.errors`, `result.metadata["timings"]`, and `result.metadata["output_dir"]` into a local candidate result file.
+The implementation must serialize simulator status, PSF/result paths, OCEAN status, scalar metric values, formula text, formula provenance, and sanitized artifacts into a local result manifest. Python must not compute metrics from PSF waveforms.
 
 - [ ] **Step 4: Verify runner tests pass with mocked SpectreSimulator**
 
@@ -1251,10 +1284,15 @@ git commit -m "docs: add real integration readiness checklist"
 5. Task 10: mock optimization loop without Cadence.
 6. Task 11 / Plan C C-1: Hermes exported `input.scs` templating contract.
 7. Plan C C-2: Hermes deterministic dry-run candidate renderer.
-8. Task 12: approved Spectre runner integration, kept execution-agent/tool-side and post-approval.
-9. Task 13: explicit Claude/Virtuoso execution contract.
-10. Tasks 14-15: final report and end-to-end smoke.
-11. Task 16: real integration checklist.
+8. Plan C C-4: post-approval real-run package contract.
+9. Plan C C-5: real-run result handoff contract.
+10. Plan C C-5.5: dual-agent result handoff simulation gate.
+11. Plan C C-6: real metric result contract for Spectre + OCEAN, including formula provenance and scalar output schema.
+12. Plan C C-6.5: optional real metric extraction simulation/evidence gate using captured Spectre/OCEAN artifacts before optimizer-loop wiring.
+13. Plan C C-7: physical execution adapter wiring for standalone Spectre + OCEAN through `virtuoso-bridge-lite`/execution-agent boundary.
+14. Plan C C-8: ledger append and optimizer state update from checked real metric results.
+15. Tasks 14-15: final report and end-to-end smoke.
+16. Task 16: real integration checklist.
 
 ## Verification Commands
 
@@ -1284,7 +1322,7 @@ virtuoso-bridge license
 
 ## Self-Review
 
-- Spec coverage: The plan covers file contracts, schema definition, Hermes template generation, validation, execution package builder, Hermes deterministic preflight, agent verification harnesses, mock optimization loop, exported `input.scs` templating, approved Spectre runner, and real integration readiness.
+- Spec coverage: The plan covers file contracts, schema definition, Hermes template generation, validation, execution package builder, Hermes deterministic preflight, agent verification harnesses, mock optimization loop, exported `input.scs` templating, approved Spectre/OCEAN result routing, and real integration readiness.
 - Boundary check: The plan keeps `virtuoso-bridge-lite` as a dependency and does not copy its `virtuoso`, `spectre`, or `optimizer` implementations.
 - Safety check: The plan enforces dry run and `supervisor_instruction.json` approval before real Spectre or optimizer execution.
 - Open interface check: The `Claude-cli-skill` boundary is handled by file contracts first, with real adapter wiring deferred until its exact invocation interface is known.

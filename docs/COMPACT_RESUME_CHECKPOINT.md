@@ -1,7 +1,7 @@
 # Compact Resume Checkpoint
 
 Date: 2026-05-28
-Last updated: 2026-06-01
+Last updated: 2026-06-02
 
 This checkpoint preserves the planning state for continuing after context compaction.
 
@@ -39,7 +39,8 @@ Current execution state:
 - Plan C C-1 was complete at this checkpoint. The next scope was confirmed, leading to C-2 and C-3 below.
 - Plan C-2 dry-run candidate renderer design spec exists: `e2b1c30 docs: design dry-run candidate renderer`.
 - Plan C-2 implementation plan exists: `5441972 docs: plan dry-run candidate renderer`.
-- The historical broad plan has been aligned to the current route: Hermes owns deterministic preflight; the execution agent owns Maestro export and post-approval real execution.
+- The historical broad plan has been aligned to the current route: the supervisor agent owns planning and decisions; Hermes workflow tooling owns deterministic preflight and file-contract validation; the execution agent owns Maestro export and post-approval real execution.
+- The locked role model is documented in `docs/ROLE_MODEL_AND_TERMINOLOGY.md`. Future work must not use "Hermes agent" to mean the supervisor agent.
 - C-2 dry-run candidate renderer is complete and reviewed. Final verification: `pytest -q` passed, 159 tests; `ruff check .` passed; local-only smoke passed.
 - C-3 execution package preflight readiness design spec exists: `a60b229 docs: design preflight readiness contract`.
 - C-3 implementation plan exists: `docs/superpowers/plans/2026-05-30-execution-package-preflight-readiness.md`.
@@ -60,8 +61,21 @@ Current execution state:
 - C-5.5 dual-agent result handoff simulation gate design spec exists: `docs/superpowers/specs/2026-06-01-dual-agent-result-handoff-simulation-gate-design.md`.
 - C-5.5 implementation plan exists: `docs/superpowers/plans/2026-06-01-dual-agent-result-handoff-simulation-gate.md`.
 - C-5.5 simulation report exists: `docs/simulations/2026-06-01-c5-5-dual-agent-result-handoff.md`.
-- C-5.5 dual-agent result handoff simulation gate passed. The next action is to confirm C-6 real metric result contract scope, including whether C-6.5 remains a separate metric-extraction simulation gate. Do not implement real Spectre execution, real metric extraction, or optimizer-loop integration before C-6 scope is confirmed.
+- C-5.5 dual-agent result handoff simulation gate passed.
 - C-5.5 final verification: `pytest -q` passed with 211 tests; `ruff check .` passed; combined docs/spec review passed with no Critical or Important findings. The first combined review found report-evidence gaps; the re-review found those addressed and only Task 5 bookkeeping remained. The closeout commit addresses that bookkeeping.
+- Spectre + OCEAN backend evidence is complete as of 2026-06-01. Both the transient/DC inverter smoke and the PSS/PAC/PNoise mixer probe show that Maestro point-level PSF and standalone Spectre replay PSF can be opened by batch OCEAN and produce matching scalar values for approved formulas.
+- New evidence directories:
+  - `docs/toolchain_evidence/2026-06-01-spectre-ocean-bridge-smoke/`
+  - `docs/toolchain_evidence/2026-06-01-pss-pac-directplot-ocean-probe/`
+- C-6 Spectre + OCEAN real metric result contract design spec exists: `docs/superpowers/specs/2026-06-01-spectre-ocean-real-metric-result-contract-design.md`.
+- C-6 implementation plan exists: `docs/superpowers/plans/2026-06-02-spectre-ocean-real-metric-result-contract.md`.
+- C-6 is complete and reviewed. Final verification: `pytest -q` passed with 282 tests; `ruff check src tests tools` passed; `git diff --check` passed. Final combined review gate approved with no Critical, Important, or Minor findings.
+- C-7 Spectre + OCEAN execution adapter design spec exists: `docs/superpowers/specs/2026-06-02-spectre-ocean-execution-adapter-design.md`.
+- C-7 implementation plan exists: `docs/superpowers/plans/2026-06-02-spectre-ocean-execution-adapter.md`.
+- C-7 is complete and reviewed. Current C-7 artifacts include `src/hermes_workflow/execution_adapters/spectre_ocean.py`, `tests/test_spectre_ocean_adapter.py`, and `tools/run_spectre_ocean_adapter.py`.
+- C-7 policy is locked: the adapter is an execution-side tool boundary, not a Hermes validator; tests use fake runners only; Python does not parse PSF or rewrite OCEAN formulas; supervisor agent must still run `check-real-run` and `check-metric-results`.
+- C-7 final verification: `python3 -m pytest tests/test_spectre_ocean_adapter.py -q` passed with 55 tests; `python3 -m pytest -q` passed with 337 tests; `python3 -m ruff check src tests tools` passed; `git diff --check` produced no output. Final re-review approved with no findings.
+- Current next action: continue to C-8 optimizer ledger/state update or local real-tool smoke/profile work if requested.
 - Real `input.scs` examples under `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example` are local-only references and must not be committed.
 
 ## Files Already Read
@@ -94,8 +108,10 @@ Current execution state:
 - Active C-5.5 design spec: `ic-auto-opt-workflow/docs/superpowers/specs/2026-06-01-dual-agent-result-handoff-simulation-gate-design.md`
 - Active C-5.5 implementation plan: `ic-auto-opt-workflow/docs/superpowers/plans/2026-06-01-dual-agent-result-handoff-simulation-gate.md`
 - Active C-5.5 simulation report: `ic-auto-opt-workflow/docs/simulations/2026-06-01-c5-5-dual-agent-result-handoff.md`
+- Active C-6 design spec: `ic-auto-opt-workflow/docs/superpowers/specs/2026-06-01-spectre-ocean-real-metric-result-contract-design.md`
+- Active C-6 implementation plan: `ic-auto-opt-workflow/docs/superpowers/plans/2026-06-02-spectre-ocean-real-metric-result-contract.md`
 
-Plan A, Plan B, Plan C C-1, Plan C C-2, Plan C C-3, Plan C C-4, Plan C C-5, and Plan C C-5.5 are complete. C-5.5 passed the dual-agent simulation gate.
+Plan A, Plan B, Plan C C-1, Plan C C-2, Plan C C-3, Plan C C-4, Plan C C-5, and Plan C C-5.5 are complete. C-5.5 passed the dual-agent simulation gate. C-6 is complete and reviewed.
 
 ## Confirmed Plan A Scope
 
@@ -126,13 +142,15 @@ Those belong to later plans.
 
 ## Backend Decision
 
-Continue the first MVP with the original standalone Spectre backend:
+Continue the first MVP with the confirmed standalone Spectre + batch OCEAN backend:
 
 ```text
 Maestro export input.scs
 -> template approved variables
 -> run standalone Spectre
--> compute metrics from Spectre results
+-> open generated PSF with batch OCEAN
+-> evaluate exact approved OCEAN/Calculator formulas
+-> record scalar metric values and provenance
 -> optimizer loop
 ```
 
@@ -140,9 +158,10 @@ Do not pivot the first MVP to a Maestro-managed simulation loop yet.
 
 Important nuance:
 
-- Complex Maestro calculator formulas may not be safely interpreted by an agent from free text.
-- `metrics.yaml` retains `maestro_formula` for traceability and future reference work.
-- Later real tests should build per-analysis metric references for `tran`, `dc`, `sp`, `pss`, `pnoise`, `stb`, and related flows.
+- Formula choice is authoritative contract input. If the approved formula uses `vh`, evaluate `vh`; if it uses `drplPacVolGnExpDen`, evaluate `drplPacVolGnExpDen`. Do not rewrite formulas across dialects.
+- Agent/tool formula discovery from Maestro/ADE outputs is allowed only to draft or audit `metrics.yaml`; discovered formulas require user/project approval before execution.
+- Python must not parse PSF waveforms or reimplement Calculator/OCEAN formulas. Python only invokes OCEAN and records OCEAN-produced scalar/text outputs.
+- C-6 adds explicit executable OCEAN formula contracts to `metrics.yaml` with provenance, analysis/result selection, scalarization expectations, and failure behavior.
 
 ## Confirmed YAML Contracts
 
@@ -241,7 +260,8 @@ Confirmed:
 - Constraint ops: `lt`, `le`, `gt`, `ge`; no `eq`.
 - Objective directions: `minimize`, `maximize`.
 - `maximize` can later be converted to minimization by negating the scalar objective.
-- `maestro_formula` is traceability/reference, not executable in Plan A.
+- In Plan A, `maestro_formula` was traceability/reference only.
+- In C-6, the metrics contract should add or clarify executable OCEAN formula fields. The formula text remains exact and user/project-approved; agent-discovered formulas are drafts until approved.
 - `required_signals` is explicit and non-empty.
 - Plan A validates references and objective expression symbols only.
 
@@ -299,7 +319,8 @@ Confirmed:
 - Do not expose plain Spectre, APS, Spectre FX, or ADE-style Spectre/APS accuracy settings in first version.
 - Existing `virtuoso-bridge-lite` maps `spectre_mode_args("ax")` to `+preset=ax +mt`.
 - `+mt` enables Spectre multithreading per simulation task. Thread count is not exposed in first version and is left to Spectre/environment/host policy.
-- `output_format` must be `psfascii`.
+- Historical Plan A fixtures used `output_format: psfascii` for the earlier parser-oriented route.
+- C-6 must update or extend this for the confirmed Spectre + OCEAN backend with an OCEAN-readable PSF format; current toolchain evidence used `psfxl`.
 - `timeout_s` is required from user/upstream config and has no hidden default.
 - `parallel_jobs` is candidate-level concurrency and server resource limit.
 
@@ -311,7 +332,7 @@ schema_version: "1.0"
 spectre:
   engine: spectre_x
   preset: ax
-  output_format: psfascii
+  output_format: psfxl
   parallel_jobs: 10
   timeout_s: 3600
   require_license_check: true
@@ -356,9 +377,9 @@ optimizer:
 
 ## Next Step
 
-Plan A, Plan B, Plan C C-1, Plan C C-2, Plan C C-3, Plan C C-4, Plan C C-5, and Plan C C-5.5 are complete as of 2026-06-01.
+Plan A, Plan B, Plan C C-1, Plan C C-2, Plan C C-3, Plan C C-4, Plan C C-5, and Plan C C-5.5 are complete as of 2026-06-01. C-6 and C-7 are complete and reviewed as of 2026-06-02.
 
-Current next step: confirm C-6 real metric result contract scope before real tool adapters, metric extraction, ledger append, or optimizer state writes. C-6 planning should carry forward the exact-schema prompt finding from C-5.5 and decide whether C-6.5 remains a separate metric-extraction simulation gate. Do not redo Plan A Tasks 1-9 or completed Plan B/C modules unless new review feedback appears.
+Current next step: continue to C-8 optimizer ledger append and optimizer state updates, or run local real-tool smoke/profile work if the user requests it. Do not redo Plan A Tasks 1-9 or completed Plan B/C modules unless new review feedback appears.
 
 Read the handoff files first:
 
@@ -379,5 +400,5 @@ Use this prompt after compact:
 4. ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md
 5. 如需背景，再读 ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。Plan A Task 1-9、Plan B mock optimization loop、Plan C C-1 netlist template contract、C-2 dry-run candidate renderer、C-3 execution package preflight readiness、C-4 post-approval real-run execution contract、C-5 real-run result handoff contract 均已完成并通过 review gate。C-5.5 dual-agent result handoff simulation gate 已完成并通过，报告在 docs/simulations/2026-06-01-c5-5-dual-agent-result-handoff.md。下一步请确认 C-6 real metric result contract scope 并写 scoped plan，同时决定 C-6.5 是否保留为单独的 metric-extraction simulation gate。真实 input.scs 示例在 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example 下，仅供本地参考，请勿将其提交到仓库。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。Plan A Task 1-9、Plan B mock optimization loop、Plan C C-1 netlist template contract、C-2 dry-run candidate renderer、C-3 execution package preflight readiness、C-4 post-approval real-run execution contract、C-5 real-run result handoff contract、C-5.5 dual-agent result handoff simulation gate、C-6 Spectre + OCEAN metric result contract、C-7 Spectre + OCEAN execution adapter 均已完成并通过 review/final gate。Spectre + OCEAN backend 已通过工具链证据验证。下一步继续 C-8 optimizer ledger/state update，或按用户要求补 C-7 local Cadence smoke / SSH execution profile。不要让 agent 重写公式，metrics.yaml 中的公式必须是用户/项目批准的精确公式。真实 input.scs 示例在 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example 下，仅供本地参考，请勿将其提交到仓库。
 ```

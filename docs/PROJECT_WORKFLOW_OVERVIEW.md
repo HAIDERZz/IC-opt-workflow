@@ -2,30 +2,38 @@
 
 ## 当前项目节点
 
-截至 2026-06-01：
+截至 2026-06-02：
 
 - Plan A Hermes File Contract MVP 已完成到 Task 9。Hermes 部分没有 Plan A Task 10。
 - Plan B mock optimization loop 已完成并提交。
 - Plan C C-1 netlist template contract 已完成并提交。
 - Plan C C-2 dry-run candidate renderer 已完成并通过最终 review gate。
-- Plan C C-3 execution package preflight readiness 已完成并通过最终 review gate：生成的 execution package 将 Maestro export 分配给执行 agent，Hermes 拥有 `prepare-netlist`、`dry-run`、`preflight-health` 和 `approve`。
-- Plan C C-4 post-approval real-run execution contract 已完成并通过合并 final review gate：Hermes 已具备 post-approval guard、immutable config drift guard、first real-run package rendering、candidate/manifest 写入、overwrite refusal、失败清理测试覆盖，以及 `hermes-workflow prepare-real-run` CLI。C-4 只准备真实 run package，不运行 Spectre。
-- Plan C C-5 real-run result handoff contract 已完成并通过 final review gate：Hermes 已具备 returned `result_manifest.json` 验证、prepared input hash attestation、artifact path safety check、`reports/real_run_check_report.json` 写入，以及 `hermes-workflow check-real-run` CLI。C-5 不运行 Spectre，不解析真实指标，不写 optimizer ledger/state。
-- 顶层 broad plan 已对齐当前路线：Hermes 负责 deterministic preflight，执行 agent 负责 Maestro export 和 approval 之后的真实 Spectre/optimizer 执行。
-- 下一步：规划并执行 C-5.5 dual-agent result handoff simulation，再进入真实工具 adapter。
+- Plan C C-3 execution package preflight readiness 已完成并通过最终 review gate：生成的 execution package 将 Maestro export 分配给执行 agent，Hermes workflow tooling 拥有 `prepare-netlist`、`dry-run`、`preflight-health` 和 `approve`。
+- Plan C C-4 post-approval real-run execution contract 已完成并通过合并 final review gate：Hermes workflow tooling 已具备 post-approval guard、immutable config drift guard、first real-run package rendering、candidate/manifest 写入、overwrite refusal、失败清理测试覆盖，以及 `hermes-workflow prepare-real-run` CLI。C-4 只准备真实 run package，不运行 Spectre。
+- Plan C C-5 real-run result handoff contract 已完成并通过 final review gate：Hermes workflow tooling 已具备 returned `result_manifest.json` 验证、prepared input hash attestation、artifact path safety check、`reports/real_run_check_report.json` 写入，以及 `hermes-workflow check-real-run` CLI。C-5 不运行 Spectre，不解析真实指标，不写 optimizer ledger/state。
+- Plan C C-5.5 dual-agent result handoff simulation gate 已完成并通过：模拟 execution-agent 和 Hermes workflow observer，验证 C-4/C-5 的 returned result package 行为边界。
+- Spectre + OCEAN backend 已通过真实工具链证据验证：Maestro point-level PSF 和 standalone Spectre replay PSF 均可被 batch OCEAN 打开并得到一致 scalar metric。
+- Plan C C-6 Spectre + OCEAN real metric result contract 已完成并通过 final combined review gate：`metrics.yaml` 支持精确批准的 OCEAN 公式，`prepare-real-run` 写入 `metric_extraction_request.json`，returned handoff 可引用 PSF/metric artifacts，`hermes-workflow check-metric-results` 验证公式身份、request hash、scalar 值和 artifact path。
+- Plan C C-7 Spectre + OCEAN execution adapter 已完成并通过 final combined review gate：新增 execution-side adapter library、fake-runner orchestration、failure/overwrite safety、explicit `tools/run_spectre_ocean_adapter.py` entry point。自动测试使用 fake runner；真实 Cadence smoke 仍然只作为 local-only evidence。
+- 角色模型已锁定在 `docs/ROLE_MODEL_AND_TERMINOLOGY.md`：主管 agent 负责规划、审批和读取 Hermes workflow report；Hermes workflow tooling 是 deterministic file-contract 与 validation 工具层；执行 agent 负责 Maestro export、approval 之后的 standalone Spectre、batch OCEAN metric extraction，以及后续被批准的 optimizer/tool-side 操作。
+- 下一步：进入 C-8 optimizer ledger/state update，或在真实环境需要时补 C-7 local Cadence smoke / SSH execution profile。
 - `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example` 下的真实 `input.scs` 示例只作为本地参考，不能提交进仓库。
 
 ## 1. 项目概览
 
 本项目的目标，是把 IC 仿真优化从“靠 agent 读 skill 后临场发挥”的流程，升级成一个可验证、可复用、可审计的 Hermes 文件合同工作流。
 
-`virtuoso-bridge-lite` 仍然是 Virtuoso/Spectre 能力层：它负责提供和 Cadence 工具交互的 skill、脚本和桥接能力。`ic-auto-opt-workflow` 则是它上面的一层流程约束：定义 YAML 合同、验证合同、生成执行包、准备 netlist 模板、读取 preflight report、控制首次真实仿真的 supervisor approval，并为未来真实优化循环提供状态和 ledger 结构。
+`virtuoso-bridge-lite` 仍然是 Virtuoso/Spectre/OCEAN 能力层：它负责提供和 Cadence 工具交互的 skill、脚本和桥接能力。`ic-auto-opt-workflow` 则是它上面的一层流程约束：定义 YAML 合同、验证合同、生成执行包、准备 netlist 模板、读取 preflight report、控制首次真实仿真的 supervisor approval，并为未来真实优化循环提供状态和 ledger 结构。
 
-责任划分已明确：执行 agent 负责导出或放置 `input.scs`；Hermes 拥有 `package`、`prepare-netlist`、`dry-run`、`preflight-health` 和 `approve`；执行 agent 仅在 `approve_first_real_run` 之后运行首次真实 Spectre。
+角色模型已锁定：主管 agent 是规划和决策 agent；Hermes workflow tooling 是本仓库内的 deterministic file-contract 与 validation 工具层，不再表示一个本地部署的 Hermes agent；执行 agent 是工具侧 agent，可以由 Claude CLI、其它 agent runtime、脚本 worker 或未来 `virtuoso-bridge-lite` adapter 承担。执行 agent 负责导出或放置 `input.scs`，并且仅在 `approve_first_real_run` 之后运行 standalone Spectre，再通过 batch OCEAN 执行用户/项目批准的精确 metric formula。主管 agent 只能依据 Hermes workflow tooling 的机器可读 report 推进流程；Python 不解析 PSF，不重写 Calculator/OCEAN 公式。
+
+该角色约定的规范文档是：
+
+- `docs/ROLE_MODEL_AND_TERMINOLOGY.md`
 
 ```mermaid
 flowchart TD
-    A[用户 / 主管 agent] --> B[Hermes 项目模板]
+    A[用户 / 主管 agent] --> B[Hermes workflow tooling 项目模板]
     B --> C[填写五个 config YAML]
     C --> D[hermes-workflow validate]
     D --> E{合同是否有效}
@@ -46,10 +54,13 @@ flowchart TD
     R --> C
     Q -- approve --> W[hermes-workflow prepare-real-run]
     W --> X[runs/real/real_001 package]
-    X --> S[执行 agent 外部运行 Spectre]
-    S --> Y[写入 result_manifest.json + artifacts]
+    X --> AC[C-7 execution-side adapter]
+    AC --> S[standalone Spectre]
+    S --> AA[batch OCEAN 读取 PSF 并计算批准公式]
+    AA --> Y[写入 result_manifest.json + metric artifacts]
     Y --> Z[hermes-workflow check-real-run]
-    Z --> T[未来 metric extraction + optimizer loop + ledger]
+    Z --> AB[hermes-workflow check-metric-results]
+    AB --> T[未来 ledger + optimizer loop]
     D --> U[hermes-workflow mock-run]
     U --> V[离线 mock ledger/state]
 ```
@@ -132,6 +143,33 @@ flowchart TD
 - `hermes-workflow check-real-run`
   调用上述逻辑，报告 returned handoff pass/fail。它不启动 Spectre，不解析 simulator database，不计算真实 metric，不写 ledger 或 optimizer state。
 
+### Spectre + OCEAN metric result contract 层
+
+- `src/hermes_workflow/metric_requests.py`
+  在 `prepare-real-run` 阶段生成 `runs/real/<run_id>/metric_extraction_request.json`。该文件把 `metrics.yaml` 中用户/项目批准的精确 OCEAN 公式、result selector、unit、failure policy 和 formula hash 交给执行 agent。Hermes 不在这里调用 OCEAN。
+
+- `src/hermes_workflow/metric_results.py`
+  验证 OCEAN scalar metric artifacts 是否匹配 `metric_extraction_request.json` 和 C-5 `result_manifest.json`，包括 request hash、formula text/hash、metric set、scalar finite value、PSF/OCEAN artifact path，以及 canonical `input.scs` hash。它不读取 PSF，不解析 waveform，不重新实现 Calculator/OCEAN 公式。
+
+- `hermes-workflow check-metric-results`
+  调用上述逻辑，写入 `reports/metric_result_check_report.json`。它只验证执行 agent 返回的 OCEAN scalar manifest，不启动 Spectre/OCEAN，不写 optimizer ledger/state。
+
+### Spectre + OCEAN execution adapter 层
+
+- `src/hermes_workflow/execution_adapters/spectre_ocean.py`
+  对应 Plan C C-7。它消费已批准的 `runs/real/<run_id>/` package，通过 injectable runner 调用 standalone Spectre 和 batch OCEAN，生成 `metrics/metric_probe.ocn`，只解析 OCEAN 写出的 `metrics/ocean_scalars.tsv`，并写入 C-5/C-6 兼容的 `result_manifest.json` 与 `metrics/metric_result_manifest.json`。它不解析 PSF，不改写公式。
+
+- `tools/run_spectre_ocean_adapter.py`
+  execution-side 显式工具入口。它不是 `hermes-workflow` validator 命令；执行 agent 在 approval 和 `prepare-real-run` 之后调用它。主管 agent 仍必须在 adapter 返回后运行 `check-real-run` 和 `check-metric-results`。
+
+### Spectre + OCEAN metric backend 证据层
+
+- `docs/toolchain_evidence/2026-06-01-spectre-ocean-bridge-smoke/`
+  使用 `Virtuoso_Bridge_test/bridge_test_inv` 验证 transient/DC 路径：Maestro point-level PSF 和 standalone Spectre replay PSF 均可由 batch OCEAN 打开，`rise`、`fall`、`DC` scalar 结果一致。
+
+- `docs/toolchain_evidence/2026-06-01-pss-pac-directplot-ocean-probe/`
+  使用 `Virtuoso_Bridge_test/Mixer_PSS_CG_Noise` 验证 PSS/PAC/PNoise 路径：Maestro point-level PSF 和 standalone Spectre replay PSF 均可由 batch OCEAN 打开，`BW`、`MAX_GAIN` scalar 结果一致。`drplPacVolGnExpDen` 在 batch OCEAN 中可用，但公式不能由 agent 自行改写；以 `metrics.yaml` 中批准的精确公式为准。
+
 ### Mock optimization 测试层
 
 - `src/hermes_workflow/mock_optimizer.py`
@@ -143,7 +181,7 @@ flowchart TD
 
 - `src/hermes_workflow/cli.py`
   当前提供：
-  `init`、`validate`、`prepare-netlist`、`dry-run`、`preflight-health`、`package`、`approve`、`prepare-real-run`、`check-real-run`、`mock-run`。
+  `init`、`validate`、`prepare-netlist`、`dry-run`、`preflight-health`、`package`、`approve`、`prepare-real-run`、`check-real-run`、`check-metric-results`、`mock-run`。
 
 ### Review gate 工具层
 
@@ -235,12 +273,21 @@ hermes-workflow prepare-real-run projects/bridge_test_inv
 
 `prepare-real-run` 会写入 `runs/real/real_001/`，但不会运行 Spectre、Virtuoso、subprocess 或 optimizer loop。
 
-执行 agent 在 Hermes 外部运行准备好的 deck 后，写入：
+执行 agent 通过 C-7 显式 adapter 在 Hermes validators 外部运行准备好的 deck：
+
+```bash
+python tools/run_spectre_ocean_adapter.py projects/bridge_test_inv --run-id real_001
+```
+
+该 adapter 写入：
 
 ```text
 projects/bridge_test_inv/runs/real/real_001/result_manifest.json
-projects/bridge_test_inv/runs/real/real_001/spectre.log
-projects/bridge_test_inv/runs/real/real_001/artifacts/*
+projects/bridge_test_inv/runs/real/real_001/spectre.stdout
+projects/bridge_test_inv/runs/real/real_001/spectre.stderr
+projects/bridge_test_inv/runs/real/real_001/psf/
+projects/bridge_test_inv/runs/real/real_001/metrics/metric_result_manifest.json
+projects/bridge_test_inv/runs/real/real_001/metrics/ocean_scalars.tsv
 ```
 
 Hermes 验证返回文件合同：
@@ -251,15 +298,27 @@ hermes-workflow check-real-run projects/bridge_test_inv
 
 `check-real-run` 只验证 returned file contract。它不启动 Spectre，不解析真实仿真结果，不计算真实 metric，不写 ledger 或 optimizer state。
 
+Hermes 验证 OCEAN scalar metric artifacts：
+
+```bash
+hermes-workflow check-metric-results projects/bridge_test_inv
+```
+
+`check-metric-results` 验证 `metric_result_manifest.json`、request hash、公式文本/hash、scalar 有限性和 artifact path。Hermes 不读取 PSF，不解析 waveform，不把 Calculator/OCEAN 公式翻译成 Python。
+
 如果只想离线测试流程，不跑 Virtuoso/Spectre：
 
 ```bash
 hermes-workflow mock-run projects/bridge_test_inv --max-evaluations 4
 ```
 
-未来真实运行接入后，真实 Spectre/Virtuoso run 应该放在 `approve` 之后，并继续通过同一套 schema、ledger、state、report 结构写入可审计结果。
+未来真实运行接入后，真实 Spectre/OCEAN run 应该放在 `approve` 和 `prepare-real-run` 之后，并继续通过同一套 schema、ledger、state、report 结构写入可审计结果。
 
-C-5.5 应在真实工具 adapter 前验证双 agent 行为：一个模拟 execution-agent 写 returned result package，另一个模拟 Hermes/supervisor 只相信 `check-real-run` 的机器可读报告。
+C-5.5 已在真实工具 adapter 前验证双 agent 行为：一个模拟 execution-agent 写 returned result package，另一个模拟 Hermes/supervisor 只相信 `check-real-run` 的机器可读报告。
+
+C-6 已把 Spectre + OCEAN metric result contract 固化进项目文件：`metrics.yaml` 中的公式为权威输入；Maestro/ADE 读取出来的公式只能作为草稿；执行 agent 必须原样交给 OCEAN 计算；Hermes 只验证结果文件合同和 scalar/provenance，不在 Python 中计算 PSF。C-6 也将真实 metric extraction 的 OCEAN-readable PSF 格式收敛到 `psfxl` 路线；历史 `psfascii` 只保留为旧合同允许值，不是 C-6 真实 OCEAN metric backend 的 ready format。
+
+C-7 已将 physical tool boundary 接到 execution agent 侧：`supervisor agent -> Hermes workflow tooling -> execution agent -> C-7 adapter -> Hermes workflow checks`。自动化测试只使用 fake runners；真实 Cadence smoke 继续保留在 local-only evidence 目录，不作为 CI 前提。
 
 ## 4. 能否严格约束主管 agent 和执行 agent 的行为
 
@@ -274,6 +333,8 @@ C-5.5 应在真实工具 adapter 前验证双 agent 行为：一个模拟 execut
 - 首次真实运行前必须有 preflight reports。
 - supervisor approval 依赖机器可读 report，而不是依赖 agent 的口头承诺。
 - 真实仿真运行被放在显式 approval gate 之后。
+- metric formula 以文件合同中批准的精确表达式为准，禁止 agent 自动翻译或改写。
+- OCEAN 负责计算真实 metric，Python 只记录 OCEAN 输出和 provenance。
 
 如果要做到生产意义上的“严格”，还需要运行环境配合：
 
@@ -281,6 +342,7 @@ C-5.5 应在真实工具 adapter 前验证双 agent 行为：一个模拟 execut
 - CI 或 supervisor 必须拒绝缺失、格式错误或失败状态的 report。
 - 文件权限或 sandbox 应阻止 agent 修改 immutable package 输入。
 - Spectre/Virtuoso 真实命令应只能通过受控 workflow entry point 触发。
+- batch OCEAN 真实 metric extraction 也应只能通过受控 workflow entry point 触发。
 
 所以更准确地说：本项目提供合同、状态机、报告和审批门；运行环境权限让这些门真正不可绕过。
 
