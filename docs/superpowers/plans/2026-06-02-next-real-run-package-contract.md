@@ -856,7 +856,7 @@ git add src/hermes_workflow/real_run.py tests/test_next_real_run.py docs/superpo
 git commit -m "feat: prepare next real run package"
 ```
 
-- [ ] **Step 9: Review gate**
+- [x] **Step 9: Review gate**
 
 Run:
 
