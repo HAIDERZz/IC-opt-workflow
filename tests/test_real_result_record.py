@@ -488,6 +488,24 @@ def test_constraint_failing_real_result_does_not_update_best(tmp_path: Path) -> 
 
 def test_worse_feasible_real_result_preserves_existing_best(tmp_path: Path) -> None:
     project_dir = _create_ready_project(tmp_path)
+    ledger_path = project_dir / "ledger" / "experiment_ledger.jsonl"
+    ledger_path.parent.mkdir(parents=True, exist_ok=True)
+    ledger_path.write_text(
+        json.dumps(
+            {
+                "candidate_id": "cand_999",
+                "parameters": {"FN": "4"},
+                "metrics": {"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-9},
+                "constraints_passed": True,
+                "objective": 1.0e-20,
+                "batch_id": 1,
+                "simulation_status": "mock_pass",
+                "timestamp_utc": "2026-06-02T11:00:00Z",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     best_path = project_dir / "state" / "best_candidate.json"
     best_path.parent.mkdir(parents=True, exist_ok=True)
     _write_json(
@@ -518,6 +536,208 @@ def test_worse_feasible_real_result_preserves_existing_best(tmp_path: Path) -> N
     assert best["candidate_id"] == "cand_999"
     state = _load_json(project_dir / "state" / "optimizer_state.json")
     assert state["best_candidate_id"] == "cand_999"
+
+
+def test_record_real_result_derives_best_from_existing_ledger(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_project(tmp_path)
+    ledger_path = project_dir / "ledger" / "experiment_ledger.jsonl"
+    ledger_path.parent.mkdir(parents=True, exist_ok=True)
+    ledger_path.write_text(
+        json.dumps(
+            {
+                "candidate_id": "cand_999",
+                "parameters": {"FN": "4"},
+                "metrics": {"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-9},
+                "constraints_passed": True,
+                "objective": 1.0e-20,
+                "batch_id": 1,
+                "simulation_status": "mock_pass",
+                "timestamp_utc": "2026-06-02T11:00:00Z",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    _write_valid_checked_result(project_dir)
+    _write_metric_result_manifest(
+        project_dir,
+        values={"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-6},
+    )
+
+    report = record_real_result(
+        project_dir,
+        recorded_at_utc="2026-06-02T12:00:00Z",
+    )
+
+    assert report.status == RealResultRecordStatus.PASS
+    best = _load_json(project_dir / "state" / "best_candidate.json")
+    assert best["candidate_id"] == "cand_999"
+    state = _load_json(project_dir / "state" / "optimizer_state.json")
+    assert state["current_evaluations"] == 2
+    assert state["best_candidate_id"] == "cand_999"
+
+
+def test_infeasible_existing_best_does_not_block_feasible_real_result(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_project(tmp_path)
+    best_path = project_dir / "state" / "best_candidate.json"
+    best_path.parent.mkdir(parents=True, exist_ok=True)
+    _write_json(
+        best_path,
+        {
+            "candidate_id": "cand_bad",
+            "parameters": {"FN": "4"},
+            "metrics": {"rise": 1.0, "fall": 1.0, "DC": 1.0},
+            "constraints_passed": False,
+            "objective": 0.0,
+            "batch_id": 1,
+            "timestamp_utc": "2026-06-02T11:00:00Z",
+        },
+    )
+    _write_valid_checked_result(project_dir)
+
+    report = record_real_result(
+        project_dir,
+        recorded_at_utc="2026-06-02T12:00:00Z",
+    )
+
+    assert report.status == RealResultRecordStatus.PASS
+    best = _load_json(best_path)
+    assert best["candidate_id"] == "real_001"
+    assert best["constraints_passed"] is True
+    state = _load_json(project_dir / "state" / "optimizer_state.json")
+    assert state["best_candidate_id"] == "real_001"
+
+
+def test_stale_best_file_is_replaced_by_ledger_best(tmp_path: Path) -> None:
+    project_dir = _create_ready_project(tmp_path)
+    ledger_path = project_dir / "ledger" / "experiment_ledger.jsonl"
+    ledger_path.parent.mkdir(parents=True, exist_ok=True)
+    ledger_path.write_text(
+        json.dumps(
+            {
+                "candidate_id": "cand_999",
+                "parameters": {"FN": "4"},
+                "metrics": {"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-9},
+                "constraints_passed": True,
+                "objective": 1.0e-20,
+                "batch_id": 1,
+                "simulation_status": "mock_pass",
+                "timestamp_utc": "2026-06-02T11:00:00Z",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    best_path = project_dir / "state" / "best_candidate.json"
+    best_path.parent.mkdir(parents=True, exist_ok=True)
+    _write_json(
+        best_path,
+        {
+            "candidate_id": "cand_stale",
+            "parameters": {"FN": "8"},
+            "metrics": {"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-3},
+            "constraints_passed": True,
+            "objective": 1.0e-3,
+            "batch_id": 1,
+            "timestamp_utc": "2026-06-02T10:00:00Z",
+        },
+    )
+    _write_valid_checked_result(project_dir)
+    _write_metric_result_manifest(
+        project_dir,
+        values={"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-6},
+    )
+
+    report = record_real_result(
+        project_dir,
+        recorded_at_utc="2026-06-02T12:00:00Z",
+    )
+
+    assert report.status == RealResultRecordStatus.PASS
+    best = _load_json(best_path)
+    assert best["candidate_id"] == "cand_999"
+    state = _load_json(project_dir / "state" / "optimizer_state.json")
+    assert state["best_candidate_id"] == "cand_999"
+
+
+def test_invalid_best_file_is_repaired_from_ledger(tmp_path: Path) -> None:
+    project_dir = _create_ready_project(tmp_path)
+    ledger_path = project_dir / "ledger" / "experiment_ledger.jsonl"
+    ledger_path.parent.mkdir(parents=True, exist_ok=True)
+    ledger_path.write_text(
+        json.dumps(
+            {
+                "candidate_id": "cand_999",
+                "parameters": {"FN": "4"},
+                "metrics": {"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-9},
+                "constraints_passed": True,
+                "objective": 1.0e-20,
+                "batch_id": 1,
+                "simulation_status": "mock_pass",
+                "timestamp_utc": "2026-06-02T11:00:00Z",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    best_path = project_dir / "state" / "best_candidate.json"
+    best_path.parent.mkdir(parents=True, exist_ok=True)
+    best_path.write_text("{not valid json}\n", encoding="utf-8")
+    _write_valid_checked_result(project_dir)
+    _write_metric_result_manifest(
+        project_dir,
+        values={"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-6},
+    )
+
+    report = record_real_result(
+        project_dir,
+        recorded_at_utc="2026-06-02T12:00:00Z",
+    )
+
+    assert report.status == RealResultRecordStatus.PASS
+    best = _load_json(best_path)
+    assert best["candidate_id"] == "cand_999"
+    state = _load_json(project_dir / "state" / "optimizer_state.json")
+    assert state["best_candidate_id"] == "cand_999"
+
+
+def test_stale_best_file_is_removed_when_no_feasible_ledger_best(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_project(tmp_path)
+    best_path = project_dir / "state" / "best_candidate.json"
+    best_path.parent.mkdir(parents=True, exist_ok=True)
+    _write_json(
+        best_path,
+        {
+            "candidate_id": "cand_stale",
+            "parameters": {"FN": "8"},
+            "metrics": {"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-3},
+            "constraints_passed": True,
+            "objective": 1.0e-3,
+            "batch_id": 1,
+            "timestamp_utc": "2026-06-02T10:00:00Z",
+        },
+    )
+    _write_valid_checked_result(project_dir)
+    _write_metric_result_manifest(
+        project_dir,
+        values={"rise": 1.0, "fall": 1.0, "DC": 1.0},
+    )
+
+    report = record_real_result(
+        project_dir,
+        recorded_at_utc="2026-06-02T12:00:00Z",
+    )
+
+    assert report.status == RealResultRecordStatus.PASS
+    assert not best_path.exists()
+    state = _load_json(project_dir / "state" / "optimizer_state.json")
+    assert state["best_candidate_id"] is None
 
 
 def test_record_real_result_normalizes_maximize_objective(tmp_path: Path) -> None:

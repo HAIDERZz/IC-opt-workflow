@@ -786,7 +786,7 @@ Still excluded:
 Next recommended action:
 
 - C-7 Task 6 final verification and combined review are complete.
-- Next C-8 should append ledger rows and update optimizer state from checked metric results.
+- C-8 now records checked real metric results into optimizer ledger/state after `check-real-run` and `check-metric-results` pass.
 
 ## Plan C C-7 Spectre + OCEAN Execution Adapter
 
@@ -825,6 +825,48 @@ Locked C-7 policy:
 - Python still must not parse PSF or reimplement Calculator/OCEAN formulas.
 - Automated tests must continue to use fake runners; real Cadence smoke remains local-only evidence.
 
+## Plan C C-8 Real Result Ledger/State Update
+
+Status: complete and reviewed as of 2026-06-02.
+
+Spec:
+
+- `docs/superpowers/specs/2026-06-02-real-result-ledger-state-update-design.md`
+
+Implementation plan:
+
+- `docs/superpowers/plans/2026-06-02-real-result-ledger-state-update.md`
+
+Implemented:
+
+- `LedgerRow` accepts optional real-result provenance fields while preserving existing mock ledger compatibility.
+- `record_real_result()` reruns `check_real_run()` and `check_metric_results()` from fresh in-memory reports before any optimizer writes.
+- Precondition failures, missing manifests, duplicate `run_id`, duplicate `candidate_id`, and invalid ledger rows fail closed before append.
+- Successful checked real results append one row to `ledger/experiment_ledger.jsonl`, update `state/optimizer_state.json`, and update `state/best_candidate.json` only when the real result is feasible and better than the existing best.
+- `hermes-workflow record-real-result PROJECT_DIR --run-id real_001` exposes the record operation with pass/fail output and no traceback for expected contract failures.
+
+Task verification:
+
+- Task 1 schema/report gate: focused tests passed; ruff passed; spec and code-quality reviews approved after mock ledger backwards-compatibility fix.
+- Task 2 fail-closed precondition gate: focused/checker tests passed; ruff passed; spec and code-quality reviews approved after adding no-persist checker calls for prerequisite reports.
+- Task 3 success write gate: real-result/checker tests passed; ruff passed; spec and code-quality reviews approved.
+- Task 4 duplicate/best hardening gate: real-result/checker tests passed; ruff passed; spec and code-quality reviews approved after removing a stale unused ledger-count helper.
+- Task 5 CLI integration gate: CLI/real-result/checker tests passed; ruff passed; combined review approved.
+- Task 6 full verification after final-review fixes: `python3 -m pytest -q` passed with 362 tests; `python3 -m ruff check src tests tools` passed; `git diff --check` produced no output.
+- Task 6 final combined review found two Important ledger/state/best consistency findings. They were fixed: best candidate is now derived from strict ledger rows plus the current real row, stale/invalid `best_candidate.json` no longer overrides ledger source of truth, and infeasible best candidates cannot block feasible rows. Final re-review confirmed the code findings were addressed; docs-only Minor cleanup remained.
+- Task 6 final docs re-review: approved with no remaining findings.
+
+Locked C-8 policy:
+
+- C-8 is contract-only. It does not run Spectre, run OCEAN, call the C-7 adapter, parse PSF, or rewrite formulas.
+- `check-real-run` and `check-metric-results` must pass before ledger/state writes.
+- The ledger remains the source of truth. Optimizer state and best candidate are derived from checked ledger-worthy payloads.
+- C-8 does not generate the next candidate and does not add failure-penalty rows for simulator/metric failures.
+
+Next recommended action:
+
+- Choose C-9 next-candidate generation or a failure/retry policy plan.
+
 ## Locked Role Model
 
 Status: locked as of 2026-06-02.
@@ -850,5 +892,5 @@ Do not use "Hermes agent" as a role name in future specs or plans. If older docu
 3. ic-auto-opt-workflow/docs/COMPACT_RESUME_CHECKPOINT.md
 4. ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。请先阅读 docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/specs/2026-06-02-spectre-ocean-execution-adapter-design.md、docs/superpowers/plans/2026-06-02-spectre-ocean-execution-adapter.md。Hermes File Contract MVP 的 Plan A Task 1-9 已完成；Plan B mock optimization loop 已完成；Plan C C-1/C-2/C-3/C-4/C-5/C-5.5/C-6/C-7 均已完成并通过相应 verification/review gate。Spectre + OCEAN backend 已通过真实工具链证据验证。下一步进入 C-8 optimizer ledger/state update，或按用户要求补 C-7 local Cadence smoke / SSH execution profile。不要提交或复制本地真实 input.scs 示例，不要让 agent 重写公式，不要用 Python 解析 PSF 或重写 Calculator/OCEAN 公式。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。请先阅读 docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md。Hermes File Contract MVP 的 Plan A Task 1-9 已完成；Plan B mock optimization loop 已完成；Plan C C-1/C-2/C-3/C-4/C-5/C-5.5/C-6/C-7 均已完成并通过相应 verification/review gate。C-8 real result ledger/state update 已完成实现并处于 final verification/review closeout；如已 closeout，下一步进入 C-9 next-candidate generation 或 failure/retry policy。Spectre + OCEAN backend 已通过真实工具链证据验证。不要提交或复制本地真实 input.scs 示例，不要让 agent 重写公式，不要用 Python 解析 PSF 或重写 Calculator/OCEAN 公式。
 ```

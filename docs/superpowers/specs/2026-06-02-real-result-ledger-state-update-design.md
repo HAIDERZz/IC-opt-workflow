@@ -198,7 +198,11 @@ C-8 must write a failed `reports/real_result_record_report.json` and avoid ledge
 - constraints cannot be evaluated
 - ledger already contains the same run id or candidate id
 - existing ledger contains invalid JSON
-- existing best candidate is invalid
+
+`state/best_candidate.json` is a derived file, not the source of truth. C-8 should
+derive best-candidate state from valid ledger rows plus the current checked row. A
+stale or invalid `best_candidate.json` should be repaired from the ledger-derived
+best candidate, or removed when no feasible ledger-derived best exists.
 
 The implementation should prepare all derived payloads before any state-changing write. The ledger is the source of truth, and optimizer state is derived from ledger content. After precondition checks and payload preparation pass, write in this order:
 

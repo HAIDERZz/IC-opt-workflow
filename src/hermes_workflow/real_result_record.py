@@ -164,9 +164,8 @@ def record_real_result(
                         f"{METRIC_RESULT_MANIFEST_NAME}"
                     ),
                 )
-                existing_best = _load_best_candidate(project_dir, issues)
                 if not issues:
-                    best_candidate = _choose_best(existing_best, row)
+                    best_candidate = _choose_best_from_rows([*ledger_rows, row])
                     best_candidate_id = (
                         best_candidate.candidate_id
                         if best_candidate is not None
@@ -176,8 +175,10 @@ def record_real_result(
     if not issues and bundle is not None and row is not None:
         write_ledger_row(project_dir, row)
         checks.ledger_write_ok = True
-        if best_candidate is not None and best_candidate.candidate_id == row.candidate_id:
+        if best_candidate is not None:
             write_best_candidate(project_dir, best_candidate)
+        else:
+            _remove_stale_best_candidate(project_dir)
         state = _new_optimizer_state(
             bundle,
             current_evaluations=len(ledger_rows) + 1,
@@ -322,37 +323,26 @@ def _check_duplicates(
     return not duplicate_issues
 
 
-def _load_best_candidate(project_dir: Path, issues: list[str]) -> BestCandidate | None:
-    best_path = project_dir / BEST_CANDIDATE_PATH
-    if not best_path.exists():
+def _choose_best_from_rows(rows: list[LedgerRow]) -> BestCandidate | None:
+    feasible_rows = [row for row in rows if row.constraints_passed]
+    if not feasible_rows:
         return None
-    payload = _load_json(best_path, "best candidate", issues)
-    if payload is None:
-        return None
-    try:
-        return BestCandidate.model_validate(payload)
-    except ValidationError as exc:
-        issues.append(f"best candidate is invalid: {exc}")
-        return None
-
-
-def _choose_best(
-    existing: BestCandidate | None,
-    current: LedgerRow,
-) -> BestCandidate | None:
-    if not current.constraints_passed:
-        return existing
-    if existing is not None and current.objective >= existing.objective:
-        return existing
+    best_row = min(feasible_rows, key=lambda row: row.objective)
     return BestCandidate(
-        candidate_id=current.candidate_id,
-        parameters=current.parameters,
-        metrics=current.metrics,
-        constraints_passed=current.constraints_passed,
-        objective=current.objective,
-        batch_id=current.batch_id,
-        timestamp_utc=current.timestamp_utc,
+        candidate_id=best_row.candidate_id,
+        parameters=best_row.parameters,
+        metrics=best_row.metrics,
+        constraints_passed=best_row.constraints_passed,
+        objective=best_row.objective,
+        batch_id=best_row.batch_id,
+        timestamp_utc=best_row.timestamp_utc,
     )
+
+
+def _remove_stale_best_candidate(project_dir: Path) -> None:
+    best_path = project_dir / BEST_CANDIDATE_PATH
+    if best_path.exists():
+        best_path.unlink()
 
 
 def _next_batch_id(existing_count: int, batch_size: int) -> int:

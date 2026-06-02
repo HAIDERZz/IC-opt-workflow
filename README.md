@@ -24,12 +24,14 @@ python tools/run_spectre_ocean_adapter.py projects/bridge_test_inv --run-id real
 hermes-workflow check-real-run projects/bridge_test_inv
 # Execution agent runs batch OCEAN outside Hermes and writes metric_result_manifest.json
 hermes-workflow check-metric-results projects/bridge_test_inv
+hermes-workflow record-real-result projects/bridge_test_inv --run-id real_001
 ```
 
 The `approve` command only approves the first real run when config validation, Hermes workflow netlist preparation, Hermes workflow dry-run, and Hermes-written preflight health all pass.
 `prepare-real-run` prepares `runs/real/real_001/` after approval, but it does not run Spectre, Virtuoso, subprocesses, or an optimizer loop.
 `check-real-run` validates the returned file contract only. It does not launch Spectre, parse simulator databases, compute real metrics, append ledger rows, or advance optimizer state.
 Metric extraction is contract-only in Hermes workflow tooling. The execution agent runs standalone Spectre and batch OCEAN outside Hermes workflow tooling, then writes `metric_result_manifest.json`. Hermes workflow tooling validates formula identity, scalar values, and artifact paths; it does not parse PSF or reimplement Calculator/OCEAN formulas.
+After both handoff checks pass, `record-real-result` appends a real evaluation row and updates optimizer state from checked contract files only. It does not run Spectre, run OCEAN, parse PSF, or generate the next candidate.
 
 The C-7 execution-side adapter is an explicit tool boundary, not a Hermes validator:
 

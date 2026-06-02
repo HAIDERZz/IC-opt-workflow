@@ -4,11 +4,11 @@
 
 - Repository: `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow`
 - Branch: `plan-a-hermes-file-contract-mvp`
-- Current scope: Plan C-8 next scope, optimizer ledger/state update
-- Current status: C-7 complete and reviewed
-- Next required action: begin C-8 optimizer ledger/state update, or run local real-tool smoke/profile work if requested
+- Current scope: Plan C-9 selection after real result ledger/state update
+- Current status: C-8 complete and reviewed
+- Next required action: choose C-9 next-candidate generation or failure/retry policy
 
-C-3 Task 6 final verification is complete. C-4 is confirmed as a contract-only first real-run package; it must not run Spectre, Virtuoso, subprocesses, or the optimizer loop. C-4 is now complete and reviewed. C-5 validates the execution agent's returned `result_manifest.json` and declared artifacts without running Spectre or parsing metrics. C-5.5 rehearsed the C-4/C-5 handoff with simulated execution-agent and Hermes-observer roles. After C-5.5, the project paused implementation to validate the real metric backend. Spectre + OCEAN is now confirmed as the backend route: standalone Spectre generates PSF, batch OCEAN opens the PSF and evaluates exact user/project-approved formulas, and Python only records OCEAN-produced scalar outputs and provenance. C-6 turned that route into deterministic file contracts and a Hermes validator without physical adapter wiring. C-7 added an explicit execution-side adapter and tool entry point while preserving the rule that Hermes workflow tooling still validates returned files after execution.
+C-3 Task 6 final verification is complete. C-4 is confirmed as a contract-only first real-run package; it must not run Spectre, Virtuoso, subprocesses, or the optimizer loop. C-4 is now complete and reviewed. C-5 validates the execution agent's returned `result_manifest.json` and declared artifacts without running Spectre or parsing metrics. C-5.5 rehearsed the C-4/C-5 handoff with simulated execution-agent and Hermes-observer roles. After C-5.5, the project paused implementation to validate the real metric backend. Spectre + OCEAN is now confirmed as the backend route: standalone Spectre generates PSF, batch OCEAN opens the PSF and evaluates exact user/project-approved formulas, and Python only records OCEAN-produced scalar outputs and provenance. C-6 turned that route into deterministic file contracts and a Hermes validator without physical adapter wiring. C-7 added an explicit execution-side adapter and tool entry point while preserving the rule that Hermes workflow tooling still validates returned files after execution. C-8 records checked real metric results into optimizer ledger/state after `check-real-run` and `check-metric-results` pass, while preserving the contract-only boundary.
 
 ## Completed Scope
 
@@ -23,6 +23,7 @@ C-3 Task 6 final verification is complete. C-4 is confirmed as a contract-only f
 - Toolchain evidence for Spectre + OCEAN metric extraction: complete.
 - Plan C C-6 Spectre + OCEAN metric result contract: complete and reviewed.
 - Plan C C-7 Spectre + OCEAN execution adapter: complete and reviewed.
+- Plan C C-8 real result ledger/state update: complete and reviewed.
 
 ## Spectre + OCEAN Backend Decision
 
@@ -214,11 +215,43 @@ ruff check .
 
 The first combined review found report-evidence gaps; the re-review found those addressed and only Task 5 bookkeeping remained. The closeout commit addresses that bookkeeping.
 
+## Plan C-8 Implementation Node
+
+Implemented:
+
+- `LedgerRow` and real-result record report schemas support real-result provenance without breaking mock rows.
+- `record_real_result()` reruns `check-real-run` and `check-metric-results` in memory before optimizer writes.
+- Precondition failures, missing manifests, duplicate `run_id`, duplicate `candidate_id`, and invalid ledger rows fail closed before unsafe writes. `state/best_candidate.json` is derived from ledger rows and is repaired or removed when stale.
+- Checked real metric results append to `ledger/experiment_ledger.jsonl`, update `state/optimizer_state.json`, and update `state/best_candidate.json` only when feasible and better.
+- `hermes-workflow record-real-result PROJECT_DIR --run-id real_001` formats pass/fail output and writes `reports/real_result_record_report.json`.
+
+Current verification:
+
+```bash
+python3 -m pytest -q
+# 362 passed
+
+python3 -m ruff check src tests tools
+# All checks passed
+
+git diff --check
+# no output
+```
+
+Still excluded:
+
+- running Spectre/OCEAN from Hermes workflow tooling
+- calling the C-7 adapter from Hermes validators
+- parsing PSF or waveform data in Python
+- recomputing OCEAN/Calculator formulas in Python
+- generating the next candidate
+- failure-penalty ledger rows for failed real tool execution
+
 ## Next Task
 
-C-6 and C-7 are closed. Next:
+C-6, C-7, and C-8 are closed. Next:
 
-- C-8 should append ledger rows and update optimizer state from checked metric results after the physical adapter and result contract are stable.
+- After C-8, choose C-9 next-candidate generation or failure/retry policy.
 
 ## Completed C-5.5 Dual-Agent Result Handoff Simulation Gate
 
@@ -254,5 +287,5 @@ are local reference material only. Do not copy or commit them into the repositor
 ## Resume Prompt
 
 ```text
-请继续 IC auto optimization workflow。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。先阅读 docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/specs/2026-06-02-spectre-ocean-execution-adapter-design.md，以及 docs/superpowers/plans/2026-06-02-spectre-ocean-execution-adapter.md。Plan A Task 1-9、Plan B、Plan C C-1、C-2、C-3、C-4、C-5、C-5.5、C-6、C-7 均已完成并通过 final verification/review gate。Spectre + OCEAN backend 已通过真实工具链证据验证。下一步进入 C-8 optimizer ledger/state update，或按用户要求补 C-7 local Cadence smoke / SSH execution profile。公式以 metrics.yaml 中用户/项目批准的精确表达式为准，不允许 agent 重写公式，不允许 Python 解析 PSF 或重写 Calculator/OCEAN 公式。
+请继续 IC auto optimization workflow。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。先阅读 docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md。Plan A Task 1-9、Plan B、Plan C C-1、C-2、C-3、C-4、C-5、C-5.5、C-6、C-7、C-8 均已完成并通过 final verification/review gate。下一步选择 C-9 next-candidate generation 或 failure/retry policy。Spectre + OCEAN backend 已通过真实工具链证据验证。公式以 metrics.yaml 中用户/项目批准的精确表达式为准，不允许 agent 重写公式，不允许 Python 解析 PSF 或重写 Calculator/OCEAN 公式。
 ```

@@ -1364,7 +1364,7 @@ Update this task's checkboxes to `[x]` after verification and review gate approv
 - Modify: `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`
 - Modify: `docs/superpowers/plans/2026-06-02-real-result-ledger-state-update.md`
 
-- [ ] **Step 1: Update README**
+- [x] **Step 1: Update README**
 
 Add after `check-metric-results`:
 
@@ -1378,7 +1378,7 @@ hermes-workflow record-real-result projects/bridge_test_inv --run-id real_001
 `record-real-result` appends a real evaluation row and updates optimizer state from checked contract files only. It does not run Spectre, run OCEAN, parse PSF, or generate the next candidate.
 ```
 
-- [ ] **Step 2: Update overview and checkpoints**
+- [x] **Step 2: Update overview and checkpoints**
 
 Record:
 
@@ -1388,7 +1388,7 @@ It remains contract-only and does not call real tools.
 Next scope after C-8 is C-9 next-candidate generation or failure/retry policy.
 ```
 
-- [ ] **Step 3: Run full verification**
+- [x] **Step 3: Run full verification**
 
 Run:
 
@@ -1406,7 +1406,7 @@ ruff: All checks passed!
 git diff --check: no output
 ```
 
-- [ ] **Step 4: Run final combined review gate**
+- [x] **Step 4: Run final combined review gate**
 
 Use the project's established review path. The review request must include:
 
@@ -1423,11 +1423,11 @@ Focus on:
 - CLI failure surface without traceback
 ```
 
-- [ ] **Step 5: Fix review findings**
+- [x] **Step 5: Fix review findings**
 
 If review returns Critical or Important findings, fix them, rerun focused tests, rerun full verification, then rerun the review gate.
 
-- [ ] **Step 6: Mark C-8 complete**
+- [x] **Step 6: Mark C-8 complete**
 
 Update this task's checkboxes to `[x]` after final verification and review approval.
 
