@@ -376,3 +376,175 @@ def test_record_real_result_writes_ledger_state_best_and_report(tmp_path: Path) 
     assert persisted["status"] == "pass"
     assert persisted["checks"]["ledger_write_ok"] is True
     assert persisted["checks"]["state_write_ok"] is True
+
+
+def test_record_real_result_rejects_duplicate_run_without_append(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_project(tmp_path)
+    _write_valid_checked_result(project_dir)
+    first = record_real_result(
+        project_dir,
+        recorded_at_utc="2026-06-02T12:00:00Z",
+    )
+    assert first.status == RealResultRecordStatus.PASS
+
+    second = record_real_result(
+        project_dir,
+        recorded_at_utc="2026-06-02T12:01:00Z",
+    )
+
+    assert second.status == RealResultRecordStatus.FAIL
+    assert "ledger already contains run_id real_001" in second.issues
+    assert second.checks.duplicate_ok is False
+    lines = (project_dir / "ledger" / "experiment_ledger.jsonl").read_text(
+        encoding="utf-8"
+    ).strip().split("\n")
+    assert len(lines) == 1
+
+
+def test_record_real_result_rejects_duplicate_candidate_without_append(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_project(tmp_path)
+    _write_valid_checked_result(project_dir)
+    ledger_path = project_dir / "ledger" / "experiment_ledger.jsonl"
+    ledger_path.parent.mkdir(parents=True, exist_ok=True)
+    ledger_path.write_text(
+        json.dumps(
+            {
+                "candidate_id": "real_001",
+                "parameters": {"FN": "2"},
+                "metrics": {"rise": 1.0},
+                "constraints_passed": True,
+                "objective": 1.0,
+                "batch_id": 1,
+                "simulation_status": "mock_pass",
+                "timestamp_utc": "2026-06-02T11:00:00Z",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    report = record_real_result(
+        project_dir,
+        recorded_at_utc="2026-06-02T12:00:00Z",
+    )
+
+    assert report.status == RealResultRecordStatus.FAIL
+    assert "ledger already contains candidate_id real_001" in report.issues
+    assert report.checks.duplicate_ok is False
+    assert len(ledger_path.read_text(encoding="utf-8").strip().split("\n")) == 1
+
+
+def test_record_real_result_rejects_invalid_ledger_without_append(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_project(tmp_path)
+    _write_valid_checked_result(project_dir)
+    ledger_path = project_dir / "ledger" / "experiment_ledger.jsonl"
+    ledger_path.parent.mkdir(parents=True, exist_ok=True)
+    ledger_path.write_text("{not valid json}\n", encoding="utf-8")
+
+    report = record_real_result(
+        project_dir,
+        recorded_at_utc="2026-06-02T12:00:00Z",
+    )
+
+    assert report.status == RealResultRecordStatus.FAIL
+    assert any("ledger row 1 is invalid" in issue for issue in report.issues)
+    assert report.checks.duplicate_ok is False
+    assert ledger_path.read_text(encoding="utf-8") == "{not valid json}\n"
+    assert not (project_dir / "state" / "optimizer_state.json").exists()
+    assert not (project_dir / "state" / "best_candidate.json").exists()
+
+
+def test_constraint_failing_real_result_does_not_update_best(tmp_path: Path) -> None:
+    project_dir = _create_ready_project(tmp_path)
+    _write_valid_checked_result(project_dir)
+    _write_metric_result_manifest(
+        project_dir,
+        values={"rise": 1.0, "fall": 1.0, "DC": 1.0},
+    )
+
+    report = record_real_result(
+        project_dir,
+        recorded_at_utc="2026-06-02T12:00:00Z",
+    )
+
+    assert report.status == RealResultRecordStatus.PASS
+    row = json.loads(
+        (project_dir / "ledger" / "experiment_ledger.jsonl")
+        .read_text(encoding="utf-8")
+        .strip()
+    )
+    assert row["simulation_status"] == "real_constraint_fail"
+    assert row["constraints_passed"] is False
+    assert not (project_dir / "state" / "best_candidate.json").exists()
+    state = _load_json(project_dir / "state" / "optimizer_state.json")
+    assert state["best_candidate_id"] is None
+
+
+def test_worse_feasible_real_result_preserves_existing_best(tmp_path: Path) -> None:
+    project_dir = _create_ready_project(tmp_path)
+    best_path = project_dir / "state" / "best_candidate.json"
+    best_path.parent.mkdir(parents=True, exist_ok=True)
+    _write_json(
+        best_path,
+        {
+            "candidate_id": "cand_999",
+            "parameters": {"FN": "4"},
+            "metrics": {"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-9},
+            "constraints_passed": True,
+            "objective": 1.0e-20,
+            "batch_id": 1,
+            "timestamp_utc": "2026-06-02T11:00:00Z",
+        },
+    )
+    _write_valid_checked_result(project_dir)
+    _write_metric_result_manifest(
+        project_dir,
+        values={"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-6},
+    )
+
+    report = record_real_result(
+        project_dir,
+        recorded_at_utc="2026-06-02T12:00:00Z",
+    )
+
+    assert report.status == RealResultRecordStatus.PASS
+    best = _load_json(best_path)
+    assert best["candidate_id"] == "cand_999"
+    state = _load_json(project_dir / "state" / "optimizer_state.json")
+    assert state["best_candidate_id"] == "cand_999"
+
+
+def test_record_real_result_normalizes_maximize_objective(tmp_path: Path) -> None:
+    project_dir = _create_ready_project(tmp_path)
+    metrics_path = project_dir / "config" / "metrics.yaml"
+    metrics_path.write_text(
+        metrics_path.read_text(encoding="utf-8").replace(
+            "direction: minimize",
+            "direction: maximize",
+        ),
+        encoding="utf-8",
+    )
+    _write_valid_checked_result(project_dir)
+    _write_metric_result_manifest(
+        project_dir,
+        values={"rise": 1.0e-12, "fall": 1.0e-12, "DC": 2.0e-6},
+    )
+
+    report = record_real_result(
+        project_dir,
+        recorded_at_utc="2026-06-02T12:00:00Z",
+    )
+
+    assert report.status == RealResultRecordStatus.PASS
+    row = json.loads(
+        (project_dir / "ledger" / "experiment_ledger.jsonl")
+        .read_text(encoding="utf-8")
+        .strip()
+    )
+    assert row["objective"] == pytest.approx(-4.0e-18)

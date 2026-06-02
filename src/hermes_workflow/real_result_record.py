@@ -5,6 +5,8 @@ import math
 from datetime import UTC, datetime
 from pathlib import Path
 
+from pydantic import ValidationError
+
 from hermes_workflow.metric_results import check_metric_results
 from hermes_workflow.mock_optimizer import (
     evaluate_constraints,
@@ -109,7 +111,14 @@ def record_real_result(
         )
         if parameters is not None:
             checks.candidate_ok = True
-        checks.duplicate_ok = True
+        ledger_rows = _read_ledger_rows(project_dir, issues)
+        if not issues and candidate_id is not None:
+            checks.duplicate_ok = _check_duplicates(
+                ledger_rows,
+                run_id=selected_run_id,
+                candidate_id=candidate_id,
+                issues=issues,
+            )
         metrics = _checked_metric_values(metric_report, issues)
 
         if parameters is not None and metrics is not None and candidate_id is not None:
@@ -140,7 +149,7 @@ def record_real_result(
                     constraints_passed=constraints_passed,
                     objective=objective_value,
                     batch_id=_next_batch_id(
-                        project_dir,
+                        len(ledger_rows),
                         bundle.optimizer.optimizer.batch_size,
                     ),
                     simulation_status=simulation_status,
@@ -155,26 +164,23 @@ def record_real_result(
                         f"{METRIC_RESULT_MANIFEST_NAME}"
                     ),
                 )
-                if row.constraints_passed:
-                    best_candidate = BestCandidate(
-                        candidate_id=row.candidate_id,
-                        parameters=row.parameters,
-                        metrics=row.metrics,
-                        constraints_passed=row.constraints_passed,
-                        objective=row.objective,
-                        batch_id=row.batch_id,
-                        timestamp_utc=row.timestamp_utc,
+                existing_best = _load_best_candidate(project_dir, issues)
+                if not issues:
+                    best_candidate = _choose_best(existing_best, row)
+                    best_candidate_id = (
+                        best_candidate.candidate_id
+                        if best_candidate is not None
+                        else None
                     )
-                    best_candidate_id = row.candidate_id
 
     if not issues and bundle is not None and row is not None:
         write_ledger_row(project_dir, row)
         checks.ledger_write_ok = True
-        if best_candidate is not None:
+        if best_candidate is not None and best_candidate.candidate_id == row.candidate_id:
             write_best_candidate(project_dir, best_candidate)
         state = _new_optimizer_state(
             bundle,
-            current_evaluations=_count_valid_ledger_rows(project_dir),
+            current_evaluations=len(ledger_rows) + 1,
             best_candidate_id=best_candidate_id,
             recorded_at_utc=recorded_at,
         )
@@ -277,25 +283,80 @@ def _checked_metric_values(
     return metrics
 
 
-def _next_batch_id(project_dir: Path, batch_size: int) -> int:
-    existing_count = _count_valid_ledger_rows(project_dir)
-    return (existing_count // batch_size) + 1
-
-
-def _count_valid_ledger_rows(project_dir: Path) -> int:
+def _read_ledger_rows(project_dir: Path, issues: list[str]) -> list[LedgerRow]:
     ledger_path = project_dir / LEDGER_PATH
     if not ledger_path.exists():
-        return 0
-    count = 0
-    for line in ledger_path.read_text(encoding="utf-8").splitlines():
-        if not line.strip():
+        return []
+    rows: list[LedgerRow] = []
+    for line_number, raw_line in enumerate(
+        ledger_path.read_text(encoding="utf-8").splitlines(),
+        1,
+    ):
+        if not raw_line.strip():
             continue
         try:
-            LedgerRow.model_validate_json(line)
-        except ValueError:
-            continue
-        count += 1
-    return count
+            payload = json.loads(raw_line)
+            rows.append(LedgerRow.model_validate(payload))
+        except (json.JSONDecodeError, ValidationError) as exc:
+            issues.append(f"ledger row {line_number} is invalid: {exc}")
+            return []
+    return rows
+
+
+def _check_duplicates(
+    rows: list[LedgerRow],
+    *,
+    run_id: str,
+    candidate_id: str,
+    issues: list[str],
+) -> bool:
+    duplicate_issues: list[str] = []
+    for row in rows:
+        if row.run_id == run_id:
+            duplicate_issues.append(f"ledger already contains run_id {run_id}")
+        if row.candidate_id == candidate_id:
+            duplicate_issues.append(
+                f"ledger already contains candidate_id {candidate_id}"
+            )
+    issues.extend(duplicate_issues)
+    return not duplicate_issues
+
+
+def _load_best_candidate(project_dir: Path, issues: list[str]) -> BestCandidate | None:
+    best_path = project_dir / BEST_CANDIDATE_PATH
+    if not best_path.exists():
+        return None
+    payload = _load_json(best_path, "best candidate", issues)
+    if payload is None:
+        return None
+    try:
+        return BestCandidate.model_validate(payload)
+    except ValidationError as exc:
+        issues.append(f"best candidate is invalid: {exc}")
+        return None
+
+
+def _choose_best(
+    existing: BestCandidate | None,
+    current: LedgerRow,
+) -> BestCandidate | None:
+    if not current.constraints_passed:
+        return existing
+    if existing is not None and current.objective >= existing.objective:
+        return existing
+    return BestCandidate(
+        candidate_id=current.candidate_id,
+        parameters=current.parameters,
+        metrics=current.metrics,
+        constraints_passed=current.constraints_passed,
+        objective=current.objective,
+        batch_id=current.batch_id,
+        timestamp_utc=current.timestamp_utc,
+    )
+
+
+def _next_batch_id(existing_count: int, batch_size: int) -> int:
+    return (existing_count // batch_size) + 1
 
 
 def _new_optimizer_state(

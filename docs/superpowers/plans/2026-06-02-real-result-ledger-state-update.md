@@ -970,7 +970,7 @@ Update this task's checkboxes to `[x]` after verification and review gate approv
 - Modify: `tests/test_real_result_record.py`
 - Modify: `docs/superpowers/plans/2026-06-02-real-result-ledger-state-update.md`
 
-- [ ] **Step 1: Add duplicate protection tests**
+- [x] **Step 1: Add duplicate protection tests**
 
 Append:
 
@@ -1022,7 +1022,7 @@ def test_record_real_result_rejects_duplicate_candidate_without_append(
     assert len(ledger_path.read_text(encoding="utf-8").strip().split("\n")) == 1
 ```
 
-- [ ] **Step 2: Add best-candidate comparison tests**
+- [x] **Step 2: Add best-candidate comparison tests**
 
 Append:
 
@@ -1082,7 +1082,7 @@ def test_worse_feasible_real_result_preserves_existing_best(tmp_path: Path) -> N
     assert state["best_candidate_id"] == "cand_999"
 ```
 
-- [ ] **Step 3: Run tests and verify failure**
+- [x] **Step 3: Run tests and verify failure**
 
 Run:
 
@@ -1092,7 +1092,7 @@ python3 -m pytest tests/test_real_result_record.py::test_record_real_result_reje
 
 Expected: FAIL until duplicate and best-comparison logic is implemented.
 
-- [ ] **Step 4: Implement ledger reading and duplicate checks**
+- [x] **Step 4: Implement ledger reading and duplicate checks**
 
 Add:
 
@@ -1131,7 +1131,7 @@ def _check_duplicates(
 
 Call `_read_ledger_rows()` and `_check_duplicates()` before constructing writes. Set `checks.duplicate_ok = True` only when no duplicates are found.
 
-- [ ] **Step 5: Implement existing best comparison**
+- [x] **Step 5: Implement existing best comparison**
 
 Add:
 
@@ -1173,7 +1173,7 @@ def _choose_best(
 
 Use `_choose_best()` before writing `best_candidate.json`.
 
-- [ ] **Step 6: Add maximize objective regression**
+- [x] **Step 6: Add maximize objective regression**
 
 Append a test that edits `config/metrics.yaml` from `direction: minimize` to `direction: maximize`, writes a valid result, and asserts the ledger objective is the negated configured objective:
 
@@ -1205,7 +1205,7 @@ def test_record_real_result_normalizes_maximize_objective(tmp_path: Path) -> Non
     assert row["objective"] < 0
 ```
 
-- [ ] **Step 7: Run hardening tests**
+- [x] **Step 7: Run hardening tests**
 
 Run:
 
