@@ -16,8 +16,9 @@
 - Plan C C-6 Spectre + OCEAN real metric result contract 已完成并通过 final combined review gate：`metrics.yaml` 支持精确批准的 OCEAN 公式，`prepare-real-run` 写入 `metric_extraction_request.json`，returned handoff 可引用 PSF/metric artifacts，`hermes-workflow check-metric-results` 验证公式身份、request hash、scalar 值和 artifact path。
 - Plan C C-7 Spectre + OCEAN execution adapter 已完成并通过 final combined review gate：新增 execution-side adapter library、fake-runner orchestration、failure/overwrite safety、explicit `tools/run_spectre_ocean_adapter.py` entry point。自动测试使用 fake runner；真实 Cadence smoke 仍然只作为 local-only evidence。
 - Plan C C-8 real result ledger/state update 已完成并通过 final review gate：`hermes-workflow record-real-result` 在 `check-real-run` 和 `check-metric-results` 通过后，将 checked real metric result 写入 `ledger/experiment_ledger.jsonl`、`state/optimizer_state.json` 和 ledger-derived best candidate。C-8 仍是 contract-only，不运行真实工具，不解析 PSF，不重写公式，不生成下一候选。
+- Plan C C-9 next real-run package contract 已完成并通过 Tasks 1-4 review gate：`hermes-workflow prepare-next-real-run` 在 C-8 已记录 checked real result 之后，按 optimizer config 的 deterministic initialization sequence 选择下一唯一候选，生成新的 C-4/C-6-compatible real-run package。C-9 不运行真实工具，不调用 C-7 adapter，不写 ledger/state，不解析 PSF，不改写公式。
 - 角色模型已锁定在 `docs/ROLE_MODEL_AND_TERMINOLOGY.md`：主管 agent 负责规划、审批和读取 Hermes workflow report；Hermes workflow tooling 是 deterministic file-contract 与 validation 工具层；执行 agent 负责 Maestro export、approval 之后的 standalone Spectre、batch OCEAN metric extraction，以及后续被批准的 optimizer/tool-side 操作。
-- 下一步：完成 C-8 final verification/review 后，进入 C-9 next-candidate generation 或 failure/retry policy。
+- 下一步：完成 C-9 final verification/review 后，选择 failure/retry policy 或本地 smoke 链接 C-9 -> C-7 -> C-8。
 - `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example` 下的真实 `input.scs` 示例只作为本地参考，不能提交进仓库。
 
 ## 1. 项目概览
@@ -63,7 +64,9 @@ flowchart TD
     Z --> AB[hermes-workflow check-metric-results]
     AB --> AD[hermes-workflow record-real-result]
     AD --> T[ledger + optimizer state]
-    T --> AE[未来 C-9 next-candidate / failure policy]
+    T --> AE[hermes-workflow prepare-next-real-run]
+    AE --> AF[runs/real/real_002 package]
+    AF --> AC
     D --> U[hermes-workflow mock-run]
     U --> V[离线 mock ledger/state]
 ```
@@ -165,6 +168,14 @@ flowchart TD
 - `hermes-workflow record-real-result`
   调用上述逻辑，写入 `reports/real_result_record_report.json`。失败时 fail closed，不追加 ledger，不写 optimizer state，不用旧 checker report 代替 fresh check。
 
+### Next real-run package 层
+
+- `src/hermes_workflow/real_run.py`
+  对应 Plan C C-9。除了 C-4 的 `prepare_real_run()` first-run package 之外，它现在提供 `prepare_next_real_run()`：读取严格 ledger 和 optimizer state，验证 immutable config 未漂移，按 optimizer config 的 deterministic initialization sequence 选择下一唯一候选，并写入新的 `runs/real/<run_id>/` package。它不运行真实工具，不调用 C-7 adapter，不写 ledger/state，不解析 PSF，不改写 OCEAN 公式。
+
+- `hermes-workflow prepare-next-real-run`
+  调用上述逻辑，在已经通过 C-8 记录 checked real result 后准备下一次真实运行 package。默认选择最小未占用 `real_###` 目录，显式 `--run-id` 会拒绝 `real_001` 和已存在 package/非空 partial 目录。
+
 ### Spectre + OCEAN execution adapter 层
 
 - `src/hermes_workflow/execution_adapters/spectre_ocean.py`
@@ -192,7 +203,7 @@ flowchart TD
 
 - `src/hermes_workflow/cli.py`
   当前提供：
-  `init`、`validate`、`prepare-netlist`、`dry-run`、`preflight-health`、`package`、`approve`、`prepare-real-run`、`check-real-run`、`check-metric-results`、`record-real-result`、`mock-run`。
+  `init`、`validate`、`prepare-netlist`、`dry-run`、`preflight-health`、`package`、`approve`、`prepare-real-run`、`prepare-next-real-run`、`check-real-run`、`check-metric-results`、`record-real-result`、`mock-run`。
 
 ### Review gate 工具层
 
@@ -325,6 +336,14 @@ hermes-workflow record-real-result projects/bridge_test_inv --run-id real_001
 
 `record-real-result` 只消费已经通过 `check-real-run` 与 `check-metric-results` 的文件合同。它追加 `ledger/experiment_ledger.jsonl`，更新 `state/optimizer_state.json`，并在可行且更优时更新 `state/best_candidate.json`。它不运行 Spectre/OCEAN，不解析 PSF，不生成下一候选。
 
+Hermes 根据已记录的 real-result ledger/state 准备下一候选 package：
+
+```bash
+hermes-workflow prepare-next-real-run projects/bridge_test_inv
+```
+
+`prepare-next-real-run` 选择下一唯一候选并写入 `runs/real/real_002/` 等新 package。它只准备文件合同，不运行 Spectre/OCEAN，不调用 C-7 adapter，不写 ledger/state。执行 agent 随后仍通过 `tools/run_spectre_ocean_adapter.py --run-id real_002` 运行真实工具，主管 agent 仍必须继续执行 `check-real-run`、`check-metric-results` 和 `record-real-result`。
+
 如果只想离线测试流程，不跑 Virtuoso/Spectre：
 
 ```bash
@@ -339,7 +358,9 @@ C-6 已把 Spectre + OCEAN metric result contract 固化进项目文件：`metri
 
 C-7 已将 physical tool boundary 接到 execution agent 侧：`supervisor agent -> Hermes workflow tooling -> execution agent -> C-7 adapter -> Hermes workflow checks`。自动化测试只使用 fake runners；真实 Cadence smoke 继续保留在 local-only evidence 目录，不作为 CI 前提。
 
-C-8 已把 checked real result 接入 optimizer ledger/state：`check-real-run -> check-metric-results -> record-real-result`。它仍然保持 Hermes workflow tooling 的 contract-only 边界，只记录已由 OCEAN 计算并由 checker 验证的 scalar/provenance。下一步 C-9 才会讨论基于 ledger 生成下一候选或 failure/retry policy。
+C-8 已把 checked real result 接入 optimizer ledger/state：`check-real-run -> check-metric-results -> record-real-result`。它仍然保持 Hermes workflow tooling 的 contract-only 边界，只记录已由 OCEAN 计算并由 checker 验证的 scalar/provenance。
+
+C-9 已把下一真实候选 package 接入 workflow：`record-real-result -> prepare-next-real-run -> C-7 execution adapter`。它使用 deterministic initialization sequence + strict dedupe 生成下一 package，但仍然不运行真实工具、不写 ledger/state。下一步应选择 failure/retry policy 或本地 smoke 链接 C-9 -> C-7 -> C-8。
 
 ## 4. 能否严格约束主管 agent 和执行 agent 的行为
 

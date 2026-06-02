@@ -1065,7 +1065,7 @@ git add src/hermes_workflow/cli.py tests/test_next_real_run.py docs/superpowers/
 git commit -m "feat: add prepare next real run cli"
 ```
 
-- [ ] **Step 6: Batched review gate for Tasks 3-4**
+- [x] **Step 6: Batched review gate for Tasks 3-4**
 
 Run code-quality review focused on:
 
@@ -1092,7 +1092,7 @@ Check:
 - Modify: `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`
 - Modify: `docs/superpowers/plans/2026-06-02-next-real-run-package-contract.md`
 
-- [ ] **Step 1: Update project overview**
+- [x] **Step 1: Update project overview**
 
 In `docs/PROJECT_WORKFLOW_OVERVIEW.md`, update the current node list:
 
@@ -1106,7 +1106,7 @@ Add CLI command to the usage section:
 hermes-workflow prepare-next-real-run projects/bridge_test_inv
 ```
 
-- [ ] **Step 2: Update execution progress**
+- [x] **Step 2: Update execution progress**
 
 Append to `docs/EXECUTION_PROGRESS_2026-05-29.md`:
 
@@ -1139,7 +1139,7 @@ Next:
 - Choose failure/retry policy or local smoke chaining C-9 -> C-7 -> C-8 on a known test cell.
 ```
 
-- [ ] **Step 3: Update compact resume checkpoint**
+- [x] **Step 3: Update compact resume checkpoint**
 
 In `docs/COMPACT_RESUME_CHECKPOINT.md`, add:
 
@@ -1147,7 +1147,7 @@ In `docs/COMPACT_RESUME_CHECKPOINT.md`, add:
 - C-9 next real-run package contract is complete and reviewed. It adds `prepare_next_real_run()` and `hermes-workflow prepare-next-real-run`, selecting the next unique candidate from the deterministic initialization sequence after C-8 has recorded checked real results. C-9 remains contract-only and does not run real tools, call C-7, write ledger/state, parse PSF, or rewrite formulas.
 ```
 
-- [ ] **Step 4: Update next development log**
+- [x] **Step 4: Update next development log**
 
 In `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`, update current status:
 
@@ -1156,7 +1156,7 @@ In `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`, update current status:
 - Next required action: choose failure/retry policy or local smoke chaining C-9 -> C-7 -> C-8.
 ```
 
-- [ ] **Step 5: Run final verification**
+- [x] **Step 5: Run final verification**
 
 Run:
 

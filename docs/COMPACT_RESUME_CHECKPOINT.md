@@ -80,7 +80,11 @@ Current execution state:
 - C-8 is complete and reviewed. Implemented schema/report extension, fail-closed record preconditions, successful real result ledger/state/best writes, duplicate protection, ledger-derived best-candidate repair, maximize objective normalization, and `hermes-workflow record-real-result` CLI.
 - C-8 policy is locked: record only checked `check-real-run` + `check-metric-results` outputs; do not run real tools, call the C-7 adapter, parse PSF, rewrite formulas, generate next candidates, or add failure-penalty rows.
 - C-8 final verification after review fixes: `python3 -m pytest -q` passed with 362 tests; `python3 -m ruff check src tests tools` passed; `git diff --check` produced no output. Final re-review approved after ledger-derived best-candidate docs cleanup.
-- Current next action: choose C-9 next-candidate generation or failure/retry policy.
+- C-9 next real-run package contract design spec exists: `docs/superpowers/specs/2026-06-02-next-real-run-package-contract-design.md`.
+- C-9 implementation plan exists: `docs/superpowers/plans/2026-06-02-next-real-run-package-contract.md`.
+- C-9 is complete and reviewed. It adds `prepare_next_real_run()` and `hermes-workflow prepare-next-real-run`, selecting the next unique candidate from the deterministic initialization sequence after C-8 has recorded checked real results. C-9 remains contract-only and does not run real tools, call C-7, write ledger/state, parse PSF, or rewrite formulas.
+- C-9 final verification: `python3 -m pytest -q` passed with 378 tests; `python3 -m ruff check src tests tools` passed; `git diff --check` produced no output.
+- Current next action: choose failure/retry policy or local smoke chaining C-9 -> C-7 -> C-8.
 - Real `input.scs` examples under `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example` are local-only references and must not be committed.
 
 ## Files Already Read
@@ -117,8 +121,10 @@ Current execution state:
 - Active C-6 implementation plan: `ic-auto-opt-workflow/docs/superpowers/plans/2026-06-02-spectre-ocean-real-metric-result-contract.md`
 - Active C-8 design spec: `ic-auto-opt-workflow/docs/superpowers/specs/2026-06-02-real-result-ledger-state-update-design.md`
 - Active C-8 implementation plan: `ic-auto-opt-workflow/docs/superpowers/plans/2026-06-02-real-result-ledger-state-update.md`
+- Active C-9 design spec: `ic-auto-opt-workflow/docs/superpowers/specs/2026-06-02-next-real-run-package-contract-design.md`
+- Active C-9 implementation plan: `ic-auto-opt-workflow/docs/superpowers/plans/2026-06-02-next-real-run-package-contract.md`
 
-Plan A, Plan B, Plan C C-1, Plan C C-2, Plan C C-3, Plan C C-4, Plan C C-5, and Plan C C-5.5 are complete. C-5.5 passed the dual-agent simulation gate. C-6, C-7, and C-8 are complete and reviewed.
+Plan A, Plan B, Plan C C-1, Plan C C-2, Plan C C-3, Plan C C-4, Plan C C-5, and Plan C C-5.5 are complete. C-5.5 passed the dual-agent simulation gate. C-6, C-7, C-8, and C-9 are complete and reviewed.
 
 ## Confirmed Plan A Scope
 
@@ -384,9 +390,9 @@ optimizer:
 
 ## Next Step
 
-Plan A, Plan B, Plan C C-1, Plan C C-2, Plan C C-3, Plan C C-4, Plan C C-5, and Plan C C-5.5 are complete as of 2026-06-01. C-6, C-7, and C-8 are complete and reviewed as of 2026-06-02.
+Plan A, Plan B, Plan C C-1, Plan C C-2, Plan C C-3, Plan C C-4, Plan C C-5, and Plan C C-5.5 are complete as of 2026-06-01. C-6, C-7, C-8, and C-9 are complete and reviewed as of 2026-06-02.
 
-Current next step: choose C-9 next-candidate generation or failure/retry policy. Do not redo Plan A Tasks 1-9 or completed Plan B/C modules unless new review feedback appears.
+Current next step: choose failure/retry policy or local smoke chaining C-9 -> C-7 -> C-8. Do not redo Plan A Tasks 1-9 or completed Plan B/C modules unless new review feedback appears.
 
 Read the handoff files first:
 
@@ -407,5 +413,5 @@ Use this prompt after compact:
 4. ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md
 5. 如需背景，再读 ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。Plan A Task 1-9、Plan B mock optimization loop、Plan C C-1 netlist template contract、C-2 dry-run candidate renderer、C-3 execution package preflight readiness、C-4 post-approval real-run execution contract、C-5 real-run result handoff contract、C-5.5 dual-agent result handoff simulation gate、C-6 Spectre + OCEAN metric result contract、C-7 Spectre + OCEAN execution adapter、C-8 real result ledger/state update 均已完成并通过 review/final gate。下一步选择 C-9 next-candidate generation 或 failure/retry policy。Spectre + OCEAN backend 已通过工具链证据验证。不要让 agent 重写公式，metrics.yaml 中的公式必须是用户/项目批准的精确公式。真实 input.scs 示例在 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example 下，仅供本地参考，请勿将其提交到仓库。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。Plan A Task 1-9、Plan B mock optimization loop、Plan C C-1 netlist template contract、C-2 dry-run candidate renderer、C-3 execution package preflight readiness、C-4 post-approval real-run execution contract、C-5 real-run result handoff contract、C-5.5 dual-agent result handoff simulation gate、C-6 Spectre + OCEAN metric result contract、C-7 Spectre + OCEAN execution adapter、C-8 real result ledger/state update、C-9 next real-run package contract 均已完成并通过 review/final gate。下一步选择 failure/retry policy 或 local smoke chaining C-9 -> C-7 -> C-8。Spectre + OCEAN backend 已通过工具链证据验证。不要让 agent 重写公式，metrics.yaml 中的公式必须是用户/项目批准的精确公式。真实 input.scs 示例在 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example 下，仅供本地参考，请勿将其提交到仓库。
 ```

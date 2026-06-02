@@ -865,7 +865,46 @@ Locked C-8 policy:
 
 Next recommended action:
 
-- Choose C-9 next-candidate generation or a failure/retry policy plan.
+- C-9 next real-run package contract is complete through implementation and review gate. Next, choose failure/retry policy or local smoke chaining C-9 -> C-7 -> C-8.
+
+## Plan C C-9 Next Real-Run Package Contract
+
+Status: complete and reviewed as of 2026-06-02.
+
+Spec:
+
+- `docs/superpowers/specs/2026-06-02-next-real-run-package-contract-design.md`
+
+Implementation plan:
+
+- `docs/superpowers/plans/2026-06-02-next-real-run-package-contract.md`
+
+Implemented:
+
+- `prepare_next_real_run()` selects the next unique candidate from the deterministic optimizer initialization sequence after C-8 records a checked real result.
+- `hermes-workflow prepare-next-real-run` writes the next C-4/C-6-compatible package under `runs/real/<run_id>/`.
+- C-9 deduplicates against strict ledger rows and already prepared run packages.
+- C-9 validates immutable config hashes, optimizer state consistency, ledger schema, max-evaluation bounds, run-id safety, overwrite safety, and partial run directory safety.
+- Ledger and best-candidate numeric fields were hardened to strict finite floats, with strict bools for feasibility, so C-9 cannot proceed from coerced ledger data.
+- Fake handoff coverage confirms a `real_002` package can be checked and recorded through `check-real-run`, `check-metric-results`, and `record-real-result`.
+
+Task verification:
+
+- Task 1 precondition gate: C-9 tests passed; C-4/C-8 related tests passed; ruff passed. Spec review approved. Code-quality review found a strict ledger coercion issue; it was fixed by strict finite ledger/best schema fields and re-reviewed as approved.
+- Task 2 package-writing gate: C-9/C-4/C-8 related tests passed; ruff passed. Spec review found partial run directory reuse; it was fixed so existing `real_###` directories are treated as used by default, explicit non-empty target directories fail closed, and existing partial contents are preserved. Spec re-review and code-quality review approved.
+- Tasks 3-4 integration/CLI gate: C-9, CLI, and real-result related tests passed; ruff passed. Batched spec and code-quality reviews approved.
+- Final verification: `python3 -m pytest -q` passed with 378 tests; `python3 -m ruff check src tests tools` passed; `git diff --check` produced no output.
+
+Locked C-9 policy:
+
+- C-9 is contract-only.
+- It does not run Virtuoso, Spectre, OCEAN, SSH, Claude CLI, `virtuoso-bridge-lite`, or the C-7 adapter.
+- It does not parse PSF, rewrite OCEAN formulas, check returned results, record ledger/state, or add failure-penalty rows.
+- The execution agent must still run C-7 after a prepared package exists, and the supervisor agent must still run `check-real-run`, `check-metric-results`, and `record-real-result`.
+
+Next recommended action:
+
+- Choose failure/retry policy for failed real-run packages, or run a local smoke that chains C-9 -> C-7 -> C-8 on a known test cell.
 
 ## Locked Role Model
 
@@ -892,5 +931,5 @@ Do not use "Hermes agent" as a role name in future specs or plans. If older docu
 3. ic-auto-opt-workflow/docs/COMPACT_RESUME_CHECKPOINT.md
 4. ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。请先阅读 docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md。Hermes File Contract MVP 的 Plan A Task 1-9 已完成；Plan B mock optimization loop 已完成；Plan C C-1/C-2/C-3/C-4/C-5/C-5.5/C-6/C-7 均已完成并通过相应 verification/review gate。C-8 real result ledger/state update 已完成实现并处于 final verification/review closeout；如已 closeout，下一步进入 C-9 next-candidate generation 或 failure/retry policy。Spectre + OCEAN backend 已通过真实工具链证据验证。不要提交或复制本地真实 input.scs 示例，不要让 agent 重写公式，不要用 Python 解析 PSF 或重写 Calculator/OCEAN 公式。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。请先阅读 docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md。Hermes File Contract MVP 的 Plan A Task 1-9 已完成；Plan B mock optimization loop 已完成；Plan C C-1/C-2/C-3/C-4/C-5/C-5.5/C-6/C-7/C-8/C-9 均已完成并通过相应 verification/review gate。下一步选择 failure/retry policy 或 local smoke chaining C-9 -> C-7 -> C-8。Spectre + OCEAN backend 已通过真实工具链证据验证。不要提交或复制本地真实 input.scs 示例，不要让 agent 重写公式，不要用 Python 解析 PSF 或重写 Calculator/OCEAN 公式。
 ```
