@@ -2229,7 +2229,7 @@ git commit -m "feat: add real run recovery cli"
 - Modify: `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`
 - Modify: `docs/superpowers/plans/2026-06-02-real-run-failure-retry-policy-contract.md`
 
-- [ ] **Step 1: Update project overview**
+- [x] **Step 1: Update project overview**
 
 In `docs/PROJECT_WORKFLOW_OVERVIEW.md`, add a C-10 current node after C-9:
 
@@ -2245,7 +2245,7 @@ hermes-workflow prepare-real-run-retry projects/bridge_test_inv --failed-run-id 
 hermes-workflow resolve-real-run-failure projects/bridge_test_inv --run-id real_002 --decision abandon_candidate --reason "skip failed candidate"
 ```
 
-- [ ] **Step 2: Update execution progress**
+- [x] **Step 2: Update execution progress**
 
 Append to `docs/EXECUTION_PROGRESS_2026-05-29.md`:
 
@@ -2279,7 +2279,7 @@ Next:
 - C-11 local smoke chaining C-9 -> C-7 -> C-8 with one controlled C-10 failure/retry case.
 ```
 
-- [ ] **Step 3: Update compact checkpoint and next log**
+- [x] **Step 3: Update compact checkpoint and next log**
 
 In `docs/COMPACT_RESUME_CHECKPOINT.md`, add:
 
@@ -2294,7 +2294,7 @@ In `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`, update current status:
 - Next required action: C-11 local smoke chaining C-9 -> C-7 -> C-8 with one controlled C-10 failure/retry case.
 ```
 
-- [ ] **Step 4: Run full verification**
+- [x] **Step 4: Run full verification**
 
 Run:
 
@@ -2310,7 +2310,7 @@ Expected:
 - ruff clean
 - no whitespace errors
 
-- [ ] **Step 5: Commit docs/progress**
+- [x] **Step 5: Commit docs/progress**
 
 ```bash
 git add docs/PROJECT_WORKFLOW_OVERVIEW.md docs/EXECUTION_PROGRESS_2026-05-29.md docs/COMPACT_RESUME_CHECKPOINT.md docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md docs/superpowers/plans/2026-06-02-real-run-failure-retry-policy-contract.md
