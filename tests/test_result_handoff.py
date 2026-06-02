@@ -342,3 +342,200 @@ def test_check_real_run_rejects_missing_declared_artifact(tmp_path: Path) -> Non
     )
     assert report.status == RealRunCheckStatus.FAIL
     assert report.checks.artifact_paths_ok is False
+
+
+def _write_extended_metric_handoff(
+    project_dir: Path,
+    *,
+    overrides: dict | None = None,
+) -> dict:
+    payload = _write_result_handoff(project_dir)
+    run_dir = project_dir / "runs" / "real" / "real_001"
+    psf_dir = run_dir / "psf"
+    metrics_dir = run_dir / "metrics"
+    psf_dir.mkdir(parents=True, exist_ok=True)
+    metrics_dir.mkdir(parents=True, exist_ok=True)
+    (psf_dir / "spectre.out").write_text(
+        "sanitized spectre output\n",
+        encoding="utf-8",
+    )
+    (metrics_dir / "metric_result_manifest.json").write_text(
+        "{}\n",
+        encoding="utf-8",
+    )
+    payload.update(
+        {
+            "result_data": {
+                "kind": "spectre_psf",
+                "psf_dir": "runs/real/real_001/psf",
+                "spectre_out": "runs/real/real_001/psf/spectre.out",
+            },
+            "metric_result_manifest": (
+                "runs/real/real_001/metrics/metric_result_manifest.json"
+            ),
+        }
+    )
+    payload["artifact_files"] = [
+        *payload["artifact_files"],
+        "runs/real/real_001/psf/spectre.out",
+        "runs/real/real_001/metrics/metric_result_manifest.json",
+    ]
+    if overrides:
+        payload.update(overrides)
+    (run_dir / "result_manifest.json").write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return payload
+
+
+def test_check_real_run_accepts_metric_artifact_references(tmp_path: Path) -> None:
+    project_dir, _package = _prepare_real_run_project(tmp_path)
+    _write_extended_metric_handoff(project_dir)
+
+    report = check_real_run(project_dir)
+
+    assert report.status == RealRunCheckStatus.PASS
+    assert report.issues == []
+
+
+def test_check_real_run_rejects_unsafe_metric_result_manifest_path(
+    tmp_path: Path,
+) -> None:
+    project_dir, _package = _prepare_real_run_project(tmp_path)
+    _write_extended_metric_handoff(
+        project_dir,
+        overrides={"metric_result_manifest": "../metric_result_manifest.json"},
+    )
+
+    report = check_real_run(project_dir)
+
+    assert report.status == RealRunCheckStatus.FAIL
+    assert "result artifact path is unsafe: ../metric_result_manifest.json" in report.issues
+
+
+def test_check_real_run_rejects_invalid_result_data_kind(tmp_path: Path) -> None:
+    project_dir, _package = _prepare_real_run_project(tmp_path)
+    _write_extended_metric_handoff(
+        project_dir,
+        overrides={
+            "result_data": {
+                "kind": "psf",
+                "psf_dir": "runs/real/real_001/psf",
+                "spectre_out": "runs/real/real_001/psf/spectre.out",
+            },
+        },
+    )
+
+    report = check_real_run(project_dir)
+
+    assert report.status == RealRunCheckStatus.FAIL
+    assert "result_data kind is invalid: psf" in report.issues
+
+
+def test_check_real_run_rejects_extra_result_data_fields(tmp_path: Path) -> None:
+    project_dir, _package = _prepare_real_run_project(tmp_path)
+    _write_extended_metric_handoff(
+        project_dir,
+        overrides={
+            "result_data": {
+                "kind": "spectre_psf",
+                "psf_dir": "runs/real/real_001/psf",
+                "spectre_out": "runs/real/real_001/psf/spectre.out",
+                "unexpected": "nope",
+            },
+        },
+    )
+
+    report = check_real_run(project_dir)
+
+    assert report.status == RealRunCheckStatus.FAIL
+    assert "result manifest is invalid" in report.issues
+
+
+@pytest.mark.parametrize(
+    ("result_data", "expected_issue"),
+    [
+        (
+            {
+                "kind": "spectre_psf",
+                "psf_dir": "/tmp/psf",
+                "spectre_out": "runs/real/real_001/psf/spectre.out",
+            },
+            "result artifact path is unsafe: /tmp/psf",
+        ),
+        (
+            {
+                "kind": "spectre_psf",
+                "psf_dir": "runs/real/real_001/psf",
+                "spectre_out": "runs/real/real_002/psf/spectre.out",
+            },
+            "result artifact path is unsafe: runs/real/real_002/psf/spectre.out",
+        ),
+    ],
+)
+def test_check_real_run_rejects_unsafe_result_data_paths(
+    tmp_path: Path,
+    result_data: dict,
+    expected_issue: str,
+) -> None:
+    project_dir, _package = _prepare_real_run_project(tmp_path)
+    _write_extended_metric_handoff(
+        project_dir,
+        overrides={"result_data": result_data},
+    )
+
+    report = check_real_run(project_dir)
+
+    assert report.status == RealRunCheckStatus.FAIL
+    assert expected_issue in report.issues
+
+
+@pytest.mark.parametrize(
+    ("overrides", "expected_issue"),
+    [
+        (
+            {
+                "result_data": {
+                    "kind": "spectre_psf",
+                    "psf_dir": "runs/real/real_001/missing_psf",
+                    "spectre_out": "runs/real/real_001/psf/spectre.out",
+                },
+            },
+            "result artifact is missing: runs/real/real_001/missing_psf",
+        ),
+        (
+            {
+                "result_data": {
+                    "kind": "spectre_psf",
+                    "psf_dir": "runs/real/real_001/psf",
+                    "spectre_out": "runs/real/real_001/psf/missing.out",
+                },
+            },
+            "result artifact is missing: runs/real/real_001/psf/missing.out",
+        ),
+        (
+            {
+                "metric_result_manifest": (
+                    "runs/real/real_001/metrics/missing_metric_result_manifest.json"
+                ),
+            },
+            (
+                "result artifact is missing: "
+                "runs/real/real_001/metrics/missing_metric_result_manifest.json"
+            ),
+        ),
+    ],
+)
+def test_check_real_run_rejects_missing_extended_artifacts(
+    tmp_path: Path,
+    overrides: dict,
+    expected_issue: str,
+) -> None:
+    project_dir, _package = _prepare_real_run_project(tmp_path)
+    _write_extended_metric_handoff(project_dir, overrides=overrides)
+
+    report = check_real_run(project_dir)
+
+    assert report.status == RealRunCheckStatus.FAIL
+    assert expected_issue in report.issues

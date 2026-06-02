@@ -54,6 +54,20 @@ class ObjectiveDirection(StrEnum):
     MAXIMIZE = "maximize"
 
 
+class OceanExpressionSource(StrEnum):
+    USER_APPROVED = "user_approved"
+    MAESTRO_OUTPUT_APPROVED = "maestro_output_approved"
+    DIRECT_PLOT_APPROVED = "direct_plot_approved"
+
+
+class OceanExpectedValueType(StrEnum):
+    REAL_SCALAR = "real_scalar"
+
+
+class FailPolicy(StrEnum):
+    FAIL = "fail"
+
+
 class SpectrePreset(StrEnum):
     CX = "cx"
     AX = "ax"
@@ -154,11 +168,29 @@ class VariablesConfig(StrictModel):
         return self
 
 
+class OceanMetricSpec(StrictModel):
+    expression: NonEmptyStr
+    result: NonEmptyStr
+    expression_source: OceanExpressionSource
+    source_reference: NonEmptyStr
+    expected_value_type: OceanExpectedValueType
+    nil_policy: FailPolicy
+    non_finite_policy: FailPolicy
+
+    @field_validator("expression")
+    @classmethod
+    def _expression_has_no_template_placeholders(cls, value: str) -> str:
+        if "{{" in value or "}}" in value:
+            raise ValueError("ocean.expression must not contain template placeholders")
+        return value
+
+
 class MetricSpec(StrictModel):
     name: str
     unit: NonEmptyStr
     maestro_formula: NonEmptyStr
     required_signals: list[NonEmptyStr]
+    ocean: OceanMetricSpec | None = None
 
     @field_validator("name")
     @classmethod
@@ -206,7 +238,7 @@ class MetricsConfig(StrictModel):
 class SpectreSettings(StrictModel):
     engine: Literal["spectre_x"]
     preset: SpectrePreset
-    output_format: Literal["psfascii"]
+    output_format: Literal["psfascii", "psfxl"]
     parallel_jobs: StrictInt = Field(ge=1)
     timeout_s: StrictInt = Field(gt=0)
     require_license_check: StrictBool

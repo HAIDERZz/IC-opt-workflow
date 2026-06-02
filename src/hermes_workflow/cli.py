@@ -8,14 +8,15 @@ from hermes_workflow import __version__
 from hermes_workflow.approvals import decide_first_real_run
 from hermes_workflow.dry_run import run_dry_run
 from hermes_workflow.health import write_preflight_health
+from hermes_workflow.metric_results import check_metric_results
 from hermes_workflow.mock_optimizer import run_mock_optimization
-from hermes_workflow.real_run import prepare_real_run
 from hermes_workflow.netlists import prepare_netlist
 from hermes_workflow.package import (
     TemplateError,
     build_execution_package,
     create_project_from_template,
 )
+from hermes_workflow.real_run import prepare_real_run
 from hermes_workflow.result_handoff import check_real_run
 from hermes_workflow.validate import validate_project_files
 
@@ -230,6 +231,39 @@ def check_real_run_command(
     for issue in report.issues:
         typer.echo(issue)
     typer.echo("report: reports/real_run_check_report.json")
+    raise typer.Exit(code=1)
+
+
+@app.command("check-metric-results")
+def check_metric_results_command(
+    project_dir: Annotated[
+        Path,
+        typer.Argument(
+            help="Project directory with returned OCEAN metric result artifacts."
+        ),
+    ],
+    run_id: Annotated[
+        str | None,
+        typer.Option(
+            "--run-id",
+            help="Real-run package id such as real_001.",
+        ),
+    ] = None,
+) -> None:
+    try:
+        report = check_metric_results(project_dir, run_id=run_id)
+    except (OSError, ValueError) as exc:
+        _exit_with_error(exc)
+    if report.status.value == "pass":
+        typer.echo("metric result check passed")
+        typer.echo(f"run: runs/real/{report.run_id}")
+        typer.echo("report: reports/metric_result_check_report.json")
+        return
+
+    typer.echo("metric result check failed")
+    for issue in report.issues:
+        typer.echo(issue)
+    typer.echo("report: reports/metric_result_check_report.json")
     raise typer.Exit(code=1)
 
 

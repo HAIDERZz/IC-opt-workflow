@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 
 from hermes_workflow.dry_run import PLACEHOLDER_RE, UNRESOLVED_PLACEHOLDER_RE
+from hermes_workflow.metric_requests import build_metric_extraction_request
 from hermes_workflow.package import sha256_file
 from hermes_workflow.validate import ContractBundle, assert_valid_project
 
@@ -26,8 +27,10 @@ class RealRunPackage:
     rendered_input_scs: Path
     candidate_path: Path
     manifest_path: Path
+    metric_request_path: Path
     candidate_payload: dict
     manifest_payload: dict
+    metric_request_payload: dict
 
 
 def prepare_real_run(
@@ -58,8 +61,12 @@ def prepare_real_run(
     candidate = _lower_bound_candidate(bundle, selected_run_id)
     rendered_relative = f"{REAL_RUN_ROOT}/{selected_run_id}/input.scs"
     candidate_relative = f"{REAL_RUN_ROOT}/{selected_run_id}/candidate.json"
+    metric_request_relative = (
+        f"{REAL_RUN_ROOT}/{selected_run_id}/metric_extraction_request.json"
+    )
     rendered_path = _project_path(bundle, rendered_relative)
     candidate_path = _project_path(bundle, candidate_relative)
+    metric_request_path = _project_path(bundle, metric_request_relative)
 
     try:
         run_dir.mkdir(parents=True, exist_ok=True)
@@ -72,6 +79,17 @@ def prepare_real_run(
             json.dumps(candidate, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
+        metric_request_payload = build_metric_extraction_request(
+            bundle,
+            run_id=selected_run_id,
+            candidate_id=selected_run_id,
+            prepared_input_scs=rendered_relative,
+            prepared_input_sha256=sha256_file(rendered_path),
+        )
+        metric_request_path.write_text(
+            json.dumps(metric_request_payload, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
         manifest_payload = _build_manifest(
             bundle,
             selected_run_id,
@@ -81,8 +99,10 @@ def prepare_real_run(
             template_relative,
             rendered_relative,
             candidate_relative,
+            metric_request_relative,
             template_path,
             rendered_path,
+            metric_request_path,
         )
         manifest_path.write_text(
             json.dumps(manifest_payload, indent=2, sort_keys=True) + "\n",
@@ -99,8 +119,10 @@ def prepare_real_run(
         rendered_input_scs=rendered_path,
         candidate_path=candidate_path,
         manifest_path=manifest_path,
+        metric_request_path=metric_request_path,
         candidate_payload=candidate,
         manifest_payload=manifest_payload,
+        metric_request_payload=metric_request_payload,
     )
 
 
@@ -225,8 +247,10 @@ def _build_manifest(
     template_relative: str,
     rendered_relative: str,
     candidate_relative: str,
+    metric_request_relative: str,
     template_path: Path,
     rendered_path: Path,
+    metric_request_path: Path,
 ) -> dict:
     spectre = bundle.spectre.spectre
     return {
@@ -239,6 +263,8 @@ def _build_manifest(
         "template_scs": template_relative,
         "rendered_input_scs": rendered_relative,
         "candidate_file": candidate_relative,
+        "metric_extraction_request": metric_request_relative,
+        "metric_extraction_request_sha256": sha256_file(metric_request_path),
         "candidate_id": run_id,
         "candidate_source": "lower_bound_first_real_run",
         "approved_config_hashes": approved_hashes,

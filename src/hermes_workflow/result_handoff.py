@@ -31,6 +31,14 @@ class ResultSimulator(BaseModel):
     command_label: str
 
 
+class ResultData(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    kind: str
+    psf_dir: str
+    spectre_out: str
+
+
 class ResultManifest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -45,6 +53,8 @@ class ResultManifest(BaseModel):
     prepared_input_sha256: str
     log_file: str
     artifact_files: list[str]
+    result_data: ResultData | None = None
+    metric_result_manifest: str | None = None
     notes: str | None = None
 
     @field_validator("started_at_utc", "completed_at_utc")
@@ -162,6 +172,15 @@ def _validate_cross_references(
             issues.append("prepared input hash mismatch")
 
     artifact_paths = [result.log_file, *result.artifact_files]
+    if result.result_data is not None:
+        if result.result_data.kind != "spectre_psf":
+            issues.append(f"result_data kind is invalid: {result.result_data.kind}")
+        artifact_paths.extend(
+            [result.result_data.psf_dir, result.result_data.spectre_out]
+        )
+    if result.metric_result_manifest is not None:
+        artifact_paths.append(result.metric_result_manifest)
+
     resolved_artifacts = [
         _safe_run_path(bundle, run_id, artifact_path, issues)
         for artifact_path in artifact_paths

@@ -426,3 +426,62 @@ def test_cli_check_real_run_reports_failure_without_traceback(tmp_path: Path) ->
     assert "result manifest is missing" in result.stdout
     assert "report: reports/real_run_check_report.json" in result.stdout
     assert "Traceback" not in result.output
+
+
+def test_cli_check_metric_results_passes_for_valid_fake_ocean_results(
+    tmp_path: Path,
+) -> None:
+    from tests.test_metric_results import (
+        TEMPLATE_TEXT,
+        _load_json,
+        _write_metric_result_manifest,
+        _write_result_manifest,
+    )
+
+    project_dir = tmp_path / "bridge_test_inv"
+    assert runner.invoke(app, ["init", str(project_dir)]).exit_code == 0
+    assert runner.invoke(app, ["package", str(project_dir)]).exit_code == 0
+    write_pass_reports(project_dir)
+    assert runner.invoke(app, ["approve", str(project_dir)]).exit_code == 0
+    template_path = project_dir / "netlists" / "templates" / "template.scs"
+    template_path.parent.mkdir(parents=True, exist_ok=True)
+    template_path.write_text(TEMPLATE_TEXT, encoding="utf-8")
+    assert runner.invoke(app, ["prepare-real-run", str(project_dir)]).exit_code == 0
+    _write_result_manifest(project_dir)
+    _write_metric_result_manifest(project_dir)
+
+    result = runner.invoke(app, ["check-metric-results", str(project_dir)])
+
+    assert result.exit_code == 0
+    assert "metric result check passed" in result.stdout
+    assert "run: runs/real/real_001" in result.stdout
+    assert "report: reports/metric_result_check_report.json" in result.stdout
+    report = _load_json(project_dir / "reports" / "metric_result_check_report.json")
+    assert report["status"] == "pass"
+
+
+def test_cli_check_metric_results_reports_failure_without_traceback(
+    tmp_path: Path,
+) -> None:
+    project_dir = tmp_path / "bridge_test_inv"
+    assert runner.invoke(app, ["init", str(project_dir)]).exit_code == 0
+    assert runner.invoke(app, ["package", str(project_dir)]).exit_code == 0
+    write_pass_reports(project_dir)
+    assert runner.invoke(app, ["approve", str(project_dir)]).exit_code == 0
+    template_path = project_dir / "netlists" / "templates" / "template.scs"
+    template_path.parent.mkdir(parents=True, exist_ok=True)
+    template_path.write_text(
+        "simulator lang=spectre\n"
+        "parameters FN={{FN}} WN={{WN}} FP={{FP}} WP={{WP}}\n",
+        encoding="utf-8",
+    )
+    assert runner.invoke(app, ["prepare-real-run", str(project_dir)]).exit_code == 0
+
+    result = runner.invoke(app, ["check-metric-results", str(project_dir)])
+
+    assert result.exit_code == 1
+    assert isinstance(result.exception, SystemExit)
+    assert "metric result check failed" in result.stdout
+    assert "result manifest is missing" in result.stdout
+    assert "report: reports/metric_result_check_report.json" in result.stdout
+    assert "Traceback" not in result.output

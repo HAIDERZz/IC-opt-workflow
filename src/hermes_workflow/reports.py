@@ -39,6 +39,16 @@ class RealRunResultStatus(StrEnum):
     FAILED = "failed"
 
 
+class MetricResultCheckStatus(StrEnum):
+    PASS = "pass"
+    FAIL = "fail"
+
+
+class MetricResultStatus(StrEnum):
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+
+
 class NetlistPreparationReport(StrictReport):
     schema_version: str
     status: PassFail
@@ -99,6 +109,38 @@ class RealRunCheckReport(StrictReport):
     log_file: str | None
     artifact_files: list[str] = Field(default_factory=list)
     checks: RealRunCheckFlags
+    issues: list[str] = Field(default_factory=list)
+
+
+class MetricResultCheckFlags(StrictReport):
+    request_hash_ok: bool = False
+    result_manifest_ok: bool = False
+    metric_manifest_ok: bool = False
+    metric_identity_ok: bool = False
+    formula_hashes_ok: bool = False
+    scalar_values_ok: bool = False
+    artifact_paths_ok: bool = False
+
+
+class CheckedMetricResult(StrictReport):
+    status: MetricResultStatus
+    value: float | None
+    value_text: str | None
+    unit: str
+    expression_sha256: str
+
+
+class MetricResultCheckReport(StrictReport):
+    schema_version: str
+    status: MetricResultCheckStatus
+    run_id: str
+    candidate_id: str | None
+    backend: str | None
+    request_file: str
+    metric_result_manifest: str
+    psf_dir: str | None
+    metrics: dict[str, CheckedMetricResult] = Field(default_factory=dict)
+    checks: MetricResultCheckFlags
     issues: list[str] = Field(default_factory=list)
 
 

@@ -2,37 +2,60 @@ schema_version: "1.0"
 
 metrics:
   - name: rise
-    unit: ps
-    maestro_formula: "riseTime(VT('/VOUT') 0 nil 1.2 nil 10 90 nil 'time')"
+    unit: s
+    maestro_formula: riseTime(VT("/VOUT") 0 nil 0.9 nil 10 90 nil "time")
     required_signals:
-      - time
-      - VOUT
+      - /VOUT
+    ocean:
+      expression: riseTime(VT("/VOUT") 0 nil 0.9 nil 10 90 nil "time")
+      result: tran
+      expression_source: user_approved
+      source_reference: fixture:bridge_test_inv:rise
+      expected_value_type: real_scalar
+      nil_policy: fail
+      non_finite_policy: fail
 
   - name: fall
-    unit: ps
-    maestro_formula: "fallTime(VT('/VOUT') 0 nil 1.2 nil 90 10 nil 'time')"
+    unit: s
+    maestro_formula: fallTime(VT("/VOUT") 0.9 nil 0 nil 10 90 nil "time")
     required_signals:
-      - time
-      - VOUT
+      - /VOUT
+    ocean:
+      expression: fallTime(VT("/VOUT") 0.9 nil 0 nil 10 90 nil "time")
+      result: tran
+      expression_source: user_approved
+      source_reference: fixture:bridge_test_inv:fall
+      expected_value_type: real_scalar
+      nil_policy: fail
+      non_finite_policy: fail
 
   - name: DC
-    unit: u
-    maestro_formula: "average(abs(IT('/VDD')))"
+    unit: W
+    maestro_formula: VDC("/VDD") * IDC("/M0/S")
     required_signals:
-      - VDD
+      - /VDD
+      - /M0/S
+    ocean:
+      expression: VDC("/VDD") * IDC("/M0/S")
+      result: tran
+      expression_source: user_approved
+      source_reference: fixture:bridge_test_inv:DC
+      expected_value_type: real_scalar
+      nil_policy: fail
+      non_finite_policy: fail
 
 constraints:
   - metric: rise
     op: lt
-    value: "80 ps"
+    value: "80e-12 s"
 
   - metric: fall
     op: lt
-    value: "80 ps"
+    value: "80e-12 s"
 
   - metric: DC
     op: lt
-    value: "400 u"
+    value: "4e-4 W"
 
 objective:
   direction: minimize

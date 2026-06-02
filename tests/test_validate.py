@@ -3,8 +3,11 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
+import pytest
 import yaml
+from pydantic import ValidationError
 
+from hermes_workflow.schemas import MetricsConfig, SpectreConfig
 from hermes_workflow.validate import assert_valid_project, validate_project_files
 
 
@@ -177,3 +180,104 @@ def test_continuous_step_units_must_match(tmp_path: Path) -> None:
         "WN lower, upper, and step unit suffixes must match" in issue.message
         for issue in report.issues
     )
+
+
+def test_metrics_config_accepts_approved_ocean_formula() -> None:
+    payload = {
+        "schema_version": "1.0",
+        "metrics": [
+            {
+                "name": "rise",
+                "unit": "s",
+                "maestro_formula": 'riseTime(VT("/VOUT") 0 nil 0.9 nil 10 90 nil "time")',
+                "required_signals": ["/VOUT"],
+                "ocean": {
+                    "expression": 'riseTime(VT("/VOUT") 0 nil 0.9 nil 10 90 nil "time")',
+                    "result": "tran",
+                    "expression_source": "user_approved",
+                    "source_reference": "maestro_output:rise",
+                    "expected_value_type": "real_scalar",
+                    "nil_policy": "fail",
+                    "non_finite_policy": "fail",
+                },
+            }
+        ],
+        "constraints": [],
+        "objective": {
+            "direction": "minimize",
+            "expression": "rise",
+        },
+    }
+
+    config = MetricsConfig.model_validate(payload)
+
+    assert config.metrics[0].ocean is not None
+    assert config.metrics[0].ocean.result == "tran"
+    assert config.metrics[0].ocean.expression_source == "user_approved"
+
+
+@pytest.mark.parametrize(
+    ("ocean_overrides", "expected_message"),
+    [
+        ({"expression": ""}, "String should have at least 1 character"),
+        ({"expected_value_type": "waveform"}, "Input should be 'real_scalar'"),
+        ({"nil_policy": "allow"}, "Input should be 'fail'"),
+        ({"non_finite_policy": "allow"}, "Input should be 'fail'"),
+        ({"expression_source": "agent_discovered"}, "Input should be"),
+        (
+            {"expression": 'value(VT("{{VOUT}}") 1n)'},
+            "ocean.expression must not contain template placeholders",
+        ),
+    ],
+)
+def test_metrics_config_rejects_invalid_ocean_formula_policy(
+    ocean_overrides: dict,
+    expected_message: str,
+) -> None:
+    ocean = {
+        "expression": 'value(VT("/VOUT") 1n)',
+        "result": "tran",
+        "expression_source": "user_approved",
+        "source_reference": "maestro_output:rise",
+        "expected_value_type": "real_scalar",
+        "nil_policy": "fail",
+        "non_finite_policy": "fail",
+    }
+    ocean.update(ocean_overrides)
+    payload = {
+        "schema_version": "1.0",
+        "metrics": [
+            {
+                "name": "rise",
+                "unit": "s",
+                "maestro_formula": 'value(VT("/VOUT") 1n)',
+                "required_signals": ["/VOUT"],
+                "ocean": ocean,
+            }
+        ],
+        "constraints": [],
+        "objective": {"direction": "minimize", "expression": "rise"},
+    }
+
+    with pytest.raises(ValidationError, match=expected_message):
+        MetricsConfig.model_validate(payload)
+
+
+def test_spectre_config_accepts_psfxl_for_ocean_backend() -> None:
+    config = SpectreConfig.model_validate(
+        {
+            "schema_version": "1.0",
+            "spectre": {
+                "engine": "spectre_x",
+                "preset": "ax",
+                "output_format": "psfxl",
+                "parallel_jobs": 10,
+                "timeout_s": 3600,
+                "require_license_check": True,
+                "keep_failed_runs": True,
+                "keep_successful_runs": True,
+            },
+        }
+    )
+
+    assert config.spectre.output_format == "psfxl"

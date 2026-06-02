@@ -7,6 +7,7 @@ import pytest
 
 from hermes_workflow import real_run
 from hermes_workflow.approvals import decide_first_real_run
+from hermes_workflow.metric_requests import expression_sha256
 from hermes_workflow.package import (
     build_execution_package,
     create_project_from_template,
@@ -250,7 +251,7 @@ def test_prepare_real_run_writes_first_real_run_package(tmp_path: Path) -> None:
     assert manifest["spectre"] == {
         "engine": "spectre_x",
         "preset": "ax",
-        "output_format": "psfascii",
+        "output_format": "psfxl",
         "parallel_jobs": 10,
         "timeout_s": 3600,
     }
@@ -258,6 +259,117 @@ def test_prepare_real_run_writes_first_real_run_package(tmp_path: Path) -> None:
     assert not (project_dir / "ledger" / "experiment_ledger.jsonl").exists()
     assert not (project_dir / "state" / "optimizer_state.json").exists()
     assert not (project_dir / "state" / "best_candidate.json").exists()
+
+
+def test_prepare_real_run_writes_metric_extraction_request(tmp_path: Path) -> None:
+    project_dir = _create_project(tmp_path)
+    _approve_project(project_dir)
+    _write_template(project_dir)
+
+    package = prepare_real_run(
+        project_dir,
+        created_at_utc="2026-06-02T00:20:00Z",
+    )
+
+    run_dir = project_dir / "runs" / "real" / "real_001"
+    request_path = run_dir / "metric_extraction_request.json"
+    request = _load_json(request_path)
+    manifest = _load_json(run_dir / "real_run_manifest.json")
+
+    assert package.metric_request_path == request_path
+    assert package.metric_request_payload == request
+    assert request["schema_version"] == "1.0"
+    assert request["backend"] == "spectre_ocean_batch"
+    assert request["run_id"] == "real_001"
+    assert request["candidate_id"] == "real_001"
+    assert request["prepared_input_scs"] == "runs/real/real_001/input.scs"
+    assert request["prepared_input_sha256"] == manifest["rendered_input_sha256"]
+    assert request["expected_psf_dir"] == "runs/real/real_001/psf"
+    assert request["spectre"] == {
+        "engine": "spectre_x",
+        "preset": "ax",
+        "output_format": "psfxl",
+        "timeout_s": 3600,
+    }
+    assert request["ocean"] == {
+        "mode": "nograph_replay",
+        "script_file": "runs/real/real_001/metrics/metric_probe.ocn",
+        "log_file": "runs/real/real_001/metrics/ocean.log",
+        "scalar_output_file": "runs/real/real_001/metrics/ocean_scalars.tsv",
+    }
+    assert request["metrics"][0]["name"] == "rise"
+    assert request["metrics"][0]["expression"]
+    assert request["metrics"][0]["expression_sha256"] == expression_sha256(
+        request["metrics"][0]["expression"]
+    )
+    request_metrics = {metric["name"]: metric for metric in request["metrics"]}
+    assert set(request_metrics) == {"rise", "fall", "DC"}
+    assert request_metrics["rise"]["expression"] == (
+        'riseTime(VT("/VOUT") 0 nil 0.9 nil 10 90 nil "time")'
+    )
+    assert request_metrics["fall"]["expression"] == (
+        'fallTime(VT("/VOUT") 0.9 nil 0 nil 10 90 nil "time")'
+    )
+    assert request_metrics["DC"]["expression"] == 'VDC("/VDD") * IDC("/M0/S")'
+    assert request_metrics["DC"]["unit"] == "W"
+    assert request_metrics["DC"]["required_signals"] == ["/VDD", "/M0/S"]
+    assert "rewrite_metric_formula" in request["forbidden_actions"]
+    assert (
+        manifest["metric_extraction_request"]
+        == "runs/real/real_001/metric_extraction_request.json"
+    )
+    assert manifest["metric_extraction_request_sha256"] == sha256_file(request_path)
+
+
+def test_prepare_real_run_rejects_metric_without_ocean_formula(tmp_path: Path) -> None:
+    project_dir = _create_project(tmp_path)
+    metrics_path = project_dir / "config" / "metrics.yaml"
+    metrics_text = metrics_path.read_text(encoding="utf-8")
+    assert "source_reference: template:spectre_maestro_project:rise" in metrics_text
+    metrics_path.write_text(
+        metrics_text.replace(
+            "    ocean:\n"
+            "      expression: riseTime(VT(\"/VOUT\") 0 nil 0.9 nil 10 90 nil \"time\")\n"
+            "      result: tran\n"
+            "      expression_source: user_approved\n"
+            "      source_reference: template:spectre_maestro_project:rise\n"
+            "      expected_value_type: real_scalar\n"
+            "      nil_policy: fail\n"
+            "      non_finite_policy: fail\n",
+            "",
+            1,
+        ),
+        encoding="utf-8",
+    )
+    _approve_project(project_dir)
+    _write_template(project_dir)
+
+    with pytest.raises(ValueError, match="metric rise is missing ocean formula"):
+        prepare_real_run(project_dir)
+
+    assert not (project_dir / "runs" / "real" / "real_001").exists()
+
+
+def test_prepare_real_run_requires_ocean_ready_spectre_format(tmp_path: Path) -> None:
+    project_dir = _create_project(tmp_path)
+    spectre_path = project_dir / "config" / "spectre.yaml"
+    spectre_path.write_text(
+        spectre_path.read_text(encoding="utf-8").replace(
+            "output_format: psfxl",
+            "output_format: psfascii",
+        ),
+        encoding="utf-8",
+    )
+    _approve_project(project_dir)
+    _write_template(project_dir)
+
+    with pytest.raises(
+        ValueError,
+        match="spectre.output_format must be OCEAN-ready for metric extraction: psfascii",
+    ):
+        prepare_real_run(project_dir)
+
+    assert not (project_dir / "runs" / "real" / "real_001").exists()
 
 
 def test_prepare_real_run_accepts_valid_custom_run_id(tmp_path: Path) -> None:
@@ -390,3 +502,26 @@ def test_prepare_real_run_cleans_partial_run_directory_on_write_failure(
     monkeypatch.undo()
     package = prepare_real_run(project_dir, created_at_utc="2026-05-31T00:21:00Z")
     assert package.manifest_path.exists()
+
+
+def test_prepare_real_run_cleans_partial_run_directory_on_manifest_write_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    project_dir = _create_project(tmp_path)
+    _approve_project(project_dir)
+    _write_template(project_dir)
+
+    original_write_text = Path.write_text
+
+    def failing_write_text(self: Path, data: str, *args, **kwargs):
+        if self.name == "real_run_manifest.json":
+            raise OSError("simulated manifest write failure")
+        return original_write_text(self, data, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "write_text", failing_write_text)
+
+    with pytest.raises(OSError, match="simulated manifest write failure"):
+        prepare_real_run(project_dir, created_at_utc="2026-05-31T00:20:00Z")
+
+    assert not (project_dir / "runs" / "real" / "real_001").exists()

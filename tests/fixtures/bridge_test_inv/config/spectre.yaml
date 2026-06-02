@@ -3,7 +3,7 @@ schema_version: "1.0"
 spectre:
   engine: spectre_x
   preset: ax
-  output_format: psfascii
+  output_format: psfxl
   parallel_jobs: 10
   timeout_s: 3600
   require_license_check: true

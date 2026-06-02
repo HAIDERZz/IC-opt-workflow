@@ -163,8 +163,9 @@ tran tran stop=10n
     )
     metrics_path = project_dir / "config" / "metrics.yaml"
     metrics_text = metrics_path.read_text(encoding="utf-8")
+    assert 'value: "80e-12 s"' in metrics_text
     metrics_path.write_text(
-        metrics_text.replace('value: "80 ps"', 'value: "0 ps"', 1),
+        metrics_text.replace('value: "80e-12 s"', 'value: "0 s"', 1),
         encoding="utf-8",
     )
 
