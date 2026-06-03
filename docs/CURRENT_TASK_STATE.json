@@ -1,8 +1,8 @@
 {
   "schema_version": "1.0",
-  "current_scope": "Plan C C-11 clean restart",
-  "current_status": "C-11 clean restart complete; verified-only",
-  "review_status": "verified-only",
+  "current_scope": "Plan C C-11 Task 1 test-only smoke helpers",
+  "current_status": "C-11 Task 1 test-only smoke helpers complete and reviewed",
+  "review_status": "reviewed",
   "subagent_dispatch": "available",
   "active_spec": "docs/superpowers/specs/2026-06-03-local-real-run-smoke-design.md",
   "active_plan": "docs/superpowers/plans/2026-06-03-local-real-run-smoke.md",
@@ -12,7 +12,7 @@
     "docs/EXECUTION_PROGRESS_2026-05-29.md",
     "docs/COMPACT_RESUME_CHECKPOINT.md"
   ],
-  "next_allowed_action": "redo C-11 Task 1 test-only smoke helpers under TDD and cadence checker",
+  "next_allowed_action": "wait for user confirmation before C-11 Task 2 library happy-path smoke",
   "forbidden_actions": [
     "run Virtuoso",
     "run Spectre",
@@ -28,15 +28,14 @@
     "stage docs/toolchain_evidence/"
   ],
   "required_pre_commit_checks": [
+    "python3 -m pytest tests/test_local_real_run_smoke.py::test_c11_helper_seeds_recorded_real_result -q",
+    "python3 -m ruff check tests/real_run_smoke_helpers.py tests/test_local_real_run_smoke.py",
     "python3 tools/check_development_cadence.py",
-    "python3 -m pytest tests/test_development_cadence_checker.py -q",
-    "python3 -m ruff check tools/check_development_cadence.py tests/test_development_cadence_checker.py",
     "git diff --check",
-    "wc -l tools/check_development_cadence.py",
     "git status --short"
   ],
   "review_evidence": {
-    "spec_review": null,
-    "code_quality_review": null
+    "spec_review": "Bohr 019e8c9f-2249-7db3-bcaf-c7744f427cbc approved C-11 Task 1 spec compliance with no Critical, Important, or Minor findings.",
+    "code_quality_review": "Volta 019e8ca0-424e-7683-bebe-bb44e2340c5c approved C-11 Task 1 code quality with no Critical, Important, or Minor findings."
   }
 }
