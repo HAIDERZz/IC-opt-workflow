@@ -17,22 +17,22 @@ Do not use "Hermes agent" as a role name. In this project, Hermes means workflow
 ## Current Development Cadence
 
 - Follow the active plan and task number exactly. Read this file, the active design spec, the active implementation plan, the current progress files, and the relevant top-level plan before changing code.
-- Use `superpowers:subagent-driven-development` for implementation-plan tasks when subagents are available. This project overrides the generic "continuous execution" guidance: stop after each task is implemented, verified, reviewed, committed, and recorded unless the user explicitly asks to run multiple tasks without stopping.
-- Use codegraph during Subagent-Driven work. Before implementation, use codegraph context/search/explore tools to locate the affected modules, symbols, and dependency paths. If codegraph is unavailable or stale, say so and use `rg`/file reads as the fallback.
-- Per task, dispatch or emulate fresh-role work in this order: implementation, spec-compliance review, code-quality review. Spec review must pass before code-quality review starts. Open review issues must be fixed and re-reviewed.
+- Use `superpowers:subagent-driven-development` for implementation-plan tasks when it materially reduces risk. This project overrides the generic "continuous execution" guidance: stop after each task is implemented, verified, committed if appropriate, and recorded unless the user explicitly asks to run multiple tasks without stopping.
+- Use codegraph during Subagent-Driven or code-changing work to locate affected modules, symbols, and dependency paths. For docs-only, environment-gate, or practice-record tasks, codegraph is optional; use `rg`/targeted file reads unless code paths are actually being changed.
+- Use review gates by risk, not by habit. High-risk code tasks that touch contracts, schemas, hashes, file writes, approval/recovery logic, ledger/state, safety guards, or real-tool adapters need spec-compliance and code-quality review evidence before `reviewed`. Medium-risk integration or CLI tasks can batch reviews over 2-3 related tasks. Low-risk docs, progress, environment gates, and practice evidence remain `verified-only` unless the user explicitly requests review.
 - `docs/CURRENT_TASK_STATE.json` is the canonical resume anchor after context compaction. Read it before task work, keep it synchronized with the active spec, active implementation plan, top-level plan, and progress files, and update it before commit.
 - The word `reviewed` is reserved for tasks with recorded spec-review and code-quality review evidence. If no callable subagent or explicit review path is available, use `verified-only` or `blocked-no-subagent` instead.
-- After each task, report the work to the user: what changed, which files changed, which verification commands ran, review-gate status, commits made, and any remaining risks or decisions.
-- After each task, update project node files before stopping:
-  - `docs/CURRENT_TASK_STATE.json`
-  - `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`
-  - `docs/EXECUTION_PROGRESS_2026-05-29.md`
-  - `docs/COMPACT_RESUME_CHECKPOINT.md`
-  - the active implementation plan checkboxes/status
-  - this file's `Current Development Cadence` section if the cadence, next task, role model, or handoff expectations changed
-- After each task, audit the current implementation against the top-level plan and the active spec. Record whether the route is still aligned or what changed.
+- After each task, report in a compact shape: status, changed files, verification commands, review status, commit if made, risks/next action. Keep it short unless the user asks for detail.
+- Use the Lean Evidence Gate for node updates:
+  - Always update `docs/CURRENT_TASK_STATE.json`.
+  - Append a short entry to `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md` when the task changes project state.
+  - Update `docs/COMPACT_RESUME_CHECKPOINT.md` only before context compaction, at milestone boundaries, or when the next resume prompt would otherwise be wrong.
+  - Update `docs/EXECUTION_PROGRESS_2026-05-29.md` only for phase/milestone completion, route changes, or user-requested summaries.
+  - Update active plan checkboxes/status when executing a plan task.
+  - Update this `Current Development Cadence` section only when cadence, next-task rules, role model, or handoff expectations change.
+- After each task, audit the current implementation against the top-level plan and the active spec. Record the audit in `CURRENT_TASK_STATE.json`; duplicate it into other progress files only when the Lean Evidence Gate says those files are due.
 - If development reveals a plan/spec problem and the implementation must differ from the written plan, synchronize the active design spec, active implementation plan, and any affected top-level plan before claiming the task is complete. Do not leave code and planning documents divergent.
-- If `tools/check_development_cadence.py` exists, run it before committing task work and fix any drift it reports.
+- Run verification by risk. Low-risk docs/environment tasks normally need only JSON validation when applicable, `python3 tools/check_development_cadence.py`, and `git diff --check`. Code tasks need targeted tests; high-risk code also needs broader regression checks and review evidence.
 - Do not start the next task until the user confirms. Do not jump to C-11 local smoke or real tool/agent integration until C-10 passes review/final gate.
 - Keep progress files aligned with implementation before context compaction.
 - When the user explicitly authorizes a fast real-tool debug lane, label the work `verified-only`, keep changes surgical, record a concise debug note under `docs/debug/`, keep raw tool artifacts local-only, and return to the normal task/review cadence before claiming a reviewed implementation task is complete.
