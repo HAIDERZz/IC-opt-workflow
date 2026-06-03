@@ -529,13 +529,18 @@ Status: complete, verified-only.
 - C-14 Tasks 3-5 are complete, verified-only. `suggest-candidate` wrote `candidate_000002` with selection mode `initialization_fallback`; `prepare-candidate-real-run` prepared `real_002`; the C-7 adapter ran `real_002` through real Spectre/OCEAN outside the sandbox; `check-real-run`, `check-metric-results`, and `record-real-result` all passed. OCEAN returned `rise=3.326181720494057e-11 s`, `fall=4.973593602698243e-11 s`, and `DC=0.0009838038264352862 W`. Ledger now has 2 rows, both with scalar metrics and `real_constraint_fail`.
 - C-14 closeout note: `docs/debug/2026-06-04-c14-real-tool-acceptance-result.md`.
 - C-14 decision: proceed to narrow optimizer loop productization. The next scope should stay small: one explicit loop that repeatedly asks for one candidate, prepares one real-run package, runs the existing C-7 adapter, records the result or classified failure, and stops on a fixed evaluation budget.
-- Next allowed action: wait for user confirmation, then plan the narrow optimizer loop productization scope.
+- C-15 Narrow Optimizer Loop Productization design spec is written at `docs/superpowers/specs/2026-06-04-narrow-optimizer-loop-productization-design.md`.
+- C-15 implementation plan is written at `docs/superpowers/plans/2026-06-04-narrow-optimizer-loop-productization.md`.
+- C-15 Tasks 1-3 are complete, verified-only; final review gate remains pending.
+- C-15 code: `src/hermes_workflow/optimizer_loop.py`, `tools/run_real_optimizer_loop.py`, and `tests/test_optimizer_loop.py`.
+- C-15 real-tool acceptance: one real loop cycle ran on `/tmp/ic_auto_opt_c14/bridge_test_inv`, recording `candidate_000003` as `real_003`. OCEAN returned `rise=6.508914194299693e-11 s`, `fall=6.17648525412794e-11 s`, `DC=0.0003515194271758733 W`. Ledger now has 3 rows; `candidate_000003` is `real_pass` and current best.
+- Next allowed action: run C-15 Task 4 final verification, review gate, and closeout before starting broader optimizer work.
 
 ## Next Step
 
 Plan A, Plan B, Plan C C-1, Plan C C-2, Plan C C-3, Plan C C-4, Plan C C-5, and Plan C C-5.5 are complete as of 2026-06-01. C-6, C-7, C-8, and C-9 are complete and reviewed as of 2026-06-02. C-10 real-run failure/retry policy contract is complete and reviewed as of 2026-06-03. C-11 local/fake smoke is complete. C-7 real-tool closure is complete and committed as `d440c95`.
 
-Current next step: wait for user confirmation, then plan the narrow optimizer loop productization scope. C-14 is complete and accepted: `real_001` and `real_002` both ran through real Spectre/OCEAN via the C-7 adapter, both passed Hermes checks, and both were recorded. Do not commit raw input decks, protected include files, PSF/raw data, full Cadence logs, `docs/OCEAN_DOC_*`, or `docs/toolchain_evidence/`. Do not parse PSF or translate OCEAN formulas in Python.
+Current next step: run C-15 Task 4 final verification, review gate, and closeout. C-14 is complete and accepted. C-15 Tasks 1-3 are complete, verified-only: the narrow loop driver recorded `candidate_000003`/`real_003` through real Spectre/OCEAN and Hermes check/record. Do not commit raw input decks, protected include files, PSF/raw data, full Cadence logs, `docs/OCEAN_DOC_*`, or `docs/toolchain_evidence/`. Do not parse PSF or translate OCEAN formulas in Python.
 
 Read the handoff files first:
 
@@ -561,5 +566,5 @@ Use this prompt after compact:
 7. ic-auto-opt-workflow/docs/superpowers/plans/2026-06-03-controlled-real-tool-agent-practice.md
 8. 如需背景，再读 ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。当前活动节点是 C-14 Real-Tool Acceptance，Task 1-5 已完成并 verified-only。Active plan 是 `docs/superpowers/plans/2026-06-04-real-tool-acceptance.md`，active spec 仍是 `docs/superpowers/specs/2026-06-04-single-candidate-optimizer-suggestion-design.md` 的 Real-Tool Acceptance section。C-14 结论：`real_001` seed 和 `real_002` suggested candidate 都通过 real Spectre/OCEAN/C-7 adapter、Hermes check、record；ledger 有 2 行，均为 scalar extraction 成功但 `real_constraint_fail`。第一次 sandbox 失败是 pipe/socket 权限限制，不是公式、adapter command 或 native layout 漂移。下一步只能在用户确认后规划 narrow optimizer loop productization。不要写 broad optimizer framework，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。不要用 Python 解析 PSF，不要让 agent 翻译或重写 Calculator/OCEAN 公式。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。当前活动节点是 C-15 Narrow Optimizer Loop Productization，Tasks 1-3 已完成并 verified-only，Task 4 final verification/review/closeout 待做。Active spec 是 `docs/superpowers/specs/2026-06-04-narrow-optimizer-loop-productization-design.md`，active plan 是 `docs/superpowers/plans/2026-06-04-narrow-optimizer-loop-productization.md`。C-15 代码包括 `src/hermes_workflow/optimizer_loop.py`、`tools/run_real_optimizer_loop.py`、`tests/test_optimizer_loop.py`。真实验证已用 `/tmp/ic_auto_opt_c14/bridge_test_inv` 跑通一轮，记录 `candidate_000003`/`real_003`，ledger 3 行，`candidate_000003` 为 `real_pass` 和 current best。下一步只能运行 C-15 Task 4 final verification/review/closeout，不要直接进入 broader optimizer framework。不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。不要用 Python 解析 PSF，不要让 agent 翻译或重写 Calculator/OCEAN 公式。
 ```

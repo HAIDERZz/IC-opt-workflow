@@ -1,18 +1,18 @@
 {
   "schema_version": "1.0",
-  "current_scope": "C-14 Real-Tool Acceptance",
-  "current_status": "C-14 is complete, verified-only. The C-13 single-candidate suggestion path was accepted against the real Spectre/OCEAN flow: seed real_001 ran and recorded; suggest-candidate wrote candidate_000002; prepare-candidate-real-run prepared real_002; the C-7 adapter ran real_002 outside the sandbox; check-real-run, check-metric-results, and record-real-result passed. Two real ledger rows now exist, both with OCEAN scalar metrics and simulation_status real_constraint_fail.",
+  "current_scope": "C-15 Narrow Optimizer Loop Productization",
+  "current_status": "C-15 Tasks 1-3 are complete, verified-only. A narrow loop library and repo tool were added, fake-adapter tests passed, and one real optimizer loop cycle ran on /tmp/ic_auto_opt_c14/bridge_test_inv. The loop recorded candidate_000003 as real_003 through the existing C-7 Spectre/OCEAN adapter, Hermes checks, and record-real-result. Ledger now has 3 rows; candidate_000003 is real_pass and current best.",
   "review_status": "verified-only",
   "subagent_dispatch": "available",
-  "active_spec": "docs/superpowers/specs/2026-06-04-single-candidate-optimizer-suggestion-design.md",
-  "active_plan": "docs/superpowers/plans/2026-06-04-real-tool-acceptance.md",
+  "active_spec": "docs/superpowers/specs/2026-06-04-narrow-optimizer-loop-productization-design.md",
+  "active_plan": "docs/superpowers/plans/2026-06-04-narrow-optimizer-loop-productization.md",
   "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
   "progress_files": [
     "docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md",
     "docs/EXECUTION_PROGRESS_2026-05-29.md",
     "docs/COMPACT_RESUME_CHECKPOINT.md"
   ],
-  "next_allowed_action": "wait for user confirmation, then plan the narrow optimizer loop productization scope",
+  "next_allowed_action": "run C-15 Task 4 final verification, review gate, and closeout before starting any broader optimizer work",
   "forbidden_actions": [
     "start broad optimizer framework work",
     "create new optimizer algorithms",
@@ -36,25 +36,27 @@
     "stage docs/toolchain_evidence/"
   ],
   "required_pre_commit_checks": [
+    "python3 -m pytest tests/test_optimizer_loop.py -q",
+    "python3 -m pytest tests/test_optimizer_suggestion.py tests/test_candidate_injection_real_run.py -q",
+    "python3 -m ruff check src tests tools",
     "python3 tools/check_development_cadence.py",
     "git diff --check",
     "git status --short"
   ],
   "route_audit": {
-    "active_spec": "docs/superpowers/specs/2026-06-04-single-candidate-optimizer-suggestion-design.md",
-    "active_plan": "docs/superpowers/plans/2026-06-04-real-tool-acceptance.md",
+    "active_spec": "docs/superpowers/specs/2026-06-04-narrow-optimizer-loop-productization-design.md",
+    "active_plan": "docs/superpowers/plans/2026-06-04-narrow-optimizer-loop-productization.md",
     "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
-    "alignment": "Aligned. C-14 completed the C-13 real-tool acceptance route: suggest-candidate -> prepare-candidate-real-run -> C-7 Spectre/OCEAN adapter -> check-real-run -> check-metric-results -> record-real-result.",
-    "drift": "None. No production code changed, no OCEAN formulas were rewritten, no PSF parsing was added, no returned manifests were edited by hand, and the native Maestro/ADE netlist layout was preserved. Spectre must be run outside the Codex sandbox in this environment because the sandbox blocks pipe/socket creation."
+    "alignment": "Aligned. C-15 productizes only the proven C-14 route: suggest one candidate, prepare one candidate run, execute the existing C-7 adapter, check, and record.",
+    "drift": "None. No new optimizer algorithm, daemon, scheduler, PSF parser, formula rewrite, or native-layout replacement was added. The loop is fixed-budget and single-candidate per cycle."
   },
-  "latest_valid_commit": "bb8c44a docs: record C14 task 2 seed run",
+  "latest_valid_commit": "003e969 docs: record C14 real tool acceptance",
   "review_evidence": {
-    "spec_review": "Not run. C-14 is a real-tool acceptance practice milestone and remains verified-only.",
-    "code_quality_review": "Not run. No production code changed in C-14 Task 3-5.",
-    "task_2_status": "real_001 passed C-7 adapter, check-real-run, check-metric-results, and record-real-result. Metrics were rise=7.52016846017672e-11 s, fall=1.078998721053984e-10 s, and DC=0.0002588877964196586 W.",
-    "task_3_status": "suggest-candidate wrote candidate_000002 with selection_mode initialization_fallback, and prepare-candidate-real-run prepared runs/real/real_002 from that request.",
-    "task_4_status": "real_002 passed C-7 adapter, check-real-run, check-metric-results, and record-real-result. Metrics were rise=3.326181720494057e-11 s, fall=4.973593602698243e-11 s, and DC=0.0009838038264352862 W.",
-    "task_5_status": "Sanitized closeout written at docs/debug/2026-06-04-c14-real-tool-acceptance-result.md. Decision: proceed to narrow optimizer loop productization.",
+    "spec_review": "Pending. C-15 code touches orchestration and file writes, so final review is required before marking reviewed.",
+    "code_quality_review": "Pending. C-15 Tasks 1-3 are verified-only until Task 4 review gate completes.",
+    "task_1_status": "Added src/hermes_workflow/optimizer_loop.py with one-cycle orchestration and fake adapter tests.",
+    "task_2_status": "Added tools/run_real_optimizer_loop.py with fake subprocess tests and a sanitized loop report.",
+    "task_3_status": "Ran one real C-15 cycle outside the sandbox. real_003/candidate_000003 recorded as real_pass with rise=6.508914194299693e-11 s, fall=6.17648525412794e-11 s, DC=0.0003515194271758733 W.",
     "sandbox_note": "Real Spectre/OCEAN adapter runs should use the approved external Cadence csh path. A sandboxed Spectre attempt failed before OCEAN with pipe/socket permission errors, while the same command shape succeeded outside the sandbox."
   }
 }

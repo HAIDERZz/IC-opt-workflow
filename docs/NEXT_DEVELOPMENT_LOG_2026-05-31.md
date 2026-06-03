@@ -640,6 +640,22 @@ C-14 Real-Tool Acceptance Tasks 3-5:
 - Route audit: aligned with the C-13 real-tool acceptance section and the top-level practice-first route. Drift: none. No production code changed, no PSF parsing, no OCEAN formula rewriting, no returned manifest hand-editing, and native Maestro/ADE layout was preserved.
 - next_allowed_action: wait for user confirmation, then plan the narrow optimizer loop productization scope
 
+C-15 Narrow Optimizer Loop Productization Tasks 1-3:
+
+- Status: complete, verified-only; final review gate remains pending.
+- Design spec: `docs/superpowers/specs/2026-06-04-narrow-optimizer-loop-productization-design.md`.
+- Implementation plan: `docs/superpowers/plans/2026-06-04-narrow-optimizer-loop-productization.md`.
+- Code: `src/hermes_workflow/optimizer_loop.py`, `tools/run_real_optimizer_loop.py`.
+- Tests: `tests/test_optimizer_loop.py`.
+- Task 1 added a small one-cycle orchestration library with injectable adapter runner. It allocates deterministic candidate/run ids, calls existing `suggest-candidate` and `prepare-candidate-real-run` contracts, invokes the adapter runner, then uses existing `check-real-run`, `check-metric-results`, and `record-real-result`.
+- Task 2 added `tools/run_real_optimizer_loop.py` with `PROJECT_DIR`, `--max-new-evaluations`, and `--cadence-cshrc`. It writes a sanitized `reports/optimizer_loop_report.json` inside the local project.
+- Task 3 real-tool acceptance ran one additional loop cycle on `/tmp/ic_auto_opt_c14/bridge_test_inv`: `candidate_000003` was prepared as `real_003`, the C-7 adapter ran outside the sandbox, Hermes checks passed, and the result was recorded.
+- Real `real_003` metrics: `rise=6.508914194299693e-11 s`, `fall=6.17648525412794e-11 s`, `DC=0.0003515194271758733 W`.
+- Ledger/state: ledger now has 3 rows; `candidate_000003` is `real_pass` and is the current best candidate.
+- Verification so far: `python3 -m pytest tests/test_optimizer_loop.py -q` passed, `python3 -m pytest tests/test_optimizer_suggestion.py tests/test_candidate_injection_real_run.py -q` passed, and focused ruff for C-15 files passed.
+- Route audit: aligned with C-15 design and top-level practice-first route. Drift: none. No new optimizer algorithm, daemon, scheduler, PSF parser, formula rewrite, or native-layout replacement was added.
+- next_allowed_action: run C-15 Task 4 final verification, review gate, and closeout before starting any broader optimizer work
+
 ## Resume Prompt
 
 ```text
