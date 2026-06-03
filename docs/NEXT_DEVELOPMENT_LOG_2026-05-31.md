@@ -552,8 +552,49 @@ Candidate-injection package contract Task 4:
 - Route audit: aligned with `docs/superpowers/specs/2026-06-04-candidate-injection-package-contract-design.md` and the top-level practice-first route. Drift: none. The review fixes tightened implementation to the existing spec; no optimizer algorithm productization, real-tool execution, PSF parsing, OCEAN formula rewriting, C-4 replacement, or C-9 replacement was added.
 - next_allowed_action: wait for user confirmation, then decide the next narrow Hermes optimizer productization scope; do not start broad optimizer framework work
 
+C-13 Single-Candidate Optimizer Suggestion MVP design:
+
+- Status: design spec complete, verified-only.
+- Design spec: `docs/superpowers/specs/2026-06-04-single-candidate-optimizer-suggestion-design.md`.
+- Scope: productize only the missing step from recorded optimizer state and ledger to exactly one candidate request JSON compatible with the existing candidate-injection package contract.
+- Boundary: C-13 must not run real tools, create a broad optimizer framework, add batch orchestration, parse PSF, rewrite OCEAN formulas, or replace the native Maestro/ADE/Spectre/OCEAN layout.
+- Route audit: aligned with the top-level practice-first route and the completed candidate-injection package contract. Drift: none.
+- next_allowed_action: write the narrow C-13 implementation plan for single-candidate optimizer suggestion; do not start C-13 code until that plan exists
+
+C-13 Single-Candidate Optimizer Suggestion MVP implementation plan:
+
+- Status: implementation plan complete, verified-only.
+- Implementation plan: `docs/superpowers/plans/2026-06-04-single-candidate-optimizer-suggestion.md`.
+- Scope: four narrow tasks: library writer with initialization fallback, TuRBO one-step suggestion and safety failures, CLI/fake handoff smoke, and final verification/review gate.
+- Boundary: C-13 stays local and contract-only for real-tool behavior. It does not run Virtuoso, Spectre, OCEAN, SSH, `virtuoso-bridge-lite`, or the C-7 subprocess adapter. C-14 is the first real-tool acceptance step.
+- Route audit: aligned with `docs/superpowers/specs/2026-06-04-single-candidate-optimizer-suggestion-design.md` and the top-level practice-first route. Drift: none.
+- next_allowed_action: execute C-13 Task 1: Library Writer With Initialization Fallback; do not start Task 2 or real-tool acceptance until Task 1 is complete and recorded
+
+C-13 Single-Candidate Optimizer Suggestion MVP Tasks 1-3:
+
+- Status: complete, verified-only. Final review gate is still pending in Task 4.
+- Code: `src/hermes_workflow/optimizer_suggestion.py`, `src/hermes_workflow/cli.py`.
+- Tests: `tests/test_optimizer_suggestion.py`.
+- Implemented `suggest_candidate_request()` to write exactly one candidate request JSON from checked ledger/state, with initialization fallback, existing unresolved-run guard, existing optimizer-state checks, atomic output writing, existing candidate dedupe inputs, and hashes for ledger/state provenance.
+- Added optional one-step TuRBO suggestion path when enough finite observations exist. If TuRBO imports are unavailable, the command explicitly falls back to the existing initialization sequence instead of failing or inventing a new algorithm.
+- Added `hermes-workflow suggest-candidate PROJECT_DIR [--candidate-id ID] [--output PATH]`.
+- Verified the suggested request can be consumed by `prepare_candidate_real_run()` and does not write `runs/real/<run_id>` itself.
+- Verification: `python3 -m pytest tests/test_optimizer_suggestion.py -q`; `python3 -m pytest tests/test_candidate_injection_real_run.py tests/test_next_real_run.py -q`; `python3 -m pytest tests/test_cli.py tests/test_optimizer_suggestion.py -q`; `python3 -m pytest tests/test_next_real_run.py tests/test_real_run.py tests/test_real_run_recovery.py tests/test_real_result_record.py tests/test_metric_results.py tests/test_cli.py tests/test_optimizer_suggestion.py -q`; `python3 -m ruff check src tests tools`.
+- Route audit: aligned with the C-13 spec and implementation plan. Drift: none. No real-tool invocation, PSF parsing, OCEAN formula rewriting, batch loop, daemon, broad optimizer framework, or layout replacement was added.
+- next_allowed_action: execute C-13 Task 4 final verification/review gate; do not enter C-14 real-tool acceptance until Task 4 is complete and recorded
+
+C-13 Single-Candidate Optimizer Suggestion MVP Task 4:
+
+- Status: complete, reviewed.
+- Final verification passed: `python3 -m pytest tests/test_optimizer_suggestion.py tests/test_candidate_injection_real_run.py -q` (33 passed); `python3 -m pytest tests/test_next_real_run.py tests/test_real_run.py tests/test_real_run_recovery.py tests/test_real_result_record.py tests/test_metric_results.py tests/test_cli.py -q` (186 passed); `python3 -m ruff check src tests tools`; `python3 tools/check_development_cadence.py`; `git diff --check`.
+- Initial review findings: spec review found race-unsafe overwrite rejection; code-quality review found race-unsafe overwrite rejection, missing validation of generated candidate requests before write, and incomplete temp cleanup on write/close failures.
+- Fixes made: `src/hermes_workflow/optimizer_suggestion.py` now validates the generated payload with `CandidateInjectionRequest`, reuses candidate parameter and uniqueness checks before writing, and publishes via temp file plus no-clobber `os.link()` with cleanup in `finally`. Added direct tests for invalid candidate id before write, missing optimizer state, max evaluations reached, and competing output creation during write.
+- Review gate: spec re-review by Hypatia found no Critical, Important, or Minor findings and cleared C-13 as reviewed. Code-quality re-review by Nash found no Critical or Important findings, confirmed C-13 code-quality review passed, and the only Minor stale plan snippet was fixed.
+- Route audit: aligned with the C-13 spec and top-level practice-first route. Drift: none. C-13 did not run real tools, parse PSF, rewrite OCEAN formulas, create a broad optimizer framework, add batch orchestration, or replace native layout.
+- next_allowed_action: write C-14 real-tool acceptance plan for suggest-candidate -> prepare-candidate-real-run -> C-7 adapter -> check/record; do not run real tools until that plan exists and the user confirms
+
 ## Resume Prompt
 
 ```text
-请继续 IC auto optimization workflow。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。先阅读 docs/CURRENT_TASK_STATE.json、AGENTS.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/specs/2026-06-04-candidate-injection-package-contract-design.md、docs/superpowers/plans/2026-06-04-candidate-injection-package-contract.md，并按需阅读 docs/superpowers/plans/2026-06-03-optimizer-practice-first.md。当前活动节点是 Candidate-Injection Package Contract，状态为 complete/reviewed。Tasks 1-4 已完成 explicit candidate request validation、candidate package writer、`hermes-workflow prepare-candidate-real-run` CLI、fake C-7 handoff smoke、final verification 和 review gate。下一步只能在用户确认后决定 narrow Hermes optimizer productization scope。不要写 broad optimizer framework，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。不要用 Python 解析 PSF，不要让 agent 翻译或重写 Calculator/OCEAN 公式。
+请继续 IC auto optimization workflow。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。先阅读 docs/CURRENT_TASK_STATE.json、AGENTS.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/specs/2026-06-04-single-candidate-optimizer-suggestion-design.md、docs/superpowers/plans/2026-06-04-single-candidate-optimizer-suggestion.md，并按需阅读 docs/superpowers/specs/2026-06-04-candidate-injection-package-contract-design.md、docs/superpowers/plans/2026-06-04-candidate-injection-package-contract.md、docs/superpowers/plans/2026-06-03-optimizer-practice-first.md。当前活动节点是 C-13 Single-Candidate Optimizer Suggestion MVP，状态为 complete/reviewed。下一步只能写 C-14 real-tool acceptance plan：`suggest-candidate -> prepare-candidate-real-run -> C-7 adapter -> check/record`。不要直接运行真实 Virtuoso/Spectre/OCEAN/SSH/bridge，直到 C-14 plan 写好并得到用户确认。不要写 broad optimizer framework，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。不要用 Python 解析 PSF，不要让 agent 翻译或重写 Calculator/OCEAN 公式。
 ```

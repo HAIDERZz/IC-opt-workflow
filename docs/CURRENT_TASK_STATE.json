@@ -1,25 +1,23 @@
 {
   "schema_version": "1.0",
-  "current_scope": "Candidate-Injection Package Contract",
-  "current_status": "Tasks 1-4 are complete and reviewed. The contract validates explicit optimizer candidate requests, prepares deterministic real_002+ packages without mutating config/variables.yaml, exposes hermes-workflow prepare-candidate-real-run, preserves candidate_request.json/hash provenance, verifies fake C-7 handoff compatibility, rejects existing override run directories, rejects whitespace-padded continuous values, covers true prepared-package duplicate rejection, and covers cleanup after write failure.",
+  "current_scope": "C-13 Single-Candidate Optimizer Suggestion MVP",
+  "current_status": "C-13 Single-Candidate Optimizer Suggestion MVP is complete and reviewed. It adds one candidate request suggestion library function, initialization fallback, optional one-step TuRBO suggestion, CLI wiring, candidate-injection handoff coverage, no-clobber atomic output writing, and validation before write.",
   "review_status": "reviewed",
   "subagent_dispatch": "available",
-  "active_spec": "docs/superpowers/specs/2026-06-04-candidate-injection-package-contract-design.md",
-  "active_plan": "docs/superpowers/plans/2026-06-04-candidate-injection-package-contract.md",
+  "active_spec": "docs/superpowers/specs/2026-06-04-single-candidate-optimizer-suggestion-design.md",
+  "active_plan": "docs/superpowers/plans/2026-06-04-single-candidate-optimizer-suggestion.md",
   "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
   "progress_files": [
     "docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md",
     "docs/EXECUTION_PROGRESS_2026-05-29.md",
     "docs/COMPACT_RESUME_CHECKPOINT.md"
   ],
-  "next_allowed_action": "wait for user confirmation, then decide the next narrow Hermes optimizer productization scope; do not start broad optimizer framework work",
+  "next_allowed_action": "write C-14 real-tool acceptance plan for suggest-candidate -> prepare-candidate-real-run -> C-7 adapter -> check/record; do not run real tools until that plan exists and the user confirms",
   "forbidden_actions": [
-    "start Hermes optimizer productization before candidate-injection package contract implementation is complete",
+    "start broad optimizer framework work",
     "create new optimizer algorithms",
-    "create broad optimizer schemas or framework assets",
-    "flatten or redesign the Maestro/ADE netlist layout",
-    "replace C-4 first real-run preparation",
-    "replace C-9 deterministic next-run preparation",
+    "create batch candidate orchestration",
+    "create daemon or service orchestration",
     "run Virtuoso",
     "run Spectre",
     "run OCEAN",
@@ -42,22 +40,20 @@
     "git status --short"
   ],
   "route_audit": {
-    "active_spec": "docs/superpowers/specs/2026-06-04-candidate-injection-package-contract-design.md",
-    "active_plan": "docs/superpowers/plans/2026-06-04-candidate-injection-package-contract.md",
+    "active_spec": "docs/superpowers/specs/2026-06-04-single-candidate-optimizer-suggestion-design.md",
+    "active_plan": "docs/superpowers/plans/2026-06-04-single-candidate-optimizer-suggestion.md",
     "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
-    "alignment": "Aligned. Tasks 1-4 complete the candidate-injection design spec and top-level practice-first route. The implementation adds only explicit candidate package preparation after recorded real evidence and before optimizer algorithm productization.",
-    "drift": "None. No optimizer algorithm productization, real-tool execution, PSF parsing, OCEAN formula rewriting, C-4 replacement, or C-9 replacement was added. Task 4 review fixes tightened the implementation to the existing spec rather than changing the route."
+    "alignment": "Aligned. C-13 follows the practice-first optimizer route: productize only the missing single-candidate suggestion step after real TuRBO practice and the candidate-injection package contract. It writes one candidate_request.json, verifies prepare-candidate-real-run handoff compatibility, and adds CLI access without running real tools.",
+    "drift": "None. C-13 did not add a broad optimizer framework, real-tool execution, PSF parsing, OCEAN formula rewriting, batch orchestration, or new result layout."
   },
-  "latest_valid_commit": "fix: complete candidate injection review gate",
+  "latest_valid_commit": "feat: add single candidate suggestion",
   "review_evidence": {
-    "spec_review": "Initial spec review by Dalton failed on existing override run dirs, true prepared duplicate coverage, cleanup coverage, and continuous whitespace. Fixes were implemented. Spec re-review by Ptolemy (019e8e98-e698-7330-863d-0de9f2cb15a4) passed with no Critical, Important, or Minor findings and confirmed Task 4 can mark review_status as reviewed.",
-    "code_quality_review": "Initial code-quality review by Helmholtz passed with non-blocking Minor notes. Code-quality re-review by Linnaeus (019e8e99-070e-7d20-ae8e-b206188faac1) passed with no Critical, Important, or Minor findings and required no further fixes.",
-    "optimizer_practice_task_4": "Task 4 ran ./.venv/bin/python /tmp/ic_auto_opt_optimizer_practice/run_turbo_bridge_test_inv.py. Evidence: /tmp/ic_auto_opt_optimizer_practice/turbo_bridge_test_inv_001/summary.json and evaluations.jsonl. evaluation_count=9, post_initial_evaluations=1, successful_evaluations=9, penalty_evaluations=0. Best candidate: FN=12, WN=1.3u, FP=2, WP=2.5u, objective=4.183168953894332e-14.",
-    "optimizer_practice_task_5": "Task 5 wrote docs/debug/2026-06-03-optimizer-practice-first-result.md and chose Productization Decision B: add an explicit candidate-injection package contract first.",
-    "candidate_injection_design": "Design spec written at docs/superpowers/specs/2026-06-04-candidate-injection-package-contract-design.md. It defines candidate request schema, validation, run-id policy, dedupe policy, package outputs, CLI, error handling, and fake-tool-only testing strategy.",
-    "candidate_injection_plan": "Implementation plan written at docs/superpowers/plans/2026-06-04-candidate-injection-package-contract.md. It has four tasks: validation, package writer, CLI/fake handoff smoke, and final verification/review gate.",
-    "candidate_injection_tasks_1_2": "Tasks 1-2 implemented in src/hermes_workflow/real_run.py with tests in tests/test_candidate_injection_real_run.py. Verification passed: python3 -m pytest tests/test_candidate_injection_real_run.py -q; python3 -m pytest tests/test_next_real_run.py tests/test_real_run.py -q; python3 -m ruff check src tests tools; python3 tools/check_development_cadence.py; git diff --check.",
-    "candidate_injection_task_3": "Task 3 implemented CLI wiring in src/hermes_workflow/cli.py and fake C-7 handoff smoke coverage in tests/test_candidate_injection_real_run.py. Red test observed: python3 -m pytest tests/test_candidate_injection_real_run.py -q failed with missing CLI command exit 2. Verification passed: python3 -m pytest tests/test_candidate_injection_real_run.py -q; python3 -m pytest tests/test_cli.py tests/test_candidate_injection_real_run.py -q; python3 -m pytest tests/test_next_real_run.py tests/test_real_result_record.py tests/test_metric_results.py -q; python3 -m ruff check src tests tools.",
-    "candidate_injection_task_4": "Task 4 final verification passed: python3 -m pytest tests/test_candidate_injection_real_run.py -q (20 passed); python3 -m pytest tests/test_real_run.py tests/test_next_real_run.py tests/test_real_run_recovery.py tests/test_result_handoff.py tests/test_metric_results.py tests/test_real_result_record.py tests/test_cli.py -q (214 passed); python3 -m ruff check src tests tools; python3 tools/check_development_cadence.py; git diff --check. Initial spec review by Dalton failed on existing override run dirs, true prepared duplicate coverage, cleanup coverage, and continuous whitespace. Fixes were implemented. Spec re-review by Ptolemy passed with no findings. Code-quality re-review by Linnaeus passed with no findings."
+    "spec_design_status": "C-13 design spec written at docs/superpowers/specs/2026-06-04-single-candidate-optimizer-suggestion-design.md. It is verified-only because no review gate was requested or run for this docs-only step.",
+    "implementation_plan_status": "C-13 implementation plan written at docs/superpowers/plans/2026-06-04-single-candidate-optimizer-suggestion.md. It defines four narrow tasks: library writer with initialization fallback, TuRBO one-step suggestion and safety failures, CLI/fake handoff smoke, and final verification/review gate.",
+    "tasks_1_to_3_status": "C-13 Tasks 1-3 implemented src/hermes_workflow/optimizer_suggestion.py, wired hermes-workflow suggest-candidate in src/hermes_workflow/cli.py, and added tests/test_optimizer_suggestion.py. Verification passed: python3 -m pytest tests/test_optimizer_suggestion.py -q; python3 -m pytest tests/test_candidate_injection_real_run.py tests/test_next_real_run.py -q; python3 -m pytest tests/test_cli.py tests/test_optimizer_suggestion.py -q; python3 -m pytest tests/test_next_real_run.py tests/test_real_run.py tests/test_real_run_recovery.py tests/test_real_result_record.py tests/test_metric_results.py tests/test_cli.py tests/test_optimizer_suggestion.py -q; python3 -m ruff check src tests tools.",
+    "task_4_verification": "Final verification passed: python3 -m pytest tests/test_optimizer_suggestion.py tests/test_candidate_injection_real_run.py -q (33 passed); python3 -m pytest tests/test_next_real_run.py tests/test_real_run.py tests/test_real_run_recovery.py tests/test_real_result_record.py tests/test_metric_results.py tests/test_cli.py -q (186 passed); python3 -m ruff check src tests tools; python3 tools/check_development_cadence.py; git diff --check.",
+    "spec_review": "Initial spec review by Banach found one Important race-safety issue in output overwrite rejection. Fixes were implemented. Spec re-review by Hypatia (019e8ecf-f34a-72b3-8fe2-4370a6773d56) found no Critical, Important, or Minor findings and said C-13 can mark spec review as passed/reviewed.",
+    "code_quality_review": "Initial code-quality review by Sartre found Important issues for race-safe no-clobber writing, validating generated payloads before writing, and temp cleanup on write/close failures. Fixes were implemented. Code-quality re-review by Nash (019e8ed0-23c1-7323-b689-3d9be2b80d99) found no Critical or Important findings and said C-13 code-quality review passed. The only Minor stale plan snippet was fixed.",
+    "previous_candidate_injection_gate": "Candidate-Injection Package Contract Tasks 1-4 completed and passed final review gate before C-13 planning began."
   }
 }

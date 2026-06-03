@@ -11,6 +11,7 @@ from hermes_workflow.health import write_preflight_health
 from hermes_workflow.metric_results import check_metric_results
 from hermes_workflow.mock_optimizer import run_mock_optimization
 from hermes_workflow.netlists import prepare_netlist
+from hermes_workflow.optimizer_suggestion import suggest_candidate_request
 from hermes_workflow.package import (
     TemplateError,
     build_execution_package,
@@ -307,6 +308,34 @@ def prepare_candidate_real_run_command(
         "candidate request: "
         f"{package.run_dir.relative_to(project_dir) / 'candidate_request.json'}"
     )
+
+
+@app.command("suggest-candidate")
+def suggest_candidate_command(
+    project_dir: Annotated[
+        Path,
+        typer.Argument(help="Project directory with checked optimizer ledger/state."),
+    ],
+    candidate_id: Annotated[
+        str | None,
+        typer.Option("--candidate-id", help="Optional candidate id for the request."),
+    ] = None,
+    output: Annotated[
+        Path | None,
+        typer.Option("--output", help="Optional candidate request output path."),
+    ] = None,
+) -> None:
+    try:
+        result = suggest_candidate_request(
+            project_dir,
+            candidate_id=candidate_id,
+            output_path=output,
+        )
+    except (OSError, ValueError) as exc:
+        _exit_with_error(exc)
+    typer.echo(f"candidate request written: {result.output_path}")
+    typer.echo(f"candidate id: {result.candidate_id}")
+    typer.echo(f"selection mode: {result.selection_mode}")
 
 
 @app.command("assess-real-run-recovery")
