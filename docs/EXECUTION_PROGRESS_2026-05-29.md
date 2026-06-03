@@ -984,8 +984,9 @@ Locked C-10 policy:
 
 Next required action:
 
-- Enter C-11 local smoke: chain C-9 -> C-7 -> C-8 with one controlled C-10 failure/retry case.
-- C-11 should remain a local/fake controlled smoke first; do not jump straight to real Virtuoso/Spectre/OCEAN/agent integration.
+- Review C-11 local smoke design spec: `docs/superpowers/specs/2026-06-03-local-real-run-smoke-design.md`.
+- After user approval, write the C-11 implementation plan.
+- C-11 remains a local/fake controlled smoke first: chain C-9 -> fake C-7-style returned artifacts -> C-5/C-6 checks -> C-8 with one controlled C-10 failure/retry case. Do not jump straight to real Virtuoso/Spectre/OCEAN/agent integration.
 
 ## Locked Role Model
 
