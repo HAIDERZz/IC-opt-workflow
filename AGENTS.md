@@ -37,6 +37,18 @@ Do not use "Hermes agent" as a role name. In this project, Hermes means workflow
 - Keep progress files aligned with implementation before context compaction.
 - When the user explicitly authorizes a fast real-tool debug lane, label the work `verified-only`, keep changes surgical, record a concise debug note under `docs/debug/`, keep raw tool artifacts local-only, and return to the normal task/review cadence before claiming a reviewed implementation task is complete.
 
+## Practice-First Tool Integration
+
+Use real, working Cadence/Maestro/ADE/OCEAN behavior as the foundation. Do not rebuild a parallel foundation and try to make it resemble the proven flow.
+
+- Preserve native Maestro/ADE file and directory structure when it is part of observed correct behavior. Adapt Hermes workflow contracts to that structure instead of flattening or inventing a substitute layout.
+- Before designing optimizer or tool-adapter features whose correctness depends on external tool behavior, run a small manual or scripted practice flow first, record the successful case, and then productize that proven path.
+- If a needed behavior has not been practically confirmed, the active design spec and implementation plan must include a scoped evidence-gathering task before code tries to generalize it.
+- Treat successful local evidence as a constraint. When new code fails, compare against the successful evidence first and move the code toward that known-good path before adding new abstractions or contract fields.
+- Do not change approved metric formulas to compensate for adapter/layout bugs. Fix the adapter/layout so the approved formulas run in the same context that made them valid.
+- Do not create speculative, overlapping, or overly broad assets.
+- Prefer one narrow artifact per verified need. Avoid broad new specs, duplicate plans, extra schemas, or catch-all debug frameworks unless the current evidence proves they are necessary.
+
 ## Contract Boundaries
 
 - Contract-only tasks must not run Virtuoso, Spectre, OCEAN, SSH, Claude CLI as an execution agent, `virtuoso-bridge-lite`, or network access.
