@@ -23,16 +23,17 @@ def _write_project(
     progress_status: str = "process hardening complete; verified-only",
 ) -> None:
     spec_path = root / "docs/superpowers/specs/process-hardening.md"
+    active_plan_path = root / "docs/superpowers/plans/current.md"
     plan_path = root / "docs/superpowers/plans/top-level.md"
     progress_path = root / "docs/NEXT.md"
     spec_path.parent.mkdir(parents=True, exist_ok=True)
-    plan_path.parent.mkdir(parents=True, exist_ok=True)
+    active_plan_path.parent.mkdir(parents=True, exist_ok=True)
     progress_path.parent.mkdir(parents=True, exist_ok=True)
     spec_path.write_text(
         "# Process Hardening\n\n"
-        "Current scope: Plan C process hardening lightweight cadence guard\n\n"
         "Acceptance criteria are explicit.\n"
     )
+    active_plan_path.write_text("# Current Plan\n")
     plan_path.write_text("# Top Level Plan\n")
     progress_path.write_text(
         "\n".join(
@@ -50,6 +51,7 @@ def _write_project(
         "review_status": review_status,
         "subagent_dispatch": "not_available",
         "active_spec": "docs/superpowers/specs/process-hardening.md",
+        "active_plan": "docs/superpowers/plans/current.md",
         "top_level_plan": "docs/superpowers/plans/top-level.md",
         "progress_files": ["docs/NEXT.md"],
         "next_allowed_action": "decide whether to redo C-11 or draft next approved scope",
@@ -109,3 +111,16 @@ def test_checker_rejects_reviewed_current_status_for_verified_only(
 
     errors = checker.check_project(tmp_path)
     assert any("verified-only" in error and "reviewed" in error for error in errors)
+
+
+def test_checker_rejects_missing_active_plan(tmp_path: Path) -> None:
+    _write_project(tmp_path)
+    state_path = tmp_path / "docs/CURRENT_TASK_STATE.json"
+    state = json.loads(state_path.read_text())
+    del state["active_plan"]
+    state_path.write_text(json.dumps(state, indent=2))
+
+    checker = _load_checker()
+
+    errors = checker.check_project(tmp_path)
+    assert any("active_plan" in error for error in errors)

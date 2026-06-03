@@ -46,6 +46,7 @@ compaction. It records:
 
 - the current scope and status
 - the active spec and top-level plan paths
+- the active implementation plan path
 - progress files that must mention the current scope and next action
 - the review status and review evidence
 - forbidden actions for the current boundary
@@ -62,7 +63,7 @@ of duplicating long plans.
 - use only the Python standard library
 - load and validate `docs/CURRENT_TASK_STATE.json`
 - confirm referenced spec, top-level plan, and progress files exist
-- confirm the active spec mentions the current scope
+- confirm the active implementation plan exists
 - confirm progress files mention the current scope and next allowed action
 - reject `reviewed` status without review evidence
 - reject current-status lines that say `reviewed` while the JSON says

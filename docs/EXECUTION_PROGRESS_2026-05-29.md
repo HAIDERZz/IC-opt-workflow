@@ -987,8 +987,8 @@ Next required action:
 - C-11 local smoke design spec exists: `docs/superpowers/specs/2026-06-03-local-real-run-smoke-design.md`.
 - C-11 local smoke implementation plan exists: `docs/superpowers/plans/2026-06-03-local-real-run-smoke.md`.
 - Plan C process hardening lightweight cadence guard is complete; verified-only. It adds `docs/CURRENT_TASK_STATE.json`, a 200-line-budget cadence checker, and a process-hardening design spec so future context resumes have a single current-state anchor and cannot falsely claim `reviewed` without evidence.
-- Current scope: Plan C C-11 local smoke redevelopment Task 1
-- Current status: C-11 redevelopment reset in progress; verified-only
+- Current scope: Plan C C-11 clean restart
+- Current status: C-11 clean restart complete; verified-only
 - Next recommended action: redo C-11 Task 1 test-only smoke helpers under TDD and cadence checker.
 - C-11 remains a local/fake controlled smoke first: chain C-9 -> fake C-7-style returned artifacts -> C-5/C-6 checks -> C-8 with one controlled C-10 failure/retry case. Do not jump straight to real Virtuoso/Spectre/OCEAN/agent integration.
 

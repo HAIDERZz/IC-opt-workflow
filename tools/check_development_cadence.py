@@ -11,8 +11,8 @@ from typing import Any
 
 REQUIRED_KEYS = set(
     "schema_version current_scope current_status review_status subagent_dispatch "
-    "active_spec top_level_plan progress_files next_allowed_action forbidden_actions "
-    "required_pre_commit_checks review_evidence".split()
+    "active_spec active_plan top_level_plan progress_files next_allowed_action "
+    "forbidden_actions required_pre_commit_checks review_evidence".split()
 )
 ALLOWED_REVIEW_STATUSES = {"verified-only", "reviewed", "blocked-no-subagent"}
 ALLOWED_SUBAGENT_STATES = {"available", "not_available"}
@@ -102,11 +102,14 @@ def _check_pre_commit_checks(state: dict[str, Any], errors: list[str]) -> None:
 
 def _check_referenced_files(root: Path, state: dict[str, Any], errors: list[str]) -> None:
     active_spec = _required_text(state.get("active_spec"), "active_spec", errors)
+    active_plan = _required_text(state.get("active_plan"), "active_plan", errors)
     top_level_plan = _required_text(state.get("top_level_plan"), "top_level_plan", errors)
     current_scope = _required_text(state.get("current_scope"), "current_scope", errors)
     next_action = _required_text(state.get("next_allowed_action"), "next_allowed_action", errors)
     if active_spec:
-        _check_existing_text_file(root, active_spec, "active_spec", errors, current_scope)
+        _check_existing_text_file(root, active_spec, "active_spec", errors)
+    if active_plan:
+        _check_existing_text_file(root, active_plan, "active_plan", errors)
     if top_level_plan:
         _check_existing_text_file(root, top_level_plan, "top_level_plan", errors)
     progress_files = state.get("progress_files")

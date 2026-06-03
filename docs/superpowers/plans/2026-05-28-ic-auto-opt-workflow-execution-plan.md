@@ -32,7 +32,7 @@ As of 2026-06-03, focused Plan A, Plan B, and Plan C C-1 through C-10 are comple
 - C-10 Task 5 CLI Integration is complete and reviewed.
 - C-10 Task 6 docs/progress/final verification is complete and reviewed.
 
-Execute C-11 Task 1 using Subagent-Driven Development, then stop for report/review/commit/node update. C-11 starts with local/fake controlled smoke before any direct real tool/agent integration. The intended C-11 chain is C-9 -> fake C-7-style returned artifacts -> C-5/C-6 checks -> C-8 plus one controlled C-10 failure/retry case. Current resume guidance is in `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`, `docs/EXECUTION_PROGRESS_2026-05-29.md`, `docs/COMPACT_RESUME_CHECKPOINT.md`, and `AGENTS.md`.
+C-11 has been cleanly restarted after an accidental subagent-window workflow drift. The current node is `Plan C C-11 clean restart`, verified-only. Next, execute C-11 Task 1 using Subagent-Driven Development, then stop for report/review/commit/node update. C-11 starts with local/fake controlled smoke before any direct real tool/agent integration. The intended C-11 chain is C-9 -> fake C-7-style returned artifacts -> C-5/C-6 checks -> C-8 plus one controlled C-10 failure/retry case. Current resume guidance is in `docs/CURRENT_TASK_STATE.json`, `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`, `docs/EXECUTION_PROGRESS_2026-05-29.md`, `docs/COMPACT_RESUME_CHECKPOINT.md`, and `AGENTS.md`.
 
 ## Current Route Alignment
 
