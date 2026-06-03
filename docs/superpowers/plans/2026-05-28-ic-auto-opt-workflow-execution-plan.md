@@ -23,7 +23,7 @@
 
 ## Current Implementation Node
 
-As of 2026-06-03, focused Plan A, Plan B, and Plan C C-1 through C-10 are complete and reviewed. Plan C C-11 local/fake controlled smoke is implementation complete and verified-only pending final review. Its design spec exists at `docs/superpowers/specs/2026-06-03-local-real-run-smoke-design.md`, and its implementation plan exists at `docs/superpowers/plans/2026-06-03-local-real-run-smoke.md`:
+As of 2026-06-03, focused Plan A, Plan B, and Plan C C-1 through C-11 are complete and reviewed. C-11's design spec exists at `docs/superpowers/specs/2026-06-03-local-real-run-smoke-design.md`, and its implementation plan exists at `docs/superpowers/plans/2026-06-03-local-real-run-smoke.md`:
 
 - C-10 Task 1 recovery report schemas are complete and reviewed.
 - C-10 Task 2 deterministic recovery classifier is complete and reviewed.
@@ -34,9 +34,9 @@ As of 2026-06-03, focused Plan A, Plan B, and Plan C C-1 through C-10 are comple
 - C-11 Task 1 test-only smoke helpers are complete and reviewed.
 - C-11 Task 2 library happy-path smoke is complete and reviewed.
 - C-11 Task 3 controlled failure/retry smoke is complete and reviewed.
-- C-11 Task 4 CLI smoke, docs, and final gate implementation is complete and verified-only pending final spec-compliance review and final code-quality review.
+- C-11 Task 4 CLI smoke, docs, and final gate is complete and reviewed.
 
-C-11 verifies the C-9 -> fake C-7-style returned artifacts -> C-5/C-6 checks -> C-8 happy path and one controlled C-10 failure/retry path without real Virtuoso/Spectre/OCEAN/SSH/agent/bridge execution. The current node is `Plan C C-11 Task 4 CLI smoke, docs, and final gate`, verified-only pending final review. Next, run C-11 Task 4 final spec-compliance review, then C-11 Task 4 final code-quality review. Current resume guidance is in `docs/CURRENT_TASK_STATE.json`, `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`, `docs/EXECUTION_PROGRESS_2026-05-29.md`, `docs/COMPACT_RESUME_CHECKPOINT.md`, and `AGENTS.md`.
+C-11 verifies the C-9 -> fake C-7-style returned artifacts -> C-5/C-6 checks -> C-8 happy path and one controlled C-10 failure/retry path without real Virtuoso/Spectre/OCEAN/SSH/agent/bridge execution. The current node is `Plan C C-11 local/fake controlled smoke complete`, reviewed. Next, choose the next real-tool/agent practice scope and write/approve its design spec before any real-tool execution. Current resume guidance is in `docs/CURRENT_TASK_STATE.json`, `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`, `docs/EXECUTION_PROGRESS_2026-05-29.md`, `docs/COMPACT_RESUME_CHECKPOINT.md`, and `AGENTS.md`.
 
 ## Current Route Alignment
 

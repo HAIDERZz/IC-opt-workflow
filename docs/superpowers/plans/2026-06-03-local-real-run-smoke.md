@@ -830,27 +830,28 @@ Expected: full pytest passes, ruff reports all checks passed, cadence passes, `g
 In this plan, mark Task 4 steps as complete.
 
 Implementation pass note: `AGENTS.md` reserves `reviewed` for recorded
-spec-compliance and code-quality review evidence. This pass therefore records
-C-11 Task 4 as implementation complete and verified-only, pending final
-spec-compliance review and then final code-quality review.
+spec-compliance and code-quality review evidence. The initial Task 4 commit
+therefore recorded C-11 Task 4 as implementation complete and verified-only
+at that checkpoint. Step 7 later supplied the required review evidence, and
+the final status update records C-11 as complete and reviewed.
 
 Update `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`:
 
 ```text
-- Current scope: Plan C C-11 Task 4 CLI smoke, docs, and final gate
-- Current status: C-11 local/fake controlled smoke implementation complete and verified-only pending final review
-- Next required action: C-11 Task 4 final spec-compliance review, then C-11 Task 4 final code-quality review
+- Current scope: Plan C C-11 local/fake controlled smoke complete
+- Current status: C-11 Task 4 and C-11 final gate complete and reviewed
+- Next required action: choose the next real-tool/agent practice scope and write/approve its design spec before any real-tool execution
 ```
 
 Update `docs/EXECUTION_PROGRESS_2026-05-29.md`, `docs/COMPACT_RESUME_CHECKPOINT.md`, `docs/PROJECT_WORKFLOW_OVERVIEW.md`, and `docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md` to record:
 
 ```text
-C-11 local/fake controlled smoke implementation is complete and verified-only pending final review. It verifies the C-9 -> fake C-7-style returned artifacts -> C-5/C-6 checks -> C-8 happy path and one C-10 failure/retry path without real Virtuoso/Spectre/OCEAN/SSH/agent/bridge execution. The next action is final spec-compliance review, then final code-quality review; any later real-tool/agent practice must be a separate approved plan.
+C-11 local/fake controlled smoke is complete and reviewed. It verifies the C-9 -> fake C-7-style returned artifacts -> C-5/C-6 checks -> C-8 happy path and one C-10 failure/retry path without real Virtuoso/Spectre/OCEAN/SSH/agent/bridge execution. Any later real-tool/agent practice must be a separate approved plan.
 ```
 
 Do not update `AGENTS.md` unless the cadence, role model, or handoff expectations change.
 
-- [ ] **Step 6: Commit Task 4**
+- [x] **Step 6: Commit Task 4**
 
 Run:
 
@@ -861,7 +862,10 @@ git commit -m "test: add local real run cli smoke"
 
 Expected: commit succeeds. Do not stage local OCEAN research or toolchain evidence files.
 
-- [ ] **Step 7: Final review gate**
+Completed in `d2c3213 test: add local real run cli smoke`. Local OCEAN
+research and toolchain evidence files remained unstaged.
+
+- [x] **Step 7: Final review gate**
 
 Run the project review gate after the commit:
 
@@ -880,6 +884,11 @@ Review C-11 local/fake controlled smoke. It must remain a test-only local smoke 
 ```
 
 If review finds issues, fix them in a follow-up commit and rerun the focused and final verification commands.
+
+Final review result:
+
+- Spec-compliance review approved by Aquinas (`019e8cd9-0de1-78e0-9201-560c807edc39`) with no findings.
+- Code-quality review approved by Feynman (`019e8cd9-33ae-7880-aab0-767a5ed1facb`). The only low bookkeeping finding was the already-completed Step 6 checkbox, fixed in this final status update.
 
 ## Plan Self-Review
 
