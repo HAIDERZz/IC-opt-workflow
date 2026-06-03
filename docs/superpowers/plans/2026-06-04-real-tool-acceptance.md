@@ -243,7 +243,7 @@ Do not start Task 2 without user confirmation because Task 2 runs real Spectre/O
 - Modify: `docs/CURRENT_TASK_STATE.json`
 - Modify: `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`
 
-- [ ] **Step 1: Run the C-7 adapter for `real_001`**
+- [x] **Step 1: Run the C-7 adapter for `real_001`**
 
 Run:
 
@@ -263,7 +263,14 @@ Expected:
 
 If this fails, stop and compare against the known-good C-7 closure evidence before making code changes.
 
-- [ ] **Step 2: Run Hermes checks and record seed result**
+Task 2 execution note:
+
+- First adapter attempt failed inside the Codex sandbox with Spectre stderr `cannot create pipe [Operation not permitted]` and Spectre fatal `can't create server socket`.
+- The failing command matched the known-good C-7 closure Spectre command, and the failure occurred before OCEAN.
+- The adapter was rerun outside the sandbox through the approved Cadence `csh -fc` path with `--allow-overwrite`, and it succeeded without code, formula, or netlist-layout changes.
+- Root cause: sandbox restriction on Spectre pipe/socket creation, not adapter command drift or OCEAN formula drift.
+
+- [x] **Step 2: Run Hermes checks and record seed result**
 
 Run:
 
@@ -279,7 +286,7 @@ Expected:
 - `ledger/experiment_ledger.jsonl` has one checked row;
 - `state/optimizer_state.json` has `current_evaluations` equal to `1`.
 
-- [ ] **Step 3: Capture sanitized seed evidence**
+- [x] **Step 3: Capture sanitized seed evidence**
 
 Run:
 
@@ -297,7 +304,7 @@ Expected:
 - hash file exists under `/tmp`;
 - no raw PSF or full Cadence log is staged.
 
-- [ ] **Step 4: Record Task 2 state and stop**
+- [x] **Step 4: Record Task 2 state and stop**
 
 Update:
 

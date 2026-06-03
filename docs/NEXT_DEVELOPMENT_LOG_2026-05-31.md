@@ -616,6 +616,18 @@ C-14 Real-Tool Acceptance Task 1:
 - Boundary: no Spectre, OCEAN, SSH, bridge, C-7 adapter, PSF parsing, formula rewrite, raw deck commit, or Cadence artifact commit occurred.
 - next_allowed_action: wait for user confirmation, then execute C-14 Task 2 seed real-tool run
 
+C-14 Real-Tool Acceptance Task 2:
+
+- Status: complete, verified-only.
+- Local project: `/tmp/ic_auto_opt_c14/bridge_test_inv`.
+- Local evidence: `/tmp/ic_auto_opt_c14/evidence/real_tool_acceptance_001/`.
+- First adapter attempt note: running Spectre inside the Codex sandbox failed before OCEAN with `cannot create pipe [Operation not permitted]` and `can't create server socket`. Comparison against C-7 closure showed the Spectre command shape matched the known-good command. Rerunning the same adapter outside the sandbox through the approved Cadence `csh -fc` path succeeded; no adapter command, metric formula, or netlist-layout change was needed.
+- Real-tool result: `real_001` produced `result_manifest.json` and `metrics/metric_result_manifest.json`; `check-real-run`, `check-metric-results`, and `record-real-result` all passed.
+- OCEAN scalar metrics: `rise=7.52016846017672e-11 s`, `fall=1.078998721053984e-10 s`, `DC=0.0002588877964196586 W`.
+- Ledger/state: one ledger row was recorded, `optimizer_state.current_evaluations = 1`, and the row status is `real_constraint_fail`, meaning scalar extraction worked but the seed does not satisfy configured performance constraints.
+- Route audit: aligned with C-14 plan, C-13 spec, and the top-level practice-first route. Drift: none. No production code changed, no PSF parsing, no OCEAN formula rewriting, and the native Maestro/ADE layout was preserved.
+- next_allowed_action: wait for user confirmation, then execute C-14 Task 3 suggest and package real_002
+
 ## Resume Prompt
 
 ```text

@@ -524,13 +524,15 @@ Status: complete, verified-only.
 - C-14 boundary: no broad optimizer framework, no new algorithms, no batch orchestration, no PSF parsing, no formula rewriting, and no native Maestro/ADE layout replacement.
 - C-14 Task 1 is complete, verified-only. Local project `/tmp/ic_auto_opt_c14/bridge_test_inv` was initialized, the known-good exported netlist bundle was copied locally, acceptance-only lower bounds were set to `FN=4`, `WN=0.6u`, `FP=4`, `WP=1.2u`, Hermes preflight/approval passed, and `prepare-real-run --run-id real_001` prepared the first-run seed package with native netlist sidecars and approved OCEAN formulas unchanged.
 - C-14 Task 1 plan correction: do not use `prepare-candidate-real-run` for `real_001`; the candidate-injection path correctly starts at `real_002+` after at least one checked ledger row exists.
-- Next allowed action: wait for user confirmation, then execute C-14 Task 2 seed real-tool run.
+- C-14 Task 2 is complete, verified-only. The first adapter attempt inside the Codex sandbox failed before OCEAN with Spectre pipe/socket permission errors (`cannot create pipe [Operation not permitted]`, `can't create server socket`). The same command shape matched known-good C-7 closure evidence, and rerunning the adapter outside the sandbox through the approved Cadence `csh -fc` path succeeded without code, formula, or layout changes.
+- C-14 Task 2 result: `real_001` produced `result_manifest.json` and `metrics/metric_result_manifest.json`; `check-real-run`, `check-metric-results`, and `record-real-result` all passed. OCEAN returned `rise=7.52016846017672e-11 s`, `fall=1.078998721053984e-10 s`, and `DC=0.0002588877964196586 W`. One ledger row was recorded, `optimizer_state.current_evaluations = 1`, and the row status is `real_constraint_fail`, meaning scalar extraction worked but this seed did not satisfy configured performance constraints.
+- Next allowed action: wait for user confirmation, then execute C-14 Task 3 suggest and package `real_002`.
 
 ## Next Step
 
 Plan A, Plan B, Plan C C-1, Plan C C-2, Plan C C-3, Plan C C-4, Plan C C-5, and Plan C C-5.5 are complete as of 2026-06-01. C-6, C-7, C-8, and C-9 are complete and reviewed as of 2026-06-02. C-10 real-run failure/retry policy contract is complete and reviewed as of 2026-06-03. C-11 local/fake smoke is complete. C-7 real-tool closure is complete and committed as `d440c95`.
 
-Current next step: wait for user confirmation, then execute C-14 Task 2 seed real-tool run. Task 2 runs real Spectre/OCEAN through the C-7 adapter. Do not commit raw input decks, protected include files, PSF/raw data, full Cadence logs, `docs/OCEAN_DOC_*`, or `docs/toolchain_evidence/`. Do not parse PSF or translate OCEAN formulas in Python.
+Current next step: wait for user confirmation, then execute C-14 Task 3 suggest and package `real_002`. Task 3 should not run real tools; it should call `suggest-candidate` for `candidate_000002`, inspect the request shape, and prepare `real_002` through `prepare-candidate-real-run`. Do not commit raw input decks, protected include files, PSF/raw data, full Cadence logs, `docs/OCEAN_DOC_*`, or `docs/toolchain_evidence/`. Do not parse PSF or translate OCEAN formulas in Python.
 
 Read the handoff files first:
 
@@ -556,5 +558,5 @@ Use this prompt after compact:
 7. ic-auto-opt-workflow/docs/superpowers/plans/2026-06-03-controlled-real-tool-agent-practice.md
 8. 如需背景，再读 ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。当前活动节点是 C-14 Real-Tool Acceptance，Task 1 已完成并 verified-only。Active plan 是 `docs/superpowers/plans/2026-06-04-real-tool-acceptance.md`，active spec 仍是 `docs/superpowers/specs/2026-06-04-single-candidate-optimizer-suggestion-design.md` 的 Real-Tool Acceptance section。下一步只能在用户确认后执行 C-14 Task 2 seed real-tool run；Task 2 会运行真实 Spectre/OCEAN/C-7 adapter。不要写 broad optimizer framework，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。不要用 Python 解析 PSF，不要让 agent 翻译或重写 Calculator/OCEAN 公式。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。当前活动节点是 C-14 Real-Tool Acceptance，Task 1 和 Task 2 已完成并 verified-only。Active plan 是 `docs/superpowers/plans/2026-06-04-real-tool-acceptance.md`，active spec 仍是 `docs/superpowers/specs/2026-06-04-single-candidate-optimizer-suggestion-design.md` 的 Real-Tool Acceptance section。下一步只能在用户确认后执行 C-14 Task 3 suggest and package real_002；Task 3 不运行真实工具。Task 2 的真实工具结论：Spectre/OCEAN/C-7 adapter 在 sandbox 外跑通，第一次 sandbox 失败是 pipe/socket 权限限制，不是公式、adapter command 或 native layout 漂移。不要写 broad optimizer framework，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。不要用 Python 解析 PSF，不要让 agent 翻译或重写 Calculator/OCEAN 公式。
 ```
