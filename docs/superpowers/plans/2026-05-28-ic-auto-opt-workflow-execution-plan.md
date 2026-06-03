@@ -23,7 +23,7 @@
 
 ## Current Implementation Node
 
-As of 2026-06-03, focused Plan A, Plan B, and Plan C C-1 through C-11 are complete and reviewed. C-11's design spec exists at `docs/superpowers/specs/2026-06-03-local-real-run-smoke-design.md`, and its implementation plan exists at `docs/superpowers/plans/2026-06-03-local-real-run-smoke.md`:
+As of 2026-06-03, focused Plan A, Plan B, and Plan C C-1 through C-11 are complete and reviewed. C-12 controlled real-tool/agent practice design spec is written at `docs/superpowers/specs/2026-06-03-controlled-real-tool-agent-practice-design.md` and is pending user review before an implementation plan is written:
 
 - C-10 Task 1 recovery report schemas are complete and reviewed.
 - C-10 Task 2 deterministic recovery classifier is complete and reviewed.
@@ -35,8 +35,9 @@ As of 2026-06-03, focused Plan A, Plan B, and Plan C C-1 through C-11 are comple
 - C-11 Task 2 library happy-path smoke is complete and reviewed.
 - C-11 Task 3 controlled failure/retry smoke is complete and reviewed.
 - C-11 Task 4 CLI smoke, docs, and final gate is complete and reviewed.
+- C-12 controlled real-tool/agent practice design spec is written; pending user review.
 
-C-11 verifies the C-9 -> fake C-7-style returned artifacts -> C-5/C-6 checks -> C-8 happy path and one controlled C-10 failure/retry path without real Virtuoso/Spectre/OCEAN/SSH/agent/bridge execution. The current node is `Plan C C-11 local/fake controlled smoke complete`, reviewed. Next, choose the next real-tool/agent practice scope and write/approve its design spec before any real-tool execution. Current resume guidance is in `docs/CURRENT_TASK_STATE.json`, `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`, `docs/EXECUTION_PROGRESS_2026-05-29.md`, `docs/COMPACT_RESUME_CHECKPOINT.md`, and `AGENTS.md`.
+C-11 verifies the C-9 -> fake C-7-style returned artifacts -> C-5/C-6 checks -> C-8 happy path and one controlled C-10 failure/retry path without real Virtuoso/Spectre/OCEAN/SSH/agent/bridge execution. The current node is `Plan C C-12 controlled real-tool/agent practice design spec`, verified-only and pending user review. Next, complete user review of the C-12 design spec before writing the C-12 implementation plan. Current resume guidance is in `docs/CURRENT_TASK_STATE.json`, `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`, `docs/EXECUTION_PROGRESS_2026-05-29.md`, `docs/COMPACT_RESUME_CHECKPOINT.md`, and `AGENTS.md`.
 
 ## Current Route Alignment
 

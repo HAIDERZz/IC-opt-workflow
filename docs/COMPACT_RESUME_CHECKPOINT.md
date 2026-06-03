@@ -104,9 +104,9 @@ Current execution state:
 - C-11 local smoke design spec exists: `docs/superpowers/specs/2026-06-03-local-real-run-smoke-design.md`.
 - C-11 local smoke implementation plan exists: `docs/superpowers/plans/2026-06-03-local-real-run-smoke.md`.
 - Plan C process hardening lightweight cadence guard is complete; verified-only. It adds `docs/CURRENT_TASK_STATE.json`, `tools/check_development_cadence.py`, and `docs/superpowers/specs/2026-06-03-process-hardening-lightweight-cadence-design.md`.
-- Current scope: Plan C C-11 local/fake controlled smoke complete
-- Current status: C-11 Task 4 and C-11 final gate complete and reviewed
-- Current next action: choose the next real-tool/agent practice scope and write/approve its design spec before any real-tool execution.
+- Current scope: Plan C C-12 controlled real-tool/agent practice design spec
+- Current status: C-12 design spec written; pending user review
+- Current next action: user review of C-12 design spec before writing the C-12 implementation plan.
 - C-11 Task 1 checkpoint: complete and reviewed. Added the single helper seed-recording smoke and test-only real-run smoke helper module. Spec review and code-quality review approved with no Critical, Important, or Minor findings.
 - C-11 Task 1 route audit: Active spec is `docs/superpowers/specs/2026-06-03-local-real-run-smoke-design.md`; top-level plan is `docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md`; alignment remains local/fake controlled smoke only; drift is none.
 - C-11 Task 2 checkpoint: complete and reviewed. Added only `test_c11_library_happy_path_records_next_real_run` to `tests/test_local_real_run_smoke.py`; it seeds `real_001`, prepares `real_002`, writes fake C-7-style result/metric manifests, checks and records the run, and asserts ledger/state/best/report outputs plus no unresolved real runs.
@@ -119,6 +119,8 @@ Current execution state:
 - C-11 Task 4 route audit: Active spec is `docs/superpowers/specs/2026-06-03-local-real-run-smoke-design.md`; top-level plan is `docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md`; alignment remains local/fake controlled smoke only. C-11 verifies the C-9 -> fake C-7-style returned artifacts -> C-5/C-6 checks -> C-8 happy path and one C-10 failure/retry path without real Virtuoso/Spectre/OCEAN/SSH/agent/bridge execution. Drift is none; no real tools, subprocess-backed C-7 adapter, network, PSF parsing, or formula rewriting were added. Status is complete and reviewed.
 - C-11 Task 4 review evidence: spec-compliance review approved by Aquinas (`019e8cd9-0de1-78e0-9201-560c807edc39`) with no findings. Code-quality review approved by Feynman (`019e8cd9-33ae-7880-aab0-767a5ed1facb`); the only low bookkeeping finding was the already-completed Step 6 checkbox, fixed in the final status update.
 - Keep future work controlled; the next allowed action is choosing/designing a new real-tool/agent practice scope, not ad-hoc real Virtuoso/Spectre/OCEAN/agent integration.
+- C-12 design spec exists: `docs/superpowers/specs/2026-06-03-controlled-real-tool-agent-practice-design.md`.
+- C-12 route audit: C-12 is a one-cell, one-run, evidence-gated real-tool/agent practice that uses Hermes workflow tooling for prepare/check/record and the execution-agent/C-7 adapter boundary for real Spectre + OCEAN execution. No implementation plan has been written yet, no real tools were run, PSF parsing remains forbidden, and formula rewriting remains forbidden.
 - Real `input.scs` examples under `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example` are local-only references and must not be committed.
 
 ## Files Already Read
@@ -430,7 +432,7 @@ optimizer:
 
 Plan A, Plan B, Plan C C-1, Plan C C-2, Plan C C-3, Plan C C-4, Plan C C-5, and Plan C C-5.5 are complete as of 2026-06-01. C-6, C-7, C-8, and C-9 are complete and reviewed as of 2026-06-02. C-10 real-run failure/retry policy contract is complete and reviewed as of 2026-06-03.
 
-Current next step: choose the next real-tool/agent practice scope and write/approve its design spec before any real-tool execution. Current state is `Plan C C-11 local/fake controlled smoke complete`, reviewed. Before continuing, read `docs/CURRENT_TASK_STATE.json` and run `python3 tools/check_development_cadence.py`. C-11 stayed local/fake controlled: C-9 -> fake C-7-style returned artifacts -> C-5/C-6 checks -> C-8 with one controlled C-10 failure/retry case. Do not run real Virtuoso/Spectre/OCEAN/SSH/agent/bridge without a new approved scope. Do not redo Plan A Tasks 1-9 or completed Plan B/C modules unless new review feedback appears.
+Current next step: user review of C-12 design spec before writing the C-12 implementation plan. Current state is `Plan C C-12 controlled real-tool/agent practice design spec`, verified-only and pending user review. Before continuing, read `docs/CURRENT_TASK_STATE.json` and run `python3 tools/check_development_cadence.py`. Do not run real Virtuoso/Spectre/OCEAN/SSH/agent/bridge without an approved C-12 implementation plan. Do not redo Plan A Tasks 1-9 or completed Plan B/C modules unless new review feedback appears.
 
 Read the handoff files first:
 
@@ -455,5 +457,5 @@ Use this prompt after compact:
 6. ic-auto-opt-workflow/docs/superpowers/specs/2026-06-03-process-hardening-lightweight-cadence-design.md
 7. 如需背景，再读 ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。当前活动节点是 Plan C C-11 local/fake controlled smoke complete，状态为 C-11 Task 4 and C-11 final gate complete and reviewed；下一步请选择下一轮真实工具/agent practice scope，并先写/批准 design spec。运行或更新任务前先执行 python3 tools/check_development_cadence.py。不要在未批准的新 scope 中运行真实 Virtuoso/Spectre/OCEAN/SSH/agent/bridge，不要调用 C-7 subprocess adapter，不要解析 PSF，不要重写 Calculator/OCEAN 公式。真实 input.scs 示例在 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example 下，仅供本地参考，请勿将其提交到仓库。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。当前活动节点是 Plan C C-12 controlled real-tool/agent practice design spec，状态为 C-12 design spec written; pending user review；下一步请让用户 review C-12 design spec，然后再写 C-12 implementation plan。运行或更新任务前先执行 python3 tools/check_development_cadence.py。不要在未批准的 C-12 implementation plan 中运行真实 Virtuoso/Spectre/OCEAN/SSH/agent/bridge，不要调用 C-7 subprocess adapter，不要解析 PSF，不要重写 Calculator/OCEAN 公式。真实 input.scs 示例在 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example 下，仅供本地参考，请勿将其提交到仓库。
 ```

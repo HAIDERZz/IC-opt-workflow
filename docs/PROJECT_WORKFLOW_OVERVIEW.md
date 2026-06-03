@@ -21,6 +21,7 @@
 - 角色模型已锁定在 `docs/ROLE_MODEL_AND_TERMINOLOGY.md`：主管 agent 负责规划、审批和读取 Hermes workflow report；Hermes workflow tooling 是 deterministic file-contract 与 validation 工具层；执行 agent 负责 Maestro export、approval 之后的 standalone Spectre、batch OCEAN metric extraction，以及后续被批准的 optimizer/tool-side 操作。
 - 仓库级 agent/coding 约束已写入 `AGENTS.md`：后续压缩上下文或更换 agent 时，必须先读取该文件，保持角色模型、contract-only 边界、公式安全和简洁外科式改动规则不漂移。
 - C-11 local/fake controlled smoke 已完成并 reviewed：`tests/test_local_real_run_smoke.py` 串联 C-9 -> fake C-7-style returned artifacts -> C-5/C-6 checks -> C-8 happy path，并包含一个受控 C-10 failure/retry case；Task 4 还新增了窄 CLI smoke 覆盖 `prepare-next-real-run`、`check-real-run`、`check-metric-results` 和 `record-real-result` 的 supervisor-facing 输出。下一步是选择下一轮真实工具/agent practice scope，并先写/批准 design spec。C-11 smoke 仍然只使用 fake/local controlled flow，不直接真实接入 Virtuoso/Spectre/OCEAN/agent。
+- C-12 controlled real-tool/agent practice design spec 已写好，等待用户 review：`docs/superpowers/specs/2026-06-03-controlled-real-tool-agent-practice-design.md`。C-12 被限定为一个已知 cell、一个 approved real-run package、一次 execution-agent/C-7 adapter 调用，然后通过 Hermes `check-real-run`、`check-metric-results`、`record-real-result` 验证和记录。真实工具执行必须等 C-12 implementation plan 被批准后才能开始。
 - `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example` 下的真实 `input.scs` 示例只作为本地参考，不能提交进仓库。
 
 ## 1. 项目概览
@@ -383,7 +384,7 @@ hermes-workflow prepare-real-run-retry projects/bridge_test_inv --failed-run-id 
 hermes-workflow resolve-real-run-failure projects/bridge_test_inv --run-id real_002 --decision abandon_candidate --reason "skip failed candidate"
 ```
 
-C-11 local/fake controlled smoke 已完成并 reviewed。它验证 C-9 -> fake C-7-style returned artifacts -> C-5/C-6 checks -> C-8 happy path 和一个 C-10 failure/retry path。下一步真实 Virtuoso/Spectre/OCEAN/agent practice 必须先进入新的 approved scope/design spec。
+C-11 local/fake controlled smoke 已完成并 reviewed。它验证 C-9 -> fake C-7-style returned artifacts -> C-5/C-6 checks -> C-8 happy path 和一个 C-10 failure/retry path。C-12 controlled real-tool/agent practice design spec 已写好并等待用户 review；下一步真实 Virtuoso/Spectre/OCEAN/agent practice 必须先进入 C-12 implementation plan 并获得批准。
 
 ## 4. 能否严格约束主管 agent 和执行 agent 的行为
 
