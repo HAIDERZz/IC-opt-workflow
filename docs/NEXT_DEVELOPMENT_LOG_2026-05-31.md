@@ -510,8 +510,17 @@ Candidate-injection package contract design:
 - Route audit: aligned with the top-level plan and the practice-first decision B. Drift: none.
 - next_allowed_action: wait for user confirmation, then write the candidate-injection package contract implementation plan only.
 
+Candidate-injection package contract implementation plan:
+
+- Status: complete, verified-only.
+- Implementation plan: `docs/superpowers/plans/2026-06-04-candidate-injection-package-contract.md`.
+- Scope: four narrow tasks: candidate request validation, package writer reuse, CLI plus fake C-7 handoff smoke, and final verification/review gate.
+- Boundary: the plan does not authorize real Virtuoso/Spectre/OCEAN/SSH/bridge execution, optimizer algorithm productization, PSF parsing, OCEAN formula rewriting, or replacement of C-4/C-9 flows.
+- Route audit: aligned with the active design spec and top-level practice-first route. Drift: none.
+- next_allowed_action: wait for user confirmation, then execute Candidate-Injection Package Contract Task 1 only.
+
 ## Resume Prompt
 
 ```text
-请继续 IC auto optimization workflow。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。先阅读 docs/CURRENT_TASK_STATE.json、AGENTS.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/specs/2026-06-04-candidate-injection-package-contract-design.md，并按需阅读 docs/superpowers/plans/2026-06-03-optimizer-practice-first.md。当前活动节点是 Candidate-Injection Package Contract Design，状态为 design spec complete/verified-only。Task 4 已跑通真实 TuRBO + Hermes + Spectre/OCEAN practice：9 次评价、8 个 init + 1 个 post-initial TuRBO suggestion、9 个 OCEAN scalar evidence、0 个 penalty，best candidate 为 `FN=12, WN=1.3u, FP=2, WP=2.5u`，objective=`4.183168953894332e-14`。Task 5 已选择产品化决策 B：native optimizer passed but Hermes lacks explicit candidate injection; add that contract first。新的 design spec 已写好，下一步只能在用户确认后写 candidate-injection package contract implementation plan。不要写新 Hermes optimizer 算法，不要创建 broad schema/framework，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。不要用 Python 解析 PSF，不要让 agent 翻译或重写 Calculator/OCEAN 公式。
+请继续 IC auto optimization workflow。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。先阅读 docs/CURRENT_TASK_STATE.json、AGENTS.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/specs/2026-06-04-candidate-injection-package-contract-design.md、docs/superpowers/plans/2026-06-04-candidate-injection-package-contract.md，并按需阅读 docs/superpowers/plans/2026-06-03-optimizer-practice-first.md。当前活动节点是 Candidate-Injection Package Contract Implementation Plan，状态为 implementation plan complete/verified-only。Task 4 已跑通真实 TuRBO + Hermes + Spectre/OCEAN practice：9 次评价、8 个 init + 1 个 post-initial TuRBO suggestion、9 个 OCEAN scalar evidence、0 个 penalty，best candidate 为 `FN=12, WN=1.3u, FP=2, WP=2.5u`，objective=`4.183168953894332e-14`。Task 5 已选择产品化决策 B：native optimizer passed but Hermes lacks explicit candidate injection; add that contract first。下一步只能在用户确认后执行 Candidate-Injection Package Contract Task 1: Candidate Request Validation。不要写新 Hermes optimizer 算法，不要创建 broad schema/framework，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。不要用 Python 解析 PSF，不要让 agent 翻译或重写 Calculator/OCEAN 公式。
 ```

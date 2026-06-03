@@ -1,20 +1,20 @@
 {
   "schema_version": "1.0",
-  "current_scope": "Candidate-Injection Package Contract Design",
-  "current_status": "Design spec is complete, verified-only. The new spec is docs/superpowers/specs/2026-06-04-candidate-injection-package-contract-design.md. It chooses a narrow explicit candidate request contract and a package-preparation command, prepare-candidate-real-run, so optimizer-selected parameters can become deterministic runs/real/<run_id>/ packages without rewriting config/variables.yaml. The design does not add optimizer algorithms, does not replace C-4 first real-run preparation, does not replace C-9 deterministic next-run preparation, does not run real tools, and does not parse PSF or rewrite OCEAN formulas.",
+  "current_scope": "Candidate-Injection Package Contract Implementation Plan",
+  "current_status": "Implementation plan is complete, verified-only. The active plan is docs/superpowers/plans/2026-06-04-candidate-injection-package-contract.md. It breaks implementation into four tasks: candidate request validation, package writer reuse, CLI plus fake C-7 handoff smoke, and final verification/review gate. The plan keeps the scope contract-only and does not authorize real tools, optimizer algorithm productization, PSF parsing, or OCEAN formula rewriting.",
   "review_status": "verified-only",
   "subagent_dispatch": "available",
   "active_spec": "docs/superpowers/specs/2026-06-04-candidate-injection-package-contract-design.md",
-  "active_plan": "docs/superpowers/specs/2026-06-04-candidate-injection-package-contract-design.md",
+  "active_plan": "docs/superpowers/plans/2026-06-04-candidate-injection-package-contract.md",
   "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
   "progress_files": [
     "docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md",
     "docs/EXECUTION_PROGRESS_2026-05-29.md",
     "docs/COMPACT_RESUME_CHECKPOINT.md"
   ],
-  "next_allowed_action": "wait for user confirmation, then write the candidate-injection package contract implementation plan only",
+  "next_allowed_action": "wait for user confirmation, then execute Candidate-Injection Package Contract Task 1 only",
   "forbidden_actions": [
-    "start Hermes optimizer productization before candidate-injection implementation plan",
+    "start Hermes optimizer productization before candidate-injection package contract implementation is complete",
     "create new optimizer algorithms",
     "create broad optimizer schemas or framework assets",
     "flatten or redesign the Maestro/ADE netlist layout",
@@ -43,14 +43,16 @@
   ],
   "route_audit": {
     "active_spec": "docs/superpowers/specs/2026-06-04-candidate-injection-package-contract-design.md",
+    "active_plan": "docs/superpowers/plans/2026-06-04-candidate-injection-package-contract.md",
     "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
-    "alignment": "Aligned. The top-level plan now requires optimizer execution through approved adapter boundaries after deterministic Hermes contracts and real practice evidence. The design spec adds only the missing package contract for explicit optimizer candidates.",
-    "drift": "None. The design preserves the proven Maestro/ADE netlist layout, keeps OCEAN formulas authoritative, keeps real-tool execution outside Hermes, and defers optimizer algorithm productization."
+    "alignment": "Aligned. The implementation plan follows the candidate-injection design spec and top-level practice-first route. It schedules only the missing package contract for explicit optimizer candidates before optimizer algorithm productization.",
+    "drift": "None. The plan preserves the proven Maestro/ADE netlist layout, keeps OCEAN formulas authoritative, keeps real-tool execution outside Hermes, and reuses existing C-4/C-6/C-9 package writer paths."
   },
   "latest_valid_commit": "docs: add candidate injection package design",
   "review_evidence": {
     "optimizer_practice_task_4": "Task 4 ran ./.venv/bin/python /tmp/ic_auto_opt_optimizer_practice/run_turbo_bridge_test_inv.py. Evidence: /tmp/ic_auto_opt_optimizer_practice/turbo_bridge_test_inv_001/summary.json and evaluations.jsonl. evaluation_count=9, post_initial_evaluations=1, successful_evaluations=9, penalty_evaluations=0. Best candidate: FN=12, WN=1.3u, FP=2, WP=2.5u, objective=4.183168953894332e-14.",
     "optimizer_practice_task_5": "Task 5 wrote docs/debug/2026-06-03-optimizer-practice-first-result.md and chose Productization Decision B: add an explicit candidate-injection package contract first.",
-    "candidate_injection_design": "Design spec written at docs/superpowers/specs/2026-06-04-candidate-injection-package-contract-design.md. It defines candidate request schema, validation, run-id policy, dedupe policy, package outputs, CLI, error handling, and fake-tool-only testing strategy."
+    "candidate_injection_design": "Design spec written at docs/superpowers/specs/2026-06-04-candidate-injection-package-contract-design.md. It defines candidate request schema, validation, run-id policy, dedupe policy, package outputs, CLI, error handling, and fake-tool-only testing strategy.",
+    "candidate_injection_plan": "Implementation plan written at docs/superpowers/plans/2026-06-04-candidate-injection-package-contract.md. It has four tasks: validation, package writer, CLI/fake handoff smoke, and final verification/review gate."
   }
 }
