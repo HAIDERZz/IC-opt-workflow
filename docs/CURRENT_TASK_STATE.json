@@ -1,8 +1,8 @@
 {
   "schema_version": "1.0",
-  "current_scope": "Plan C C-12 Task 4 Hermes check/recovery handling",
-  "current_status": "C-12 Task 4 complete and reviewed; Hermes accepted the failed handoff manifest structure, rejected metric-result recording, and classified real_001 as tool_result_failed",
-  "review_status": "reviewed",
+  "current_scope": "Fast debug lane for C-7 real-tool adapter compatibility",
+  "current_status": "C-7 adapter SPECTRE-132 root cause found and patched in working tree: Spectre log output must use =log psf/spectre.out, not -log psf/spectre.out. Real-tool debug then exposed three follow-up contract gaps: relative include sidecars such as ade_e.scs are not packaged into real run dirs, whitespace unit values such as '0.3 um' render into invalid Spectre parameter assignments, and sample ADE/Maestro metric formulas use a slash namespace that the current standalone adapter PSF does not expose. Debug evidence is recorded in docs/debug/2026-06-03-c7-real-tool-debug-lane.md and /tmp only.",
+  "review_status": "verified-only",
   "subagent_dispatch": "available",
   "active_spec": "docs/superpowers/specs/2026-06-03-controlled-real-tool-agent-practice-design.md",
   "active_plan": "docs/superpowers/plans/2026-06-03-controlled-real-tool-agent-practice.md",
@@ -12,7 +12,7 @@
     "docs/EXECUTION_PROGRESS_2026-05-29.md",
     "docs/COMPACT_RESUME_CHECKPOINT.md"
   ],
-  "next_allowed_action": "commit C-12 Task 4 docs, then stop; after user confirmation, scope a focused C-7 adapter command-compatibility fix",
+  "next_allowed_action": "finish the scoped C-7 command fix for =log, then decide whether the next scoped fix is exported netlist bundle sidecars, Spectre-safe unit formatting, or metric namespace/formula contract; do not claim reviewed until review evidence exists",
   "forbidden_actions": [
     "run Virtuoso",
     "run Spectre",
@@ -24,6 +24,11 @@
     "run subprocess-backed C-7 adapter",
     "parse PSF",
     "rewrite OCEAN formulas",
+    "translate metric formulas in Python",
+    "commit raw input.scs",
+    "commit protected ade_e.scs",
+    "commit PSF/raw data",
+    "commit full Cadence logs",
     "stage docs/OCEAN_DOC_*",
     "stage docs/toolchain_evidence/"
   ],

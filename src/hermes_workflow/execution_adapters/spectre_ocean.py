@@ -514,7 +514,7 @@ def _spectre_argv(context: SpectreOceanContext) -> list[str]:
         SPECTRE_OUTPUT_FORMAT,
         "-raw",
         context.psf_dir.name,
-        "-log",
+        "=log",
         f"{PSF_DIR_NAME}/spectre.out",
     ]
 

@@ -35,6 +35,7 @@ Do not use "Hermes agent" as a role name. In this project, Hermes means workflow
 - If `tools/check_development_cadence.py` exists, run it before committing task work and fix any drift it reports.
 - Do not start the next task until the user confirms. Do not jump to C-11 local smoke or real tool/agent integration until C-10 passes review/final gate.
 - Keep progress files aligned with implementation before context compaction.
+- When the user explicitly authorizes a fast real-tool debug lane, label the work `verified-only`, keep changes surgical, record a concise debug note under `docs/debug/`, keep raw tool artifacts local-only, and return to the normal task/review cadence before claiming a reviewed implementation task is complete.
 
 ## Contract Boundaries
 

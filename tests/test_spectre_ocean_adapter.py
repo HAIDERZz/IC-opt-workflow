@@ -682,7 +682,7 @@ def test_run_spectre_ocean_adapter_uses_project_root_for_ocean_paths(
 
     run_spectre_ocean_adapter(project_dir, runner=runner)
 
-    assert runner.commands[0][runner.commands[0].index("-log") + 1] == "psf/spectre.out"
+    assert runner.commands[0][runner.commands[0].index("=log") + 1] == "psf/spectre.out"
     assert runner.commands[1][runner.commands[1].index("-replay") + 1] == (
         "runs/real/real_001/metrics/metric_probe.ocn"
     )
