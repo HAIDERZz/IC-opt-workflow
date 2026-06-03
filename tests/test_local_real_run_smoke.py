@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 import pytest
-from typer.testing import CliRunner
 
-from hermes_workflow.cli import app
 from hermes_workflow.metric_results import check_metric_results
 from hermes_workflow.real_result_record import record_real_result
 from hermes_workflow.real_run import prepare_next_real_run
@@ -180,46 +178,3 @@ def test_c11_controlled_failure_retry_records_retry_success(tmp_path):
         created_at_utc="2026-06-03T01:20:00Z",
     )
     assert next_package.run_id == "real_004"
-
-
-def test_c11_cli_smoke_records_next_real_run(tmp_path):
-    project_dir = create_approved_real_project(tmp_path)
-    record_checked_run(
-        project_dir,
-        run_id="real_001",
-        recorded_at_utc="2026-06-03T00:40:00Z",
-    )
-    runner = CliRunner()
-
-    prepare_result = runner.invoke(
-        app,
-        ["prepare-next-real-run", str(project_dir), "--run-id", "real_002"],
-    )
-    assert prepare_result.exit_code == 0
-    assert "next real run package prepared" in prepare_result.stdout
-    assert "run: runs/real/real_002" in prepare_result.stdout
-
-    write_fake_result_manifest(project_dir, run_id="real_002")
-    write_fake_metric_result_manifest(project_dir, run_id="real_002")
-
-    real_result = runner.invoke(
-        app,
-        ["check-real-run", str(project_dir), "--run-id", "real_002"],
-    )
-    metric_result = runner.invoke(
-        app,
-        ["check-metric-results", str(project_dir), "--run-id", "real_002"],
-    )
-    record_result = runner.invoke(
-        app,
-        ["record-real-result", str(project_dir), "--run-id", "real_002"],
-    )
-
-    rows = ledger_rows(project_dir)
-    assert real_result.exit_code == 0
-    assert "real run handoff check passed" in real_result.stdout
-    assert metric_result.exit_code == 0
-    assert "metric result check passed" in metric_result.stdout
-    assert record_result.exit_code == 0
-    assert "real result recorded" in record_result.stdout
-    assert [row["run_id"] for row in rows] == ["real_001", "real_002"]

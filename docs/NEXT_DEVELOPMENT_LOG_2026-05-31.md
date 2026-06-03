@@ -4,9 +4,9 @@
 
 - Repository: `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow`
 - Branch: `plan-a-hermes-file-contract-mvp`
-- Current scope: Plan C process hardening lightweight cadence guard
-- Current status: process hardening complete; verified-only
-- Next required action: decide whether to redo C-11 or draft next approved real-tool/agent practice scope
+- Current scope: Plan C C-11 local smoke redevelopment Task 1
+- Current status: C-11 redevelopment reset in progress; verified-only
+- Next required action: redo C-11 Task 1 test-only smoke helpers under TDD and cadence checker
 
 C-3 Task 6 final verification is complete. C-4 is confirmed as a contract-only first real-run package; it must not run Spectre, Virtuoso, subprocesses, or the optimizer loop. C-4 is now complete and reviewed. C-5 validates the execution agent's returned `result_manifest.json` and declared artifacts without running Spectre or parsing metrics. C-5.5 rehearsed the C-4/C-5 handoff with simulated execution-agent and Hermes-observer roles. After C-5.5, the project paused implementation to validate the real metric backend. Spectre + OCEAN is now confirmed as the backend route: standalone Spectre generates PSF, batch OCEAN opens the PSF and evaluates exact user/project-approved formulas, and Python only records OCEAN-produced scalar outputs and provenance. C-6 turned that route into deterministic file contracts and a Hermes validator without physical adapter wiring. C-7 added an explicit execution-side adapter and tool entry point while preserving the rule that Hermes workflow tooling still validates returned files after execution. C-8 records checked real metric results into optimizer ledger/state after `check-real-run` and `check-metric-results` pass, while preserving the contract-only boundary. C-9 prepares the next real-run package from strict ledger/state and deterministic optimizer initialization sequence, while still not running real tools or writing ledger/state. C-10 classifies failed/partial/pending real-run packages, writes explicit recovery decisions, prepares retry packages, exposes supervisor-facing recovery CLI commands, and blocks C-9 from advancing while unresolved real-run packages exist. C-10 final review fixes aligned unsafe artifact classification with the spec and hardened symlinked recovery decision reads.
 
@@ -18,9 +18,9 @@ C-11 Task 2 route audit: no technical-route drift was found. The happy-path smok
 
 C-11 Task 3 route audit: no technical-route drift was found. The controlled failure/retry smoke uses a synthetic failed result manifest, C-10 recovery assessment, explicit retry package preparation, fake retry success artifacts, existing check/record entry points, and the C-9 unresolved-run guard only; it does not run real tools, call the subprocess-backed C-7 adapter, parse PSF, rewrite formulas, or add optimizer policy.
 
-C-11 final route audit: no technical-route drift was found. C-11 local/fake controlled smoke is complete. It verifies the C-9 -> fake C-7-style returned artifacts -> C-5/C-6 checks -> C-8 happy path and one C-10 failure/retry path without real Virtuoso/Spectre/OCEAN/SSH/agent/bridge execution. The next scope must be a separate real-tool/agent practice plan.
-
 Process hardening route audit: no Hermes technical-route change is introduced by the lightweight cadence guard. The active node is now Plan C process hardening lightweight cadence guard, tracked by `docs/CURRENT_TASK_STATE.json`, `tools/check_development_cadence.py`, and `docs/superpowers/specs/2026-06-03-process-hardening-lightweight-cadence-design.md`. This node is `verified-only` because no true callable subagent dispatch path is available in the current session. It does not run real tools, call the C-7 adapter, parse PSF, rewrite formulas, or change optimizer policy.
+
+C-11 redevelopment route audit: no technical-route drift is introduced by resetting and redoing C-11. The active C-11 scope remains local/fake controlled smoke only, using synthetic C-7-style returned artifacts and existing Hermes validators. It still does not authorize real Virtuoso/Spectre/OCEAN/SSH/agent/bridge execution, C-7 subprocess adapter use, PSF parsing, formula rewriting, or new optimizer policy.
 
 The C-10 design spec and implementation plan remain aligned with the implementation: failed `input.scs` is preserved literally for retry packages, approved OCEAN formula contracts are compared by text/hash and are not rewritten, retry targets and decision files reject symlink/overwrite hazards, CLI commands delegate to recovery logic only, unsafe declared result artifacts classify as partial tool results, and C-10 still does not write optimizer ledger/state or call real tools.
 
@@ -373,5 +373,5 @@ are local reference material only. Do not copy or commit them into the repositor
 ## Resume Prompt
 
 ```text
-请继续 IC auto optimization workflow。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。先阅读 docs/CURRENT_TASK_STATE.json、AGENTS.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md。当前活动节点是 Plan C process hardening lightweight cadence guard，状态为 verified-only；如果没有真实 review evidence，不要写 reviewed。运行或更新任务前先执行 python3 tools/check_development_cadence.py。下一步是 decide whether to redo C-11 or draft next approved real-tool/agent practice scope。在新的 design spec 获批前不要运行真实 Virtuoso/Spectre/OCEAN/SSH/agent/bridge，不要调用 C-7 subprocess adapter，不要解析 PSF，不要重写 Calculator/OCEAN 公式，不要提交本地真实 input.scs 示例。
+请继续 IC auto optimization workflow。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。先阅读 docs/CURRENT_TASK_STATE.json、AGENTS.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md。当前活动节点是 Plan C C-11 local smoke redevelopment Task 1，状态为 verified-only；如果没有真实 review evidence，不要写 reviewed。运行或更新任务前先执行 python3 tools/check_development_cadence.py。下一步是 redo C-11 Task 1 test-only smoke helpers under TDD and cadence checker。不要运行真实 Virtuoso/Spectre/OCEAN/SSH/agent/bridge，不要调用 C-7 subprocess adapter，不要解析 PSF，不要重写 Calculator/OCEAN 公式，不要提交本地真实 input.scs 示例。
 ```

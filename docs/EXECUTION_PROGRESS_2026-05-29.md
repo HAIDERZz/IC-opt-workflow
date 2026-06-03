@@ -989,12 +989,11 @@ Next required action:
 - C-11 Task 1 test-only smoke helpers are complete and reviewed. Added `tests/real_run_smoke_helpers.py` and the seed helper smoke test in `tests/test_local_real_run_smoke.py`; focused pytest and ruff checks passed.
 - C-11 Task 2 library happy-path smoke is complete and reviewed. Added the local/fake happy-path test that records `real_001`, prepares `real_002`, validates fake returned artifacts through `check-real-run` and `check-metric-results`, records the result, and asserts ledger/state/report evidence plus the unresolved-run guard. Focused smoke, regression, and ruff checks passed.
 - C-11 Task 3 controlled failure/retry smoke is complete and reviewed. Added the local/fake failure/retry test that prepares `real_002`, writes a failed result manifest, verifies C-10 retry classification and C-9 blocking, prepares retry `real_003`, records retry success through existing checks and C-8, verifies source resolution, and confirms C-9 can prepare `real_004`. Focused smoke, recovery/next-run regression, and ruff checks passed.
-- C-11 Task 4 CLI smoke, docs, and final gate is complete and reviewed. Added the narrow local/fake CLI smoke that prepares `real_002`, checks fake returned artifacts, records the result through supervisor-facing CLI commands, and verifies the ledger update. Full pytest, ruff, and diff checks passed.
-- C-11 local/fake controlled smoke is complete. It verifies the C-9 -> fake C-7-style returned artifacts -> C-5/C-6 checks -> C-8 happy path and one C-10 failure/retry path without real Virtuoso/Spectre/OCEAN/SSH/agent/bridge execution. The next scope must be a separate real-tool/agent practice plan.
 - Plan C process hardening lightweight cadence guard is complete; verified-only. It adds `docs/CURRENT_TASK_STATE.json`, a 200-line-budget cadence checker, and a process-hardening design spec so future context resumes have a single current-state anchor and cannot falsely claim `reviewed` without evidence.
-- Current scope: Plan C process hardening lightweight cadence guard
-- Current status: process hardening complete; verified-only
-- Next recommended action: decide whether to redo C-11 or draft next approved real-tool/agent practice scope.
+- Current scope: Plan C C-11 local smoke redevelopment Task 1
+- Current status: C-11 redevelopment reset in progress; verified-only
+- Next recommended action: redo C-11 Task 1 test-only smoke helpers under TDD and cadence checker.
+- C-11 remains a local/fake controlled smoke first: chain C-9 -> fake C-7-style returned artifacts -> C-5/C-6 checks -> C-8 with one controlled C-10 failure/retry case. Do not jump straight to real Virtuoso/Spectre/OCEAN/agent integration.
 
 ## Locked Role Model
 
@@ -1022,5 +1021,5 @@ Do not use "Hermes agent" as a role name in future specs or plans. If older docu
 4. ic-auto-opt-workflow/docs/COMPACT_RESUME_CHECKPOINT.md
 5. ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。请先阅读 docs/CURRENT_TASK_STATE.json、AGENTS.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md。当前活动节点是 Plan C process hardening lightweight cadence guard，状态为 verified-only；如果没有真实 review evidence，不要写 reviewed。运行或更新任务前先执行 python3 tools/check_development_cadence.py。下一步是 decide whether to redo C-11 or draft next approved real-tool/agent practice scope。在新的 design spec 获批前不要运行真实工具。不要提交或复制本地真实 input.scs 示例，不要让 agent 重写公式，不要用 Python 解析 PSF 或重写 Calculator/OCEAN 公式。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。请先阅读 docs/CURRENT_TASK_STATE.json、AGENTS.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md。当前活动节点是 Plan C C-11 local smoke redevelopment Task 1，状态为 verified-only；如果没有真实 review evidence，不要写 reviewed。运行或更新任务前先执行 python3 tools/check_development_cadence.py。下一步是 redo C-11 Task 1 test-only smoke helpers under TDD and cadence checker。不要运行真实工具，不要提交或复制本地真实 input.scs 示例，不要让 agent 重写公式，不要用 Python 解析 PSF 或重写 Calculator/OCEAN 公式。
 ```
