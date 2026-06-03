@@ -643,7 +643,7 @@ Task 3 final state: complete and reviewed. Stop before Task 4; do not rerun the 
 
 This task returns to Hermes workflow tooling. It does not run Spectre/OCEAN. It must validate original adapter outputs; do not edit manifests to force a pass.
 
-- [ ] **Step 1: Run real-run handoff check**
+- [x] **Step 1: Run real-run handoff check**
 
 Run:
 
@@ -659,7 +659,12 @@ Expected success path:
 
 If it exits nonzero, preserve the report and continue to Step 4 recovery assessment.
 
-- [ ] **Step 2: Run metric result check**
+Observed on 2026-06-03:
+
+- `check-real-run` exited 0 and wrote `reports/real_run_check_report.json`.
+- Transcript: `$C12_EVIDENCE/10_check_real_run.txt`.
+
+- [x] **Step 2: Run metric result check**
 
 Run only if Step 1 passed:
 
@@ -675,7 +680,13 @@ Expected success path:
 
 If it exits nonzero, preserve the report and continue to Step 4 recovery assessment.
 
-- [ ] **Step 3: Record checked real result**
+Observed on 2026-06-03:
+
+- `check-metric-results` exited 1.
+- Issues: simulator result was not succeeded, `result_manifest` was missing `metric_result_manifest`, and `runs/real/real_001/metrics/metric_result_manifest.json` was missing.
+- Transcript: `$C12_EVIDENCE/11_check_metric_results.txt`.
+
+- [x] **Step 3: Record checked real result (skipped because Step 2 failed)**
 
 Run only if Steps 1 and 2 passed:
 
@@ -691,7 +702,13 @@ Expected:
 - `"$C12_PROJECT/state/optimizer_state.json"` exists
 - `"$C12_PROJECT/reports/real_result_record_report.json"` exists
 
-- [ ] **Step 4: Assess recovery if any check or record step failed**
+Observed on 2026-06-03:
+
+- `record-real-result` was skipped because Step 2 failed.
+- Skip evidence: `$C12_EVIDENCE/12_record_real_result.skipped.txt`.
+- No unchecked failed result was recorded.
+
+- [x] **Step 4: Assess recovery if any check or record step failed**
 
 Run only if Step 1, 2, or 3 failed:
 
@@ -707,7 +724,17 @@ Expected:
 
 Do not run `prepare-real-run-retry` inside C-12 unless the user explicitly requests a retry scope after reviewing the evidence.
 
-- [ ] **Step 5: Capture Hermes report hashes locally**
+Observed on 2026-06-03:
+
+- `assess-real-run-recovery` exited 0 and wrote `reports/real_run_recovery_report.json`.
+- Classification: `tool_result_failed`.
+- Recommended action: `retry_same_candidate`.
+- Allowed actions: `retry_same_candidate`, `abandon_candidate`, `stop_workflow`.
+- Attempt number: `1`; retry budget remaining: `1`.
+- Transcript: `$C12_EVIDENCE/13_assess_recovery.txt`.
+- No retry package was prepared in C-12 Task 4.
+
+- [x] **Step 5: Capture Hermes report hashes locally**
 
 Run:
 
@@ -726,7 +753,12 @@ Expected:
 - hash file exists locally
 - raw reports remain local unless the user approves a sanitized summary
 
-- [ ] **Step 6: Request review gate**
+Observed on 2026-06-03:
+
+- Hash file written locally: `$C12_EVIDENCE/hermes_report_state_hashes.sha256`.
+- The hash set includes Hermes reports, `state/health_check.json`, and `.gitkeep` placeholders only; no optimizer ledger/state row was appended for the failed unchecked result.
+
+- [x] **Step 6: Request review gate**
 
 Request spec-compliance and code-quality/evidence review.
 
@@ -741,7 +773,12 @@ Expected:
 - spec-compliance review passes before code-quality/evidence review
 - any findings are fixed or recorded as blockers before proceeding
 
-- [ ] **Step 7: Update progress docs for Task 4**
+Observed on 2026-06-03:
+
+- Spec-compliance review approved by Euclid (`019e8da2-93d8-7b60-b406-cd1b2e136e3a`) with no findings.
+- Code-quality/evidence review approved by Ramanujan (`019e8da5-684d-71d0-a48c-4624e76df34a`) after stale C-12 overview/checkpoint wording and the Task 4 commit pathspec were fixed; re-review found no Critical, Important, or Minor findings.
+
+- [x] **Step 7: Update progress docs for Task 4**
 
 Record one of these exact status lines:
 
@@ -756,6 +793,16 @@ C-12 Task 4 checkpoint: Hermes validation or recording failed for real_001. Reco
 ```
 
 Also record review evidence and route audit.
+
+Task 4 progress docs were updated on 2026-06-03, including final review evidence.
+
+Task 4 route audit:
+
+- Active spec: `docs/superpowers/specs/2026-06-03-controlled-real-tool-agent-practice-design.md`.
+- Active plan: `docs/superpowers/plans/2026-06-03-controlled-real-tool-agent-practice.md`.
+- Top-level plan: `docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md`.
+- Alignment: C-12 remains a one-cell, one-run, evidence-gated real-tool/agent practice. Task 4 used only Hermes workflow tooling on returned C-7 adapter artifacts already present under `/tmp`, did not rerun real tools, did not repair manifests, did not parse PSF, did not rewrite formulas, and did not record an unchecked failed result.
+- Drift: none. The C-7 adapter command-compatibility issue remains a later scoped fix after Task 4 review/commit.
 
 - [ ] **Step 8: Verify and commit Task 4 docs**
 
@@ -776,7 +823,7 @@ Expected:
 Commit:
 
 ```bash
-git add docs/CURRENT_TASK_STATE.json docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md docs/EXECUTION_PROGRESS_2026-05-29.md docs/COMPACT_RESUME_CHECKPOINT.md docs/superpowers/plans/2026-06-03-controlled-real-tool-agent-practice.md
+git add docs/CURRENT_TASK_STATE.json docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md docs/EXECUTION_PROGRESS_2026-05-29.md docs/COMPACT_RESUME_CHECKPOINT.md docs/PROJECT_WORKFLOW_OVERVIEW.md docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md docs/superpowers/plans/2026-06-03-controlled-real-tool-agent-practice.md
 git commit -m "docs: record c12 hermes verification"
 ```
 

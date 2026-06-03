@@ -22,8 +22,9 @@
 - 仓库级 agent/coding 约束已写入 `AGENTS.md`：后续压缩上下文或更换 agent 时，必须先读取该文件，保持角色模型、contract-only 边界、公式安全和简洁外科式改动规则不漂移。
 - C-11 local/fake controlled smoke 已完成并 reviewed：`tests/test_local_real_run_smoke.py` 串联 C-9 -> fake C-7-style returned artifacts -> C-5/C-6 checks -> C-8 happy path，并包含一个受控 C-10 failure/retry case；Task 4 还新增了窄 CLI smoke 覆盖 `prepare-next-real-run`、`check-real-run`、`check-metric-results` 和 `record-real-result` 的 supervisor-facing 输出。下一步是选择下一轮真实工具/agent practice scope，并先写/批准 design spec。C-11 smoke 仍然只使用 fake/local controlled flow，不直接真实接入 Virtuoso/Spectre/OCEAN/agent。
 - C-12 controlled real-tool/agent practice design spec 已批准并进入执行：`docs/superpowers/specs/2026-06-03-controlled-real-tool-agent-practice-design.md`。C-12 被限定为一个已知 cell、一个 approved real-run package、一次 execution-agent/C-7 adapter 调用，然后通过 Hermes `check-real-run`、`check-metric-results`、`record-real-result` 验证和记录。真实工具执行仍必须等 Task 3 前的明确用户确认。
-- C-12 implementation plan 已批准并执行到 Task 3：`docs/superpowers/plans/2026-06-03-controlled-real-tool-agent-practice.md`。计划分为本地 workspace/input gate、Hermes preflight/package、用户确认后的 C-7 adapter 真工具调用、Hermes check/record/recovery、sanitized evidence/final gate 五个任务。
-- C-12 Task 3 execution-agent/C-7 adapter invocation 已完成并 reviewed：用户明确确认后，adapter 对 `/tmp/ic_auto_opt_c12/bridge_test_inv/runs/real/real_001` 运行，写出了 failed `result_manifest.json` 和本地 hash evidence；没有产生 metric manifest 或 OCEAN scalar 输出。`spectre.stdout` 报 `SPECTRE-132`，原因是当前 adapter 的 `-log psf/spectre.out` 参数在该 Spectre 调用中被解释为第二个 input file。下一步必须由用户确认：进入 C-12 Task 4 Hermes check/recovery 合同验证，或先开一个 scoped C-7 adapter command-compatibility fix。
+- C-12 implementation plan 已批准并执行到 Task 4：`docs/superpowers/plans/2026-06-03-controlled-real-tool-agent-practice.md`。计划分为本地 workspace/input gate、Hermes preflight/package、用户确认后的 C-7 adapter 真工具调用、Hermes check/record/recovery、sanitized evidence/final gate 五个任务。
+- C-12 Task 3 execution-agent/C-7 adapter invocation 已完成并 reviewed：用户明确确认后，adapter 对 `/tmp/ic_auto_opt_c12/bridge_test_inv/runs/real/real_001` 运行，写出了 failed `result_manifest.json` 和本地 hash evidence；没有产生 metric manifest 或 OCEAN scalar 输出。`spectre.stdout` 报 `SPECTRE-132`，原因是当前 adapter 的 `-log psf/spectre.out` 参数在该 Spectre 调用中被解释为第二个 input file。
+- C-12 Task 4 Hermes check/recovery handling 已完成并 reviewed：用户确认先做轻量 Task 4 后，Hermes `check-real-run` 接受了 failed handoff manifest 的结构，`check-metric-results` 因仿真未成功且缺少 `metric_result_manifest` fail-closed，`record-real-result` 被跳过，`assess-real-run-recovery` 将 `real_001` 分类为 `tool_result_failed` 并推荐 `retry_same_candidate`。未重跑 adapter，未修补 returned artifacts，未解析 PSF，未改写公式，也未记录 unchecked failed result。下一步应是 scoped C-7 adapter command-compatibility fix。
 - `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example` 下的真实 `input.scs` 示例只作为本地参考，不能提交进仓库。
 
 ## 1. 项目概览
@@ -386,7 +387,7 @@ hermes-workflow prepare-real-run-retry projects/bridge_test_inv --failed-run-id 
 hermes-workflow resolve-real-run-failure projects/bridge_test_inv --run-id real_002 --decision abandon_candidate --reason "skip failed candidate"
 ```
 
-C-11 local/fake controlled smoke 已完成并 reviewed。它验证 C-9 -> fake C-7-style returned artifacts -> C-5/C-6 checks -> C-8 happy path 和一个 C-10 failure/retry path。C-12 controlled real-tool/agent practice design spec 和 implementation plan 已写好；当前 C-12 Task 3 已完成并 reviewed，真实 C-7 adapter 边界返回 failed `result_manifest.json`，暴露出 adapter Spectre log 参数兼容性问题。不要直接继续真实工具重跑；下一步需用户确认是进入 Task 4 failure/recovery 合同验证，还是先开一个 scoped C-7 adapter bugfix。
+C-11 local/fake controlled smoke 已完成并 reviewed。它验证 C-9 -> fake C-7-style returned artifacts -> C-5/C-6 checks -> C-8 happy path 和一个 C-10 failure/retry path。C-12 controlled real-tool/agent practice design spec 和 implementation plan 已写好；当前 C-12 Task 4 已完成并 reviewed，Hermes 已将真实 C-7 adapter 边界返回的 failed `result_manifest.json` 归类为 `tool_result_failed`，且没有记录 unchecked failed result。不要直接继续真实工具重跑；下一步应开一个 scoped C-7 adapter command-compatibility fix。
 
 ## 4. 能否严格约束主管 agent 和执行 agent 的行为
 

@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
-  "current_scope": "Plan C C-12 Task 3 Execution-Agent C-7 adapter invocation",
-  "current_status": "C-12 Task 3 complete and reviewed; adapter invocation returned a structured failed result_manifest",
+  "current_scope": "Plan C C-12 Task 4 Hermes check/recovery handling",
+  "current_status": "C-12 Task 4 complete and reviewed; Hermes accepted the failed handoff manifest structure, rejected metric-result recording, and classified real_001 as tool_result_failed",
   "review_status": "reviewed",
   "subagent_dispatch": "available",
   "active_spec": "docs/superpowers/specs/2026-06-03-controlled-real-tool-agent-practice-design.md",
@@ -12,7 +12,7 @@
     "docs/EXECUTION_PROGRESS_2026-05-29.md",
     "docs/COMPACT_RESUME_CHECKPOINT.md"
   ],
-  "next_allowed_action": "request user confirmation before C-12 Task 4 Hermes check/recovery work; do not rerun the adapter",
+  "next_allowed_action": "commit C-12 Task 4 docs, then stop; after user confirmation, scope a focused C-7 adapter command-compatibility fix",
   "forbidden_actions": [
     "run Virtuoso",
     "run Spectre",
@@ -33,14 +33,15 @@
     "git status --short"
   ],
   "review_evidence": {
-    "spec_review": "Heisenberg 019e8d87-de02-7a11-aa3f-cf7ab47895cb approved C-12 Task 3 spec compliance after two stale resume-prompt findings were fixed; no remaining Critical, Important, or Minor findings. Evidence commands included git diff, focused rg/sed/nl, git diff --check, and python3 tools/check_development_cadence.py. No files were edited and no real tools were run by the reviewer.",
-    "code_quality_review": "Pascal 019e8d8d-707e-7052-b58e-1488b3fdd145 approved C-12 Task 3 code-quality/evidence after the current-state Task 4 confirmation gate and canonical Task 3 spec-review evidence were fixed; no remaining Critical, Important, or Minor findings. Evidence commands included cadence checker, JSON validation, git diff --check, git status/diff checks, focused rg/nl, and pathspec checks. No files were edited, staged, or committed by the reviewer and no real tools were run.",
+    "spec_review": "Euclid 019e8da2-93d8-7b60-b406-cd1b2e136e3a approved C-12 Task 4 spec compliance with no Critical, Important, or Minor findings. Review confirmed route alignment did not drift: Task 4 used only Hermes workflow tooling against returned C-7 artifacts, did not rerun real tools or adapter, did not repair manifests, did not parse PSF or rewrite formulas, and did not record unchecked ledger/state results. Review also confirmed state/progress docs stop before the scoped C-7 fix.",
+    "code_quality_review": "Ramanujan 019e8da5-684d-71d0-a48c-4624e76df34a approved C-12 Task 4 code-quality/evidence after stale C-12 overview/checkpoint wording and the Task 4 commit pathspec were fixed. Re-review found no Critical, Important, or Minor findings. Evidence commands included git status, git diff --cached --name-only, git diff --check, JSON validation, cadence checker, focused git diff, rg, and nl reads. Nothing was staged by the reviewer and no real tools or adapter were run.",
     "previous_task_2_spec_review": "Noether 019e8d66-cfe1-73a2-9b12-a70c59305735 approved C-12 Task 2 spec compliance with no Critical, Important, or Minor findings. Route audit aligned and Task 3 remains gated behind explicit user confirmation.",
     "previous_task_2_code_quality_review": "Mill 019e8d68-4d37-7ba0-98fa-4892078d7aed approved C-12 Task 2 code quality after the stale PROJECT_WORKFLOW_OVERVIEW wording was fixed; no open Critical, Important, or Minor findings. Residual risk: untracked docs/OCEAN_DOC_* and docs/toolchain_evidence/ require explicit pathspec staging.",
     "task_3_adapter_invocation": "User confirmed C-12 Task 3 with '进行Task 3'. The execution-agent/C-7 adapter boundary was recorded under /tmp. Local csh did not support -lc, so Task 3 used csh -fc after updating the plan. Spectre and OCEAN were visible in the sourced Cadence shell. The adapter wrote result_manifest.json with status failed, metric_result_manifest null, and notes 'spectre command failed'. spectre.stdout reports SPECTRE-132 because the adapter's current '-log psf/spectre.out' argument is interpreted as a second input file by this Spectre invocation. Returned artifact hashes were captured locally. No manual manifest repair, PSF parsing, formula rewriting, retry preparation, Hermes check/record, or additional adapter rerun occurred.",
     "task_2_completion": "C-12 Task 2 ran Hermes validate/package/prepare-netlist/dry-run/preflight-health/approve/prepare-real-run for real_001 and wrote local-only pre-execution hashes under /tmp. User confirmed the provided input.scs corresponds to the template metrics.yaml before Task 2. No real tools, C-7 adapter, SSH, bridge, PSF parsing, formula rewriting, or deck commit occurred.",
     "task_1_input_gate_completion": "C-12 Task 1 confirmed /tmp/ic_auto_opt_c12/bridge_test_inv/netlists/exported/input.scs exists and wrote the local-only hash file to /tmp/ic_auto_opt_c12/evidence/2026-06-03-c12-controlled-real-tool-agent-practice/exported_input_scs.sha256. No real tools were run, no adapter was called, no PSF was parsed, and no formula was rewritten.",
     "previous_task_3_spec_review": "Ptolemy 019e8cc5-30bf-7022-bca2-657b57fec88a approved C-11 Task 3 spec compliance after stale handoff prompts were fixed; no remaining Critical, Important, or Minor findings.",
-    "previous_task_3_code_quality_review": "Heisenberg 019e8cc8-c26b-7ef2-8fd4-d5679088521d approved C-11 Task 3 code quality with no Critical, Important, or Minor findings."
+    "previous_task_3_code_quality_review": "Heisenberg 019e8cc8-c26b-7ef2-8fd4-d5679088521d approved C-11 Task 3 code quality with no Critical, Important, or Minor findings.",
+    "task_4_local_verification": "User confirmed lightweight C-12 Task 4 before C-7 fix. Hermes check-real-run passed for real_001 and wrote reports/real_run_check_report.json. Hermes check-metric-results failed because simulator status was failed, result_manifest.metric_result_manifest was null, and runs/real/real_001/metrics/metric_result_manifest.json was missing. record-real-result was skipped. assess-real-run-recovery passed and wrote reports/real_run_recovery_report.json with classification tool_result_failed, recommended_action retry_same_candidate, allowed_actions retry_same_candidate/abandon_candidate/stop_workflow, attempt_number 1, retry_budget_remaining 1. Local evidence and hashes were written under /tmp/ic_auto_opt_c12/evidence/2026-06-03-c12-controlled-real-tool-agent-practice. No adapter rerun, no real tool rerun, no manual artifact repair, no PSF parsing, no formula rewriting, no retry package, and no optimizer ledger/state row were created for the failed unchecked result."
   }
 }
