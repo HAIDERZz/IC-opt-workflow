@@ -1,19 +1,19 @@
 {
   "schema_version": "1.0",
-  "current_scope": "C-7 Real Tool Closure Fixes",
-  "current_status": "C-7 Real Tool Closure Fixes Task 3 and Task 4 are complete, verified-only. Root cause was not OCEAN formula text; Spectre must run from an ADE-style runs/real/<run_id>/netlist working directory with sibling runs/real/<run_id>/psf so OCEAN recovers slash signal names such as /VOUT, /VDD, and /M0/S. Real Spectre+OCEAN adapter closure passed in /tmp/ic_auto_opt_c7_fixed_001/bridge_test_inv, followed by Hermes check-real-run, check-metric-results, and record-real-result.",
+  "current_scope": "Optimizer Practice-First Plan",
+  "current_status": "Optimizer Practice-First Task 1 is complete, verified-only. A clean practice project was initialized at /tmp/ic_auto_opt_optimizer_practice/bridge_test_inv using the known-good C-7 closure netlist bundle from /tmp/ic_auto_opt_c7_fixed_001/bridge_test_inv/netlists/exported. Hermes validate, package, prepare-netlist, dry-run, preflight-health, approve, and prepare-real-run --run-id real_001 all passed. The prepared package preserves the ADE-style runs/real/real_001/netlist/input.scs layout, copies sidecars such as ade_e.scs and amap/, keeps approved metric expressions unchanged in metric_extraction_request.json, and does not create PSF before Task 2.",
   "review_status": "verified-only",
   "subagent_dispatch": "available",
-  "active_spec": "docs/superpowers/specs/2026-06-03-controlled-real-tool-agent-practice-design.md",
-  "active_plan": "docs/superpowers/plans/2026-06-03-c7-real-tool-closure-fixes.md",
+  "active_spec": "docs/superpowers/plans/2026-06-03-optimizer-practice-first.md",
+  "active_plan": "docs/superpowers/plans/2026-06-03-optimizer-practice-first.md",
   "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
   "progress_files": [
     "docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md",
     "docs/EXECUTION_PROGRESS_2026-05-29.md",
     "docs/COMPACT_RESUME_CHECKPOINT.md"
   ],
-  "next_allowed_action": "commit this C-7 closure fix with explicit pathspecs, then decide whether to rerun C-12 controlled real-tool practice from a clean project",
-    "forbidden_actions": [
+  "next_allowed_action": "wait for user confirmation, then execute Optimizer Practice-First Task 2 only",
+  "forbidden_actions": [
     "run Virtuoso",
     "run Spectre",
     "run OCEAN",
@@ -24,9 +24,13 @@
     "run subprocess-backed C-7 adapter",
     "parse PSF",
     "rewrite OCEAN formulas",
-    "translate metric formulas in Python",
+    "write new optimizer algorithms before practice evidence",
+    "create broad optimizer schemas or framework assets",
+    "flatten or redesign the Maestro/ADE netlist layout",
+    "parse PSF in Python",
+    "rewrite OCEAN formulas",
     "commit raw input.scs",
-    "commit protected ade_e.scs",
+    "commit protected include sidecars",
     "commit PSF/raw data",
     "commit full Cadence logs",
     "stage docs/OCEAN_DOC_*",
@@ -37,17 +41,16 @@
     "git diff --check",
     "git status --short"
   ],
+  "route_audit": {
+    "active_plan": "docs/superpowers/plans/2026-06-03-optimizer-practice-first.md",
+    "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
+    "alignment": "Aligned with the locked practice-first route: optimizer development must start from a successful real optimizer practice that invokes optimizer.skill guidance and local TuRBO, not from speculative optimizer code or hand-picked point tests.",
+    "drift": "None for Task 1. It executed only the baseline package shape check and did not run real tools, adapter, TuRBO, or optimizer code."
+  },
+  "latest_valid_commit": "d440c95 fix: preserve ADE netlist layout for real runs",
   "review_evidence": {
-    "spec_review": "Euclid 019e8da2-93d8-7b60-b406-cd1b2e136e3a approved C-12 Task 4 spec compliance with no Critical, Important, or Minor findings. Review confirmed route alignment did not drift: Task 4 used only Hermes workflow tooling against returned C-7 artifacts, did not rerun real tools or adapter, did not repair manifests, did not parse PSF or rewrite formulas, and did not record unchecked ledger/state results. Review also confirmed state/progress docs stop before the scoped C-7 fix.",
-    "code_quality_review": "Ramanujan 019e8da5-684d-71d0-a48c-4624e76df34a approved C-12 Task 4 code-quality/evidence after stale C-12 overview/checkpoint wording and the Task 4 commit pathspec were fixed. Re-review found no Critical, Important, or Minor findings. Evidence commands included git status, git diff --cached --name-only, git diff --check, JSON validation, cadence checker, focused git diff, rg, and nl reads. Nothing was staged by the reviewer and no real tools or adapter were run.",
-    "previous_task_2_spec_review": "Noether 019e8d66-cfe1-73a2-9b12-a70c59305735 approved C-12 Task 2 spec compliance with no Critical, Important, or Minor findings. Route audit aligned and Task 3 remains gated behind explicit user confirmation.",
-    "previous_task_2_code_quality_review": "Mill 019e8d68-4d37-7ba0-98fa-4892078d7aed approved C-12 Task 2 code quality after the stale PROJECT_WORKFLOW_OVERVIEW wording was fixed; no open Critical, Important, or Minor findings. Residual risk: untracked docs/OCEAN_DOC_* and docs/toolchain_evidence/ require explicit pathspec staging.",
-    "task_3_adapter_invocation": "User confirmed C-12 Task 3 with '进行Task 3'. The execution-agent/C-7 adapter boundary was recorded under /tmp. Local csh did not support -lc, so Task 3 used csh -fc after updating the plan. Spectre and OCEAN were visible in the sourced Cadence shell. The adapter wrote result_manifest.json with status failed, metric_result_manifest null, and notes 'spectre command failed'. spectre.stdout reports SPECTRE-132 because the adapter's current '-log psf/spectre.out' argument is interpreted as a second input file by this Spectre invocation. Returned artifact hashes were captured locally. No manual manifest repair, PSF parsing, formula rewriting, retry preparation, Hermes check/record, or additional adapter rerun occurred.",
-    "task_2_completion": "C-12 Task 2 ran Hermes validate/package/prepare-netlist/dry-run/preflight-health/approve/prepare-real-run for real_001 and wrote local-only pre-execution hashes under /tmp. User confirmed the provided input.scs corresponds to the template metrics.yaml before Task 2. No real tools, C-7 adapter, SSH, bridge, PSF parsing, formula rewriting, or deck commit occurred.",
-    "task_1_input_gate_completion": "C-12 Task 1 confirmed /tmp/ic_auto_opt_c12/bridge_test_inv/netlists/exported/input.scs exists and wrote the local-only hash file to /tmp/ic_auto_opt_c12/evidence/2026-06-03-c12-controlled-real-tool-agent-practice/exported_input_scs.sha256. No real tools were run, no adapter was called, no PSF was parsed, and no formula was rewritten.",
-    "previous_task_3_spec_review": "Ptolemy 019e8cc5-30bf-7022-bca2-657b57fec88a approved C-11 Task 3 spec compliance after stale handoff prompts were fixed; no remaining Critical, Important, or Minor findings.",
-    "previous_task_3_code_quality_review": "Heisenberg 019e8cc8-c26b-7ef2-8fd4-d5679088521d approved C-11 Task 3 code quality with no Critical, Important, or Minor findings.",
-    "task_4_local_verification": "User confirmed lightweight C-12 Task 4 before C-7 fix. Hermes check-real-run passed for real_001 and wrote reports/real_run_check_report.json. Hermes check-metric-results failed because simulator status was failed, result_manifest.metric_result_manifest was null, and runs/real/real_001/metrics/metric_result_manifest.json was missing. record-real-result was skipped. assess-real-run-recovery passed and wrote reports/real_run_recovery_report.json with classification tool_result_failed, recommended_action retry_same_candidate, allowed_actions retry_same_candidate/abandon_candidate/stop_workflow, attempt_number 1, retry_budget_remaining 1. Local evidence and hashes were written under /tmp/ic_auto_opt_c12/evidence/2026-06-03-c12-controlled-real-tool-agent-practice. No adapter rerun, no real tool rerun, no manual artifact repair, no PSF parsing, no formula rewriting, no retry package, and no optimizer ledger/state row were created for the failed unchecked result.",
-    "c7_real_tool_closure": "Real debug compared the old failed adapter output against the successful Phase4 evidence. Complete Maestro sidecars and +escchars/+preset flags were not sufficient when the run package flattened the netlist bundle into the run root: OCEAN saw plain names and slash formulas returned nil. Running Spectre from a directory literally named netlist with sibling psf restored slash names and made rise/fall/DC match Phase4. Code now prepares rendered input at runs/real/<run_id>/netlist/input.scs, copies exported sidecars under that netlist directory, runs Spectre from it, and keeps PSF at runs/real/<run_id>/psf. Verification: python3 -m pytest -q passed 445 tests; python3 -m ruff check . passed; real adapter plus Hermes check-real-run/check-metric-results/record-real-result passed for /tmp/ic_auto_opt_c7_fixed_001/bridge_test_inv."
+    "c7_real_tool_closure": "Real Spectre + OCEAN adapter closure passed in /tmp/ic_auto_opt_c7_fixed_001/bridge_test_inv. Hermes check-real-run, check-metric-results, and record-real-result passed. Metrics: rise=7.52016846017672e-11 s, fall=1.078998721053984e-10 s, DC=0.0002588877964196586 W.",
+    "optimizer_practice_plan": "Docs-only plan created and corrected at docs/superpowers/plans/2026-06-03-optimizer-practice-first.md. It now requires optimizer.skill-guided local TuRBO practice with n_init=8, max_evals=9, batch_size=1 before Hermes optimizer productization. No optimizer code or real tools were run while writing the plan.",
+    "task_1_baseline_package_shape": "Task 1 verified /tmp/ic_auto_opt_optimizer_practice/bridge_test_inv. Commands passed: hermes-workflow init, validate, package, prepare-netlist, dry-run, preflight-health, approve, and prepare-real-run --run-id real_001. Evidence paths: runs/real/real_001/netlist/input.scs, netlist/ade_e.scs, netlist/amap/, metric_extraction_request.json. PSF was absent before Task 2 as expected."
   }
 }

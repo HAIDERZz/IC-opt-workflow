@@ -38,8 +38,11 @@ As of 2026-06-03, focused Plan A, Plan B, and Plan C C-1 through C-11 are comple
 - C-12 Task 2 Hermes preflight and approved real-run package is complete and reviewed.
 - C-12 Task 3 execution-agent/C-7 adapter invocation is complete and reviewed; it reached the real Spectre boundary and returned a structured failed `result_manifest.json`.
 - C-12 Task 4 Hermes check/recovery handling is complete and reviewed; Hermes accepted the failed handoff manifest structure, rejected metric-result recording, skipped `record-real-result`, and classified `real_001` as `tool_result_failed`.
+- C-7 real-tool closure fixes are complete and committed as `d440c95 fix: preserve ADE netlist layout for real runs`; the fixed adapter preserves the Maestro/ADE `netlist/` working-directory shape with sibling `psf/`, and the real inverter closure passed through Spectre, OCEAN, `check-real-run`, `check-metric-results`, and `record-real-result`.
+- Optimizer practice-first plan is written at `docs/superpowers/plans/2026-06-03-optimizer-practice-first.md`. This plan requires a real optimizer loop using `virtuoso-bridge-lite/skills/optimizer/SKILL.md` and local TuRBO before Hermes optimizer development; a few hand-picked candidate points are not enough.
+- Optimizer Practice-First Task 1 baseline package shape check is complete and verified-only. The clean practice package exists under `/tmp/ic_auto_opt_optimizer_practice/bridge_test_inv/runs/real/real_001`; no Spectre/OCEAN adapter, TuRBO, or optimizer loop was run.
 
-C-11 verifies the C-9 -> fake C-7-style returned artifacts -> C-5/C-6 checks -> C-8 happy path and one controlled C-10 failure/retry path without real Virtuoso/Spectre/OCEAN/SSH/agent/bridge execution. The current node is `Plan C C-12 Task 4 Hermes check/recovery handling`, complete and reviewed: user confirmed the lightweight Task 4 before the C-7 fix, Hermes `check-real-run` passed for the failed handoff manifest, Hermes `check-metric-results` failed closed because no successful metric manifest exists, `record-real-result` was skipped, and `assess-real-run-recovery` classified `real_001` as `tool_result_failed` with `retry_same_candidate` recommended. The next implementation scope should be a focused C-7 adapter command-compatibility fix after user confirmation. Current resume guidance is in `docs/CURRENT_TASK_STATE.json`, `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`, `docs/EXECUTION_PROGRESS_2026-05-29.md`, `docs/COMPACT_RESUME_CHECKPOINT.md`, and `AGENTS.md`.
+C-11 verifies the C-9 -> fake C-7-style returned artifacts -> C-5/C-6 checks -> C-8 happy path and one controlled C-10 failure/retry path without real Virtuoso/Spectre/OCEAN/SSH/agent/bridge execution. C-12 then exposed the real C-7 adapter failure path; the subsequent C-7 closure fixed the root cause by moving implementation back toward the successful Maestro/ADE evidence instead of inventing a new result layout. The current node is `Optimizer Practice-First Plan`, Task 1 complete and verified-only: before writing new Hermes optimizer code, run a real optimizer practice that follows `virtuoso-bridge-lite/skills/optimizer/SKILL.md`, imports local TuRBO, and completes at least the minimum four-variable TuRBO budget `n_init=8`, `max_evals=9`, `batch_size=1`. Current resume guidance is in `docs/CURRENT_TASK_STATE.json`, `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`, `docs/EXECUTION_PROGRESS_2026-05-29.md`, `docs/COMPACT_RESUME_CHECKPOINT.md`, and `AGENTS.md`.
 
 ## Current Route Alignment
 
@@ -1315,7 +1318,9 @@ git commit -m "docs: add real integration readiness checklist"
 15. Plan C C-9: next real-run package contract after checked recorded real results.
 16. Plan C C-10: real-run failure/retry policy contract and unresolved-run guard.
 17. Plan C C-11: local/fake controlled smoke for C-9 -> fake C-7-style artifacts -> C-5/C-6 -> C-8 plus one C-10 retry path.
-18. Later real-tool/agent practice scope, only after a separate approved design spec.
+18. Plan C C-12: controlled real-tool/agent practice for one approved real run.
+19. C-7 real-tool closure fixes: preserve the proven Maestro/ADE `netlist/` and `psf/` layout in the physical Spectre + OCEAN adapter.
+20. Optimizer practice-first flow: use the known-good real `real_001` chain as a foundation check, then run a real `optimizer.skill` + TuRBO loop before implementing new Hermes optimizer behavior.
 
 ## Verification Commands
 

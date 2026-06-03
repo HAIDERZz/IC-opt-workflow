@@ -431,6 +431,30 @@ Real `input.scs` examples under:
 
 are local reference material only. Do not copy or commit them into the repository.
 
+## Optimizer Practice-First Node
+
+Current scope: `Optimizer Practice-First Plan`.
+
+Status: planned, verified-only.
+
+- C-7 real-tool closure is complete and committed as `d440c95 fix: preserve ADE netlist layout for real runs`.
+- The next development direction is not optimizer implementation yet. It is an optimizer practice-first flow recorded in `docs/superpowers/plans/2026-06-03-optimizer-practice-first.md`.
+- The known-good Spectre + OCEAN single-point chain is only the foundation check. A few hand-picked candidate points are not sufficient to validate optimizer development.
+- Before Hermes optimizer development, the practice must use `virtuoso-bridge-lite/skills/optimizer/SKILL.md` and local TuRBO at `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/TuRBO`.
+- For four `bridge_test_inv` variables, the minimum TuRBO practice budget is `n_init=8`, `max_evals=9`, `batch_size=1`, so at least one candidate is chosen after TuRBO's initial sample set.
+- No new optimizer algorithm, schema, broad framework, PSF parser, or formula rewrite is authorized by this plan.
+next_allowed_action: wait for user confirmation, then execute Optimizer Practice-First Task 2 only.
+
+Task 1 baseline package shape checkpoint:
+
+- Status: complete, verified-only.
+- Practice project: `/tmp/ic_auto_opt_optimizer_practice/bridge_test_inv`.
+- Netlist bundle source: `/tmp/ic_auto_opt_c7_fixed_001/bridge_test_inv/netlists/exported`.
+- Passed commands: `hermes-workflow init`, `validate`, `package`, `prepare-netlist`, `dry-run`, `preflight-health`, `approve`, and `prepare-real-run --run-id real_001`.
+- Verified package shape: `runs/real/real_001/netlist/input.scs`, sidecars such as `netlist/ade_e.scs`, and `netlist/amap/`.
+- Verified `metric_extraction_request.json` keeps approved expressions unchanged and declares `expected_psf_dir` as `runs/real/real_001/psf`.
+- No Spectre, OCEAN, C-7 adapter, TuRBO, or optimizer loop was run in Task 1.
+
 ## Resume Prompt
 
 ```text

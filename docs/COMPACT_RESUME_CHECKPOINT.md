@@ -449,11 +449,30 @@ optimizer:
   deduplicate_candidates: true
 ```
 
+## Optimizer Practice-First Node
+
+Current scope: `Optimizer Practice-First Plan`.
+
+Status: planned, verified-only.
+
+- C-7 real-tool closure is complete and committed as `d440c95 fix: preserve ADE netlist layout for real runs`.
+- Active plan: `docs/superpowers/plans/2026-06-03-optimizer-practice-first.md`.
+- The known-good `real_001` Spectre + OCEAN chain is only a foundation check. A few hand-picked candidate points are not sufficient to validate optimizer development.
+- Before Hermes optimizer development, the required practice is a real optimizer loop using `virtuoso-bridge-lite/skills/optimizer/SKILL.md` and local TuRBO at `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/TuRBO`.
+- For four `bridge_test_inv` variables, minimum TuRBO practice budget is `n_init=8`, `max_evals=9`, `batch_size=1`.
+- Do not write optimizer algorithms, add broad schemas/frameworks, parse PSF, rewrite formulas, or redesign the ADE netlist/PSF layout before practice evidence.
+- Task 1 baseline package shape check is complete, verified-only.
+- Practice project: `/tmp/ic_auto_opt_optimizer_practice/bridge_test_inv`.
+- Task 1 passed Hermes `init`, `validate`, `package`, `prepare-netlist`, `dry-run`, `preflight-health`, `approve`, and `prepare-real-run --run-id real_001`.
+- Verified `runs/real/real_001/netlist/input.scs`, `netlist/ade_e.scs`, `netlist/amap/`, unchanged approved metric expressions, and declared `expected_psf_dir = runs/real/real_001/psf`.
+- No Spectre, OCEAN, C-7 adapter, TuRBO, or optimizer loop was run in Task 1.
+- Next allowed action: wait for user confirmation, then execute Optimizer Practice-First Task 2 only.
+
 ## Next Step
 
-Plan A, Plan B, Plan C C-1, Plan C C-2, Plan C C-3, Plan C C-4, Plan C C-5, and Plan C C-5.5 are complete as of 2026-06-01. C-6, C-7, C-8, and C-9 are complete and reviewed as of 2026-06-02. C-10 real-run failure/retry policy contract is complete and reviewed as of 2026-06-03.
+Plan A, Plan B, Plan C C-1, Plan C C-2, Plan C C-3, Plan C C-4, Plan C C-5, and Plan C C-5.5 are complete as of 2026-06-01. C-6, C-7, C-8, and C-9 are complete and reviewed as of 2026-06-02. C-10 real-run failure/retry policy contract is complete and reviewed as of 2026-06-03. C-11 local/fake smoke is complete. C-7 real-tool closure is complete and committed as `d440c95`.
 
-Current next step: start C-7 Real Tool Closure Fixes Task 3 metric namespace contract. Current state is `C-7 Real Tool Closure Fixes`, verified-only. The scoped Spectre command fix is already committed as `51fc057`; Task 0 evidence inventory, Task 1 exported netlist bundle sidecars, and Task 2 Spectre-safe unit formatting guard are complete. next_allowed_action: start C-7 Real Tool Closure Fixes Task 3 metric namespace contract; do not run real tools until formula contract fixes are complete and user authorizes the closure smoke. Do not commit raw input decks, protected include files, PSF/raw data, full Cadence logs, `docs/OCEAN_DOC_*`, or `docs/toolchain_evidence/`. Do not parse PSF or translate OCEAN formulas in Python.
+Current next step: execute `docs/superpowers/plans/2026-06-03-optimizer-practice-first.md` Task 2 after user confirmation. Do not commit raw input decks, protected include files, PSF/raw data, full Cadence logs, `docs/OCEAN_DOC_*`, or `docs/toolchain_evidence/`. Do not parse PSF or translate OCEAN formulas in Python.
 
 Read the handoff files first:
 
@@ -479,5 +498,5 @@ Use this prompt after compact:
 7. ic-auto-opt-workflow/docs/superpowers/plans/2026-06-03-controlled-real-tool-agent-practice.md
 8. 如需背景，再读 ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。当前活动节点是 C-7 Real Tool Closure Fixes，状态为 verified-only。先读 docs/CURRENT_TASK_STATE.json、docs/debug/2026-06-03-c7-real-tool-debug-lane.md、docs/debug/2026-06-03-real-tool-evidence-index.md、docs/superpowers/plans/2026-06-03-c7-real-tool-closure-fixes.md。`=log` 命令修复已提交为 51fc057。Task 0 evidence inventory、Task 1 sidecars、Task 2 Spectre-safe unit formatting guard 已完成。下一步是 start C-7 Real Tool Closure Fixes Task 3 metric namespace contract; do not run real tools until formula contract fixes are complete and user authorizes the closure smoke。不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。不要用 Python 解析 PSF，不要让 agent 翻译或重写 Calculator/OCEAN 公式。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。当前活动节点是 Optimizer Practice-First Plan，状态为 Task 1 complete/verified-only。先读 docs/CURRENT_TASK_STATE.json、AGENTS.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/plans/2026-06-03-optimizer-practice-first.md。C-7 real-tool closure 已完成并提交为 d440c95。Task 1 已在 /tmp/ic_auto_opt_optimizer_practice/bridge_test_inv 重建 clean real_001 package，未运行真实工具。下一步只能在用户确认后执行 Optimizer Practice-First Task 2：Single-Point Replay Sanity Check，会运行 C-7 adapter/Spectre/OCEAN。注意：real_001 只是地基检查；正式 Hermes optimizer 开发前必须完成一次真实 optimizer practice，依据 virtuoso-bridge-lite/skills/optimizer/SKILL.md，并调用本地 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/TuRBO 的 TuRBO。不要写新 optimizer 算法，不要创建 broad schema/framework，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。不要用 Python 解析 PSF，不要让 agent 翻译或重写 Calculator/OCEAN 公式。
 ```
