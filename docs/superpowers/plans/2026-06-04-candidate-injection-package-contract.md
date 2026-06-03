@@ -951,13 +951,15 @@ Stop for user confirmation.
 
 **Files:**
 
+- Modify: `src/hermes_workflow/real_run.py`
+- Modify: `tests/test_candidate_injection_real_run.py`
 - Modify: `docs/CURRENT_TASK_STATE.json`
 - Modify: `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`
 - Modify: `docs/COMPACT_RESUME_CHECKPOINT.md`
 - Modify: `docs/EXECUTION_PROGRESS_2026-05-29.md`
 - Modify: `docs/superpowers/plans/2026-06-04-candidate-injection-package-contract.md`
 
-- [ ] **Step 1: Run full targeted verification**
+- [x] **Step 1: Run full targeted verification**
 
 Run:
 
@@ -972,7 +974,7 @@ git status --short
 
 Expected: pass. `git status --short` may still show local-only `docs/OCEAN_DOC_*` and `docs/toolchain_evidence/`; do not stage them.
 
-- [ ] **Step 2: Run high-risk review gate**
+- [x] **Step 2: Run high-risk review gate**
 
 Use the project review path available in the session. If Claude review MCP is available, request:
 
@@ -987,7 +989,19 @@ Record status as:
 - `verified-only` if no callable review path is available.
 - `blocked-no-subagent` if review is required by the user and no review path exists.
 
-- [ ] **Step 3: Update milestone state**
+Review result:
+
+- Initial spec-compliance review found missing edge coverage and one run-id policy gap:
+  pre-existing override run dirs, true prepared-package duplicate tests, forced
+  write-failure cleanup coverage, and compact continuous-value formatting.
+- The implementation now rejects any existing candidate override run directory,
+  rejects leading/trailing whitespace in continuous candidates, tests true
+  prepared-package duplicate rejection through a resolved-abandoned prepared run,
+  and tests cleanup after exported sidecar symlink write failure.
+- Spec re-review passed with no Critical, Important, or Minor findings.
+- Code-quality re-review passed with no Critical, Important, or Minor findings.
+
+- [x] **Step 3: Update milestone state**
 
 Update:
 
@@ -1004,7 +1018,7 @@ Alignment: The implementation follows the candidate-injection design spec and to
 Drift: None if no optimizer algorithm, real-tool execution, PSF parsing, formula rewriting, or Maestro/ADE layout replacement was added.
 ```
 
-- [ ] **Step 4: Commit final docs if needed**
+- [x] **Step 4: Commit final docs if needed**
 
 Run:
 

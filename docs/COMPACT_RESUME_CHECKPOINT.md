@@ -495,17 +495,18 @@ Status: complete, verified-only.
 - Candidate-injection package contract implementation plan is complete, verified-only.
 - Implementation plan: `docs/superpowers/plans/2026-06-04-candidate-injection-package-contract.md`.
 - It has four tasks: candidate request validation, package writer reuse, CLI plus fake C-7 handoff smoke, and final verification/review gate.
-- Candidate-Injection Package Contract Tasks 1-3 are complete, verified-only.
+- Candidate-Injection Package Contract Tasks 1-4 are complete, reviewed.
 - Task 1 added candidate request validation against `config/variables.yaml`.
 - Task 2 reused the existing real-run package writer to prepare explicit candidate packages and persist `candidate_request.json` evidence.
 - Task 3 added `hermes-workflow prepare-candidate-real-run` and fake C-7 handoff smoke coverage that preserves the explicit optimizer candidate id through check/metric/record contracts.
-- Next allowed action: wait for user confirmation, then execute Candidate-Injection Package Contract Task 4 final verification and review gate only.
+- Task 4 final verification and review gate passed after tightening run-id override rejection, compact continuous-value validation, prepared duplicate coverage, and write-failure cleanup coverage.
+- Next allowed action: wait for user confirmation, then decide the next narrow Hermes optimizer productization scope. Do not start broad optimizer framework work.
 
 ## Next Step
 
 Plan A, Plan B, Plan C C-1, Plan C C-2, Plan C C-3, Plan C C-4, Plan C C-5, and Plan C C-5.5 are complete as of 2026-06-01. C-6, C-7, C-8, and C-9 are complete and reviewed as of 2026-06-02. C-10 real-run failure/retry policy contract is complete and reviewed as of 2026-06-03. C-11 local/fake smoke is complete. C-7 real-tool closure is complete and committed as `d440c95`.
 
-Current next step: execute Candidate-Injection Package Contract Task 4 final verification and review gate after user confirmation. Do not commit raw input decks, protected include files, PSF/raw data, full Cadence logs, `docs/OCEAN_DOC_*`, or `docs/toolchain_evidence/`. Do not parse PSF or translate OCEAN formulas in Python.
+Current next step: decide the next narrow Hermes optimizer productization scope after user confirmation. Do not commit raw input decks, protected include files, PSF/raw data, full Cadence logs, `docs/OCEAN_DOC_*`, or `docs/toolchain_evidence/`. Do not parse PSF or translate OCEAN formulas in Python.
 
 Read the handoff files first:
 
@@ -531,5 +532,5 @@ Use this prompt after compact:
 7. ic-auto-opt-workflow/docs/superpowers/plans/2026-06-03-controlled-real-tool-agent-practice.md
 8. 如需背景，再读 ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。当前活动节点是 Candidate-Injection Package Contract Task 3，状态为 complete/verified-only。Task 1-2 已实现 candidate request validation 和 explicit candidate real-run package writer，复用现有 real_run package writer，写入 `candidate_request.json` evidence，并保持 `config/variables.yaml` 不变。Task 3 已实现 `hermes-workflow prepare-candidate-real-run` CLI，并通过 fake C-7 handoff smoke 验证 explicit candidate package 可以被 `check_real_run`、`check_metric_results`、`record_real_result` 接收并写入 ledger。新的 design spec 是 `docs/superpowers/specs/2026-06-04-candidate-injection-package-contract-design.md`，implementation plan 是 `docs/superpowers/plans/2026-06-04-candidate-injection-package-contract.md`。下一步只能在用户确认后执行 Candidate-Injection Package Contract Task 4: Final Verification And Review Gate。不要写新 Hermes optimizer 算法，不要创建 broad schema/framework，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。不要用 Python 解析 PSF，不要让 agent 翻译或重写 Calculator/OCEAN 公式。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。当前活动节点是 Candidate-Injection Package Contract，状态为 complete/reviewed。Tasks 1-4 已完成 explicit candidate request validation、candidate package writer、`hermes-workflow prepare-candidate-real-run` CLI、fake C-7 handoff smoke、final verification 和 review gate。新的 design spec 是 `docs/superpowers/specs/2026-06-04-candidate-injection-package-contract-design.md`，implementation plan 是 `docs/superpowers/plans/2026-06-04-candidate-injection-package-contract.md`。下一步只能在用户确认后决定 narrow Hermes optimizer productization scope。不要写 broad optimizer framework，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。不要用 Python 解析 PSF，不要让 agent 翻译或重写 Calculator/OCEAN 公式。
 ```

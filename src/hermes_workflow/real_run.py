@@ -172,6 +172,7 @@ def prepare_candidate_real_run(
     _assert_approved(instruction)
     approved_hashes = _approved_hashes(manifest, instruction)
     _assert_config_hashes(project_dir, approved_hashes)
+    selected_run_id = _select_candidate_run_id(project_dir, run_id)
 
     from hermes_workflow.real_run_recovery import assert_no_unresolved_real_runs
 
@@ -184,7 +185,6 @@ def prepare_candidate_real_run(
     state = _load_optimizer_state_or_raise(project_dir)
     _assert_optimizer_state_matches_bundle(bundle, state, ledger_rows)
     _assert_candidate_is_unique(project_dir, request, ledger_rows)
-    selected_run_id = _select_candidate_run_id(project_dir, run_id)
     request_relative = f"{REAL_RUN_ROOT}/{selected_run_id}/candidate_request.json"
     request_sha256 = _sha256_text(request_text)
     candidate = {
@@ -385,6 +385,8 @@ def _assert_integer_candidate(
 
 
 def _parse_continuous_candidate(raw: str) -> tuple[Decimal, str]:
+    if raw != raw.strip():
+        raise ValueError("value must use compact Spectre-safe formatting")
     match = CONTINUOUS_VALUE_RE.match(raw)
     if match is None:
         raise ValueError("value must be numeric with an optional unit suffix")
@@ -406,6 +408,10 @@ def _assert_continuous_candidate(
     try:
         value, value_unit = _parse_continuous_candidate(raw_value)
     except ValueError as exc:
+        if "compact Spectre-safe formatting" in str(exc):
+            raise ValueError(
+                f"{name} must use compact Spectre-safe formatting"
+            ) from exc
         if "attached unit suffix" in str(exc):
             raise ValueError(
                 f"{name} must use a Spectre-safe attached unit suffix"
@@ -448,6 +454,9 @@ def _select_candidate_run_id(project_dir: Path, run_id: str | None) -> str:
     selected = _validate_run_id(run_id)
     if selected == DEFAULT_RUN_ID:
         raise ValueError("prepare-candidate-real-run cannot target real_001")
+    run_dir = project_dir / REAL_RUN_ROOT / selected
+    if run_dir.exists() or run_dir.is_symlink():
+        raise FileExistsError(f"candidate real run directory already exists: {run_dir}")
     return selected
 
 

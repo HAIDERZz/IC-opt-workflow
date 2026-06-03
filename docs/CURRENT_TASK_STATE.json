@@ -1,8 +1,8 @@
 {
   "schema_version": "1.0",
-  "current_scope": "Candidate-Injection Package Contract Task 3",
-  "current_status": "Task 3 is implemented and verified-only. Added hermes-workflow prepare-candidate-real-run CLI wiring and focused fake C-7 handoff smoke coverage. The fake handoff smoke prepares an explicit candidate package, writes sanitized result and metric manifests that preserve the explicit optimizer candidate_id, checks real-run and metric-result contracts, records the result, and verifies ledger rows real_001 and real_002.",
-  "review_status": "verified-only",
+  "current_scope": "Candidate-Injection Package Contract",
+  "current_status": "Tasks 1-4 are complete and reviewed. The contract validates explicit optimizer candidate requests, prepares deterministic real_002+ packages without mutating config/variables.yaml, exposes hermes-workflow prepare-candidate-real-run, preserves candidate_request.json/hash provenance, verifies fake C-7 handoff compatibility, rejects existing override run directories, rejects whitespace-padded continuous values, covers true prepared-package duplicate rejection, and covers cleanup after write failure.",
+  "review_status": "reviewed",
   "subagent_dispatch": "available",
   "active_spec": "docs/superpowers/specs/2026-06-04-candidate-injection-package-contract-design.md",
   "active_plan": "docs/superpowers/plans/2026-06-04-candidate-injection-package-contract.md",
@@ -12,7 +12,7 @@
     "docs/EXECUTION_PROGRESS_2026-05-29.md",
     "docs/COMPACT_RESUME_CHECKPOINT.md"
   ],
-  "next_allowed_action": "wait for user confirmation, then execute Candidate-Injection Package Contract Task 4 final verification and review gate only",
+  "next_allowed_action": "wait for user confirmation, then decide the next narrow Hermes optimizer productization scope; do not start broad optimizer framework work",
   "forbidden_actions": [
     "start Hermes optimizer productization before candidate-injection package contract implementation is complete",
     "create new optimizer algorithms",
@@ -45,16 +45,19 @@
     "active_spec": "docs/superpowers/specs/2026-06-04-candidate-injection-package-contract-design.md",
     "active_plan": "docs/superpowers/plans/2026-06-04-candidate-injection-package-contract.md",
     "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
-    "alignment": "Aligned. Task 3 exposes the candidate-injection package writer through the CLI and verifies compatibility with the existing C-7-style result handoff, metric-result check, and record-real-result contracts using fake sanitized artifacts only.",
-    "drift": "None. No optimizer algorithm productization, real-tool execution, PSF parsing, OCEAN formula rewriting, C-4 replacement, or C-9 replacement was added. The implementation plan was corrected to use local fake handoff writers because the existing next-real-run helper writers intentionally set candidate_id to run_id, which would violate the explicit candidate-injection contract."
+    "alignment": "Aligned. Tasks 1-4 complete the candidate-injection design spec and top-level practice-first route. The implementation adds only explicit candidate package preparation after recorded real evidence and before optimizer algorithm productization.",
+    "drift": "None. No optimizer algorithm productization, real-tool execution, PSF parsing, OCEAN formula rewriting, C-4 replacement, or C-9 replacement was added. Task 4 review fixes tightened the implementation to the existing spec rather than changing the route."
   },
-  "latest_valid_commit": "feat: add candidate real run CLI",
+  "latest_valid_commit": "fix: complete candidate injection review gate",
   "review_evidence": {
+    "spec_review": "Initial spec review by Dalton failed on existing override run dirs, true prepared duplicate coverage, cleanup coverage, and continuous whitespace. Fixes were implemented. Spec re-review by Ptolemy (019e8e98-e698-7330-863d-0de9f2cb15a4) passed with no Critical, Important, or Minor findings and confirmed Task 4 can mark review_status as reviewed.",
+    "code_quality_review": "Initial code-quality review by Helmholtz passed with non-blocking Minor notes. Code-quality re-review by Linnaeus (019e8e99-070e-7d20-ae8e-b206188faac1) passed with no Critical, Important, or Minor findings and required no further fixes.",
     "optimizer_practice_task_4": "Task 4 ran ./.venv/bin/python /tmp/ic_auto_opt_optimizer_practice/run_turbo_bridge_test_inv.py. Evidence: /tmp/ic_auto_opt_optimizer_practice/turbo_bridge_test_inv_001/summary.json and evaluations.jsonl. evaluation_count=9, post_initial_evaluations=1, successful_evaluations=9, penalty_evaluations=0. Best candidate: FN=12, WN=1.3u, FP=2, WP=2.5u, objective=4.183168953894332e-14.",
     "optimizer_practice_task_5": "Task 5 wrote docs/debug/2026-06-03-optimizer-practice-first-result.md and chose Productization Decision B: add an explicit candidate-injection package contract first.",
     "candidate_injection_design": "Design spec written at docs/superpowers/specs/2026-06-04-candidate-injection-package-contract-design.md. It defines candidate request schema, validation, run-id policy, dedupe policy, package outputs, CLI, error handling, and fake-tool-only testing strategy.",
     "candidate_injection_plan": "Implementation plan written at docs/superpowers/plans/2026-06-04-candidate-injection-package-contract.md. It has four tasks: validation, package writer, CLI/fake handoff smoke, and final verification/review gate.",
     "candidate_injection_tasks_1_2": "Tasks 1-2 implemented in src/hermes_workflow/real_run.py with tests in tests/test_candidate_injection_real_run.py. Verification passed: python3 -m pytest tests/test_candidate_injection_real_run.py -q; python3 -m pytest tests/test_next_real_run.py tests/test_real_run.py -q; python3 -m ruff check src tests tools; python3 tools/check_development_cadence.py; git diff --check.",
-    "candidate_injection_task_3": "Task 3 implemented CLI wiring in src/hermes_workflow/cli.py and fake C-7 handoff smoke coverage in tests/test_candidate_injection_real_run.py. Red test observed: python3 -m pytest tests/test_candidate_injection_real_run.py -q failed with missing CLI command exit 2. Verification passed: python3 -m pytest tests/test_candidate_injection_real_run.py -q; python3 -m pytest tests/test_cli.py tests/test_candidate_injection_real_run.py -q; python3 -m pytest tests/test_next_real_run.py tests/test_real_result_record.py tests/test_metric_results.py -q; python3 -m ruff check src tests tools."
+    "candidate_injection_task_3": "Task 3 implemented CLI wiring in src/hermes_workflow/cli.py and fake C-7 handoff smoke coverage in tests/test_candidate_injection_real_run.py. Red test observed: python3 -m pytest tests/test_candidate_injection_real_run.py -q failed with missing CLI command exit 2. Verification passed: python3 -m pytest tests/test_candidate_injection_real_run.py -q; python3 -m pytest tests/test_cli.py tests/test_candidate_injection_real_run.py -q; python3 -m pytest tests/test_next_real_run.py tests/test_real_result_record.py tests/test_metric_results.py -q; python3 -m ruff check src tests tools.",
+    "candidate_injection_task_4": "Task 4 final verification passed: python3 -m pytest tests/test_candidate_injection_real_run.py -q (20 passed); python3 -m pytest tests/test_real_run.py tests/test_next_real_run.py tests/test_real_run_recovery.py tests/test_result_handoff.py tests/test_metric_results.py tests/test_real_result_record.py tests/test_cli.py -q (214 passed); python3 -m ruff check src tests tools; python3 tools/check_development_cadence.py; git diff --check. Initial spec review by Dalton failed on existing override run dirs, true prepared duplicate coverage, cleanup coverage, and continuous whitespace. Fixes were implemented. Spec re-review by Ptolemy passed with no findings. Code-quality re-review by Linnaeus passed with no findings."
   }
 }

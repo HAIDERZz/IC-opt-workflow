@@ -160,6 +160,23 @@ def _write_candidate_metric_result_manifest(project_dir: Path, *, run_id: str) -
     )
 
 
+def _write_abandon_decision(project_dir: Path, *, run_id: str) -> None:
+    _write_json(
+        project_dir / "runs" / "real" / run_id / "recovery_decision.json",
+        {
+            "schema_version": "1.0",
+            "run_id": run_id,
+            "candidate_id": _load_json(
+                project_dir / "runs" / "real" / run_id / "candidate.json"
+            )["candidate_id"],
+            "decision": "abandon_candidate",
+            "reason": "test resolved prepared package",
+            "decided_at_utc": "2026-06-04T00:05:00Z",
+            "issues": [],
+        },
+    )
+
+
 def test_prepare_candidate_real_run_rejects_missing_parameter(
     tmp_path: Path,
 ) -> None:
@@ -225,6 +242,10 @@ def test_prepare_candidate_real_run_rejects_bad_candidate_id(
         (
             {"FN": "12", "WN": "1.3 um", "FP": "2", "WP": "2.5u"},
             "WN must use a Spectre-safe attached unit suffix",
+        ),
+        (
+            {"FN": "12", "WN": " 1.3u ", "FP": "2", "WP": "2.5u"},
+            "WN must use compact Spectre-safe formatting",
         ),
         (
             {"FN": "12", "WN": "1.4u", "FP": "2", "WP": "2.5u"},
@@ -312,6 +333,24 @@ def test_prepare_candidate_real_run_rejects_real_001_override(
         prepare_candidate_real_run(project_dir, candidate_file=request, run_id="real_001")
 
 
+def test_prepare_candidate_real_run_rejects_existing_override_run_dir(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_project(tmp_path)
+    _record_real_001(project_dir)
+    request = _candidate_request(project_dir)
+    run_dir = project_dir / "runs" / "real" / "real_009"
+    run_dir.mkdir(parents=True)
+
+    with pytest.raises(
+        FileExistsError,
+        match="candidate real run directory already exists",
+    ):
+        prepare_candidate_real_run(project_dir, candidate_file=request, run_id="real_009")
+
+    assert not (run_dir / "real_run_manifest.json").exists()
+
+
 def test_prepare_candidate_real_run_rejects_duplicate_candidate_id_from_ledger(
     tmp_path: Path,
 ) -> None:
@@ -337,7 +376,50 @@ def test_prepare_candidate_real_run_rejects_duplicate_parameter_tuple_from_ledge
         prepare_candidate_real_run(project_dir, candidate_file=request)
 
 
-def test_prepare_candidate_real_run_rejects_unresolved_prepared_candidate_first(
+def test_prepare_candidate_real_run_rejects_duplicate_prepared_candidate_id(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_project(tmp_path)
+    _record_real_001(project_dir)
+    first = _candidate_request(project_dir, candidate_id="candidate_000009")
+    prepare_candidate_real_run(project_dir, candidate_file=first)
+    _write_abandon_decision(project_dir, run_id="real_002")
+    second = _candidate_request(
+        project_dir,
+        candidate_id="candidate_000009",
+        parameters={"FN": "11", "WN": "1.3u", "FP": "2", "WP": "2.5u"},
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="prepared run already contains candidate_id candidate_000009",
+    ):
+        prepare_candidate_real_run(
+            project_dir,
+            candidate_file=second,
+            run_id="real_003",
+        )
+
+
+def test_prepare_candidate_real_run_rejects_duplicate_prepared_parameters(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_project(tmp_path)
+    _record_real_001(project_dir)
+    first = _candidate_request(project_dir, candidate_id="candidate_000009")
+    prepare_candidate_real_run(project_dir, candidate_file=first)
+    _write_abandon_decision(project_dir, run_id="real_002")
+    second = _candidate_request(project_dir, candidate_id="candidate_000010")
+
+    with pytest.raises(ValueError, match="prepared run already contains candidate parameters"):
+        prepare_candidate_real_run(
+            project_dir,
+            candidate_file=second,
+            run_id="real_003",
+        )
+
+
+def test_prepare_candidate_real_run_rejects_unresolved_distinct_prepared_run(
     tmp_path: Path,
 ) -> None:
     project_dir = _create_ready_project(tmp_path)
@@ -346,7 +428,7 @@ def test_prepare_candidate_real_run_rejects_unresolved_prepared_candidate_first(
     prepare_candidate_real_run(project_dir, candidate_file=first)
     second = _candidate_request(
         project_dir,
-        candidate_id="candidate_000009",
+        candidate_id="candidate_000010",
         parameters={"FN": "13", "WN": "1.3u", "FP": "2", "WP": "2.5u"},
     )
 
@@ -358,21 +440,23 @@ def test_prepare_candidate_real_run_rejects_unresolved_prepared_candidate_first(
         )
 
 
-def test_prepare_candidate_real_run_rejects_unresolved_prepared_parameters_first(
+def test_prepare_candidate_real_run_cleans_up_after_write_failure(
     tmp_path: Path,
 ) -> None:
     project_dir = _create_ready_project(tmp_path)
     _record_real_001(project_dir)
-    first = _candidate_request(project_dir, candidate_id="candidate_000009")
-    prepare_candidate_real_run(project_dir, candidate_file=first)
-    second = _candidate_request(project_dir, candidate_id="candidate_000010")
+    request = _candidate_request(project_dir)
+    (project_dir / "netlists" / "exported" / "sidecar.scs").symlink_to(
+        project_dir / "netlists" / "exported" / "input.scs"
+    )
 
-    with pytest.raises(ValueError, match="unresolved real run exists"):
-        prepare_candidate_real_run(
-            project_dir,
-            candidate_file=second,
-            run_id="real_003",
-        )
+    with pytest.raises(
+        FileExistsError,
+        match="exported netlist bundle must not contain symlinks",
+    ):
+        prepare_candidate_real_run(project_dir, candidate_file=request)
+
+    assert not (project_dir / "runs" / "real" / "real_002").exists()
 
 
 def test_prepare_candidate_real_run_cli_success(tmp_path: Path) -> None:
