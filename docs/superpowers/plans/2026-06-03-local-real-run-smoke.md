@@ -427,7 +427,7 @@ Expected: commit succeeds. Do not stage local OCEAN research or toolchain eviden
 - Modify: `docs/EXECUTION_PROGRESS_2026-05-29.md`
 - Modify: `docs/COMPACT_RESUME_CHECKPOINT.md`
 
-- [x] **Step 1: Add the failing happy-path smoke test**
+- [ ] **Step 1: Add the failing happy-path smoke test**
 
 Append to `tests/test_local_real_run_smoke.py`:
 
@@ -497,7 +497,7 @@ def test_c11_library_happy_path_records_next_real_run(tmp_path):
 
 If Task 1 already imported `assert_no_unresolved_real_runs`, replace the import block instead of duplicating imports. Keep imports sorted by ruff.
 
-- [x] **Step 2: Run the new test and verify it fails or passes for the right reason**
+- [ ] **Step 2: Run the new test and verify it fails or passes for the right reason**
 
 Run:
 
@@ -507,7 +507,7 @@ python3 -m pytest tests/test_local_real_run_smoke.py::test_c11_library_happy_pat
 
 Expected: the test should pass if Task 1 helpers were complete. If it fails, the failure must identify a real mismatch in the integration chain; fix only the test/helper or documented contract issue needed for this task.
 
-- [x] **Step 3: Run focused regression tests**
+- [ ] **Step 3: Run focused regression tests**
 
 Run:
 
@@ -517,7 +517,7 @@ python3 -m pytest tests/test_local_real_run_smoke.py tests/test_next_real_run.py
 
 Expected: all selected tests pass.
 
-- [x] **Step 4: Run focused lint**
+- [ ] **Step 4: Run focused lint**
 
 Run:
 
@@ -527,7 +527,7 @@ python3 -m ruff check tests/real_run_smoke_helpers.py tests/test_local_real_run_
 
 Expected: all checks pass.
 
-- [x] **Step 5: Update task status and node files**
+- [ ] **Step 5: Update task status and node files**
 
 In this plan, mark Task 2 steps as complete.
 
@@ -541,7 +541,7 @@ Update the current node in `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md` to:
 
 Add matching C-11 Task 2 checkpoint bullets to `docs/EXECUTION_PROGRESS_2026-05-29.md` and `docs/COMPACT_RESUME_CHECKPOINT.md`.
 
-- [x] **Step 6: Commit Task 2**
+- [ ] **Step 6: Commit Task 2**
 
 Run:
 

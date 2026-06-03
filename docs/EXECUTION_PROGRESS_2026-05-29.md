@@ -987,7 +987,6 @@ Next required action:
 - C-11 local smoke design spec exists: `docs/superpowers/specs/2026-06-03-local-real-run-smoke-design.md`.
 - C-11 local smoke implementation plan exists: `docs/superpowers/plans/2026-06-03-local-real-run-smoke.md`.
 - C-11 Task 1 test-only smoke helpers are complete and reviewed. Added `tests/real_run_smoke_helpers.py` and the seed helper smoke test in `tests/test_local_real_run_smoke.py`; focused pytest and ruff checks passed.
-- C-11 Task 2 library happy-path smoke is complete and reviewed. Added the local/fake happy-path test that records `real_001`, prepares `real_002`, validates fake returned artifacts through `check-real-run` and `check-metric-results`, records the result, and asserts ledger/state/report evidence plus the unresolved-run guard. Focused smoke, regression, and ruff checks passed.
 - Plan C process hardening lightweight cadence guard is complete; verified-only. It adds `docs/CURRENT_TASK_STATE.json`, a 200-line-budget cadence checker, and a process-hardening design spec so future context resumes have a single current-state anchor and cannot falsely claim `reviewed` without evidence.
 - Current scope: Plan C C-11 local smoke redevelopment Task 1
 - Current status: C-11 redevelopment reset in progress; verified-only
