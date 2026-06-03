@@ -1,18 +1,18 @@
 {
   "schema_version": "1.0",
-  "current_scope": "Plan C C-12 controlled real-tool/agent practice design spec",
-  "current_status": "C-12 design spec written; pending user review",
+  "current_scope": "Plan C C-12 controlled real-tool/agent practice implementation plan",
+  "current_status": "C-12 implementation plan written; pending user execution choice",
   "review_status": "verified-only",
   "subagent_dispatch": "available",
   "active_spec": "docs/superpowers/specs/2026-06-03-controlled-real-tool-agent-practice-design.md",
-  "active_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
+  "active_plan": "docs/superpowers/plans/2026-06-03-controlled-real-tool-agent-practice.md",
   "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
   "progress_files": [
     "docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md",
     "docs/EXECUTION_PROGRESS_2026-05-29.md",
     "docs/COMPACT_RESUME_CHECKPOINT.md"
   ],
-  "next_allowed_action": "user review of C-12 design spec before writing the C-12 implementation plan",
+  "next_allowed_action": "user review of C-12 implementation plan and execution approach choice",
   "forbidden_actions": [
     "run Virtuoso",
     "run Spectre",
@@ -33,7 +33,7 @@
     "git status --short"
   ],
   "review_evidence": {
-    "spec_self_review": "C-12 design spec placeholder, internal consistency, scope, and ambiguity checks were performed inline. No implementation plan exists yet and no real tools were run.",
+    "plan_self_review": "C-12 implementation plan covers one known cell, one approved real-run package, one execution-agent/C-7 adapter invocation, Hermes checks/recording, failure recovery assessment, and local-only evidence policy. No real tools were run while writing the plan.",
     "previous_task_3_spec_review": "Ptolemy 019e8cc5-30bf-7022-bca2-657b57fec88a approved C-11 Task 3 spec compliance after stale handoff prompts were fixed; no remaining Critical, Important, or Minor findings.",
     "previous_task_3_code_quality_review": "Heisenberg 019e8cc8-c26b-7ef2-8fd4-d5679088521d approved C-11 Task 3 code quality with no Critical, Important, or Minor findings."
   }
