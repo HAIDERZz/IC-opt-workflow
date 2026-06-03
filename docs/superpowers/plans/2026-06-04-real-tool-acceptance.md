@@ -4,7 +4,7 @@
 
 **Goal:** Validate the C-13 single-candidate suggestion path against the real working Spectre + OCEAN chain.
 
-**Architecture:** Use the proven native Maestro/ADE netlist layout and existing Hermes workflow contracts. Seed one known-good real result, ask `suggest-candidate` for the next candidate request, prepare that explicit candidate package, run the C-7 adapter, then check and record through existing Hermes commands.
+**Architecture:** Use the proven native Maestro/ADE netlist layout and existing Hermes workflow contracts. Prepare one first-run seed package with a known-good lower-bound point, ask `suggest-candidate` for the next candidate request after that seed is recorded, prepare that explicit candidate package, run the C-7 adapter, then check and record through existing Hermes commands.
 
 **Tech Stack:** Python 3, existing `hermes-workflow` CLI, `tools/run_spectre_ocean_adapter.py`, Cadence Spectre/OCEAN from `/home/zzchen/cadence_ic231_env.csh`, local-only `/tmp` evidence, pytest/ruff/cadence checker for repo-side verification.
 
@@ -17,9 +17,10 @@ This is C-14 real-tool acceptance for the already-reviewed C-13 MVP.
 Allowed:
 
 - Create one clean local practice project under `/tmp/ic_auto_opt_c14`.
-- Use one known-good seed candidate to create and record `real_001`.
+- Use a local acceptance-only `variables.yaml` lower-bound seed so C-4 `prepare-real-run` creates a known-good `real_001`.
 - Run `hermes-workflow suggest-candidate` to write one candidate request.
-- Run `hermes-workflow prepare-candidate-real-run` to prepare `real_002`.
+- Run `hermes-workflow prepare-real-run` to prepare `real_001`.
+- Run `hermes-workflow prepare-candidate-real-run` to prepare `real_002` after `suggest-candidate`.
 - Run the C-7 Spectre/OCEAN adapter for `real_001` and `real_002`.
 - Run `check-real-run`, `check-metric-results`, and `record-real-result`.
 - If `real_002` is a candidate-level metric failure, run `assess-real-run-recovery` and record the evidence without rewriting formulas.
@@ -81,9 +82,9 @@ Local-only evidence stays under:
 /tmp/ic_auto_opt_c14/evidence/real_tool_acceptance_001/
 ```
 
-## Task 1: Clean Acceptance Workspace And Seed Package
+## Task 1: Clean Acceptance Workspace And First-Run Seed Package
 
-**Risk:** Medium. This prepares one approved local project and one seed package. It must not run Spectre or OCEAN.
+**Risk:** Medium. This prepares one approved local project and one first-run seed package. It must not run Spectre or OCEAN.
 
 **Files:**
 
@@ -91,7 +92,7 @@ Local-only evidence stays under:
 - Modify: `docs/CURRENT_TASK_STATE.json`
 - Modify: `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`
 
-- [ ] **Step 1: Confirm repo and CLI state**
+- [x] **Step 1: Confirm repo and CLI state**
 
 Run:
 
@@ -110,7 +111,7 @@ Expected:
 - untracked OCEAN research/evidence files may remain untracked;
 - no unexpected tracked changes are present.
 
-- [ ] **Step 2: Create clean local workspace**
+- [x] **Step 2: Create clean local workspace**
 
 Run:
 
@@ -125,7 +126,7 @@ Expected:
 - `$C14_PROJECT/config/project_config.yaml` exists;
 - `$C14_PROJECT/netlists/exported/` exists.
 
-- [ ] **Step 3: Copy the known-good exported netlist bundle into the local project**
+- [x] **Step 3: Copy the known-good exported netlist bundle into the local project**
 
 Run:
 
@@ -145,7 +146,43 @@ Expected:
 
 If `$C14_SOURCE_NETLIST` is missing, stop and ask the user to provide or re-export the known-good `bridge_test_inv` netlist bundle. Do not copy raw decks into the repository.
 
-- [ ] **Step 4: Run Hermes preflight and approval**
+- [x] **Step 4: Set local acceptance-only known-good lower bounds**
+
+Run:
+
+```bash
+python3 - <<'PY'
+from pathlib import Path
+
+import yaml
+
+path = Path("/tmp/ic_auto_opt_c14/bridge_test_inv/config/variables.yaml")
+payload = yaml.safe_load(path.read_text())
+lower_by_name = {
+    "FN": "4",
+    "WN": "0.6u",
+    "FP": "4",
+    "WP": "1.2u",
+}
+for variable in payload["variables"]:
+    name = variable["name"]
+    if name in lower_by_name:
+        variable["lower"] = lower_by_name[name]
+path.write_text(yaml.safe_dump(payload, sort_keys=False))
+PY
+rg -n "lower: '?4'?|lower: 0.6u|lower: 1.2u|upper: '?12'?|upper: 3u" \
+  "$C14_PROJECT/config/variables.yaml"
+```
+
+Expected:
+
+- `FN` and `FP` lower bounds are `4`;
+- `WN` lower bound is `0.6u`;
+- `WP` lower bound is `1.2u`;
+- upper bounds remain broad enough for `suggest-candidate` to produce a later unique candidate;
+- this change is local to `/tmp/ic_auto_opt_c14` and is not committed.
+
+- [x] **Step 5: Run Hermes preflight and approval**
 
 Run:
 
@@ -164,43 +201,12 @@ Expected:
 - `supervisor_instruction.json` contains `approve_first_real_run`;
 - no real tool has run yet.
 
-- [ ] **Step 5: Write a known-good seed candidate request locally**
+- [x] **Step 6: Prepare first real-run seed package**
 
 Run:
 
 ```bash
-cat > "$C14_EVIDENCE/seed_candidate_000001.json" <<'JSON'
-{
-  "schema_version": "1.0",
-  "candidate_id": "candidate_seed_000001",
-  "source": "c14_known_good_seed",
-  "parameters": {
-    "FN": "4",
-    "WN": "0.6u",
-    "FP": "4",
-    "WP": "1.2u"
-  },
-  "metadata": {
-    "reason": "known-good bridge_test_inv scalar seed from optimizer practice"
-  }
-}
-JSON
-```
-
-Expected:
-
-- seed request exists only under `/tmp`;
-- parameters match the previously proven scalar baseline.
-
-- [ ] **Step 6: Prepare seed real-run package**
-
-Run:
-
-```bash
-"$HERMES" prepare-candidate-real-run \
-  "$C14_PROJECT" \
-  --candidate-file "$C14_EVIDENCE/seed_candidate_000001.json" \
-  --run-id real_001
+"$HERMES" prepare-real-run "$C14_PROJECT" --run-id real_001
 ```
 
 Expected:
@@ -208,9 +214,10 @@ Expected:
 - `runs/real/real_001/netlist/input.scs` exists;
 - `runs/real/real_001/netlist/ade_e.scs` exists;
 - `runs/real/real_001/netlist/amap/` exists;
+- `runs/real/real_001/candidate.json` records `FN=4`, `WN=0.6u`, `FP=4`, and `WP=1.2u`;
 - `runs/real/real_001/metric_extraction_request.json` keeps approved OCEAN formulas unchanged.
 
-- [ ] **Step 7: Record Task 1 state and stop**
+- [x] **Step 7: Record Task 1 state and stop**
 
 Update:
 

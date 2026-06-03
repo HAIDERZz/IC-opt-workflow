@@ -603,8 +603,21 @@ C-14 Real-Tool Acceptance plan:
 - Route audit: aligned with the top-level practice-first route and C-13's explicit C-14 acceptance requirement. Drift: none.
 - next_allowed_action: execute C-14 Task 1 clean acceptance workspace and seed package; do not run real tools until Task 2 is explicitly confirmed
 
+C-14 Real-Tool Acceptance Task 1:
+
+- Status: complete, verified-only.
+- Local project: `/tmp/ic_auto_opt_c14/bridge_test_inv`.
+- Local evidence: `/tmp/ic_auto_opt_c14/evidence/real_tool_acceptance_001/`.
+- Plan correction: `prepare-candidate-real-run` correctly refuses `real_001`, so Task 1 was corrected to use the C-4 first-run contract for `real_001`; candidate-injection remains the `real_002+` path after a checked ledger row exists.
+- Setup completed: Hermes CLI available at `/home/zzchen/.venvs/openclaw/bin/hermes-workflow`, project initialized, known-good C-7 closure netlist bundle copied locally, `input.scs` hash/tree captured under `/tmp`, local acceptance-only lower bounds set to `FN=4`, `WN=0.6u`, `FP=4`, `WP=1.2u`, upper bounds preserved for later suggestions.
+- Hermes commands passed: `validate`, `package`, `prepare-netlist`, `dry-run`, `preflight-health`, `approve`, and `prepare-real-run --run-id real_001`.
+- Prepared package shape: `runs/real/real_001/netlist/input.scs`, `netlist/ade_e.scs`, `netlist/amap/`, `candidate.json` with the known-good seed parameters, and `metric_extraction_request.json` with approved OCEAN formulas unchanged.
+- Route audit: aligned with C-14 plan, C-13 spec, and the top-level practice-first route. Drift found in the initial C-14 plan was corrected: do not use candidate-injection for `real_001`.
+- Boundary: no Spectre, OCEAN, SSH, bridge, C-7 adapter, PSF parsing, formula rewrite, raw deck commit, or Cadence artifact commit occurred.
+- next_allowed_action: wait for user confirmation, then execute C-14 Task 2 seed real-tool run
+
 ## Resume Prompt
 
 ```text
-请继续 IC auto optimization workflow。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。先阅读 docs/CURRENT_TASK_STATE.json、AGENTS.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/plans/2026-06-04-real-tool-acceptance.md，并按需阅读 docs/superpowers/specs/2026-06-04-single-candidate-optimizer-suggestion-design.md、docs/superpowers/plans/2026-06-04-single-candidate-optimizer-suggestion.md、docs/superpowers/specs/2026-06-04-candidate-injection-package-contract-design.md、docs/superpowers/plans/2026-06-04-candidate-injection-package-contract.md。当前活动节点是 C-14 Real-Tool Acceptance，状态为 implementation plan complete/verified-only。下一步只能执行 C-14 Task 1 clean acceptance workspace and seed package。Task 1 不运行真实工具；不要运行真实 Virtuoso/Spectre/OCEAN/SSH/bridge，直到进入对应 C-14 task 并得到用户确认。不要写 broad optimizer framework，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。不要用 Python 解析 PSF，不要让 agent 翻译或重写 Calculator/OCEAN 公式。
+请继续 IC auto optimization workflow。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。先阅读 docs/CURRENT_TASK_STATE.json、AGENTS.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/plans/2026-06-04-real-tool-acceptance.md，并按需阅读 docs/superpowers/specs/2026-06-04-single-candidate-optimizer-suggestion-design.md、docs/superpowers/plans/2026-06-04-single-candidate-optimizer-suggestion.md、docs/superpowers/specs/2026-06-04-candidate-injection-package-contract-design.md、docs/superpowers/plans/2026-06-04-candidate-injection-package-contract.md。当前活动节点是 C-14 Real-Tool Acceptance，Task 1 已完成并 verified-only。下一步只能在用户确认后执行 C-14 Task 2 seed real-tool run；Task 2 会运行真实 Spectre/OCEAN/C-7 adapter。不要写 broad optimizer framework，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。不要用 Python 解析 PSF，不要让 agent 翻译或重写 Calculator/OCEAN 公式。
 ```

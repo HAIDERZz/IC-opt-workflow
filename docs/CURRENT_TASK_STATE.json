@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "current_scope": "C-14 Real-Tool Acceptance",
-  "current_status": "C-14 real-tool acceptance implementation plan is written, verified-only. It scopes one clean local acceptance flow: seed a known-good real_001, run suggest-candidate for candidate_000002, prepare real_002, run the C-7 adapter, then check and record or classify through existing Hermes contracts.",
+  "current_status": "C-14 Task 1 is complete, verified-only. A clean local acceptance workspace was prepared under /tmp/ic_auto_opt_c14, the known-good exported netlist bundle was copied locally, acceptance-only lower bounds were set to the proven scalar seed, Hermes preflight/approval passed, and first-run package real_001 was prepared without running Spectre or OCEAN.",
   "review_status": "verified-only",
   "subagent_dispatch": "available",
   "active_spec": "docs/superpowers/specs/2026-06-04-single-candidate-optimizer-suggestion-design.md",
@@ -12,7 +12,7 @@
     "docs/EXECUTION_PROGRESS_2026-05-29.md",
     "docs/COMPACT_RESUME_CHECKPOINT.md"
   ],
-  "next_allowed_action": "execute C-14 Task 1 clean acceptance workspace and seed package; do not run real tools until Task 2 is explicitly confirmed",
+  "next_allowed_action": "wait for user confirmation, then execute C-14 Task 2 seed real-tool run",
   "forbidden_actions": [
     "start broad optimizer framework work",
     "create new optimizer algorithms",
@@ -51,7 +51,8 @@
   "review_evidence": {
     "spec_review": "Not run. C-14 plan is a docs-only verified-only planning node using the existing reviewed C-13 design spec's Real-Tool Acceptance section.",
     "code_quality_review": "Not run. No production code changed for this planning node.",
-    "plan_status": "Implementation plan written at docs/superpowers/plans/2026-06-04-real-tool-acceptance.md. It defines five tasks: clean workspace and seed package, seed real-tool run and record, suggest/package real_002, run suggested candidate through real tools, and sanitized closeout decision.",
+    "plan_status": "Implementation plan written at docs/superpowers/plans/2026-06-04-real-tool-acceptance.md. During Task 1 execution, the plan was corrected so real_001 uses the existing prepare-real-run first-run contract and candidate-injection starts at real_002.",
+    "task_1_status": "Task 1 completed locally under /tmp/ic_auto_opt_c14/bridge_test_inv. Commands verified Hermes CLI availability, initialized the project, copied the known-good exported netlist bundle, wrote local input.scs hash/tree evidence, adjusted acceptance-only lower bounds to FN=4/WN=0.6u/FP=4/WP=1.2u while preserving broad upper bounds, passed validate/package/prepare-netlist/dry-run/preflight-health/approve, and prepared runs/real/real_001 with native netlist sidecars and unchanged approved OCEAN formulas. No Spectre, OCEAN, SSH, bridge, PSF parsing, or formula rewrite occurred.",
     "previous_c13_gate": "C-13 Single-Candidate Optimizer Suggestion MVP completed and was committed as bb93e46 with spec and code-quality re-review evidence."
   }
 }
