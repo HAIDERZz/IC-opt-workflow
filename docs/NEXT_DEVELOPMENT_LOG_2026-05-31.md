@@ -593,8 +593,18 @@ C-13 Single-Candidate Optimizer Suggestion MVP Task 4:
 - Route audit: aligned with the C-13 spec and top-level practice-first route. Drift: none. C-13 did not run real tools, parse PSF, rewrite OCEAN formulas, create a broad optimizer framework, add batch orchestration, or replace native layout.
 - next_allowed_action: write C-14 real-tool acceptance plan for suggest-candidate -> prepare-candidate-real-run -> C-7 adapter -> check/record; do not run real tools until that plan exists and the user confirms
 
+C-14 Real-Tool Acceptance plan:
+
+- Status: implementation plan complete, verified-only.
+- Active spec: `docs/superpowers/specs/2026-06-04-single-candidate-optimizer-suggestion-design.md` because its Real-Tool Acceptance section defines C-14.
+- Implementation plan: `docs/superpowers/plans/2026-06-04-real-tool-acceptance.md`.
+- Scope: one clean local acceptance flow, using a known-good seed `real_001`, `hermes-workflow suggest-candidate` for `candidate_000002`, `prepare-candidate-real-run` for `real_002`, the C-7 Spectre/OCEAN adapter, and existing `check-real-run`/`check-metric-results`/`record-real-result` contracts.
+- Boundary: no broad optimizer framework, no new algorithms, no batch orchestration, no PSF parsing, no OCEAN formula rewrite, and no native Maestro/ADE layout replacement.
+- Route audit: aligned with the top-level practice-first route and C-13's explicit C-14 acceptance requirement. Drift: none.
+- next_allowed_action: execute C-14 Task 1 clean acceptance workspace and seed package; do not run real tools until Task 2 is explicitly confirmed
+
 ## Resume Prompt
 
 ```text
-请继续 IC auto optimization workflow。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。先阅读 docs/CURRENT_TASK_STATE.json、AGENTS.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/specs/2026-06-04-single-candidate-optimizer-suggestion-design.md、docs/superpowers/plans/2026-06-04-single-candidate-optimizer-suggestion.md，并按需阅读 docs/superpowers/specs/2026-06-04-candidate-injection-package-contract-design.md、docs/superpowers/plans/2026-06-04-candidate-injection-package-contract.md、docs/superpowers/plans/2026-06-03-optimizer-practice-first.md。当前活动节点是 C-13 Single-Candidate Optimizer Suggestion MVP，状态为 complete/reviewed。下一步只能写 C-14 real-tool acceptance plan：`suggest-candidate -> prepare-candidate-real-run -> C-7 adapter -> check/record`。不要直接运行真实 Virtuoso/Spectre/OCEAN/SSH/bridge，直到 C-14 plan 写好并得到用户确认。不要写 broad optimizer framework，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。不要用 Python 解析 PSF，不要让 agent 翻译或重写 Calculator/OCEAN 公式。
+请继续 IC auto optimization workflow。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。先阅读 docs/CURRENT_TASK_STATE.json、AGENTS.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/plans/2026-06-04-real-tool-acceptance.md，并按需阅读 docs/superpowers/specs/2026-06-04-single-candidate-optimizer-suggestion-design.md、docs/superpowers/plans/2026-06-04-single-candidate-optimizer-suggestion.md、docs/superpowers/specs/2026-06-04-candidate-injection-package-contract-design.md、docs/superpowers/plans/2026-06-04-candidate-injection-package-contract.md。当前活动节点是 C-14 Real-Tool Acceptance，状态为 implementation plan complete/verified-only。下一步只能执行 C-14 Task 1 clean acceptance workspace and seed package。Task 1 不运行真实工具；不要运行真实 Virtuoso/Spectre/OCEAN/SSH/bridge，直到进入对应 C-14 task 并得到用户确认。不要写 broad optimizer framework，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。不要用 Python 解析 PSF，不要让 agent 翻译或重写 Calculator/OCEAN 公式。
 ```

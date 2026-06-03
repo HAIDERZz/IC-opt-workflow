@@ -518,12 +518,17 @@ Status: complete, verified-only.
 - Spec re-review by Hypatia passed with no findings. Code-quality re-review by Nash passed with no Critical or Important findings; the only Minor stale plan snippet was fixed.
 - C-13 route audit: aligned with the C-13 spec and top-level practice-first route. Drift: none. C-13 did not run real tools, parse PSF, rewrite OCEAN formulas, create a broad optimizer framework, add batch orchestration, or replace native layout.
 - Next allowed action: write C-14 real-tool acceptance plan for `suggest-candidate -> prepare-candidate-real-run -> C-7 adapter -> check/record`; do not run real tools until that plan exists and the user confirms.
+- C-14 Real-Tool Acceptance plan is complete, verified-only.
+- Active C-14 plan: `docs/superpowers/plans/2026-06-04-real-tool-acceptance.md`.
+- C-14 plan scope: one clean local acceptance flow using known-good seed `real_001`, C-13 `suggest-candidate` for `candidate_000002`, `prepare-candidate-real-run` for `real_002`, the existing C-7 Spectre/OCEAN adapter, and existing Hermes check/record or recovery classification.
+- C-14 boundary: no broad optimizer framework, no new algorithms, no batch orchestration, no PSF parsing, no formula rewriting, and no native Maestro/ADE layout replacement.
+- Next allowed action: execute C-14 Task 1 clean acceptance workspace and seed package; do not run real tools until Task 2 is explicitly confirmed.
 
 ## Next Step
 
 Plan A, Plan B, Plan C C-1, Plan C C-2, Plan C C-3, Plan C C-4, Plan C C-5, and Plan C C-5.5 are complete as of 2026-06-01. C-6, C-7, C-8, and C-9 are complete and reviewed as of 2026-06-02. C-10 real-run failure/retry policy contract is complete and reviewed as of 2026-06-03. C-11 local/fake smoke is complete. C-7 real-tool closure is complete and committed as `d440c95`.
 
-Current next step: write C-14 real-tool acceptance plan for `suggest-candidate -> prepare-candidate-real-run -> C-7 adapter -> check/record`; do not run real tools until that plan exists and the user confirms. Do not commit raw input decks, protected include files, PSF/raw data, full Cadence logs, `docs/OCEAN_DOC_*`, or `docs/toolchain_evidence/`. Do not parse PSF or translate OCEAN formulas in Python.
+Current next step: execute C-14 Task 1 clean acceptance workspace and seed package. Task 1 must not run real tools; do not run real Virtuoso/Spectre/OCEAN/SSH/bridge until the corresponding C-14 task is reached and explicitly confirmed. Do not commit raw input decks, protected include files, PSF/raw data, full Cadence logs, `docs/OCEAN_DOC_*`, or `docs/toolchain_evidence/`. Do not parse PSF or translate OCEAN formulas in Python.
 
 Read the handoff files first:
 
@@ -549,5 +554,5 @@ Use this prompt after compact:
 7. ic-auto-opt-workflow/docs/superpowers/plans/2026-06-03-controlled-real-tool-agent-practice.md
 8. 如需背景，再读 ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。当前活动节点是 C-13 Single-Candidate Optimizer Suggestion MVP，状态为 complete/reviewed。Design spec 是 `docs/superpowers/specs/2026-06-04-single-candidate-optimizer-suggestion-design.md`，implementation plan 是 `docs/superpowers/plans/2026-06-04-single-candidate-optimizer-suggestion.md`。代码新增 `src/hermes_workflow/optimizer_suggestion.py`，CLI 新增 `hermes-workflow suggest-candidate`，测试是 `tests/test_optimizer_suggestion.py`，Task 4 final verification/review gate 已通过。下一步只能写 C-14 real-tool acceptance plan：`suggest-candidate -> prepare-candidate-real-run -> C-7 adapter -> check/record`。不要直接运行真实 Virtuoso/Spectre/OCEAN/SSH/bridge，直到 C-14 plan 写好并得到用户确认。不要写 broad optimizer framework，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。不要用 Python 解析 PSF，不要让 agent 翻译或重写 Calculator/OCEAN 公式。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。当前活动节点是 C-14 Real-Tool Acceptance，状态为 implementation plan complete/verified-only。Active plan 是 `docs/superpowers/plans/2026-06-04-real-tool-acceptance.md`，active spec 仍是 `docs/superpowers/specs/2026-06-04-single-candidate-optimizer-suggestion-design.md` 的 Real-Tool Acceptance section。下一步只能执行 C-14 Task 1 clean acceptance workspace and seed package。Task 1 不运行真实工具；不要运行真实 Virtuoso/Spectre/OCEAN/SSH/bridge，直到进入对应 C-14 task 并得到用户确认。不要写 broad optimizer framework，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。不要用 Python 解析 PSF，不要让 agent 翻译或重写 Calculator/OCEAN 公式。
 ```
