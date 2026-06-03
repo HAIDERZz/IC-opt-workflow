@@ -77,7 +77,7 @@ def test_load_adapter_context_accepts_prepared_real_run(tmp_path: Path) -> None:
     assert context.run_id == "real_001"
     assert context.run_relative == "runs/real/real_001"
     assert context.run_dir == project_dir / "runs" / "real" / "real_001"
-    assert context.input_scs == context.run_dir / "input.scs"
+    assert context.input_scs == context.run_dir / "netlist" / "input.scs"
     assert context.psf_dir == context.run_dir / "psf"
     assert context.metrics_dir == context.run_dir / "metrics"
     assert context.request.backend == "spectre_ocean_batch"
@@ -147,9 +147,9 @@ def test_load_adapter_context_rejects_unsafe_expected_psf_dir(tmp_path: Path) ->
     [
         (
             lambda request, _manifest: request.update(
-                {"prepared_input_scs": "runs/real/real_001/alternate_input.scs"}
+                {"prepared_input_scs": "runs/real/real_001/netlist/alternate_input.scs"}
             ),
-            "prepared_input_scs must be runs/real/real_001/input.scs",
+            "prepared_input_scs must be runs/real/real_001/netlist/input.scs",
         ),
         (
             lambda request, _manifest: request.update(
@@ -204,7 +204,7 @@ def test_load_adapter_context_rejects_symlinked_input_before_hashing(
     tmp_path: Path,
 ) -> None:
     project_dir = _create_ready_real_run_project(tmp_path)
-    input_scs = project_dir / "runs" / "real" / "real_001" / "input.scs"
+    input_scs = project_dir / "runs" / "real" / "real_001" / "netlist" / "input.scs"
     outside_input = tmp_path / "outside_input.scs"
     outside_input.write_text(input_scs.read_text(encoding="utf-8"), encoding="utf-8")
     input_scs.unlink()
@@ -509,7 +509,7 @@ class FakeSuccessRunner:
         stderr_path.write_text("", encoding="utf-8")
         assert timeout_s > 0
         if argv[0] == "spectre":
-            psf_dir = cwd / "psf"
+            psf_dir = cwd.parent / "psf"
             psf_dir.mkdir(parents=True, exist_ok=True)
             (psf_dir / "spectre.out").write_text("fake spectre out\n", encoding="utf-8")
         elif argv[0] == "ocean":
@@ -682,7 +682,11 @@ def test_run_spectre_ocean_adapter_uses_project_root_for_ocean_paths(
 
     run_spectre_ocean_adapter(project_dir, runner=runner)
 
-    assert runner.commands[0][runner.commands[0].index("=log") + 1] == "psf/spectre.out"
+    assert "+escchars" in runner.commands[0]
+    assert runner.commands[0][runner.commands[0].index("+log") + 1] == (
+        "../psf/spectre.out"
+    )
+    assert runner.commands[0][runner.commands[0].index("-raw") + 1] == "../psf"
     assert runner.commands[1][runner.commands[1].index("-replay") + 1] == (
         "runs/real/real_001/metrics/metric_probe.ocn"
     )

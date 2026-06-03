@@ -21,6 +21,7 @@ from hermes_workflow.validate import ContractBundle, assert_valid_project
 RUN_ID_RE = re.compile(r"^real_[0-9]{3}$")
 DEFAULT_RUN_ID = "real_001"
 REAL_RUN_ROOT = "runs/real"
+SPECTRE_NETLIST_DIR = "netlist"
 SUPERVISOR_INSTRUCTION = "supervisor_instruction.json"
 EXECUTION_MANIFEST = "execution_package/execution_manifest.json"
 LEDGER_PATH = "ledger/experiment_ledger.jsonl"
@@ -388,7 +389,9 @@ def _write_real_run_package(
     if not template_path.exists():
         raise FileNotFoundError(f"template.scs is missing: {template_relative}")
 
-    rendered_relative = f"{REAL_RUN_ROOT}/{selected_run_id}/input.scs"
+    rendered_relative = (
+        f"{REAL_RUN_ROOT}/{selected_run_id}/{SPECTRE_NETLIST_DIR}/input.scs"
+    )
     candidate_relative = f"{REAL_RUN_ROOT}/{selected_run_id}/candidate.json"
     metric_request_relative = (
         f"{REAL_RUN_ROOT}/{selected_run_id}/metric_extraction_request.json"
@@ -400,7 +403,9 @@ def _write_real_run_package(
     created_run_dir = not run_dir.exists()
     try:
         run_dir.mkdir(parents=True, exist_ok=True)
-        _copy_exported_netlist_bundle(bundle, run_dir)
+        netlist_dir = run_dir / SPECTRE_NETLIST_DIR
+        netlist_dir.mkdir(parents=True, exist_ok=True)
+        _copy_exported_netlist_bundle(bundle, netlist_dir)
         rendered_text = (
             rendered_text_override
             if rendered_text_override is not None

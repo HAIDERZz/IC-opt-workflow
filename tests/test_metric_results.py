@@ -818,7 +818,7 @@ def test_check_metric_results_rejects_current_prepared_input_hash_drift(
 ) -> None:
     project_dir = _create_ready_project(tmp_path)
     _write_valid_result_files(project_dir)
-    input_path = project_dir / "runs" / "real" / "real_001" / "input.scs"
+    input_path = project_dir / "runs" / "real" / "real_001" / "netlist" / "input.scs"
     input_path.write_text(input_path.read_text(encoding="utf-8") + "\n// drift\n")
 
     report = check_metric_results(project_dir)

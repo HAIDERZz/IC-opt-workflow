@@ -25,6 +25,7 @@ from hermes_workflow.validate import ContractBundle, assert_valid_project
 RUN_ID_RE = re.compile(r"^real_[0-9]{3}$")
 DEFAULT_RUN_ID = "real_001"
 REAL_RUN_ROOT = "runs/real"
+SPECTRE_NETLIST_DIR = "netlist"
 METRIC_RESULT_REPORT = "reports/metric_result_check_report.json"
 METRIC_REQUEST_NAME = "metric_extraction_request.json"
 METRIC_RESULT_MANIFEST_NAME = "metrics/metric_result_manifest.json"
@@ -470,7 +471,7 @@ def _validate_prepared_input_identity(
     issues: list[str],
 ) -> bool:
     identity_ok = True
-    expected_input_scs = f"{REAL_RUN_ROOT}/{run_id}/input.scs"
+    expected_input_scs = f"{REAL_RUN_ROOT}/{run_id}/{SPECTRE_NETLIST_DIR}/input.scs"
     if prepared.rendered_input_scs != expected_input_scs:
         identity_ok = False
         issues.append("prepared input path does not match expected path")

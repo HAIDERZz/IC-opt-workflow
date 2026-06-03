@@ -258,7 +258,7 @@ def test_prepare_next_real_run_writes_real_002_package(tmp_path: Path) -> None:
     candidate = _load_json(run_dir / "candidate.json")
     manifest = _load_json(run_dir / "real_run_manifest.json")
     metric_request = _load_json(run_dir / "metric_extraction_request.json")
-    rendered = (run_dir / "input.scs").read_text(encoding="utf-8")
+    rendered = (run_dir / "netlist" / "input.scs").read_text(encoding="utf-8")
 
     assert package.run_id == "real_002"
     assert package.run_dir == run_dir

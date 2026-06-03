@@ -812,7 +812,7 @@ def test_prepare_retry_preserves_rendered_input(tmp_path: Path) -> None:
     project_dir = _create_ready_project(tmp_path)
     _write_result_manifest(project_dir, status="failed")
     original = (
-        project_dir / "runs" / "real" / "real_001" / "input.scs"
+        project_dir / "runs" / "real" / "real_001" / "netlist" / "input.scs"
     ).read_text(encoding="utf-8")
 
     prepare_real_run_retry(
@@ -824,7 +824,7 @@ def test_prepare_retry_preserves_rendered_input(tmp_path: Path) -> None:
     )
 
     retry_text = (
-        project_dir / "runs" / "real" / "real_002" / "input.scs"
+        project_dir / "runs" / "real" / "real_002" / "netlist" / "input.scs"
     ).read_text(encoding="utf-8")
     assert retry_text == original
 
@@ -835,7 +835,7 @@ def test_prepare_retry_preserves_rendered_input_after_template_change(
     project_dir = _create_ready_project(tmp_path)
     _write_result_manifest(project_dir, status="failed")
     original = (
-        project_dir / "runs" / "real" / "real_001" / "input.scs"
+        project_dir / "runs" / "real" / "real_001" / "netlist" / "input.scs"
     ).read_text(encoding="utf-8")
     template_path = project_dir / "netlists" / "templates" / "template.scs"
     template_path.write_text(
@@ -852,7 +852,7 @@ def test_prepare_retry_preserves_rendered_input_after_template_change(
     )
 
     retry_text = (
-        project_dir / "runs" / "real" / "real_002" / "input.scs"
+        project_dir / "runs" / "real" / "real_002" / "netlist" / "input.scs"
     ).read_text(encoding="utf-8")
     assert retry_text == original
     assert "stop=20n" not in retry_text

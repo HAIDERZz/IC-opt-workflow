@@ -43,6 +43,7 @@ from hermes_workflow.validate import assert_valid_project
 RUN_ID_RE = re.compile(r"^real_[0-9]{3}$")
 DEFAULT_SCHEMA_VERSION = "1.0"
 REAL_RUN_ROOT = "runs/real"
+SPECTRE_NETLIST_DIR = "netlist"
 RECOVERY_REPORT = "reports/real_run_recovery_report.json"
 REAL_RUN_CHECK_REPORT = "reports/real_run_check_report.json"
 METRIC_RESULT_CHECK_REPORT = "reports/metric_result_check_report.json"
@@ -831,7 +832,7 @@ def _assert_decision_target_available(decision_path: Path) -> None:
 
 
 def _failed_rendered_input_text(failed_run_dir: Path) -> str:
-    input_path = failed_run_dir / "input.scs"
+    input_path = failed_run_dir / SPECTRE_NETLIST_DIR / "input.scs"
     if not input_path.exists():
         raise FileNotFoundError(f"failed run rendered input is missing: {input_path}")
     return input_path.read_text(encoding="utf-8")

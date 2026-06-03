@@ -206,13 +206,13 @@ def test_prepare_real_run_writes_first_real_run_package(tmp_path: Path) -> None:
     )
 
     run_dir = project_dir / "runs" / "real" / "real_001"
-    rendered = (run_dir / "input.scs").read_text(encoding="utf-8")
+    rendered = (run_dir / "netlist" / "input.scs").read_text(encoding="utf-8")
     candidate = _load_json(run_dir / "candidate.json")
     manifest = _load_json(run_dir / "real_run_manifest.json")
 
     assert package.run_id == "real_001"
     assert package.run_dir == run_dir
-    assert package.rendered_input_scs == run_dir / "input.scs"
+    assert package.rendered_input_scs == run_dir / "netlist" / "input.scs"
     assert package.candidate_path == run_dir / "candidate.json"
     assert package.manifest_path == run_dir / "real_run_manifest.json"
     assert "{{" not in rendered
@@ -239,14 +239,14 @@ def test_prepare_real_run_writes_first_real_run_package(tmp_path: Path) -> None:
     assert manifest["status"] == "prepared"
     assert manifest["supervisor_decision"] == "approve_first_real_run"
     assert manifest["template_scs"] == "netlists/templates/template.scs"
-    assert manifest["rendered_input_scs"] == "runs/real/real_001/input.scs"
+    assert manifest["rendered_input_scs"] == "runs/real/real_001/netlist/input.scs"
     assert manifest["candidate_file"] == "runs/real/real_001/candidate.json"
     assert manifest["candidate_id"] == "real_001"
     assert manifest["candidate_source"] == "lower_bound_first_real_run"
     assert manifest["template_sha256"] == sha256_file(
         project_dir / "netlists" / "templates" / "template.scs"
     )
-    assert manifest["rendered_input_sha256"] == sha256_file(run_dir / "input.scs")
+    assert manifest["rendered_input_sha256"] == sha256_file(run_dir / "netlist" / "input.scs")
     assert manifest["approved_config_hashes"]["config/project_config.yaml"]
     assert manifest["spectre"] == {
         "engine": "spectre_x",
@@ -287,14 +287,15 @@ def test_prepare_real_run_copies_exported_netlist_sidecars(tmp_path: Path) -> No
     prepare_real_run(project_dir, created_at_utc="2026-05-31T00:20:00Z")
 
     run_dir = project_dir / "runs" / "real" / "real_001"
-    assert (run_dir / "ade_e.scs").read_text(encoding="utf-8") == (
+    netlist_dir = run_dir / "netlist"
+    assert (netlist_dir / "ade_e.scs").read_text(encoding="utf-8") == (
         "simulatorOptions options\n"
     )
-    assert (run_dir / "amap" / "designData.json").read_text(encoding="utf-8") == "{}\n"
-    assert (run_dir / ".modelFiles").read_text(encoding="utf-8") == (
+    assert (netlist_dir / "amap" / "designData.json").read_text(encoding="utf-8") == "{}\n"
+    assert (netlist_dir / ".modelFiles").read_text(encoding="utf-8") == (
         "model file sidecar\n"
     )
-    assert "FN=2" in (run_dir / "input.scs").read_text(encoding="utf-8")
+    assert "FN=2" in (netlist_dir / "input.scs").read_text(encoding="utf-8")
 
 
 def test_prepare_real_run_rejects_exported_netlist_sidecar_symlink(
@@ -339,7 +340,7 @@ def test_prepare_real_run_writes_metric_extraction_request(tmp_path: Path) -> No
     assert request["backend"] == "spectre_ocean_batch"
     assert request["run_id"] == "real_001"
     assert request["candidate_id"] == "real_001"
-    assert request["prepared_input_scs"] == "runs/real/real_001/input.scs"
+    assert request["prepared_input_scs"] == "runs/real/real_001/netlist/input.scs"
     assert request["prepared_input_sha256"] == manifest["rendered_input_sha256"]
     assert request["expected_psf_dir"] == "runs/real/real_001/psf"
     assert request["spectre"] == {
@@ -446,7 +447,7 @@ def test_prepare_real_run_accepts_valid_custom_run_id(tmp_path: Path) -> None:
     assert package.run_id == "real_007"
     assert manifest["run_id"] == "real_007"
     assert manifest["candidate_id"] == "real_007"
-    assert manifest["rendered_input_scs"] == "runs/real/real_007/input.scs"
+    assert manifest["rendered_input_scs"] == "runs/real/real_007/netlist/input.scs"
 
 
 def test_prepare_real_run_rejects_placeholder_candidate_values(

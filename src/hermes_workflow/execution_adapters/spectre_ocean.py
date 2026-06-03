@@ -31,6 +31,7 @@ METRIC_REQUEST_NAME = "metric_extraction_request.json"
 REAL_RUN_MANIFEST_NAME = "real_run_manifest.json"
 SPECTRE_ENGINE = "spectre_x"
 SPECTRE_OUTPUT_FORMAT = "psfxl"
+SPECTRE_NETLIST_DIR_NAME = "netlist"
 SPECTRE_INPUT_NAME = "input.scs"
 PSF_DIR_NAME = "psf"
 METRICS_DIR_NAME = "metrics"
@@ -168,7 +169,7 @@ def run_spectre_ocean_adapter(
 
     spectre_result = runner.run(
         _spectre_argv(context),
-        cwd=context.run_dir,
+        cwd=context.input_scs.parent,
         stdout_path=context.run_dir / SPECTRE_STDOUT_NAME,
         stderr_path=context.run_dir / SPECTRE_STDERR_NAME,
         timeout_s=int(context.request.spectre.get("timeout_s", 3600)),
@@ -254,7 +255,7 @@ def load_adapter_context(
 
     _validate_ids_and_modes(selected_run_id, prepared, request)
 
-    expected_input = f"{run_relative}/{SPECTRE_INPUT_NAME}"
+    expected_input = f"{run_relative}/{SPECTRE_NETLIST_DIR_NAME}/{SPECTRE_INPUT_NAME}"
     expected_psf = f"{run_relative}/{PSF_DIR_NAME}"
     expected_metrics = f"{run_relative}/{METRICS_DIR_NAME}"
     expected_ocean_script = f"{expected_metrics}/{OCEAN_SCRIPT_NAME}"
@@ -325,6 +326,7 @@ def load_adapter_context(
     if request.prepared_input_sha256 != prepared.rendered_input_sha256:
         raise AdapterPreconditionError("prepared input hash mismatch")
     _reject_symlinks(project_dir, input_scs, "prepared_input_scs")
+    _reject_symlinks(project_dir, input_scs.parent, "spectre netlist directory")
     if not input_scs.exists():
         raise AdapterPreconditionError("prepared input_scs is missing")
     current_input_sha256 = sha256_file(input_scs)
@@ -510,12 +512,24 @@ def _spectre_argv(context: SpectreOceanContext) -> list[str]:
         "spectre",
         "-64",
         context.input_scs.name,
+        "+escchars",
+        "+preset=cx",
+        "+mt=16",
+        "+lqtimeout",
+        "900",
+        "-maxw",
+        "5",
+        "-maxn",
+        "5",
+        "-env",
+        "ade",
+        "+logstatus",
         "-format",
         SPECTRE_OUTPUT_FORMAT,
         "-raw",
-        context.psf_dir.name,
-        "=log",
-        f"{PSF_DIR_NAME}/spectre.out",
+        f"../{PSF_DIR_NAME}",
+        "+log",
+        f"../{PSF_DIR_NAME}/spectre.out",
     ]
 
 

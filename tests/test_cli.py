@@ -289,7 +289,7 @@ tran tran stop=10n
     assert "run: runs/real/real_001" in result.stdout
     assert "manifest: runs/real/real_001/real_run_manifest.json" in result.stdout
     assert manifest_path.exists()
-    assert (project_dir / "runs" / "real" / "real_001" / "input.scs").exists()
+    assert (project_dir / "runs" / "real" / "real_001" / "netlist" / "input.scs").exists()
 
 
 def test_cli_prepare_real_run_reports_missing_approval_without_traceback(

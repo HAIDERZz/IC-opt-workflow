@@ -34,7 +34,7 @@ tran tran stop=10n
 def test_ledger_row_accepts_real_result_provenance() -> None:
     row = LedgerRow(
         candidate_id="real_001",
-        parameters={"FN": "2", "WN": "0.3 um", "FP": "2", "WP": "0.3 um"},
+        parameters={"FN": "2", "WN": "0.3u", "FP": "2", "WP": "0.3u"},
         metrics={"rise": 1.25e-10, "fall": 1.45e-10, "DC": 3.2e-4},
         constraints_passed=True,
         objective=3.2e-4,
@@ -344,9 +344,9 @@ def test_record_real_result_writes_ledger_state_best_and_report(tmp_path: Path) 
     assert row["timestamp_utc"] == "2026-06-02T12:00:00Z"
     assert row["parameters"] == {
         "FN": "2",
-        "WN": "0.3 um",
+        "WN": "0.3u",
         "FP": "2",
-        "WP": "0.3 um",
+        "WP": "0.3u",
     }
     assert row["metrics"]["rise"] == pytest.approx(1.0e-12)
     assert row["metrics"]["fall"] == pytest.approx(1.0e-12)
@@ -365,9 +365,9 @@ def test_record_real_result_writes_ledger_state_best_and_report(tmp_path: Path) 
     assert best["candidate_id"] == "real_001"
     assert best["parameters"] == {
         "FN": "2",
-        "WN": "0.3 um",
+        "WN": "0.3u",
         "FP": "2",
-        "WP": "0.3 um",
+        "WP": "0.3u",
     }
     assert best["metrics"] == row["metrics"]
     assert best["objective"] == pytest.approx(row["objective"])

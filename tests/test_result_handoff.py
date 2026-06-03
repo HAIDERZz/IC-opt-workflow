@@ -71,7 +71,7 @@ def test_real_run_check_report_schema_accepts_pass_report() -> None:
         result_status=RealRunResultStatus.SUCCEEDED,
         real_run_manifest="runs/real/real_001/real_run_manifest.json",
         result_manifest="runs/real/real_001/result_manifest.json",
-        prepared_input_scs="runs/real/real_001/input.scs",
+        prepared_input_scs="runs/real/real_001/netlist/input.scs",
         log_file="runs/real/real_001/spectre.log",
         artifact_files=["runs/real/real_001/artifacts/psf_summary.txt"],
         checks=RealRunCheckFlags(
@@ -99,7 +99,7 @@ def test_real_run_check_report_schema_rejects_unknown_fields() -> None:
             result_status="succeeded",
             real_run_manifest="runs/real/real_001/real_run_manifest.json",
             result_manifest="runs/real/real_001/result_manifest.json",
-            prepared_input_scs="runs/real/real_001/input.scs",
+            prepared_input_scs="runs/real/real_001/netlist/input.scs",
             log_file="runs/real/real_001/spectre.log",
             artifact_files=[],
             checks={
@@ -173,7 +173,7 @@ def test_check_real_run_accepts_valid_succeeded_handoff(tmp_path: Path) -> None:
     assert report.candidate_id == "real_001"
     assert report.real_run_manifest == "runs/real/real_001/real_run_manifest.json"
     assert report.result_manifest == "runs/real/real_001/result_manifest.json"
-    assert report.prepared_input_scs == "runs/real/real_001/input.scs"
+    assert report.prepared_input_scs == "runs/real/real_001/netlist/input.scs"
     assert report.log_file == "runs/real/real_001/spectre.log"
     assert report.artifact_files == ["runs/real/real_001/artifacts/psf_summary.txt"]
     assert report.checks.prepared_manifest_ok is True
@@ -283,7 +283,7 @@ def test_check_real_run_reports_invalid_manifest_shape(
 def test_check_real_run_reports_prepared_input_hash_drift(tmp_path: Path) -> None:
     project_dir, _package = _prepare_real_run_project(tmp_path)
     _write_result_handoff(project_dir)
-    input_path = project_dir / "runs" / "real" / "real_001" / "input.scs"
+    input_path = project_dir / "runs" / "real" / "real_001" / "netlist" / "input.scs"
     input_path.write_text(
         input_path.read_text(encoding="utf-8") + "\n// changed after prepare-real-run\n",
         encoding="utf-8",

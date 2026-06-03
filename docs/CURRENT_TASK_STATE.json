@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "current_scope": "C-7 Real Tool Closure Fixes",
-  "current_status": "C-7 Real Tool Closure Fixes Task 2 is complete, verified-only. Variable validation now rejects whitespace-separated unit suffixes such as 0.3 um for continuous_step variables, shipped template and fixture variables use compact Spectre-safe suffixes such as 0.3u, and mock optimizer candidate generation preserves compact unit formatting.",
+  "current_status": "C-7 Real Tool Closure Fixes Task 3 and Task 4 are complete, verified-only. Root cause was not OCEAN formula text; Spectre must run from an ADE-style runs/real/<run_id>/netlist working directory with sibling runs/real/<run_id>/psf so OCEAN recovers slash signal names such as /VOUT, /VDD, and /M0/S. Real Spectre+OCEAN adapter closure passed in /tmp/ic_auto_opt_c7_fixed_001/bridge_test_inv, followed by Hermes check-real-run, check-metric-results, and record-real-result.",
   "review_status": "verified-only",
   "subagent_dispatch": "available",
   "active_spec": "docs/superpowers/specs/2026-06-03-controlled-real-tool-agent-practice-design.md",
@@ -12,8 +12,8 @@
     "docs/EXECUTION_PROGRESS_2026-05-29.md",
     "docs/COMPACT_RESUME_CHECKPOINT.md"
   ],
-  "next_allowed_action": "start C-7 Real Tool Closure Fixes Task 3 metric namespace contract; do not run real tools until formula contract fixes are complete and user authorizes the closure smoke",
-  "forbidden_actions": [
+  "next_allowed_action": "commit this C-7 closure fix with explicit pathspecs, then decide whether to rerun C-12 controlled real-tool practice from a clean project",
+    "forbidden_actions": [
     "run Virtuoso",
     "run Spectre",
     "run OCEAN",
@@ -47,6 +47,7 @@
     "task_1_input_gate_completion": "C-12 Task 1 confirmed /tmp/ic_auto_opt_c12/bridge_test_inv/netlists/exported/input.scs exists and wrote the local-only hash file to /tmp/ic_auto_opt_c12/evidence/2026-06-03-c12-controlled-real-tool-agent-practice/exported_input_scs.sha256. No real tools were run, no adapter was called, no PSF was parsed, and no formula was rewritten.",
     "previous_task_3_spec_review": "Ptolemy 019e8cc5-30bf-7022-bca2-657b57fec88a approved C-11 Task 3 spec compliance after stale handoff prompts were fixed; no remaining Critical, Important, or Minor findings.",
     "previous_task_3_code_quality_review": "Heisenberg 019e8cc8-c26b-7ef2-8fd4-d5679088521d approved C-11 Task 3 code quality with no Critical, Important, or Minor findings.",
-    "task_4_local_verification": "User confirmed lightweight C-12 Task 4 before C-7 fix. Hermes check-real-run passed for real_001 and wrote reports/real_run_check_report.json. Hermes check-metric-results failed because simulator status was failed, result_manifest.metric_result_manifest was null, and runs/real/real_001/metrics/metric_result_manifest.json was missing. record-real-result was skipped. assess-real-run-recovery passed and wrote reports/real_run_recovery_report.json with classification tool_result_failed, recommended_action retry_same_candidate, allowed_actions retry_same_candidate/abandon_candidate/stop_workflow, attempt_number 1, retry_budget_remaining 1. Local evidence and hashes were written under /tmp/ic_auto_opt_c12/evidence/2026-06-03-c12-controlled-real-tool-agent-practice. No adapter rerun, no real tool rerun, no manual artifact repair, no PSF parsing, no formula rewriting, no retry package, and no optimizer ledger/state row were created for the failed unchecked result."
+    "task_4_local_verification": "User confirmed lightweight C-12 Task 4 before C-7 fix. Hermes check-real-run passed for real_001 and wrote reports/real_run_check_report.json. Hermes check-metric-results failed because simulator status was failed, result_manifest.metric_result_manifest was null, and runs/real/real_001/metrics/metric_result_manifest.json was missing. record-real-result was skipped. assess-real-run-recovery passed and wrote reports/real_run_recovery_report.json with classification tool_result_failed, recommended_action retry_same_candidate, allowed_actions retry_same_candidate/abandon_candidate/stop_workflow, attempt_number 1, retry_budget_remaining 1. Local evidence and hashes were written under /tmp/ic_auto_opt_c12/evidence/2026-06-03-c12-controlled-real-tool-agent-practice. No adapter rerun, no real tool rerun, no manual artifact repair, no PSF parsing, no formula rewriting, no retry package, and no optimizer ledger/state row were created for the failed unchecked result.",
+    "c7_real_tool_closure": "Real debug compared the old failed adapter output against the successful Phase4 evidence. Complete Maestro sidecars and +escchars/+preset flags were not sufficient when the run package flattened the netlist bundle into the run root: OCEAN saw plain names and slash formulas returned nil. Running Spectre from a directory literally named netlist with sibling psf restored slash names and made rise/fall/DC match Phase4. Code now prepares rendered input at runs/real/<run_id>/netlist/input.scs, copies exported sidecars under that netlist directory, runs Spectre from it, and keeps PSF at runs/real/<run_id>/psf. Verification: python3 -m pytest -q passed 445 tests; python3 -m ruff check . passed; real adapter plus Hermes check-real-run/check-metric-results/record-real-result passed for /tmp/ic_auto_opt_c7_fixed_001/bridge_test_inv."
   }
 }
