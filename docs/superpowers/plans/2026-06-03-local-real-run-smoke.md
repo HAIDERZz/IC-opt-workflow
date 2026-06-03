@@ -736,7 +736,7 @@ Expected: commit succeeds. Do not stage local OCEAN research or toolchain eviden
 - Modify: `docs/PROJECT_WORKFLOW_OVERVIEW.md`
 - Modify: `docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md`
 
-- [ ] **Step 1: Add the failing narrow CLI smoke test**
+- [x] **Step 1: Add the failing narrow CLI smoke test**
 
 Append to `tests/test_local_real_run_smoke.py`:
 
@@ -791,7 +791,7 @@ def test_c11_cli_smoke_records_next_real_run(tmp_path):
 
 If imports become duplicated, consolidate them at the top of `tests/test_local_real_run_smoke.py` before running ruff.
 
-- [ ] **Step 2: Run the CLI smoke test**
+- [x] **Step 2: Run the CLI smoke test**
 
 Run:
 
@@ -801,7 +801,7 @@ python3 -m pytest tests/test_local_real_run_smoke.py::test_c11_cli_smoke_records
 
 Expected: 1 test passes.
 
-- [ ] **Step 3: Run focused smoke suite**
+- [x] **Step 3: Run focused smoke suite**
 
 Run:
 
@@ -811,7 +811,7 @@ python3 -m pytest tests/test_local_real_run_smoke.py -q
 
 Expected: all C-11 smoke tests pass.
 
-- [ ] **Step 4: Run full verification**
+- [x] **Step 4: Run full verification**
 
 Run:
 
@@ -823,7 +823,7 @@ git diff --check
 
 Expected: full pytest passes, ruff reports all checks passed, and `git diff --check` has no output.
 
-- [ ] **Step 5: Update docs and route audit**
+- [x] **Step 5: Update docs and route audit**
 
 In this plan, mark Task 4 steps as complete.
 
@@ -843,7 +843,7 @@ C-11 local/fake controlled smoke is complete. It verifies the C-9 -> fake C-7-st
 
 Do not update `AGENTS.md` unless the cadence, role model, or handoff expectations change.
 
-- [ ] **Step 6: Commit Task 4**
+- [x] **Step 6: Commit Task 4**
 
 Run:
 
@@ -854,7 +854,7 @@ git commit -m "test: add local real run cli smoke"
 
 Expected: commit succeeds. Do not stage local OCEAN research or toolchain evidence files.
 
-- [ ] **Step 7: Final review gate**
+- [x] **Step 7: Final review gate**
 
 Run the project review gate after the commit:
 
