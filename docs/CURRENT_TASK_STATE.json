@@ -1,8 +1,8 @@
 {
   "schema_version": "1.0",
-  "current_scope": "Plan C C-12 controlled real-tool/agent practice implementation plan",
-  "current_status": "C-12 implementation plan written; pending user execution choice",
-  "review_status": "verified-only",
+  "current_scope": "Plan C C-12 Task 1 practice workspace and input gate",
+  "current_status": "C-12 Task 1 blocked at exported input.scs gate",
+  "review_status": "reviewed",
   "subagent_dispatch": "available",
   "active_spec": "docs/superpowers/specs/2026-06-03-controlled-real-tool-agent-practice-design.md",
   "active_plan": "docs/superpowers/plans/2026-06-03-controlled-real-tool-agent-practice.md",
@@ -12,7 +12,7 @@
     "docs/EXECUTION_PROGRESS_2026-05-29.md",
     "docs/COMPACT_RESUME_CHECKPOINT.md"
   ],
-  "next_allowed_action": "user review of C-12 implementation plan and execution approach choice",
+  "next_allowed_action": "place the real exported input.scs at /tmp/ic_auto_opt_c12/bridge_test_inv/netlists/exported/input.scs, then rerun C-12 Task 1 Step 7",
   "forbidden_actions": [
     "run Virtuoso",
     "run Spectre",
@@ -33,7 +33,9 @@
     "git status --short"
   ],
   "review_evidence": {
-    "plan_self_review": "C-12 implementation plan covers one known cell, one approved real-run package, one execution-agent/C-7 adapter invocation, Hermes checks/recording, failure recovery assessment, and local-only evidence policy. No real tools were run while writing the plan.",
+    "spec_review": "Plato 019e8d35-a238-7980-ba60-607d6457152d approved C-12 Task 1 blocker recording with no Critical, Important, or Minor findings. Route audit aligned and not drifted.",
+    "code_quality_review": "Aristotle 019e8d36-b189-7a02-aa9f-fb52a510daef approved the modified tracked-file changes. Important residual risk: untracked docs/OCEAN_DOC_* and docs/toolchain_evidence/ remain an accidental-commit risk, so commits must use explicit pathspecs.",
+    "task_1_blocker": "C-12 Task 1 completed local workspace creation, Hermes CLI availability check, Hermes init, fixed cell contract check, and approved formula text check. It stopped at Step 7 because /tmp/ic_auto_opt_c12/bridge_test_inv/netlists/exported/input.scs is missing. No real tools were run, no adapter was called, no PSF was parsed, and no formula was rewritten.",
     "previous_task_3_spec_review": "Ptolemy 019e8cc5-30bf-7022-bca2-657b57fec88a approved C-11 Task 3 spec compliance after stale handoff prompts were fixed; no remaining Critical, Important, or Minor findings.",
     "previous_task_3_code_quality_review": "Heisenberg 019e8cc8-c26b-7ef2-8fd4-d5679088521d approved C-11 Task 3 code quality with no Critical, Important, or Minor findings."
   }

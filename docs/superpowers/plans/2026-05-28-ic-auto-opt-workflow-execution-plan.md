@@ -35,9 +35,9 @@ As of 2026-06-03, focused Plan A, Plan B, and Plan C C-1 through C-11 are comple
 - C-11 Task 2 library happy-path smoke is complete and reviewed.
 - C-11 Task 3 controlled failure/retry smoke is complete and reviewed.
 - C-11 Task 4 CLI smoke, docs, and final gate is complete and reviewed.
-- C-12 controlled real-tool/agent practice design spec and implementation plan are written; pending user execution choice.
+- C-12 Task 1 practice workspace and input gate is blocked at the missing exported `input.scs` gate.
 
-C-11 verifies the C-9 -> fake C-7-style returned artifacts -> C-5/C-6 checks -> C-8 happy path and one controlled C-10 failure/retry path without real Virtuoso/Spectre/OCEAN/SSH/agent/bridge execution. The current node is `Plan C C-12 controlled real-tool/agent practice implementation plan`, verified-only and pending user execution choice. Next, review the C-12 implementation plan and choose execution approach. Current resume guidance is in `docs/CURRENT_TASK_STATE.json`, `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`, `docs/EXECUTION_PROGRESS_2026-05-29.md`, `docs/COMPACT_RESUME_CHECKPOINT.md`, and `AGENTS.md`.
+C-11 verifies the C-9 -> fake C-7-style returned artifacts -> C-5/C-6 checks -> C-8 happy path and one controlled C-10 failure/retry path without real Virtuoso/Spectre/OCEAN/SSH/agent/bridge execution. The current node is `Plan C C-12 Task 1 practice workspace and input gate`, verified-only and blocked because `/tmp/ic_auto_opt_c12/bridge_test_inv/netlists/exported/input.scs` is missing after `hermes-workflow init`. Next, place the real exported input.scs at /tmp/ic_auto_opt_c12/bridge_test_inv/netlists/exported/input.scs, then rerun C-12 Task 1 Step 7. Current resume guidance is in `docs/CURRENT_TASK_STATE.json`, `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`, `docs/EXECUTION_PROGRESS_2026-05-29.md`, `docs/COMPACT_RESUME_CHECKPOINT.md`, and `AGENTS.md`.
 
 ## Current Route Alignment
 

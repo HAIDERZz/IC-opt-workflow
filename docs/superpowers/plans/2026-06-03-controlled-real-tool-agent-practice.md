@@ -114,7 +114,7 @@ If `hermes-workflow` is not on `PATH`, stop and install or activate the local pr
 
 This task prepares the local practice workspace and confirms the fixed cell/deck/formula gates. It does not run real Spectre, OCEAN, SSH, `virtuoso-bridge-lite`, Claude CLI, or the C-7 adapter.
 
-- [ ] **Step 1: Confirm route and repo state**
+- [x] **Step 1: Confirm route and repo state**
 
 Run:
 
@@ -130,7 +130,7 @@ Expected:
 - `git status --short` shows no unexpected tracked changes
 - local OCEAN research/evidence files may remain untracked
 
-- [ ] **Step 2: Create local practice directories**
+- [x] **Step 2: Create local practice directories**
 
 Run:
 
@@ -149,7 +149,7 @@ Expected:
 - `/tmp/ic_auto_opt_c12` exists
 - `/tmp/ic_auto_opt_c12/evidence/2026-06-03-c12-controlled-real-tool-agent-practice/session_paths.txt` exists
 
-- [ ] **Step 3: Confirm Hermes CLI availability**
+- [x] **Step 3: Confirm Hermes CLI availability**
 
 Run:
 
@@ -165,7 +165,7 @@ Expected:
 
 If either command fails, stop and report an environment setup blocker. Do not replace Hermes CLI with ad-hoc Python.
 
-- [ ] **Step 4: Initialize the local C-12 project**
+- [x] **Step 4: Initialize the local C-12 project**
 
 Run:
 
@@ -181,7 +181,7 @@ Expected:
 
 This `rm -rf` targets only `/tmp/ic_auto_opt_c12/bridge_test_inv`. Do not run destructive cleanup on repository paths.
 
-- [ ] **Step 5: Confirm the fixed cell contract**
+- [x] **Step 5: Confirm the fixed cell contract**
 
 Run:
 
@@ -197,7 +197,7 @@ bridge_test_inv
 tran_dc_test
 ```
 
-- [ ] **Step 6: Confirm approved formula contract text**
+- [x] **Step 6: Confirm approved formula contract text**
 
 Run:
 
@@ -231,6 +231,8 @@ If this fails, stop and ask the user or execution agent to place the real export
 ```
 
 Do not copy local `input.scs` examples into the repository and do not commit the deck.
+
+Task 1 stopped here on 2026-06-03: the file was missing after `hermes-workflow init`, so Step 8 and later steps must wait until the real exported deck is placed at the path above.
 
 - [ ] **Step 8: Capture local-only input hash**
 
