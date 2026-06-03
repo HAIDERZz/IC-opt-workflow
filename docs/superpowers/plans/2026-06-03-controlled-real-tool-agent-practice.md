@@ -467,7 +467,7 @@ Stop and report Task 2 status to the user.
 
 This is the first C-12 task that may run real Spectre and OCEAN. It must not start until the user explicitly confirms that real-tool execution is allowed for C-12 Task 3.
 
-- [ ] **Step 1: Request and record user go-ahead**
+- [x] **Step 1: Request and record user go-ahead**
 
 Before running any real-tool command, ask the user:
 
@@ -479,7 +479,9 @@ Expected: user explicitly confirms.
 
 If the user does not confirm, stop with `blocked-no-subagent` or `verified-only` status as appropriate. Do not run Task 3.
 
-- [ ] **Step 2: Confirm Cadence setup file exists**
+Task 3 go-ahead was provided on 2026-06-03 by the user request: `进行Task 3`.
+
+- [x] **Step 2: Confirm Cadence setup file exists**
 
 Run:
 
@@ -491,12 +493,12 @@ Expected: command exits 0.
 
 If it fails, stop and report an environment setup blocker.
 
-- [ ] **Step 3: Confirm Spectre and OCEAN are visible in the execution shell**
+- [x] **Step 3: Confirm Spectre and OCEAN are visible in the execution shell**
 
 Run:
 
 ```bash
-csh -lc "source $C12_CADENCE_CSHRC; which spectre; which ocean"
+csh -fc "source $C12_CADENCE_CSHRC; which spectre; which ocean"
 ```
 
 Expected:
@@ -506,7 +508,9 @@ Expected:
 
 This checks tool visibility only. It does not run simulations.
 
-- [ ] **Step 4: Record execution-agent boundary**
+Plan correction from the first real Task 3 attempt: local `csh` does not support `-lc`; use `csh -fc` for C-shell batch commands in this environment.
+
+- [x] **Step 4: Record execution-agent boundary**
 
 Write this line to `$C12_EVIDENCE/08_execution_boundary.txt`:
 
@@ -522,13 +526,12 @@ printf '%s\n' \
 
 Expected: boundary evidence file exists locally.
 
-- [ ] **Step 5: Run the C-7 adapter through the execution shell**
+- [x] **Step 5: Run the C-7 adapter through the execution shell**
 
 Run:
 
 ```bash
-csh -lc "source $C12_CADENCE_CSHRC; cd $REPO; python tools/run_spectre_ocean_adapter.py $C12_PROJECT --run-id real_001" \
-  | tee "$C12_EVIDENCE/09_adapter_run.txt"
+bash -o pipefail -lc 'csh -fc "source $C12_CADENCE_CSHRC; cd $REPO; python tools/run_spectre_ocean_adapter.py $C12_PROJECT --run-id real_001" | tee "$C12_EVIDENCE/09_adapter_run.txt"'
 ```
 
 Expected success path:
@@ -546,7 +549,16 @@ Expected failure path:
 - result or metric manifest may indicate failure or be absent depending on precondition/tool failure
 - stop after Step 6 and proceed to Task 4 failure handling instead of hand-editing returned artifacts
 
-- [ ] **Step 6: Capture returned artifact hashes locally**
+Plan correction from the first real Task 3 attempt: use `pipefail` around the `tee` transcript pipeline so future runs preserve the adapter exit status. The first run used the previous command shape, so the recorded Task 3 status is determined from `09_adapter_run.txt` and `result_manifest.json`, not from the masked pipeline exit code.
+
+Task 3 observed the failure path on 2026-06-03:
+
+- `09_adapter_run.txt` contains `failed: run_id=real_001` and `issue: spectre command failed`.
+- `result_manifest.json` has `status: failed`, `metric_result_manifest: null`, and `notes: spectre command failed`.
+- `spectre.stdout` reports `SPECTRE-132`: the adapter's current `-log psf/spectre.out` argument is interpreted as a second input file by this Spectre invocation.
+- No metric result manifest, PSF directory, or `ocean_scalars.tsv` was produced.
+
+- [x] **Step 6: Capture returned artifact hashes locally**
 
 Run:
 
@@ -566,7 +578,7 @@ Expected:
 - hash file exists locally
 - raw artifacts remain uncommitted
 
-- [ ] **Step 7: Update progress docs for Task 3**
+- [x] **Step 7: Update progress docs for Task 3**
 
 Record one of these exact status lines:
 
@@ -586,7 +598,7 @@ Also record:
 No manual manifest repair, PSF parsing, or formula rewriting occurred.
 ```
 
-- [ ] **Step 8: Verify and commit Task 3 docs**
+- [x] **Step 8: Verify and commit Task 3 docs**
 
 Run:
 
@@ -605,11 +617,19 @@ Expected:
 Commit:
 
 ```bash
-git add docs/CURRENT_TASK_STATE.json docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md docs/EXECUTION_PROGRESS_2026-05-29.md docs/COMPACT_RESUME_CHECKPOINT.md docs/superpowers/plans/2026-06-03-controlled-real-tool-agent-practice.md
+git add docs/CURRENT_TASK_STATE.json docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md docs/EXECUTION_PROGRESS_2026-05-29.md docs/COMPACT_RESUME_CHECKPOINT.md docs/PROJECT_WORKFLOW_OVERVIEW.md docs/superpowers/specs/2026-06-03-controlled-real-tool-agent-practice-design.md docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md docs/superpowers/plans/2026-06-03-controlled-real-tool-agent-practice.md
 git commit -m "docs: record c12 adapter practice"
 ```
 
 Stop and report Task 3 status to the user.
+
+Task 3 review gate:
+
+- Spec-compliance review approved by Heisenberg (`019e8d87-de02-7a11-aa3f-cf7ab47895cb`) after stale resume prompts were fixed.
+- Code-quality/evidence review approved by Pascal (`019e8d8d-707e-7052-b58e-1488b3fdd145`) after current-state Task 4 confirmation gating and canonical Task 3 spec-review evidence were fixed.
+- Both reviews reported no remaining Critical, Important, or Minor findings.
+
+Task 3 final state: complete and reviewed. Stop before Task 4; do not rerun the adapter without a new explicit user request.
 
 ## Task 4: Hermes Check, Record, Or Recovery Assessment
 

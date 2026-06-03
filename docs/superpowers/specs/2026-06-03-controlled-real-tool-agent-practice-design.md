@@ -169,6 +169,8 @@ python tools/run_spectre_ocean_adapter.py PROJECT_DIR --run-id real_001
 
 or an equivalent already-reviewed C-7 adapter entry point.
 
+When invoked through the local Cadence C-shell setup, the practice plan uses `csh -fc "source ...; ..."` because the local `csh` does not support `-lc`. If the command transcript is captured with `tee`, the wrapper must preserve the adapter exit status with pipefail or must explicitly derive status from the adapter transcript and returned manifest.
+
 The execution agent may:
 
 - source local Cadence setup required by the adapter
@@ -185,6 +187,13 @@ The execution agent must not:
 - patch manifests by hand after a failed check
 - parse PSF or compute metrics outside OCEAN
 - decide supervisor recovery policy
+
+C-12 Task 3 first real invocation outcome:
+
+- The execution-agent/C-7 adapter boundary was reached for `real_001`.
+- Spectre/OCEAN were visible in the sourced Cadence shell.
+- The adapter returned a structured failed `result_manifest.json` before OCEAN execution.
+- The failure is evidence for the recovery path, not authorization for manual manifest repair or formula changes.
 
 ## Supervisor/Hermes Boundary
 

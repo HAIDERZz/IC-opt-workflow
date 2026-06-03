@@ -4,9 +4,10 @@
 
 - Repository: `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow`
 - Branch: `plan-a-hermes-file-contract-mvp`
-- Current scope: Plan C C-12 Task 2 Hermes preflight and approved real-run package
-- Current status: C-12 Task 2 complete and reviewed
-- Next required action: request explicit user confirmation before C-12 Task 3 real Spectre/OCEAN adapter execution
+- Current scope: Plan C C-12 Task 3 Execution-Agent C-7 adapter invocation
+- Current status: C-12 Task 3 complete and reviewed; adapter invocation returned a structured failed result manifest
+- Next required action: request user confirmation before C-12 Task 4 Hermes check/recovery work; do not rerun the adapter
+- next_allowed_action: request user confirmation before C-12 Task 4 Hermes check/recovery work; do not rerun the adapter
 
 C-3 Task 6 final verification is complete. C-4 is confirmed as a contract-only first real-run package; it must not run Spectre, Virtuoso, subprocesses, or the optimizer loop. C-4 is now complete and reviewed. C-5 validates the execution agent's returned `result_manifest.json` and declared artifacts without running Spectre or parsing metrics. C-5.5 rehearsed the C-4/C-5 handoff with simulated execution-agent and Hermes-observer roles. After C-5.5, the project paused implementation to validate the real metric backend. Spectre + OCEAN is now confirmed as the backend route: standalone Spectre generates PSF, batch OCEAN opens the PSF and evaluates exact user/project-approved formulas, and Python only records OCEAN-produced scalar outputs and provenance. C-6 turned that route into deterministic file contracts and a Hermes validator without physical adapter wiring. C-7 added an explicit execution-side adapter and tool entry point while preserving the rule that Hermes workflow tooling still validates returned files after execution. C-8 records checked real metric results into optimizer ledger/state after `check-real-run` and `check-metric-results` pass, while preserving the contract-only boundary. C-9 prepares the next real-run package from strict ledger/state and deterministic optimizer initialization sequence, while still not running real tools or writing ledger/state. C-10 classifies failed/partial/pending real-run packages, writes explicit recovery decisions, prepares retry packages, exposes supervisor-facing recovery CLI commands, and blocks C-9 from advancing while unresolved real-run packages exist. C-10 final review fixes aligned unsafe artifact classification with the spec and hardened symlinked recovery decision reads.
 
@@ -54,6 +55,14 @@ C-12 Task 2 checkpoint: user confirmed the provided `input.scs` corresponds to t
 
 C-12 Task 2 review evidence: spec-compliance review approved by Noether (`019e8d66-cfe1-73a2-9b12-a70c59305735`) with no findings. Code-quality review approved by Mill (`019e8d68-4d37-7ba0-98fa-4892078d7aed`) after stale C-12 overview wording was fixed. Task 2 is complete and reviewed; Task 3 remains blocked until the user explicitly confirms real Spectre/OCEAN adapter execution.
 
+C-12 Task 3 checkpoint: execution-agent/C-7 adapter invocation failed or was blocked for real_001. Returned artifacts/logs were preserved locally; Hermes failure checks and recovery assessment are pending.
+
+No manual manifest repair, PSF parsing, or formula rewriting occurred.
+
+C-12 Task 3 route audit: Active spec is `docs/superpowers/specs/2026-06-03-controlled-real-tool-agent-practice-design.md`; active plan is `docs/superpowers/plans/2026-06-03-controlled-real-tool-agent-practice.md`; top-level plan is `docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md`. Alignment remains contract-led and evidence-gated: user explicitly confirmed Task 3, Spectre/OCEAN visibility was checked, and real execution occurred only through the execution-agent/C-7 adapter entry point. Drift found and synchronized: the local `csh` command must use `-fc` rather than unsupported `-lc`, and future transcript pipelines should preserve adapter exit status with pipefail. Real outcome: the adapter wrote `result_manifest.json` with `status: failed`, `metric_result_manifest: null`, and `notes: spectre command failed`; `spectre.stdout` reports `SPECTRE-132` because the current adapter `-log psf/spectre.out` argument is interpreted as a second input file by this Spectre invocation. This exposes a C-7 adapter command-compatibility issue for later scope; Task 3 did not hand-edit returned artifacts or rerun with overwrite.
+
+C-12 Task 3 review evidence: spec-compliance review approved by Heisenberg (`019e8d87-de02-7a11-aa3f-cf7ab47895cb`) after stale resume prompts were fixed. Code-quality/evidence review approved by Pascal (`019e8d8d-707e-7052-b58e-1488b3fdd145`) after the current-state Task 4 confirmation gate and canonical Task 3 spec-review evidence were fixed. Both reviews reported no remaining Critical, Important, or Minor findings. Task 3 is complete and reviewed; do not enter Task 4 or rerun the adapter without user confirmation.
+
 The C-10 design spec and implementation plan remain aligned with the implementation: failed `input.scs` is preserved literally for retry packages, approved OCEAN formula contracts are compared by text/hash and are not rewritten, retry targets and decision files reject symlink/overwrite hazards, CLI commands delegate to recovery logic only, unsafe declared result artifacts classify as partial tool results, and C-10 still does not write optimizer ledger/state or call real tools.
 
 C-10 Task 4 review found and fixed two route-sensitive deadlocks: a retry-prepared source run no longer blocks forever after the retry run is recorded by C-8, and it no longer blocks forever after the retry run itself is resolved abandoned. Code-quality review also found and fixed hidden report writes from the guard path; `assert_no_unresolved_real_runs()` now keeps nested checker calls non-persistent when used as a C-9 guard. C-10 Task 5 review found and fixed stale recovery-report output for pre-assessment validation failures; CLI now prints report details only when the current command updates the recovery report. Final review found and fixed unsafe artifact classification and symlinked decision-read hardening.
@@ -77,7 +86,7 @@ Workspace-level agent constraints now exist in `AGENTS.md`. Future agents should
 - Plan C C-9 next real-run package contract: complete and reviewed.
 - Plan C C-10 real-run failure/retry policy contract: complete and reviewed.
 - Plan C C-11 local/fake controlled smoke: complete and reviewed.
-- Plan C C-12 controlled real-tool/agent practice: Task 2 complete and reviewed; Task 3 requires explicit real-tool confirmation.
+- Plan C C-12 controlled real-tool/agent practice: Task 3 complete and reviewed; the adapter invocation reached the real execution boundary and returned a structured Spectre failure.
 
 ## Spectre + OCEAN Backend Decision
 
@@ -407,5 +416,5 @@ are local reference material only. Do not copy or commit them into the repositor
 ## Resume Prompt
 
 ```text
-请继续 IC auto optimization workflow。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。先阅读 docs/CURRENT_TASK_STATE.json、AGENTS.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md。当前活动节点是 Plan C C-11 local/fake controlled smoke complete，状态为 C-11 Task 4 and C-11 final gate complete and reviewed；下一步请选择下一轮真实工具/agent practice scope，并先写/批准 design spec。运行或更新任务前先执行 python3 tools/check_development_cadence.py。不要在未批准的新 scope 中运行真实 Virtuoso/Spectre/OCEAN/SSH/agent/bridge，不要调用 C-7 subprocess adapter，不要解析 PSF，不要重写 Calculator/OCEAN 公式，不要提交本地真实 input.scs 示例。
+请继续 IC auto optimization workflow。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。先阅读 docs/CURRENT_TASK_STATE.json、AGENTS.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/specs/2026-06-03-controlled-real-tool-agent-practice-design.md、docs/superpowers/plans/2026-06-03-controlled-real-tool-agent-practice.md。当前活动节点是 Plan C C-12 Task 3 Execution-Agent C-7 adapter invocation，状态为 C-12 Task 3 complete and reviewed；下一步必须先向用户确认是否进入 C-12 Task 4 Hermes check/recovery work，且不要重新运行 adapter。运行或更新任务前先执行 python3 tools/check_development_cadence.py。不要重新运行真实 Spectre/OCEAN adapter，不要提交或复制本地真实 input.scs/PSF/log 示例，不要让 agent 重写公式，不要用 Python 解析 PSF 或重写 Calculator/OCEAN 公式。
 ```

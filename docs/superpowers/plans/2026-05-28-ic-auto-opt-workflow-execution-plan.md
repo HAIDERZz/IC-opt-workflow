@@ -36,8 +36,9 @@ As of 2026-06-03, focused Plan A, Plan B, and Plan C C-1 through C-11 are comple
 - C-11 Task 3 controlled failure/retry smoke is complete and reviewed.
 - C-11 Task 4 CLI smoke, docs, and final gate is complete and reviewed.
 - C-12 Task 2 Hermes preflight and approved real-run package is complete and reviewed.
+- C-12 Task 3 execution-agent/C-7 adapter invocation is complete and reviewed; it reached the real Spectre boundary and returned a structured failed `result_manifest.json`.
 
-C-11 verifies the C-9 -> fake C-7-style returned artifacts -> C-5/C-6 checks -> C-8 happy path and one controlled C-10 failure/retry path without real Virtuoso/Spectre/OCEAN/SSH/agent/bridge execution. The current node is `Plan C C-12 Task 2 Hermes preflight and approved real-run package`, complete and reviewed after Hermes prepared `real_001` under `/tmp` without running real tools. Next, request explicit user confirmation before C-12 Task 3 real Spectre/OCEAN adapter execution. Current resume guidance is in `docs/CURRENT_TASK_STATE.json`, `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`, `docs/EXECUTION_PROGRESS_2026-05-29.md`, `docs/COMPACT_RESUME_CHECKPOINT.md`, and `AGENTS.md`.
+C-11 verifies the C-9 -> fake C-7-style returned artifacts -> C-5/C-6 checks -> C-8 happy path and one controlled C-10 failure/retry path without real Virtuoso/Spectre/OCEAN/SSH/agent/bridge execution. The current node is `Plan C C-12 Task 3 Execution-Agent C-7 adapter invocation`, complete and reviewed: user confirmed the real-tool attempt, the adapter wrote a failed `result_manifest.json` for `real_001`, and local evidence shows Spectre rejected the current adapter command because `-log psf/spectre.out` was interpreted as a second input file. Next, ask the user whether to enter Task 4 failure/recovery handling or first scope a C-7 adapter command-compatibility fix. Current resume guidance is in `docs/CURRENT_TASK_STATE.json`, `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`, `docs/EXECUTION_PROGRESS_2026-05-29.md`, `docs/COMPACT_RESUME_CHECKPOINT.md`, and `AGENTS.md`.
 
 ## Current Route Alignment
 
