@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "current_scope": "C-14 Real-Tool Acceptance",
-  "current_status": "C-14 Task 2 is complete, verified-only. The seed real_001 package was run through the existing C-7 Spectre/OCEAN adapter outside the sandbox, Hermes check-real-run and check-metric-results passed, and record-real-result wrote one checked ledger row plus optimizer state. The first sandboxed adapter attempt failed before OCEAN with Spectre pipe/socket permission errors; comparison with the known-good C-7 closure command showed no adapter command, formula, or native-layout drift.",
+  "current_status": "C-14 is complete, verified-only. The C-13 single-candidate suggestion path was accepted against the real Spectre/OCEAN flow: seed real_001 ran and recorded; suggest-candidate wrote candidate_000002; prepare-candidate-real-run prepared real_002; the C-7 adapter ran real_002 outside the sandbox; check-real-run, check-metric-results, and record-real-result passed. Two real ledger rows now exist, both with OCEAN scalar metrics and simulation_status real_constraint_fail.",
   "review_status": "verified-only",
   "subagent_dispatch": "available",
   "active_spec": "docs/superpowers/specs/2026-06-04-single-candidate-optimizer-suggestion-design.md",
@@ -12,15 +12,15 @@
     "docs/EXECUTION_PROGRESS_2026-05-29.md",
     "docs/COMPACT_RESUME_CHECKPOINT.md"
   ],
-  "next_allowed_action": "wait for user confirmation, then execute C-14 Task 3 suggest and package real_002",
+  "next_allowed_action": "wait for user confirmation, then plan the narrow optimizer loop productization scope",
   "forbidden_actions": [
     "start broad optimizer framework work",
     "create new optimizer algorithms",
-    "create batch candidate orchestration",
+    "create batch candidate orchestration without a narrow plan",
     "create daemon or service orchestration",
     "run Virtuoso before explicit task confirmation",
-    "run Spectre before C-14 Task 4 confirmation",
-    "run OCEAN before C-14 Task 4 confirmation",
+    "run Spectre before the next real-tool task explicitly requires it",
+    "run OCEAN before the next real-tool task explicitly requires it",
     "run SSH before explicit task confirmation",
     "run Claude CLI as an execution agent before explicit task confirmation",
     "run virtuoso-bridge-lite before explicit task confirmation",
@@ -44,15 +44,17 @@
     "active_spec": "docs/superpowers/specs/2026-06-04-single-candidate-optimizer-suggestion-design.md",
     "active_plan": "docs/superpowers/plans/2026-06-04-real-tool-acceptance.md",
     "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
-    "alignment": "Aligned. C-14 Task 2 exercised the reviewed C-13 real-tool acceptance route only for the seed package: C-7 adapter -> check-real-run -> check-metric-results -> record-real-result.",
-    "drift": "None. No production code changed, no OCEAN formulas were rewritten, no PSF parsing was added, and the native Maestro/ADE netlist layout was preserved. The only operational correction was to run Spectre outside the sandbox because the sandbox blocks pipe/socket creation."
+    "alignment": "Aligned. C-14 completed the C-13 real-tool acceptance route: suggest-candidate -> prepare-candidate-real-run -> C-7 Spectre/OCEAN adapter -> check-real-run -> check-metric-results -> record-real-result.",
+    "drift": "None. No production code changed, no OCEAN formulas were rewritten, no PSF parsing was added, no returned manifests were edited by hand, and the native Maestro/ADE netlist layout was preserved. Spectre must be run outside the Codex sandbox in this environment because the sandbox blocks pipe/socket creation."
   },
-  "latest_valid_commit": "debb2c2 docs: record C14 task 1 seed package",
+  "latest_valid_commit": "bb8c44a docs: record C14 task 2 seed run",
   "review_evidence": {
-    "spec_review": "Not run. C-14 Task 2 is a real-tool acceptance practice task and remains verified-only.",
-    "code_quality_review": "Not run. No production code changed for Task 2.",
-    "task_1_status": "C-14 Task 1 completed locally under /tmp/ic_auto_opt_c14/bridge_test_inv and prepared real_001 without running real tools.",
-    "task_2_status": "C-14 Task 2 ran real_001 through the existing C-7 adapter outside the sandbox, produced result_manifest.json and metric_result_manifest.json, passed Hermes check-real-run and check-metric-results, and recorded one ledger row plus optimizer_state.current_evaluations = 1. Metrics were rise=7.52016846017672e-11 s, fall=1.078998721053984e-10 s, and DC=0.0002588877964196586 W. The row simulation_status is real_constraint_fail, which means scalar extraction worked but the seed did not satisfy configured performance constraints.",
-    "sandbox_note": "The first Task 2 adapter attempt inside the sandbox failed before OCEAN with Spectre stderr cannot create pipe [Operation not permitted] and fatal can't create server socket. The same command shape is known-good in C-7 closure and succeeded outside the sandbox; do not treat that first failure as formula or adapter drift."
+    "spec_review": "Not run. C-14 is a real-tool acceptance practice milestone and remains verified-only.",
+    "code_quality_review": "Not run. No production code changed in C-14 Task 3-5.",
+    "task_2_status": "real_001 passed C-7 adapter, check-real-run, check-metric-results, and record-real-result. Metrics were rise=7.52016846017672e-11 s, fall=1.078998721053984e-10 s, and DC=0.0002588877964196586 W.",
+    "task_3_status": "suggest-candidate wrote candidate_000002 with selection_mode initialization_fallback, and prepare-candidate-real-run prepared runs/real/real_002 from that request.",
+    "task_4_status": "real_002 passed C-7 adapter, check-real-run, check-metric-results, and record-real-result. Metrics were rise=3.326181720494057e-11 s, fall=4.973593602698243e-11 s, and DC=0.0009838038264352862 W.",
+    "task_5_status": "Sanitized closeout written at docs/debug/2026-06-04-c14-real-tool-acceptance-result.md. Decision: proceed to narrow optimizer loop productization.",
+    "sandbox_note": "Real Spectre/OCEAN adapter runs should use the approved external Cadence csh path. A sandboxed Spectre attempt failed before OCEAN with pipe/socket permission errors, while the same command shape succeeded outside the sandbox."
   }
 }

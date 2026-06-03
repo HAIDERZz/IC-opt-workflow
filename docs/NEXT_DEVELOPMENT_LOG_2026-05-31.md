@@ -628,6 +628,18 @@ C-14 Real-Tool Acceptance Task 2:
 - Route audit: aligned with C-14 plan, C-13 spec, and the top-level practice-first route. Drift: none. No production code changed, no PSF parsing, no OCEAN formula rewriting, and the native Maestro/ADE layout was preserved.
 - next_allowed_action: wait for user confirmation, then execute C-14 Task 3 suggest and package real_002
 
+C-14 Real-Tool Acceptance Tasks 3-5:
+
+- Status: complete, verified-only.
+- Task 3: `suggest-candidate` wrote `/tmp/ic_auto_opt_c14/bridge_test_inv/candidate_requests/candidate_000002.json` with selection mode `initialization_fallback`, and `prepare-candidate-real-run` prepared `runs/real/real_002` with the explicit candidate request, candidate manifest, native netlist sidecars, and unchanged approved OCEAN formulas.
+- Task 4: `real_002` ran through the existing C-7 Spectre/OCEAN adapter outside the sandbox and succeeded. `check-real-run`, `check-metric-results`, and `record-real-result` all passed.
+- Task 4 scalar metrics: `rise=3.326181720494057e-11 s`, `fall=4.973593602698243e-11 s`, `DC=0.0009838038264352862 W`.
+- Ledger/state: ledger now has 2 rows and `optimizer_state.current_evaluations = 2`. Both rows have `simulation_status = real_constraint_fail`, meaning scalar extraction worked but neither point satisfied configured performance constraints.
+- Task 5 closeout: `docs/debug/2026-06-04-c14-real-tool-acceptance-result.md`.
+- Decision: proceed to narrow optimizer loop productization. The next scope should stay small: one explicit loop that repeatedly asks for one candidate, prepares one real-run package, runs the existing C-7 adapter, records the result or classified failure, and stops on a fixed evaluation budget.
+- Route audit: aligned with the C-13 real-tool acceptance section and the top-level practice-first route. Drift: none. No production code changed, no PSF parsing, no OCEAN formula rewriting, no returned manifest hand-editing, and native Maestro/ADE layout was preserved.
+- next_allowed_action: wait for user confirmation, then plan the narrow optimizer loop productization scope
+
 ## Resume Prompt
 
 ```text

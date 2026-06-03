@@ -328,7 +328,7 @@ wait for user confirmation, then execute C-14 Task 3 suggest and package real_00
 - Modify: `docs/CURRENT_TASK_STATE.json`
 - Modify: `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`
 
-- [ ] **Step 1: Run `suggest-candidate`**
+- [x] **Step 1: Run `suggest-candidate`**
 
 Run:
 
@@ -344,7 +344,7 @@ Expected:
 - output includes `candidate id: candidate_000002`;
 - `candidate_requests/candidate_000002.json` exists.
 
-- [ ] **Step 2: Inspect the candidate request shape without changing it**
+- [x] **Step 2: Inspect the candidate request shape without changing it**
 
 Run:
 
@@ -362,7 +362,7 @@ Expected:
 - parameters are present;
 - provenance hashes are present.
 
-- [ ] **Step 3: Prepare candidate real-run package**
+- [x] **Step 3: Prepare candidate real-run package**
 
 Run:
 
@@ -380,13 +380,19 @@ Expected:
 - `runs/real/real_002/candidate.json` has `candidate_id` equal to `candidate_000002`;
 - native netlist sidecars remain under `runs/real/real_002/netlist/`.
 
-- [ ] **Step 4: Record Task 3 state and stop**
+- [x] **Step 4: Record Task 3 state and stop**
 
 Update:
 
 - `docs/CURRENT_TASK_STATE.json`
 - `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`
 - this plan's Task 3 checkboxes
+
+Task 3 execution note:
+
+- `suggest-candidate` wrote `candidate_requests/candidate_000002.json`.
+- The selection mode was `initialization_fallback`, as expected with one checked ledger row.
+- `prepare-candidate-real-run` prepared `runs/real/real_002` with `candidate_request.json`, `candidate.json`, native netlist sidecars, and unchanged approved OCEAN formulas.
 
 Set next allowed action:
 
@@ -406,7 +412,7 @@ Do not start Task 4 without user confirmation because Task 4 runs real Spectre/O
 - Modify: `docs/CURRENT_TASK_STATE.json`
 - Modify: `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`
 
-- [ ] **Step 1: Run the C-7 adapter for `real_002`**
+- [x] **Step 1: Run the C-7 adapter for `real_002`**
 
 Run:
 
@@ -422,7 +428,7 @@ Expected:
 - preferred: adapter exits 0 and prints `succeeded: run_id=real_002`;
 - if adapter fails, stop and compare with `real_001` plus C-7 closure evidence before code changes.
 
-- [ ] **Step 2: Run Hermes checks**
+- [x] **Step 2: Run Hermes checks**
 
 Run:
 
@@ -437,7 +443,7 @@ Expected:
 - if `check-real-run` fails, stop because the execution handoff is invalid;
 - if `check-metric-results` fails after `check-real-run` passes, run Step 4 before deciding on code changes.
 
-- [ ] **Step 3: Record suggested candidate result when checks pass**
+- [x] **Step 3: Record suggested candidate result when checks pass**
 
 Run only if both Step 2 checks pass:
 
@@ -451,7 +457,9 @@ Expected:
 - `ledger/experiment_ledger.jsonl` has rows for `real_001` and `real_002`;
 - `state/optimizer_state.json` has `current_evaluations` equal to `2`.
 
-- [ ] **Step 4: Classify a metric failure without changing formulas**
+- [x] **Step 4: Classify a metric failure without changing formulas**
+
+Not needed. `check-real-run` and `check-metric-results` both passed for `real_002`.
 
 Run only if `check-real-run` passes but `check-metric-results` fails:
 
@@ -468,7 +476,7 @@ Expected:
 - no OCEAN formula is changed;
 - the result is recorded as a focused follow-up decision, not hidden as a C-13 success.
 
-- [ ] **Step 5: Capture sanitized `real_002` evidence**
+- [x] **Step 5: Capture sanitized `real_002` evidence**
 
 Run:
 
@@ -488,13 +496,20 @@ Expected:
 - local-only evidence exists under `/tmp`;
 - no raw Cadence data is staged.
 
-- [ ] **Step 6: Record Task 4 state and stop**
+- [x] **Step 6: Record Task 4 state and stop**
 
 Update:
 
 - `docs/CURRENT_TASK_STATE.json`
 - `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`
 - this plan's Task 4 checkboxes
+
+Task 4 execution note:
+
+- `real_002` ran through the C-7 Spectre/OCEAN adapter outside the sandbox and succeeded.
+- `check-real-run`, `check-metric-results`, and `record-real-result` passed.
+- OCEAN returned scalar values for `rise`, `fall`, and `DC`.
+- The recorded ledger row has `simulation_status = real_constraint_fail`, meaning scalar extraction worked but the candidate did not satisfy configured constraints.
 
 Set next allowed action:
 
@@ -515,7 +530,7 @@ wait for user confirmation, then execute C-14 Task 5 acceptance decision and doc
 - Modify if milestone-level summary is needed: `docs/EXECUTION_PROGRESS_2026-05-29.md`
 - Modify if context compaction is likely: `docs/COMPACT_RESUME_CHECKPOINT.md`
 
-- [ ] **Step 1: Write sanitized acceptance note**
+- [x] **Step 1: Write sanitized acceptance note**
 
 Create `docs/debug/2026-06-04-c14-real-tool-acceptance-result.md` with this structure:
 
@@ -567,7 +582,7 @@ Raw Cadence artifacts remain local-only.
 
 Replace each angle-bracket field with the actual observed result before committing. Keep the note sanitized.
 
-- [ ] **Step 2: Run repo-side verification**
+- [x] **Step 2: Run repo-side verification**
 
 Run:
 
@@ -584,7 +599,7 @@ Expected:
 - whitespace check is clean;
 - raw Cadence files, `docs/OCEAN_DOC_*`, and `docs/toolchain_evidence/` remain untracked or unstaged.
 
-- [ ] **Step 3: Commit sanitized docs only if user wants a commit**
+- [x] **Step 3: Commit sanitized docs only if user wants a commit**
 
 If committing, use explicit pathspecs:
 
