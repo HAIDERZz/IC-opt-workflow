@@ -987,12 +987,16 @@ Next required action:
 - C-11 local smoke design spec exists: `docs/superpowers/specs/2026-06-03-local-real-run-smoke-design.md`.
 - C-11 local smoke implementation plan exists: `docs/superpowers/plans/2026-06-03-local-real-run-smoke.md`.
 - Plan C process hardening lightweight cadence guard is complete; verified-only. It adds `docs/CURRENT_TASK_STATE.json`, a 200-line-budget cadence checker, and a process-hardening design spec so future context resumes have a single current-state anchor and cannot falsely claim `reviewed` without evidence.
-- Current scope: Plan C C-11 Task 1 test-only smoke helpers
-- Current status: C-11 Task 1 test-only smoke helpers complete and reviewed
-- Next recommended action: wait for user confirmation before C-11 Task 2 library happy-path smoke.
+- Current scope: Plan C C-11 Task 2 library happy-path smoke
+- Current status: C-11 Task 2 library happy-path smoke complete and reviewed
+- Next recommended action: wait for user confirmation before C-11 Task 3 controlled failure/retry smoke.
 - C-11 Task 1 checkpoint: added `tests/test_local_real_run_smoke.py` with only `test_c11_helper_seeds_recorded_real_result` and `tests/real_run_smoke_helpers.py` with test-only synthetic project, fake result/metric manifests, checked recording, and ledger row helpers.
 - C-11 Task 1 route audit: Active spec is `docs/superpowers/specs/2026-06-03-local-real-run-smoke-design.md`; top-level plan is `docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md`; alignment remains local/fake controlled smoke only; drift is none.
 - C-11 Task 1 review evidence: spec-compliance review approved by Bohr (`019e8c9f-2249-7db3-bcaf-c7744f427cbc`); code-quality review approved by Volta (`019e8ca0-424e-7683-bebe-bb44e2340c5c`). Both reviews reported no Critical, Important, or Minor findings.
+- C-11 Task 2 checkpoint: added only `test_c11_library_happy_path_records_next_real_run` to `tests/test_local_real_run_smoke.py`. The smoke seeds `real_001` with `record_checked_run`, prepares `real_002`, writes fake result and metric manifests, runs `check_real_run`, `check_metric_results`, and `record_real_result`, and asserts ledger/state/best/report outputs plus `assert_no_unresolved_real_runs`.
+- C-11 Task 2 route audit: Active spec is `docs/superpowers/specs/2026-06-03-local-real-run-smoke-design.md`; top-level plan is `docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md`; alignment remains local/fake controlled smoke only; drift is none. No real tools, subprocess-backed C-7 adapter, network, PSF parsing, formula rewriting, Task 3 retry flow, Task 4 CLI smoke, or final gate work was added.
+- C-11 Task 2 verification checkpoint: focused happy-path smoke passed immediately using Task 1 helpers; focused smoke/next-run/record regression suite passed; focused ruff passed.
+- C-11 Task 2 review evidence: spec-compliance review approved by Socrates (`019e8caf-9520-75e3-9cf4-e9d913d872d0`); code-quality review approved by Dirac (`019e8cb1-9279-7273-a76e-7e760fed813e`). Both reviews reported no Critical, Important, or Minor findings.
 - C-11 remains a local/fake controlled smoke first: chain C-9 -> fake C-7-style returned artifacts -> C-5/C-6 checks -> C-8 with one controlled C-10 failure/retry case. Do not jump straight to real Virtuoso/Spectre/OCEAN/agent integration.
 
 ## Locked Role Model
@@ -1021,5 +1025,5 @@ Do not use "Hermes agent" as a role name in future specs or plans. If older docu
 4. ic-auto-opt-workflow/docs/COMPACT_RESUME_CHECKPOINT.md
 5. ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。请先阅读 docs/CURRENT_TASK_STATE.json、AGENTS.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md。当前活动节点是 Plan C C-11 Task 1 test-only smoke helpers，状态为 reviewed；下一步请等待用户确认后进入 C-11 Task 2 library happy-path smoke。运行或更新任务前先执行 python3 tools/check_development_cadence.py。不要运行真实工具，不要提交或复制本地真实 input.scs 示例，不要让 agent 重写公式，不要用 Python 解析 PSF 或重写 Calculator/OCEAN 公式。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。请先阅读 docs/CURRENT_TASK_STATE.json、AGENTS.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md。当前活动节点是 Plan C C-11 Task 2 library happy-path smoke，状态为 reviewed；下一步请等待用户确认后进入 C-11 Task 3 controlled failure/retry smoke。运行或更新任务前先执行 python3 tools/check_development_cadence.py。不要运行真实工具，不要提交或复制本地真实 input.scs 示例，不要让 agent 重写公式，不要用 Python 解析 PSF 或重写 Calculator/OCEAN 公式。
 ```

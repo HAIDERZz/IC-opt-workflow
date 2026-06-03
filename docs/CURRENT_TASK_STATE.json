@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
-  "current_scope": "Plan C C-11 Task 1 test-only smoke helpers",
-  "current_status": "C-11 Task 1 test-only smoke helpers complete and reviewed",
+  "current_scope": "Plan C C-11 Task 2 library happy-path smoke",
+  "current_status": "C-11 Task 2 library happy-path smoke complete and reviewed",
   "review_status": "reviewed",
   "subagent_dispatch": "available",
   "active_spec": "docs/superpowers/specs/2026-06-03-local-real-run-smoke-design.md",
@@ -12,7 +12,7 @@
     "docs/EXECUTION_PROGRESS_2026-05-29.md",
     "docs/COMPACT_RESUME_CHECKPOINT.md"
   ],
-  "next_allowed_action": "wait for user confirmation before C-11 Task 2 library happy-path smoke",
+  "next_allowed_action": "wait for user confirmation before C-11 Task 3 controlled failure/retry smoke",
   "forbidden_actions": [
     "run Virtuoso",
     "run Spectre",
@@ -28,14 +28,15 @@
     "stage docs/toolchain_evidence/"
   ],
   "required_pre_commit_checks": [
-    "python3 -m pytest tests/test_local_real_run_smoke.py::test_c11_helper_seeds_recorded_real_result -q",
+    "python3 -m pytest tests/test_local_real_run_smoke.py::test_c11_library_happy_path_records_next_real_run -q",
+    "python3 -m pytest tests/test_local_real_run_smoke.py tests/test_next_real_run.py tests/test_real_result_record.py -q",
     "python3 -m ruff check tests/real_run_smoke_helpers.py tests/test_local_real_run_smoke.py",
     "python3 tools/check_development_cadence.py",
     "git diff --check",
     "git status --short"
   ],
   "review_evidence": {
-    "spec_review": "Bohr 019e8c9f-2249-7db3-bcaf-c7744f427cbc approved C-11 Task 1 spec compliance with no Critical, Important, or Minor findings.",
-    "code_quality_review": "Volta 019e8ca0-424e-7683-bebe-bb44e2340c5c approved C-11 Task 1 code quality with no Critical, Important, or Minor findings."
+    "spec_review": "Socrates 019e8caf-9520-75e3-9cf4-e9d913d872d0 approved C-11 Task 2 spec compliance with no Critical, Important, or Minor findings.",
+    "code_quality_review": "Dirac 019e8cb1-9279-7273-a76e-7e760fed813e approved C-11 Task 2 code quality with no Critical, Important, or Minor findings."
   }
 }
