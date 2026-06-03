@@ -736,7 +736,7 @@ Expected: commit succeeds. Do not stage local OCEAN research or toolchain eviden
 - Modify: `docs/PROJECT_WORKFLOW_OVERVIEW.md`
 - Modify: `docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md`
 
-- [ ] **Step 1: Add the failing narrow CLI smoke test**
+- [x] **Step 1: Add the failing narrow CLI smoke test**
 
 Append to `tests/test_local_real_run_smoke.py`:
 
@@ -791,7 +791,7 @@ def test_c11_cli_smoke_records_next_real_run(tmp_path):
 
 If imports become duplicated, consolidate them at the top of `tests/test_local_real_run_smoke.py` before running ruff.
 
-- [ ] **Step 2: Run the CLI smoke test**
+- [x] **Step 2: Run the CLI smoke test**
 
 Run:
 
@@ -801,7 +801,7 @@ python3 -m pytest tests/test_local_real_run_smoke.py::test_c11_cli_smoke_records
 
 Expected: 1 test passes.
 
-- [ ] **Step 3: Run focused smoke suite**
+- [x] **Step 3: Run focused smoke suite**
 
 Run:
 
@@ -811,34 +811,41 @@ python3 -m pytest tests/test_local_real_run_smoke.py -q
 
 Expected: all C-11 smoke tests pass.
 
-- [ ] **Step 4: Run full verification**
+- [x] **Step 4: Run full verification**
 
 Run:
 
 ```bash
 python3 -m pytest -q
 python3 -m ruff check src tests tools
+python3 tools/check_development_cadence.py
 git diff --check
+git status --short
 ```
 
-Expected: full pytest passes, ruff reports all checks passed, and `git diff --check` has no output.
+Expected: full pytest passes, ruff reports all checks passed, cadence passes, `git diff --check` has no output, and `git status --short` shows only intentional Task 4 edits plus any pre-existing ignored/forbidden untracked local evidence paths.
 
-- [ ] **Step 5: Update docs and route audit**
+- [x] **Step 5: Update docs and route audit**
 
 In this plan, mark Task 4 steps as complete.
+
+Implementation pass note: `AGENTS.md` reserves `reviewed` for recorded
+spec-compliance and code-quality review evidence. This pass therefore records
+C-11 Task 4 as implementation complete and verified-only, pending final
+spec-compliance review and then final code-quality review.
 
 Update `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`:
 
 ```text
-- Current scope: Plan C C-11 local smoke complete
-- Current status: C-11 local/fake controlled smoke complete and reviewed
-- Next required action: choose the next real-tool/agent practice scope; do not run real tools until the next design spec is approved
+- Current scope: Plan C C-11 Task 4 CLI smoke, docs, and final gate
+- Current status: C-11 local/fake controlled smoke implementation complete and verified-only pending final review
+- Next required action: C-11 Task 4 final spec-compliance review, then C-11 Task 4 final code-quality review
 ```
 
 Update `docs/EXECUTION_PROGRESS_2026-05-29.md`, `docs/COMPACT_RESUME_CHECKPOINT.md`, `docs/PROJECT_WORKFLOW_OVERVIEW.md`, and `docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md` to record:
 
 ```text
-C-11 local/fake controlled smoke is complete. It verifies the C-9 -> fake C-7-style returned artifacts -> C-5/C-6 checks -> C-8 happy path and one C-10 failure/retry path without real Virtuoso/Spectre/OCEAN/SSH/agent/bridge execution. The next scope must be a separate real-tool/agent practice plan.
+C-11 local/fake controlled smoke implementation is complete and verified-only pending final review. It verifies the C-9 -> fake C-7-style returned artifacts -> C-5/C-6 checks -> C-8 happy path and one C-10 failure/retry path without real Virtuoso/Spectre/OCEAN/SSH/agent/bridge execution. The next action is final spec-compliance review, then final code-quality review; any later real-tool/agent practice must be a separate approved plan.
 ```
 
 Do not update `AGENTS.md` unless the cadence, role model, or handoff expectations change.

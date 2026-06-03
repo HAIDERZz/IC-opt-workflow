@@ -1,8 +1,8 @@
 {
   "schema_version": "1.0",
-  "current_scope": "Plan C C-11 Task 3 controlled failure/retry smoke",
-  "current_status": "C-11 Task 3 controlled failure/retry smoke complete and reviewed",
-  "review_status": "reviewed",
+  "current_scope": "Plan C C-11 Task 4 CLI smoke, docs, and final gate",
+  "current_status": "C-11 Task 4 implementation complete and verified-only pending final review",
+  "review_status": "verified-only",
   "subagent_dispatch": "available",
   "active_spec": "docs/superpowers/specs/2026-06-03-local-real-run-smoke-design.md",
   "active_plan": "docs/superpowers/plans/2026-06-03-local-real-run-smoke.md",
@@ -12,7 +12,7 @@
     "docs/EXECUTION_PROGRESS_2026-05-29.md",
     "docs/COMPACT_RESUME_CHECKPOINT.md"
   ],
-  "next_allowed_action": "wait for user confirmation before C-11 Task 4 CLI smoke, docs, and final gate",
+  "next_allowed_action": "C-11 Task 4 final spec-compliance review, then C-11 Task 4 final code-quality review",
   "forbidden_actions": [
     "run Virtuoso",
     "run Spectre",
@@ -28,15 +28,17 @@
     "stage docs/toolchain_evidence/"
   ],
   "required_pre_commit_checks": [
-    "python3 -m pytest tests/test_local_real_run_smoke.py::test_c11_controlled_failure_retry_records_retry_success -q",
-    "python3 -m pytest tests/test_local_real_run_smoke.py tests/test_real_run_recovery.py tests/test_next_real_run.py -q",
-    "python3 -m ruff check tests/real_run_smoke_helpers.py tests/test_local_real_run_smoke.py",
+    "python3 -m pytest tests/test_local_real_run_smoke.py::test_c11_cli_smoke_records_next_real_run -q",
+    "python3 -m pytest tests/test_local_real_run_smoke.py -q",
+    "python3 -m pytest -q",
+    "python3 -m ruff check src tests tools",
     "python3 tools/check_development_cadence.py",
     "git diff --check",
     "git status --short"
   ],
   "review_evidence": {
-    "spec_review": "Ptolemy 019e8cc5-30bf-7022-bca2-657b57fec88a approved C-11 Task 3 spec compliance after stale handoff prompts were fixed; no remaining Critical, Important, or Minor findings.",
-    "code_quality_review": "Heisenberg 019e8cc8-c26b-7ef2-8fd4-d5679088521d approved C-11 Task 3 code quality with no Critical, Important, or Minor findings."
+    "implementation_verification": "C-11 Task 4 local implementation verification passed for focused CLI smoke, focused C-11 smoke suite, full pytest, ruff, cadence, and whitespace checks. Final review evidence is pending.",
+    "previous_task_3_spec_review": "Ptolemy 019e8cc5-30bf-7022-bca2-657b57fec88a approved C-11 Task 3 spec compliance after stale handoff prompts were fixed; no remaining Critical, Important, or Minor findings.",
+    "previous_task_3_code_quality_review": "Heisenberg 019e8cc8-c26b-7ef2-8fd4-d5679088521d approved C-11 Task 3 code quality with no Critical, Important, or Minor findings."
   }
 }

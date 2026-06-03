@@ -23,7 +23,7 @@
 
 ## Current Implementation Node
 
-As of 2026-06-03, focused Plan A, Plan B, and Plan C C-1 through C-10 are complete and reviewed. The next planned scope is C-11 local smoke. Its design spec exists at `docs/superpowers/specs/2026-06-03-local-real-run-smoke-design.md`, and its implementation plan exists at `docs/superpowers/plans/2026-06-03-local-real-run-smoke.md`:
+As of 2026-06-03, focused Plan A, Plan B, and Plan C C-1 through C-10 are complete and reviewed. Plan C C-11 local/fake controlled smoke is implementation complete and verified-only pending final review. Its design spec exists at `docs/superpowers/specs/2026-06-03-local-real-run-smoke-design.md`, and its implementation plan exists at `docs/superpowers/plans/2026-06-03-local-real-run-smoke.md`:
 
 - C-10 Task 1 recovery report schemas are complete and reviewed.
 - C-10 Task 2 deterministic recovery classifier is complete and reviewed.
@@ -31,8 +31,12 @@ As of 2026-06-03, focused Plan A, Plan B, and Plan C C-1 through C-10 are comple
 - C-10 Task 4 C-9 unresolved real-run guard is complete and reviewed.
 - C-10 Task 5 CLI Integration is complete and reviewed.
 - C-10 Task 6 docs/progress/final verification is complete and reviewed.
+- C-11 Task 1 test-only smoke helpers are complete and reviewed.
+- C-11 Task 2 library happy-path smoke is complete and reviewed.
+- C-11 Task 3 controlled failure/retry smoke is complete and reviewed.
+- C-11 Task 4 CLI smoke, docs, and final gate implementation is complete and verified-only pending final spec-compliance review and final code-quality review.
 
-C-11 has been cleanly restarted after an accidental subagent-window workflow drift. The current node is `Plan C C-11 clean restart`, verified-only. Next, execute C-11 Task 1 using Subagent-Driven Development, then stop for report/review/commit/node update. C-11 starts with local/fake controlled smoke before any direct real tool/agent integration. The intended C-11 chain is C-9 -> fake C-7-style returned artifacts -> C-5/C-6 checks -> C-8 plus one controlled C-10 failure/retry case. Current resume guidance is in `docs/CURRENT_TASK_STATE.json`, `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`, `docs/EXECUTION_PROGRESS_2026-05-29.md`, `docs/COMPACT_RESUME_CHECKPOINT.md`, and `AGENTS.md`.
+C-11 verifies the C-9 -> fake C-7-style returned artifacts -> C-5/C-6 checks -> C-8 happy path and one controlled C-10 failure/retry path without real Virtuoso/Spectre/OCEAN/SSH/agent/bridge execution. The current node is `Plan C C-11 Task 4 CLI smoke, docs, and final gate`, verified-only pending final review. Next, run C-11 Task 4 final spec-compliance review, then C-11 Task 4 final code-quality review. Current resume guidance is in `docs/CURRENT_TASK_STATE.json`, `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`, `docs/EXECUTION_PROGRESS_2026-05-29.md`, `docs/COMPACT_RESUME_CHECKPOINT.md`, and `AGENTS.md`.
 
 ## Current Route Alignment
 
@@ -1305,8 +1309,10 @@ git commit -m "docs: add real integration readiness checklist"
 12. Plan C C-6.5: optional real metric extraction simulation/evidence gate using captured Spectre/OCEAN artifacts before optimizer-loop wiring.
 13. Plan C C-7: physical execution adapter wiring for standalone Spectre + OCEAN through `virtuoso-bridge-lite`/execution-agent boundary.
 14. Plan C C-8: ledger append and optimizer state update from checked real metric results.
-15. Tasks 14-15: final report and end-to-end smoke.
-16. Task 16: real integration checklist.
+15. Plan C C-9: next real-run package contract after checked recorded real results.
+16. Plan C C-10: real-run failure/retry policy contract and unresolved-run guard.
+17. Plan C C-11: local/fake controlled smoke for C-9 -> fake C-7-style artifacts -> C-5/C-6 -> C-8 plus one C-10 retry path.
+18. Later real-tool/agent practice scope, only after a separate approved design spec.
 
 ## Verification Commands
 
