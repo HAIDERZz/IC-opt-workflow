@@ -488,13 +488,17 @@ Status: complete, verified-only.
 - Task 5 productization decision is complete, verified-only.
 - Practice note: `docs/debug/2026-06-03-optimizer-practice-first-result.md`.
 - Decision: `B. Native optimizer passed but Hermes lacks explicit candidate injection; add that contract first.`
-- Next allowed action: wait for user confirmation, then write a narrow candidate-injection package contract design spec only.
+- Candidate-injection package contract design spec is complete, verified-only.
+- Design spec: `docs/superpowers/specs/2026-06-04-candidate-injection-package-contract-design.md`.
+- The spec defines a narrow `prepare-candidate-real-run` package contract for explicit optimizer-selected parameters without rewriting `config/variables.yaml`.
+- It does not add optimizer algorithms, replace C-4, replace C-9, run real tools, parse PSF, or rewrite OCEAN formulas.
+- Next allowed action: wait for user confirmation, then write the candidate-injection package contract implementation plan only.
 
 ## Next Step
 
 Plan A, Plan B, Plan C C-1, Plan C C-2, Plan C C-3, Plan C C-4, Plan C C-5, and Plan C C-5.5 are complete as of 2026-06-01. C-6, C-7, C-8, and C-9 are complete and reviewed as of 2026-06-02. C-10 real-run failure/retry policy contract is complete and reviewed as of 2026-06-03. C-11 local/fake smoke is complete. C-7 real-tool closure is complete and committed as `d440c95`.
 
-Current next step: write a narrow candidate-injection package contract design spec after user confirmation. Do not commit raw input decks, protected include files, PSF/raw data, full Cadence logs, `docs/OCEAN_DOC_*`, or `docs/toolchain_evidence/`. Do not parse PSF or translate OCEAN formulas in Python.
+Current next step: write the candidate-injection package contract implementation plan after user confirmation. Do not commit raw input decks, protected include files, PSF/raw data, full Cadence logs, `docs/OCEAN_DOC_*`, or `docs/toolchain_evidence/`. Do not parse PSF or translate OCEAN formulas in Python.
 
 Read the handoff files first:
 
@@ -520,5 +524,5 @@ Use this prompt after compact:
 7. ic-auto-opt-workflow/docs/superpowers/plans/2026-06-03-controlled-real-tool-agent-practice.md
 8. 如需背景，再读 ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。当前活动节点是 Optimizer Practice-First Plan，状态为 Task 5 complete/verified-only。Task 4 已通过 `/tmp/ic_auto_opt_optimizer_practice/run_turbo_bridge_test_inv.py` 跑通真实 TuRBO + Hermes + Spectre/OCEAN practice：9 次评价、8 个 init + 1 个 post-initial TuRBO suggestion、9 个 OCEAN scalar evidence、0 个 penalty，best candidate 为 `FN=12, WN=1.3u, FP=2, WP=2.5u`，objective=`4.183168953894332e-14`。Task 5 已写 `docs/debug/2026-06-03-optimizer-practice-first-result.md`，产品化决策为 B：native optimizer passed but Hermes lacks explicit candidate injection; add that contract first。下一步只能在用户确认后写一个窄 candidate-injection package contract design spec。不要写新 Hermes optimizer 算法，不要创建 broad schema/framework，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。不要用 Python 解析 PSF，不要让 agent 翻译或重写 Calculator/OCEAN 公式。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。当前活动节点是 Candidate-Injection Package Contract Design，状态为 design spec complete/verified-only。Task 4 已通过 `/tmp/ic_auto_opt_optimizer_practice/run_turbo_bridge_test_inv.py` 跑通真实 TuRBO + Hermes + Spectre/OCEAN practice：9 次评价、8 个 init + 1 个 post-initial TuRBO suggestion、9 个 OCEAN scalar evidence、0 个 penalty，best candidate 为 `FN=12, WN=1.3u, FP=2, WP=2.5u`，objective=`4.183168953894332e-14`。Task 5 已写 `docs/debug/2026-06-03-optimizer-practice-first-result.md`，产品化决策为 B。新的 design spec 是 `docs/superpowers/specs/2026-06-04-candidate-injection-package-contract-design.md`。下一步只能在用户确认后写 candidate-injection package contract implementation plan。不要写新 Hermes optimizer 算法，不要创建 broad schema/framework，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。不要用 Python 解析 PSF，不要让 agent 翻译或重写 Calculator/OCEAN 公式。
 ```

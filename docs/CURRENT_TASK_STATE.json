@@ -1,23 +1,32 @@
 {
   "schema_version": "1.0",
-  "current_scope": "Optimizer Practice-First Plan",
-  "current_status": "Optimizer Practice-First Task 5 is complete, verified-only. Productization decision note was written at docs/debug/2026-06-03-optimizer-practice-first-result.md. Decision is B: native optimizer practice passed, but Hermes lacks an explicit candidate-injection package contract. Task 4 proved the real route with local Turbo1, 9 evaluations, 1 post-initial TuRBO suggestion, 9 OCEAN scalar evaluations, 0 penalties, and best candidate FN=12, WN=1.3u, FP=2, WP=2.5u, objective=4.183168953894332e-14. The practice workaround locked each candidate by rewriting per-eval config/variables.yaml lower/upper values in isolated /tmp projects; this should not become the product interface.",
+  "current_scope": "Candidate-Injection Package Contract Design",
+  "current_status": "Design spec is complete, verified-only. The new spec is docs/superpowers/specs/2026-06-04-candidate-injection-package-contract-design.md. It chooses a narrow explicit candidate request contract and a package-preparation command, prepare-candidate-real-run, so optimizer-selected parameters can become deterministic runs/real/<run_id>/ packages without rewriting config/variables.yaml. The design does not add optimizer algorithms, does not replace C-4 first real-run preparation, does not replace C-9 deterministic next-run preparation, does not run real tools, and does not parse PSF or rewrite OCEAN formulas.",
   "review_status": "verified-only",
   "subagent_dispatch": "available",
-  "active_spec": "docs/superpowers/plans/2026-06-03-optimizer-practice-first.md",
-  "active_plan": "docs/superpowers/plans/2026-06-03-optimizer-practice-first.md",
+  "active_spec": "docs/superpowers/specs/2026-06-04-candidate-injection-package-contract-design.md",
+  "active_plan": "docs/superpowers/specs/2026-06-04-candidate-injection-package-contract-design.md",
   "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
   "progress_files": [
     "docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md",
     "docs/EXECUTION_PROGRESS_2026-05-29.md",
     "docs/COMPACT_RESUME_CHECKPOINT.md"
   ],
-  "next_allowed_action": "wait for user confirmation, then write a narrow candidate-injection package contract design spec only",
+  "next_allowed_action": "wait for user confirmation, then write the candidate-injection package contract implementation plan only",
   "forbidden_actions": [
-    "start Hermes optimizer productization before candidate-injection design spec",
+    "start Hermes optimizer productization before candidate-injection implementation plan",
     "create new optimizer algorithms",
     "create broad optimizer schemas or framework assets",
     "flatten or redesign the Maestro/ADE netlist layout",
+    "replace C-4 first real-run preparation",
+    "replace C-9 deterministic next-run preparation",
+    "run Virtuoso",
+    "run Spectre",
+    "run OCEAN",
+    "run SSH",
+    "run Claude CLI",
+    "run virtuoso-bridge-lite",
+    "run subprocess-backed C-7 adapter",
     "parse PSF",
     "rewrite OCEAN formulas",
     "commit raw input.scs",
@@ -33,18 +42,15 @@
     "git status --short"
   ],
   "route_audit": {
-    "active_plan": "docs/superpowers/plans/2026-06-03-optimizer-practice-first.md",
+    "active_spec": "docs/superpowers/specs/2026-06-04-candidate-injection-package-contract-design.md",
     "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
-    "alignment": "Aligned. The top-level plan requires optimizer execution through approved adapter boundaries after deterministic Hermes contracts and real practice evidence. Task 5 keeps that route by choosing a narrow candidate-injection contract before any optimizer product code.",
-    "drift": "None. The productization decision explicitly rejects broad optimizer framework work and records the practice workaround as evidence for the next narrow contract."
+    "alignment": "Aligned. The top-level plan now requires optimizer execution through approved adapter boundaries after deterministic Hermes contracts and real practice evidence. The design spec adds only the missing package contract for explicit optimizer candidates.",
+    "drift": "None. The design preserves the proven Maestro/ADE netlist layout, keeps OCEAN formulas authoritative, keeps real-tool execution outside Hermes, and defers optimizer algorithm productization."
   },
-  "latest_valid_commit": "docs: record optimizer productization decision",
+  "latest_valid_commit": "docs: add candidate injection package design",
   "review_evidence": {
-    "c7_real_tool_closure": "Real Spectre + OCEAN adapter closure passed in /tmp/ic_auto_opt_c7_fixed_001/bridge_test_inv. Hermes check-real-run, check-metric-results, and record-real-result passed. Metrics: rise=7.52016846017672e-11 s, fall=1.078998721053984e-10 s, DC=0.0002588877964196586 W.",
-    "optimizer_practice_task_1": "Task 1 verified /tmp/ic_auto_opt_optimizer_practice/bridge_test_inv package shape through init, validate, package, prepare-netlist, dry-run, preflight-health, approve, and prepare-real-run --run-id real_001.",
-    "optimizer_practice_task_2": "Task 2 verified /tmp/ic_auto_opt_optimizer_practice/bridge_test_inv_baseline_001 through C-7 adapter, check-real-run, check-metric-results, and record-real-result. Baseline metrics matched C-7 closure exactly. The lower-bound point produced non_scalar rise/fall and is treated as candidate-level performance failure evidence, not formula/layout drift.",
-    "optimizer_practice_task_3": "Task 3 verified optimizer skill guidance and local TuRBO import with project-local .venv: torch=2.12.0+cpu, gpytorch=1.15.2, numpy=2.4.6, scipy=1.17.1.",
     "optimizer_practice_task_4": "Task 4 ran ./.venv/bin/python /tmp/ic_auto_opt_optimizer_practice/run_turbo_bridge_test_inv.py. Evidence: /tmp/ic_auto_opt_optimizer_practice/turbo_bridge_test_inv_001/summary.json and evaluations.jsonl. evaluation_count=9, post_initial_evaluations=1, successful_evaluations=9, penalty_evaluations=0. Best candidate: FN=12, WN=1.3u, FP=2, WP=2.5u, objective=4.183168953894332e-14.",
-    "optimizer_practice_task_5": "Task 5 wrote docs/debug/2026-06-03-optimizer-practice-first-result.md and chose Productization Decision B: add an explicit candidate-injection package contract first."
+    "optimizer_practice_task_5": "Task 5 wrote docs/debug/2026-06-03-optimizer-practice-first-result.md and chose Productization Decision B: add an explicit candidate-injection package contract first.",
+    "candidate_injection_design": "Design spec written at docs/superpowers/specs/2026-06-04-candidate-injection-package-contract-design.md. It defines candidate request schema, validation, run-id policy, dedupe policy, package outputs, CLI, error handling, and fake-tool-only testing strategy."
   }
 }
