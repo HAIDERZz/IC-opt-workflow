@@ -156,6 +156,8 @@ hermes-workflow record-real-result "$PRACTICE_PROJECT" --run-id real_001
 
 ## Task 3: Optimizer Skill And TuRBO Environment Gate
 
+**Status:** Complete, verified-only.
+
 **Intent:** Verify the actual optimizer ingredients before running a real optimization loop.
 
 **Commands:**
@@ -173,13 +175,25 @@ PY
 **Expected Evidence:**
 
 - The optimizer skill describes black-box optimization with TuRBO or scipy.
-- `Turbo1` imports from the local TuRBO checkout.
+- Project-local Linux `.venv` exists at `ic-auto-opt-workflow/.venv` and is intentionally untracked.
+- `.venv` has CPU-only `torch`, `gpytorch`, `numpy`, and `scipy` installed for local TuRBO practice.
+- `Turbo1` imports from the local TuRBO checkout using `.venv/bin/python`.
 - The practice record states the selected optimizer budget:
 
 ```text
 n_init = 8
 max_evals = 9
 batch_size = 1
+```
+
+Verified import evidence:
+
+```text
+Turbo1
+torch=2.12.0+cpu
+gpytorch=1.15.2
+numpy=2.4.6
+scipy=1.17.1
 ```
 
 **Stop Condition:** If TuRBO cannot import, fix the environment or record the exact missing dependency before any optimizer development.

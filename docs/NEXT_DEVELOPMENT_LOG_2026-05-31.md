@@ -443,7 +443,7 @@ Status: planned, verified-only.
 - Before Hermes optimizer development, the practice must use `virtuoso-bridge-lite/skills/optimizer/SKILL.md` and local TuRBO at `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/TuRBO`.
 - For four `bridge_test_inv` variables, the minimum TuRBO practice budget is `n_init=8`, `max_evals=9`, `batch_size=1`, so at least one candidate is chosen after TuRBO's initial sample set.
 - No new optimizer algorithm, schema, broad framework, PSF parser, or formula rewrite is authorized by this plan.
-next_allowed_action: wait for user confirmation, then execute Optimizer Practice-First Task 3 only.
+next_allowed_action: wait for user confirmation, then execute Optimizer Practice-First Task 4 only.
 
 Task 1 baseline package shape checkpoint:
 
@@ -469,8 +469,18 @@ Task 2 single-point replay checkpoint:
 - `state/best_candidate.json` is absent because the checked row is `real_constraint_fail`; this does not block Task 2.
 - No Hermes code, OCEAN formula, adapter layout, or PSF parser change was made.
 
+Task 3 optimizer skill and TuRBO environment gate:
+
+- Status: complete, verified-only.
+- `virtuoso-bridge-lite/skills/optimizer/SKILL.md` was read. It confirms black-box optimization, TuRBO/scipy backend choices, TuRBO's minimum `2 * n_params` initialization guidance, minimization semantics, and finite failure penalties rather than `nan`/`inf`.
+- Project-local Linux `.venv` was created under `ic-auto-opt-workflow/.venv` and ignored via `.gitignore`.
+- `.venv` was populated with CPU-only `torch=2.12.0+cpu`, `gpytorch=1.15.2`, `numpy=2.4.6`, and `scipy=1.17.1`.
+- Local TuRBO import passed with `.venv/bin/python`: `from turbo import Turbo1` printed `Turbo1`.
+- Route audit: aligned with the practice-first plan and top-level plan. No Hermes optimizer code, real tools, C-7 adapter run, PSF parser, formula rewrite, or broad framework asset was added.
+- next_allowed_action: wait for user confirmation, then execute Optimizer Practice-First Task 4 only.
+
 ## Resume Prompt
 
 ```text
-请继续 IC auto optimization workflow。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。先阅读 docs/CURRENT_TASK_STATE.json、AGENTS.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/specs/2026-06-03-controlled-real-tool-agent-practice-design.md、docs/superpowers/plans/2026-06-03-controlled-real-tool-agent-practice.md。当前活动节点是 Plan C C-12 Task 4 Hermes check/recovery handling，状态为 C-12 Task 4 complete and reviewed；下一步必须先确认是否进入 scoped C-7 adapter command-compatibility fix。不要重新运行真实 Spectre/OCEAN adapter，除非新的 C-7 fix plan 明确要求并获得用户确认。运行或更新任务前先执行 python3 tools/check_development_cadence.py。不要提交或复制本地真实 input.scs/PSF/log 示例，不要让 agent 重写公式，不要用 Python 解析 PSF 或重写 Calculator/OCEAN 公式。
+请继续 IC auto optimization workflow。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。先阅读 docs/CURRENT_TASK_STATE.json、AGENTS.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/plans/2026-06-03-optimizer-practice-first.md。当前活动节点是 Optimizer Practice-First Plan，状态为 Task 3 complete/verified-only。Task 3 已创建项目本地 Linux `.venv`，安装 CPU-only `torch=2.12.0+cpu`、`gpytorch=1.15.2`、`numpy=2.4.6`、`scipy=1.17.1`，并确认 `.venv/bin/python` 可以从 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/TuRBO import `Turbo1`。下一步只能在用户确认后执行 Optimizer Practice-First Task 4：Native Optimizer Full-Loop Practice。不要写新 Hermes optimizer 算法，不要创建 broad schema/framework，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。不要用 Python 解析 PSF，不要让 agent 翻译或重写 Calculator/OCEAN 公式。
 ```
