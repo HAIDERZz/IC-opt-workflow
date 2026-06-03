@@ -986,7 +986,8 @@ Next required action:
 
 - C-11 local smoke design spec exists: `docs/superpowers/specs/2026-06-03-local-real-run-smoke-design.md`.
 - C-11 local smoke implementation plan exists: `docs/superpowers/plans/2026-06-03-local-real-run-smoke.md`.
-- Next recommended action: execute C-11 Task 1 test-only smoke helpers using Subagent-Driven Development, then stop for report/review/commit/node update.
+- C-11 Task 1 test-only smoke helpers are complete and reviewed. Added `tests/real_run_smoke_helpers.py` and the seed helper smoke test in `tests/test_local_real_run_smoke.py`; focused pytest and ruff checks passed.
+- Next recommended action: wait for user confirmation before C-11 Task 2 library happy-path smoke.
 - C-11 remains a local/fake controlled smoke first: chain C-9 -> fake C-7-style returned artifacts -> C-5/C-6 checks -> C-8 with one controlled C-10 failure/retry case. Do not jump straight to real Virtuoso/Spectre/OCEAN/agent integration.
 
 ## Locked Role Model

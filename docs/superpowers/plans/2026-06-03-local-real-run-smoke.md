@@ -99,7 +99,7 @@ Use fixed timestamps in tests:
 - Modify: `docs/EXECUTION_PROGRESS_2026-05-29.md`
 - Modify: `docs/COMPACT_RESUME_CHECKPOINT.md`
 
-- [ ] **Step 1: Write the failing helper smoke test**
+- [x] **Step 1: Write the failing helper smoke test**
 
 Create `tests/test_local_real_run_smoke.py` with this initial content:
 
@@ -131,7 +131,7 @@ def test_c11_helper_seeds_recorded_real_result(tmp_path):
     assert_no_unresolved_real_runs(project_dir)
 ```
 
-- [ ] **Step 2: Run the focused test and verify it fails**
+- [x] **Step 2: Run the focused test and verify it fails**
 
 Run:
 
@@ -141,7 +141,7 @@ python3 -m pytest tests/test_local_real_run_smoke.py::test_c11_helper_seeds_reco
 
 Expected: FAIL with `ModuleNotFoundError: No module named 'tests.real_run_smoke_helpers'`.
 
-- [ ] **Step 3: Add the test-only helper module**
+- [x] **Step 3: Add the test-only helper module**
 
 Create `tests/real_run_smoke_helpers.py`:
 
@@ -370,7 +370,7 @@ def ledger_rows(project_dir: Path) -> list[dict]:
     ]
 ```
 
-- [ ] **Step 4: Run the focused test and verify it passes**
+- [x] **Step 4: Run the focused test and verify it passes**
 
 Run:
 
@@ -380,7 +380,7 @@ python3 -m pytest tests/test_local_real_run_smoke.py::test_c11_helper_seeds_reco
 
 Expected: 1 test passes.
 
-- [ ] **Step 5: Run focused lint**
+- [x] **Step 5: Run focused lint**
 
 Run:
 
@@ -390,7 +390,7 @@ python3 -m ruff check tests/real_run_smoke_helpers.py tests/test_local_real_run_
 
 Expected: all checks pass.
 
-- [ ] **Step 6: Update task status and node files**
+- [x] **Step 6: Update task status and node files**
 
 In this plan, mark Task 1 steps as complete.
 
@@ -404,7 +404,7 @@ Update the current node in `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md` to:
 
 Add matching C-11 Task 1 checkpoint bullets to `docs/EXECUTION_PROGRESS_2026-05-29.md` and `docs/COMPACT_RESUME_CHECKPOINT.md`.
 
-- [ ] **Step 7: Commit Task 1**
+- [x] **Step 7: Commit Task 1**
 
 Run:
 

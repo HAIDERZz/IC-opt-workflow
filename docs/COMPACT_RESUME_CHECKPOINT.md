@@ -102,7 +102,8 @@ Current execution state:
 - C-10 real-run failure/retry policy contract is complete and reviewed.
 - C-11 local smoke design spec exists: `docs/superpowers/specs/2026-06-03-local-real-run-smoke-design.md`.
 - C-11 local smoke implementation plan exists: `docs/superpowers/plans/2026-06-03-local-real-run-smoke.md`.
-- Current next action: execute C-11 Task 1 test-only smoke helpers using Subagent-Driven Development, then stop for report/review/commit/node update. Keep C-11 local/fake controlled first; do not jump straight to real Virtuoso/Spectre/OCEAN/agent integration.
+- C-11 Task 1 test-only smoke helpers are complete and reviewed. Added `tests/real_run_smoke_helpers.py` and the seed helper smoke test in `tests/test_local_real_run_smoke.py`; focused pytest and ruff checks passed.
+- Current next action: wait for user confirmation before C-11 Task 2 library happy-path smoke. Keep C-11 local/fake controlled first; do not jump straight to real Virtuoso/Spectre/OCEAN/agent integration.
 - Real `input.scs` examples under `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example` are local-only references and must not be committed.
 
 ## Files Already Read
@@ -414,7 +415,7 @@ optimizer:
 
 Plan A, Plan B, Plan C C-1, Plan C C-2, Plan C C-3, Plan C C-4, Plan C C-5, and Plan C C-5.5 are complete as of 2026-06-01. C-6, C-7, C-8, and C-9 are complete and reviewed as of 2026-06-02. C-10 real-run failure/retry policy contract is complete and reviewed as of 2026-06-03.
 
-Current next step: start C-11 local smoke design/plan. Chain C-9 -> C-7 -> C-8 with one controlled C-10 failure/retry case. Keep C-11 local/fake controlled first; do not redo Plan A Tasks 1-9 or completed Plan B/C modules unless new review feedback appears.
+Current next step: wait for user confirmation before C-11 Task 2 library happy-path smoke. C-11 Task 1 test-only smoke helpers are complete and reviewed. Keep C-11 local/fake controlled first; do not redo Plan A Tasks 1-9 or completed Plan B/C modules unless new review feedback appears.
 
 Read the handoff files first:
 
@@ -438,5 +439,5 @@ Use this prompt after compact:
 5. ic-auto-opt-workflow/docs/superpowers/plans/2026-06-02-real-run-failure-retry-policy-contract.md
 6. 如需背景，再读 ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。Plan A Task 1-9、Plan B mock optimization loop、Plan C C-1 netlist template contract、C-2 dry-run candidate renderer、C-3 execution package preflight readiness、C-4 post-approval real-run execution contract、C-5 real-run result handoff contract、C-5.5 dual-agent result handoff simulation gate、C-6 Spectre + OCEAN metric result contract、C-7 Spectre + OCEAN execution adapter、C-8 real result ledger/state update、C-9 next real-run package contract、C-10 real-run failure/retry policy contract 均已完成并通过 review/final gate。下一步请进入 C-11 local smoke design/plan：串联 C-9 -> C-7 -> C-8，并包含一个受控 C-10 failure/retry case。C-11 应先保持 local/fake controlled smoke，不要直接真实接入 Virtuoso/Spectre/OCEAN/agent。Spectre + OCEAN backend 已通过工具链证据验证。不要让 agent 重写公式，metrics.yaml 中的公式必须是用户/项目批准的精确公式。真实 input.scs 示例在 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example 下，仅供本地参考，请勿将其提交到仓库。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。Plan A Task 1-9、Plan B mock optimization loop、Plan C C-1 netlist template contract、C-2 dry-run candidate renderer、C-3 execution package preflight readiness、C-4 post-approval real-run execution contract、C-5 real-run result handoff contract、C-5.5 dual-agent result handoff simulation gate、C-6 Spectre + OCEAN metric result contract、C-7 Spectre + OCEAN execution adapter、C-8 real result ledger/state update、C-9 next real-run package contract、C-10 real-run failure/retry policy contract 均已完成并通过 review/final gate。C-11 Task 1 test-only smoke helpers 已完成并通过 focused pytest/ruff；下一步请等待用户确认后进入 C-11 Task 2 library happy-path smoke。C-11 应先保持 local/fake controlled smoke，不要直接真实接入 Virtuoso/Spectre/OCEAN/agent。Spectre + OCEAN backend 已通过工具链证据验证。不要让 agent 重写公式，metrics.yaml 中的公式必须是用户/项目批准的精确公式。真实 input.scs 示例在 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example 下，仅供本地参考，请勿将其提交到仓库。
 ```
