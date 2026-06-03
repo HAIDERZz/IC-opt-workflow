@@ -519,8 +519,19 @@ Candidate-injection package contract implementation plan:
 - Route audit: aligned with the active design spec and top-level practice-first route. Drift: none.
 - next_allowed_action: wait for user confirmation, then execute Candidate-Injection Package Contract Task 1 only.
 
+Candidate-injection package contract Tasks 1-2:
+
+- Status: complete, verified-only.
+- Code: `src/hermes_workflow/real_run.py`.
+- Tests: `tests/test_candidate_injection_real_run.py`.
+- Task 1 added explicit candidate request validation against `config/variables.yaml`, including safe candidate ids, exact variable names, integer bounds/steps, continuous-step bounds/steps, and Spectre-safe attached unit suffixes.
+- Task 2 reused the existing real-run package writer to prepare explicit candidate packages. It writes `runs/real/<run_id>/candidate_request.json`, records `candidate_request_sha256` in `candidate.json` and `real_run_manifest.json`, rejects duplicate ledger candidate ids and parameter tuples, and keeps `config/variables.yaml` unchanged.
+- Route audit: aligned with `docs/superpowers/specs/2026-06-04-candidate-injection-package-contract-design.md` and the top-level practice-first route. Drift: none. No optimizer algorithm productization, real-tool execution, PSF parsing, OCEAN formula rewriting, C-4 replacement, or C-9 replacement was added.
+- Verification: `python3 -m pytest tests/test_candidate_injection_real_run.py -q`; `python3 -m pytest tests/test_next_real_run.py tests/test_real_run.py -q`; `python3 -m ruff check src tests tools`; `python3 tools/check_development_cadence.py`; `git diff --check`.
+- next_allowed_action: wait for user confirmation, then execute Candidate-Injection Package Contract Task 3 only.
+
 ## Resume Prompt
 
 ```text
-请继续 IC auto optimization workflow。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。先阅读 docs/CURRENT_TASK_STATE.json、AGENTS.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/specs/2026-06-04-candidate-injection-package-contract-design.md、docs/superpowers/plans/2026-06-04-candidate-injection-package-contract.md，并按需阅读 docs/superpowers/plans/2026-06-03-optimizer-practice-first.md。当前活动节点是 Candidate-Injection Package Contract Implementation Plan，状态为 implementation plan complete/verified-only。Task 4 已跑通真实 TuRBO + Hermes + Spectre/OCEAN practice：9 次评价、8 个 init + 1 个 post-initial TuRBO suggestion、9 个 OCEAN scalar evidence、0 个 penalty，best candidate 为 `FN=12, WN=1.3u, FP=2, WP=2.5u`，objective=`4.183168953894332e-14`。Task 5 已选择产品化决策 B：native optimizer passed but Hermes lacks explicit candidate injection; add that contract first。下一步只能在用户确认后执行 Candidate-Injection Package Contract Task 1: Candidate Request Validation。不要写新 Hermes optimizer 算法，不要创建 broad schema/framework，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。不要用 Python 解析 PSF，不要让 agent 翻译或重写 Calculator/OCEAN 公式。
+请继续 IC auto optimization workflow。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。先阅读 docs/CURRENT_TASK_STATE.json、AGENTS.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/specs/2026-06-04-candidate-injection-package-contract-design.md、docs/superpowers/plans/2026-06-04-candidate-injection-package-contract.md，并按需阅读 docs/superpowers/plans/2026-06-03-optimizer-practice-first.md。当前活动节点是 Candidate-Injection Package Contract Tasks 1-2，状态为 complete/verified-only。Task 1-2 已实现 candidate request validation 和 explicit candidate real-run package writer，复用现有 real_run package writer，写入 `candidate_request.json` evidence，并保持 `config/variables.yaml` 不变。下一步只能在用户确认后执行 Candidate-Injection Package Contract Task 3: CLI Wiring And Fake Handoff Smoke。不要写新 Hermes optimizer 算法，不要创建 broad schema/framework，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。不要用 Python 解析 PSF，不要让 agent 翻译或重写 Calculator/OCEAN 公式。
 ```

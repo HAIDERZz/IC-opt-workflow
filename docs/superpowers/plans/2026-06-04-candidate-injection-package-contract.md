@@ -64,7 +64,7 @@ Forbidden:
 - Modify: `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`
 - Modify: `docs/superpowers/plans/2026-06-04-candidate-injection-package-contract.md`
 
-- [ ] **Step 1: Add focused failing tests for request schema and parameter validation**
+- [x] **Step 1: Add focused failing tests for request schema and parameter validation**
 
 Add `tests/test_candidate_injection_real_run.py` with imports and helpers:
 
@@ -190,7 +190,7 @@ def test_prepare_candidate_real_run_rejects_invalid_values(
         prepare_candidate_real_run(project_dir, candidate_file=request)
 ```
 
-- [ ] **Step 2: Run validation tests and confirm they fail because the function is missing**
+- [x] **Step 2: Run validation tests and confirm they fail because the function is missing**
 
 Run:
 
@@ -200,7 +200,7 @@ python3 -m pytest tests/test_candidate_injection_real_run.py -q
 
 Expected: fail with `ImportError` or `AttributeError` for `prepare_candidate_real_run`.
 
-- [ ] **Step 3: Add minimal validation implementation in `real_run.py`**
+- [x] **Step 3: Add minimal validation implementation in `real_run.py`**
 
 Modify imports:
 
@@ -361,7 +361,7 @@ def prepare_candidate_real_run(
     raise NotImplementedError("candidate real-run package writing is implemented in Task 2")
 ```
 
-- [ ] **Step 4: Run validation tests and confirm invalid cases pass**
+- [x] **Step 4: Run validation tests and confirm invalid cases pass**
 
 Run:
 
@@ -371,7 +371,7 @@ python3 -m pytest tests/test_candidate_injection_real_run.py -q
 
 Expected: validation rejection tests pass. Tests that expect a successful package are not added until Task 2.
 
-- [ ] **Step 5: Update task state and commit Task 1**
+- [x] **Step 5: Update task state and commit Task 1**
 
 Update:
 
@@ -410,7 +410,7 @@ Stop for user confirmation.
 - Modify: `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`
 - Modify: `docs/superpowers/plans/2026-06-04-candidate-injection-package-contract.md`
 
-- [ ] **Step 1: Add failing happy-path and dedupe tests**
+- [x] **Step 1: Add failing happy-path and dedupe tests**
 
 Append tests:
 
@@ -512,7 +512,7 @@ def test_prepare_candidate_real_run_rejects_duplicate_prepared_parameters(tmp_pa
         prepare_candidate_real_run(project_dir, candidate_file=second, run_id="real_003")
 ```
 
-- [ ] **Step 2: Run tests and confirm package-writing failures**
+- [x] **Step 2: Run tests and confirm package-writing failures**
 
 Run:
 
@@ -522,7 +522,7 @@ python3 -m pytest tests/test_candidate_injection_real_run.py -q
 
 Expected: happy-path and dedupe tests fail because package writing is not implemented.
 
-- [ ] **Step 3: Implement package writing by reusing `_write_real_run_package()`**
+- [x] **Step 3: Implement package writing by reusing `_write_real_run_package()`**
 
 Add helper functions:
 
@@ -690,7 +690,7 @@ def prepare_candidate_real_run(
     )
 ```
 
-- [ ] **Step 4: Run targeted package tests**
+- [x] **Step 4: Run targeted package tests**
 
 Run:
 
@@ -701,7 +701,7 @@ python3 -m pytest tests/test_next_real_run.py tests/test_real_run.py -q
 
 Expected: pass.
 
-- [ ] **Step 5: Update task state and commit Task 2**
+- [x] **Step 5: Update task state and commit Task 2**
 
 Update:
 

@@ -6,15 +6,16 @@ import re
 import shutil
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from decimal import Decimal, InvalidOperation
 from pathlib import Path, PurePosixPath
 
-from pydantic import ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from hermes_workflow.dry_run import PLACEHOLDER_RE, UNRESOLVED_PLACEHOLDER_RE
 from hermes_workflow.metric_requests import build_metric_extraction_request
 from hermes_workflow.mock_optimizer import generate_candidates
 from hermes_workflow.package import sha256_file
-from hermes_workflow.schemas import LedgerRow, OptimizerState
+from hermes_workflow.schemas import LedgerRow, OptimizerState, VariableKind
 from hermes_workflow.validate import ContractBundle, assert_valid_project
 
 
@@ -29,6 +30,11 @@ OPTIMIZER_STATE_PATH = "state/optimizer_state.json"
 NEXT_CANDIDATE_SOURCE = "deterministic_initialization_sequence"
 NEXT_SELECTION_POLICY = "next_unique_from_optimizer_initialization_sequence"
 EMPTY_LEDGER_SHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+SAFE_CANDIDATE_ID_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
+CONTINUOUS_VALUE_RE = re.compile(
+    r"^\s*(?P<value>[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)"
+    r"(?:\s*(?P<unit>\S+))?\s*$"
+)
 
 
 @dataclass(frozen=True)
@@ -42,6 +48,30 @@ class RealRunPackage:
     candidate_payload: dict
     manifest_payload: dict
     metric_request_payload: dict
+
+
+class CandidateInjectionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: str
+    candidate_id: str
+    source: str = Field(min_length=1)
+    parameters: dict[str, str]
+    metadata: dict[str, object] = Field(default_factory=dict)
+
+    @field_validator("schema_version")
+    @classmethod
+    def _schema_version_is_supported(cls, value: str) -> str:
+        if value != "1.0":
+            raise ValueError('schema_version must be "1.0"')
+        return value
+
+    @field_validator("candidate_id")
+    @classmethod
+    def _candidate_id_is_safe(cls, value: str) -> str:
+        if not value or not SAFE_CANDIDATE_ID_RE.match(value):
+            raise ValueError("candidate_id must be a safe identifier")
+        return value
 
 
 @dataclass(frozen=True)
@@ -126,6 +156,67 @@ def prepare_next_real_run(
     )
 
 
+def prepare_candidate_real_run(
+    project_dir: Path,
+    *,
+    candidate_file: Path,
+    run_id: str | None = None,
+    created_at_utc: str | None = None,
+) -> RealRunPackage:
+    project_dir = Path(project_dir)
+    candidate_file = Path(candidate_file)
+    if run_id is not None:
+        _validate_run_id(run_id)
+    manifest = _load_execution_manifest(project_dir)
+    instruction = _load_supervisor_instruction(project_dir)
+    _assert_approved(instruction)
+    approved_hashes = _approved_hashes(manifest, instruction)
+    _assert_config_hashes(project_dir, approved_hashes)
+
+    from hermes_workflow.real_run_recovery import assert_no_unresolved_real_runs
+
+    assert_no_unresolved_real_runs(project_dir)
+    request = _load_candidate_request(candidate_file)
+    request_text = candidate_file.read_text(encoding="utf-8")
+    bundle = assert_valid_project(project_dir)
+    _assert_candidate_parameters_match_bundle(bundle, request.parameters)
+    ledger_rows = _read_ledger_rows_or_raise(project_dir)
+    state = _load_optimizer_state_or_raise(project_dir)
+    _assert_optimizer_state_matches_bundle(bundle, state, ledger_rows)
+    _assert_candidate_is_unique(project_dir, request, ledger_rows)
+    selected_run_id = _select_candidate_run_id(project_dir, run_id)
+    request_relative = f"{REAL_RUN_ROOT}/{selected_run_id}/candidate_request.json"
+    request_sha256 = _sha256_text(request_text)
+    candidate = {
+        "schema_version": "1.0",
+        "candidate_id": request.candidate_id,
+        "source": "explicit_candidate_request",
+        "requested_source": request.source,
+        "parameters": request.parameters,
+        "metadata": request.metadata,
+    }
+    return _write_real_run_package(
+        bundle,
+        selected_run_id,
+        candidate,
+        created_at_utc or _utc_now(),
+        instruction,
+        approved_hashes,
+        manifest_extra={
+            "candidate_source": "explicit_candidate_request",
+            "selection_policy": "explicit_candidate_injection",
+            "candidate_request_file": request_relative,
+            "candidate_request_sha256": request_sha256,
+            "ledger_snapshot_sha256": _sha256_existing_or_empty(
+                project_dir / LEDGER_PATH
+            ),
+            "optimizer_state_sha256": sha256_file(project_dir / OPTIMIZER_STATE_PATH),
+            "previous_evaluations": len(ledger_rows),
+        },
+        candidate_request_text=request_text,
+    )
+
+
 def _validate_run_id(run_id: str) -> str:
     if not RUN_ID_RE.match(run_id):
         raise ValueError(f"run_id must match real_[0-9]{{3}}: {run_id}")
@@ -153,6 +244,27 @@ def _load_json_object(path: Path, label: str) -> dict:
     if not isinstance(payload, dict):
         raise ValueError(f"{label} is invalid: expected JSON object")
     return payload
+
+
+def _load_candidate_request(path: Path) -> CandidateInjectionRequest:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        raise FileNotFoundError(f"candidate request is missing: {path}") from None
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"candidate request is invalid JSON: {exc.msg}") from exc
+    try:
+        return CandidateInjectionRequest.model_validate(payload)
+    except ValidationError as exc:
+        raise ValueError(f"candidate request is invalid: {exc}") from exc
+
+
+def _json_text(payload: dict) -> str:
+    return json.dumps(payload, indent=2, sort_keys=True) + "\n"
+
+
+def _sha256_text(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 def _read_ledger_rows_or_raise(project_dir: Path) -> list[LedgerRow]:
@@ -219,6 +331,99 @@ def _assert_optimizer_state_matches_bundle(
         raise ValueError("optimizer maximum evaluations have already been reached")
 
 
+def _assert_candidate_parameters_match_bundle(
+    bundle: ContractBundle,
+    parameters: dict[str, str],
+) -> None:
+    expected_names = [variable.name for variable in bundle.variables.variables]
+    if set(parameters) != set(expected_names):
+        raise ValueError("candidate parameters must match variables.yaml")
+    for variable in bundle.variables.variables:
+        raw_value = parameters[variable.name]
+        if not isinstance(raw_value, str):
+            raise ValueError(f"{variable.name} value must be a string")
+        if variable.kind == VariableKind.INTEGER:
+            _assert_integer_candidate(
+                variable.name,
+                raw_value,
+                variable.lower,
+                variable.upper,
+                variable.step,
+            )
+        elif variable.kind == VariableKind.CONTINUOUS_STEP:
+            _assert_continuous_candidate(
+                variable.name,
+                raw_value,
+                variable.lower,
+                variable.upper,
+                variable.step,
+            )
+        else:
+            raise ValueError(f"{variable.name} kind is unsupported: {variable.kind}")
+
+
+def _assert_integer_candidate(
+    name: str,
+    raw_value: str,
+    lower_raw: str,
+    upper_raw: str,
+    step_raw: str,
+) -> None:
+    try:
+        value = int(raw_value)
+        lower = int(lower_raw)
+        upper = int(upper_raw)
+        step = int(step_raw)
+    except ValueError as exc:
+        raise ValueError(f"{name} must be an integer") from exc
+    if str(value) != raw_value:
+        raise ValueError(f"{name} must be an integer")
+    if value < lower or value > upper:
+        raise ValueError(f"{name} is outside approved bounds")
+    if step <= 0 or (value - lower) % step != 0:
+        raise ValueError(f"{name} is not aligned to approved step")
+
+
+def _parse_continuous_candidate(raw: str) -> tuple[Decimal, str]:
+    match = CONTINUOUS_VALUE_RE.match(raw)
+    if match is None:
+        raise ValueError("value must be numeric with an optional unit suffix")
+    if match.group("unit") and match.start("unit") > match.end("value"):
+        raise ValueError("value must use a Spectre-safe attached unit suffix")
+    try:
+        return Decimal(match.group("value")), match.group("unit") or ""
+    except InvalidOperation as exc:
+        raise ValueError("value must be numeric with an optional unit suffix") from exc
+
+
+def _assert_continuous_candidate(
+    name: str,
+    raw_value: str,
+    lower_raw: str,
+    upper_raw: str,
+    step_raw: str,
+) -> None:
+    try:
+        value, value_unit = _parse_continuous_candidate(raw_value)
+    except ValueError as exc:
+        if "attached unit suffix" in str(exc):
+            raise ValueError(
+                f"{name} must use a Spectre-safe attached unit suffix"
+            ) from exc
+        raise ValueError(
+            f"{name} must be numeric with an optional unit suffix"
+        ) from exc
+    lower, lower_unit = _parse_continuous_candidate(lower_raw)
+    upper, upper_unit = _parse_continuous_candidate(upper_raw)
+    step, step_unit = _parse_continuous_candidate(step_raw)
+    if len({value_unit, lower_unit, upper_unit, step_unit}) != 1:
+        raise ValueError(f"{name} unit suffix must match variables.yaml")
+    if value < lower or value > upper:
+        raise ValueError(f"{name} is outside approved bounds")
+    if step <= 0 or (value - lower) % step != 0:
+        raise ValueError(f"{name} is not aligned to approved step")
+
+
 def _next_unused_run_id(project_dir: Path) -> str:
     root = project_dir / REAL_RUN_ROOT
     used: set[int] = {1}
@@ -237,6 +442,15 @@ def _next_unused_run_id(project_dir: Path) -> str:
     return f"real_{next_id:03d}"
 
 
+def _select_candidate_run_id(project_dir: Path, run_id: str | None) -> str:
+    if run_id is None:
+        return _next_unused_run_id(project_dir)
+    selected = _validate_run_id(run_id)
+    if selected == DEFAULT_RUN_ID:
+        raise ValueError("prepare-candidate-real-run cannot target real_001")
+    return selected
+
+
 def _select_next_run_id(project_dir: Path, run_id: str | None) -> str:
     if run_id is None:
         return _next_unused_run_id(project_dir)
@@ -248,6 +462,28 @@ def _select_next_run_id(project_dir: Path, run_id: str | None) -> str:
 
 def _parameter_key(parameters: dict[str, str]) -> tuple[tuple[str, str], ...]:
     return tuple(sorted(parameters.items()))
+
+
+def _prepared_candidate_ids(project_dir: Path) -> set[str]:
+    root = project_dir / REAL_RUN_ROOT
+    ids: set[str] = set()
+    if not root.exists():
+        return ids
+    for run_dir in sorted(root.iterdir()):
+        if not RUN_ID_RE.match(run_dir.name):
+            continue
+        _assert_run_dir_is_not_symlink(run_dir)
+        if not run_dir.is_dir():
+            continue
+        candidate_path = run_dir / "candidate.json"
+        if not candidate_path.exists():
+            continue
+        payload = _load_json_object(candidate_path, "prepared candidate")
+        candidate_id = payload.get("candidate_id")
+        if not isinstance(candidate_id, str):
+            raise ValueError(f"prepared candidate is invalid: {candidate_path}")
+        ids.add(candidate_id)
+    return ids
 
 
 def _prepared_candidate_keys(project_dir: Path) -> set[tuple[tuple[str, str], ...]]:
@@ -273,6 +509,27 @@ def _prepared_candidate_keys(project_dir: Path) -> set[tuple[tuple[str, str], ..
             raise ValueError(f"prepared candidate is invalid: {candidate_path}")
         keys.add(_parameter_key(parameters))
     return keys
+
+
+def _assert_candidate_is_unique(
+    project_dir: Path,
+    request: CandidateInjectionRequest,
+    ledger_rows: list[LedgerRow],
+) -> None:
+    request_key = _parameter_key(request.parameters)
+    for row in ledger_rows:
+        if row.candidate_id == request.candidate_id:
+            raise ValueError(
+                f"ledger already contains candidate_id {request.candidate_id}"
+            )
+        if _parameter_key(row.parameters) == request_key:
+            raise ValueError("ledger already contains candidate parameters")
+    if request.candidate_id in _prepared_candidate_ids(project_dir):
+        raise ValueError(
+            f"prepared run already contains candidate_id {request.candidate_id}"
+        )
+    if request_key in _prepared_candidate_keys(project_dir):
+        raise ValueError("prepared run already contains candidate parameters")
 
 
 def _select_next_candidate(
@@ -374,6 +631,7 @@ def _write_real_run_package(
     *,
     manifest_extra: dict,
     rendered_text_override: str | None = None,
+    candidate_request_text: str | None = None,
 ) -> RealRunPackage:
     _assert_real_run_parent_dirs_are_not_symlinks(bundle.project_dir)
     run_dir = _project_path(bundle, f"{REAL_RUN_ROOT}/{selected_run_id}")
@@ -393,14 +651,25 @@ def _write_real_run_package(
         f"{REAL_RUN_ROOT}/{selected_run_id}/{SPECTRE_NETLIST_DIR}/input.scs"
     )
     candidate_relative = f"{REAL_RUN_ROOT}/{selected_run_id}/candidate.json"
+    candidate_request_relative = (
+        f"{REAL_RUN_ROOT}/{selected_run_id}/candidate_request.json"
+        if candidate_request_text is not None
+        else None
+    )
     metric_request_relative = (
         f"{REAL_RUN_ROOT}/{selected_run_id}/metric_extraction_request.json"
     )
     rendered_path = _project_path(bundle, rendered_relative)
     candidate_path = _project_path(bundle, candidate_relative)
+    candidate_request_path = (
+        _project_path(bundle, candidate_request_relative)
+        if candidate_request_relative is not None
+        else None
+    )
     metric_request_path = _project_path(bundle, metric_request_relative)
 
     created_run_dir = not run_dir.exists()
+    candidate_for_write = dict(candidate)
     try:
         run_dir.mkdir(parents=True, exist_ok=True)
         netlist_dir = run_dir / SPECTRE_NETLIST_DIR
@@ -415,11 +684,17 @@ def _write_real_run_package(
             )
         )
         rendered_path.write_text(rendered_text, encoding="utf-8")
-        candidate_path.write_text(
-            json.dumps(candidate, indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
-        )
-        candidate_id = str(candidate["candidate_id"])
+        if candidate_request_path is not None and candidate_request_text is not None:
+            candidate_request_path.write_text(
+                candidate_request_text,
+                encoding="utf-8",
+            )
+            candidate_for_write["candidate_request_file"] = candidate_request_relative
+            candidate_for_write["candidate_request_sha256"] = sha256_file(
+                candidate_request_path
+            )
+        candidate_path.write_text(_json_text(candidate_for_write), encoding="utf-8")
+        candidate_id = str(candidate_for_write["candidate_id"])
         metric_request_payload = build_metric_extraction_request(
             bundle,
             run_id=selected_run_id,
@@ -463,7 +738,7 @@ def _write_real_run_package(
         candidate_path=candidate_path,
         manifest_path=manifest_path,
         metric_request_path=metric_request_path,
-        candidate_payload=candidate,
+        candidate_payload=candidate_for_write,
         manifest_payload=manifest_payload,
         metric_request_payload=metric_request_payload,
     )
