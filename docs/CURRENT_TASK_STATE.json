@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
-  "current_scope": "Plan C C-12 Task 1 practice workspace and input gate",
-  "current_status": "C-12 Task 1 complete and reviewed",
+  "current_scope": "Plan C C-12 Task 2 Hermes preflight and approved real-run package",
+  "current_status": "C-12 Task 2 complete and reviewed",
   "review_status": "reviewed",
   "subagent_dispatch": "available",
   "active_spec": "docs/superpowers/specs/2026-06-03-controlled-real-tool-agent-practice-design.md",
@@ -12,7 +12,7 @@
     "docs/EXECUTION_PROGRESS_2026-05-29.md",
     "docs/COMPACT_RESUME_CHECKPOINT.md"
   ],
-  "next_allowed_action": "user confirmation to start C-12 Task 2 Hermes preflight and approved real-run package",
+  "next_allowed_action": "request explicit user confirmation before C-12 Task 3 real Spectre/OCEAN adapter execution",
   "forbidden_actions": [
     "run Virtuoso",
     "run Spectre",
@@ -33,8 +33,9 @@
     "git status --short"
   ],
   "review_evidence": {
-    "spec_review": "Epicurus 019e8d56-4dd7-7712-b7ae-abdc6fc88c02 approved C-12 Task 1 input gate completion after the Step 10 pathspec Minor was fixed; no open Critical, Important, or Minor findings. Route remains aligned.",
-    "code_quality_review": "Ohm 019e8d58-ba6e-7b42-91fe-ef05eb5b611e approved C-12 Task 1 docs/status changes with no Critical, Important, or Minor findings. Residual risk: approval was based on supplied facts, so final commit uses explicit pathspecs to avoid untracked evidence.",
+    "spec_review": "Noether 019e8d66-cfe1-73a2-9b12-a70c59305735 approved C-12 Task 2 spec compliance with no Critical, Important, or Minor findings. Route audit aligned and Task 3 remains gated behind explicit user confirmation.",
+    "code_quality_review": "Mill 019e8d68-4d37-7ba0-98fa-4892078d7aed approved C-12 Task 2 code quality after the stale PROJECT_WORKFLOW_OVERVIEW wording was fixed; no open Critical, Important, or Minor findings. Residual risk: untracked docs/OCEAN_DOC_* and docs/toolchain_evidence/ require explicit pathspec staging.",
+    "task_2_completion": "C-12 Task 2 ran Hermes validate/package/prepare-netlist/dry-run/preflight-health/approve/prepare-real-run for real_001 and wrote local-only pre-execution hashes under /tmp. User confirmed the provided input.scs corresponds to the template metrics.yaml before Task 2. No real tools, C-7 adapter, SSH, bridge, PSF parsing, formula rewriting, or deck commit occurred.",
     "task_1_input_gate_completion": "C-12 Task 1 confirmed /tmp/ic_auto_opt_c12/bridge_test_inv/netlists/exported/input.scs exists and wrote the local-only hash file to /tmp/ic_auto_opt_c12/evidence/2026-06-03-c12-controlled-real-tool-agent-practice/exported_input_scs.sha256. No real tools were run, no adapter was called, no PSF was parsed, and no formula was rewritten.",
     "previous_task_3_spec_review": "Ptolemy 019e8cc5-30bf-7022-bca2-657b57fec88a approved C-11 Task 3 spec compliance after stale handoff prompts were fixed; no remaining Critical, Important, or Minor findings.",
     "previous_task_3_code_quality_review": "Heisenberg 019e8cc8-c26b-7ef2-8fd4-d5679088521d approved C-11 Task 3 code quality with no Critical, Important, or Minor findings."

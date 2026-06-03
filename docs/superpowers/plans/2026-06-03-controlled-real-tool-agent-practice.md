@@ -303,7 +303,7 @@ Stop and report Task 1 status to the user.
 
 This task runs Hermes workflow tooling only. It prepares the approved package but does not run Spectre, OCEAN, SSH, bridge, Claude CLI, or the C-7 adapter.
 
-- [ ] **Step 1: Validate the project contract**
+- [x] **Step 1: Validate the project contract**
 
 Run:
 
@@ -317,7 +317,7 @@ Expected:
 - command exits 0
 - output reports a valid project
 
-- [ ] **Step 2: Build the execution package**
+- [x] **Step 2: Build the execution package**
 
 Run:
 
@@ -330,7 +330,7 @@ Expected:
 - command exits 0
 - output includes `execution_package/execution_manifest.json`
 
-- [ ] **Step 3: Prepare the netlist template**
+- [x] **Step 3: Prepare the netlist template**
 
 Run:
 
@@ -345,7 +345,7 @@ Expected:
 - `"$C12_PROJECT/reports/netlist_preparation_report.json"` exists
 - `"$C12_PROJECT/netlists/templates/template.scs"` exists
 
-- [ ] **Step 4: Run deterministic dry-run**
+- [x] **Step 4: Run deterministic dry-run**
 
 Run:
 
@@ -359,7 +359,7 @@ Expected:
 - output includes `dry run passed`
 - `"$C12_PROJECT/reports/dry_run_report.json"` exists
 
-- [ ] **Step 5: Run preflight health**
+- [x] **Step 5: Run preflight health**
 
 Run:
 
@@ -373,7 +373,7 @@ Expected:
 - output includes `preflight health passed`
 - `"$C12_PROJECT/state/health_check.json"` exists
 
-- [ ] **Step 6: Approve the first real run**
+- [x] **Step 6: Approve the first real run**
 
 Run:
 
@@ -385,9 +385,9 @@ Expected:
 
 - command exits 0
 - output is `approve_first_real_run`
-- `"$C12_PROJECT/reports/supervisor_instruction.json"` exists
+- `"$C12_PROJECT/supervisor_instruction.json"` exists
 
-- [ ] **Step 7: Prepare `real_001`**
+- [x] **Step 7: Prepare `real_001`**
 
 Run:
 
@@ -403,7 +403,7 @@ Expected:
 - `"$C12_PROJECT/runs/real/real_001/real_run_manifest.json"` exists
 - `"$C12_PROJECT/runs/real/real_001/metric_extraction_request.json"` exists
 
-- [ ] **Step 8: Capture package hashes locally**
+- [x] **Step 8: Capture package hashes locally**
 
 Run:
 
@@ -420,7 +420,7 @@ Expected:
 - hash file exists under `$C12_EVIDENCE`
 - no raw deck or manifest is committed
 
-- [ ] **Step 9: Update progress docs for Task 2**
+- [x] **Step 9: Update progress docs for Task 2**
 
 Record:
 
@@ -430,7 +430,7 @@ C-12 Task 2 checkpoint: Hermes validate/package/prepare-netlist/dry-run/prefligh
 
 Update the same node files as Task 1 and mark Task 2 checkboxes in this plan.
 
-- [ ] **Step 10: Verify and commit Task 2 docs**
+- [x] **Step 10: Verify and commit Task 2 docs**
 
 Run:
 
@@ -449,7 +449,7 @@ Expected:
 Commit:
 
 ```bash
-git add docs/CURRENT_TASK_STATE.json docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md docs/EXECUTION_PROGRESS_2026-05-29.md docs/COMPACT_RESUME_CHECKPOINT.md docs/superpowers/plans/2026-06-03-controlled-real-tool-agent-practice.md
+git add docs/CURRENT_TASK_STATE.json docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md docs/EXECUTION_PROGRESS_2026-05-29.md docs/COMPACT_RESUME_CHECKPOINT.md docs/PROJECT_WORKFLOW_OVERVIEW.md docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md docs/superpowers/plans/2026-06-03-controlled-real-tool-agent-practice.md
 git commit -m "docs: record c12 approved real run package"
 ```
 

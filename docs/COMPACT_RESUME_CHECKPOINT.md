@@ -104,9 +104,9 @@ Current execution state:
 - C-11 local smoke design spec exists: `docs/superpowers/specs/2026-06-03-local-real-run-smoke-design.md`.
 - C-11 local smoke implementation plan exists: `docs/superpowers/plans/2026-06-03-local-real-run-smoke.md`.
 - Plan C process hardening lightweight cadence guard is complete; verified-only. It adds `docs/CURRENT_TASK_STATE.json`, `tools/check_development_cadence.py`, and `docs/superpowers/specs/2026-06-03-process-hardening-lightweight-cadence-design.md`.
-- Current scope: Plan C C-12 Task 1 practice workspace and input gate
-- Current status: C-12 Task 1 complete and reviewed
-- Current next action: user confirmation to start C-12 Task 2 Hermes preflight and approved real-run package.
+- Current scope: Plan C C-12 Task 2 Hermes preflight and approved real-run package
+- Current status: C-12 Task 2 complete and reviewed
+- Current next action: request explicit user confirmation before C-12 Task 3 real Spectre/OCEAN adapter execution.
 - C-11 Task 1 checkpoint: complete and reviewed. Added the single helper seed-recording smoke and test-only real-run smoke helper module. Spec review and code-quality review approved with no Critical, Important, or Minor findings.
 - C-11 Task 1 route audit: Active spec is `docs/superpowers/specs/2026-06-03-local-real-run-smoke-design.md`; top-level plan is `docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md`; alignment remains local/fake controlled smoke only; drift is none.
 - C-11 Task 2 checkpoint: complete and reviewed. Added only `test_c11_library_happy_path_records_next_real_run` to `tests/test_local_real_run_smoke.py`; it seeds `real_001`, prepares `real_002`, writes fake C-7-style result/metric manifests, checks and records the run, and asserts ledger/state/best/report outputs plus no unresolved real runs.
@@ -127,6 +127,8 @@ Current execution state:
 - C-12 Task 1 blocker review evidence: spec-compliance review approved by Plato (`019e8d35-a238-7980-ba60-607d6457152d`) with no Critical, Important, or Minor findings. Code-quality review approved by Aristotle (`019e8d36-b189-7a02-aa9f-fb52a510daef`) for the modified tracked-file changes. The only Important residual risk is that untracked `docs/OCEAN_DOC_*` and `docs/toolchain_evidence/` remain an accidental-commit risk; use explicit pathspecs only.
 - C-12 Task 1 input gate completion checkpoint: `/tmp/ic_auto_opt_c12/bridge_test_inv/netlists/exported/input.scs` now exists, and its local-only SHA256 evidence file was written to `/tmp/ic_auto_opt_c12/evidence/2026-06-03-c12-controlled-real-tool-agent-practice/exported_input_scs.sha256`. Route audit remains aligned with the C-12 spec and top-level plan. Drift: none. No real tools, C-7 adapter, SSH, bridge, PSF parsing, formula rewriting, or deck commit occurred.
 - C-12 Task 1 completion review evidence: spec-compliance review approved by Epicurus (`019e8d56-4dd7-7712-b7ae-abdc6fc88c02`) after fixing the Step 10 pathspec Minor. Code-quality review approved by Ohm (`019e8d58-ba6e-7b42-91fe-ef05eb5b611e`) with no Critical, Important, or Minor findings. Task 1 is complete and reviewed; do not start Task 2 until the user confirms.
+- C-12 Task 2 checkpoint: user confirmed the provided `input.scs` corresponds to the template `metrics.yaml`, then Hermes `validate`, `package`, `prepare-netlist`, `dry-run`, `preflight-health`, `approve`, and `prepare-real-run --run-id real_001` all completed. `real_001` exists under `/tmp/ic_auto_opt_c12/bridge_test_inv/runs/real/real_001`, and local-only pre-execution hashes were written to `/tmp/ic_auto_opt_c12/evidence/2026-06-03-c12-controlled-real-tool-agent-practice/real_001_pre_execution_hashes.sha256`. Plan correction: the approval file exists at `$C12_PROJECT/supervisor_instruction.json`, matching `src/hermes_workflow/approvals.py` and `src/hermes_workflow/real_run.py`; the implementation plan Step 6 expected path was corrected from `reports/supervisor_instruction.json`. Route audit remains aligned with the C-12 spec and top-level plan. Drift: none. No real Spectre/OCEAN execution, C-7 adapter invocation, SSH, bridge, PSF parsing, formula rewriting, or deck commit occurred.
+- C-12 Task 2 review evidence: spec-compliance review approved by Noether (`019e8d66-cfe1-73a2-9b12-a70c59305735`) with no findings. Code-quality review approved by Mill (`019e8d68-4d37-7ba0-98fa-4892078d7aed`) after stale C-12 overview wording was fixed. Task 2 is complete and reviewed; Task 3 remains blocked until the user explicitly confirms real Spectre/OCEAN adapter execution.
 - Real `input.scs` examples under `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example` are local-only references and must not be committed.
 
 ## Files Already Read
@@ -438,7 +440,7 @@ optimizer:
 
 Plan A, Plan B, Plan C C-1, Plan C C-2, Plan C C-3, Plan C C-4, Plan C C-5, and Plan C C-5.5 are complete as of 2026-06-01. C-6, C-7, C-8, and C-9 are complete and reviewed as of 2026-06-02. C-10 real-run failure/retry policy contract is complete and reviewed as of 2026-06-03.
 
-Current next step: wait for user confirmation before starting C-12 Task 2 Hermes preflight and approved real-run package. Current state is `Plan C C-12 Task 1 practice workspace and input gate`, reviewed and complete. Before continuing, read `docs/CURRENT_TASK_STATE.json` and run `python3 tools/check_development_cadence.py`. Do not run real Virtuoso/Spectre/OCEAN/SSH/agent/bridge without the explicit Task 3 confirmation required by the C-12 implementation plan. Do not redo Plan A Tasks 1-9 or completed Plan B/C modules unless new review feedback appears.
+Current next step: request explicit user confirmation before starting C-12 Task 3 real Spectre/OCEAN adapter execution. Current state is `Plan C C-12 Task 2 Hermes preflight and approved real-run package`, reviewed and complete. Before continuing, read `docs/CURRENT_TASK_STATE.json` and run `python3 tools/check_development_cadence.py`. Do not run real Virtuoso/Spectre/OCEAN/SSH/agent/bridge without the explicit Task 3 confirmation required by the C-12 implementation plan. Do not redo Plan A Tasks 1-9 or completed Plan B/C modules unless new review feedback appears.
 
 Read the handoff files first:
 
@@ -463,5 +465,5 @@ Use this prompt after compact:
 6. ic-auto-opt-workflow/docs/superpowers/specs/2026-06-03-process-hardening-lightweight-cadence-design.md
 7. 如需背景，再读 ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。当前活动节点是 Plan C C-12 Task 1 practice workspace and input gate，状态为 C-12 Task 1 complete and reviewed；下一步等待用户确认后进入 C-12 Task 2 Hermes preflight and approved real-run package。运行或更新任务前先执行 python3 tools/check_development_cadence.py。不要在用户明确确认前运行 Task 3 的真实 Spectre/OCEAN adapter，不要解析 PSF，不要重写 Calculator/OCEAN 公式。真实 input.scs 示例在 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example 下，仅供本地参考，请勿将其提交到仓库。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。当前活动节点是 Plan C C-12 Task 2 Hermes preflight and approved real-run package，状态为 C-12 Task 2 complete and reviewed；下一步向用户请求 C-12 Task 3 真实 Spectre/OCEAN adapter 执行确认。运行或更新任务前先执行 python3 tools/check_development_cadence.py。不要在用户明确确认前运行 Task 3 的真实 Spectre/OCEAN adapter，不要解析 PSF，不要重写 Calculator/OCEAN 公式。真实 input.scs 示例在 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example 下，仅供本地参考，请勿将其提交到仓库。
 ```

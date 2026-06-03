@@ -35,9 +35,9 @@ As of 2026-06-03, focused Plan A, Plan B, and Plan C C-1 through C-11 are comple
 - C-11 Task 2 library happy-path smoke is complete and reviewed.
 - C-11 Task 3 controlled failure/retry smoke is complete and reviewed.
 - C-11 Task 4 CLI smoke, docs, and final gate is complete and reviewed.
-- C-12 Task 1 practice workspace and input gate is complete and reviewed.
+- C-12 Task 2 Hermes preflight and approved real-run package is complete and reviewed.
 
-C-11 verifies the C-9 -> fake C-7-style returned artifacts -> C-5/C-6 checks -> C-8 happy path and one controlled C-10 failure/retry path without real Virtuoso/Spectre/OCEAN/SSH/agent/bridge execution. The current node is `Plan C C-12 Task 1 practice workspace and input gate`, complete and reviewed after confirming `/tmp/ic_auto_opt_c12/bridge_test_inv/netlists/exported/input.scs` exists and writing its local-only hash evidence under `/tmp`. Next, wait for user confirmation before C-12 Task 2 Hermes preflight and approved real-run package. Current resume guidance is in `docs/CURRENT_TASK_STATE.json`, `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`, `docs/EXECUTION_PROGRESS_2026-05-29.md`, `docs/COMPACT_RESUME_CHECKPOINT.md`, and `AGENTS.md`.
+C-11 verifies the C-9 -> fake C-7-style returned artifacts -> C-5/C-6 checks -> C-8 happy path and one controlled C-10 failure/retry path without real Virtuoso/Spectre/OCEAN/SSH/agent/bridge execution. The current node is `Plan C C-12 Task 2 Hermes preflight and approved real-run package`, complete and reviewed after Hermes prepared `real_001` under `/tmp` without running real tools. Next, request explicit user confirmation before C-12 Task 3 real Spectre/OCEAN adapter execution. Current resume guidance is in `docs/CURRENT_TASK_STATE.json`, `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`, `docs/EXECUTION_PROGRESS_2026-05-29.md`, `docs/COMPACT_RESUME_CHECKPOINT.md`, and `AGENTS.md`.
 
 ## Current Route Alignment
 
