@@ -50,7 +50,7 @@
     "alignment": "Aligned. C-15 productizes only the proven C-14 route: suggest one candidate, prepare one candidate run, execute the existing C-7 adapter, check, and record.",
     "drift": "None. No new optimizer algorithm, daemon, scheduler, PSF parser, formula rewrite, or native-layout replacement was added. The loop is fixed-budget and single-candidate per cycle."
   },
-  "latest_valid_commit": "54dea7b feat: add narrow optimizer loop driver",
+  "latest_valid_commit": "674800a fix: close C15 optimizer loop gate",
   "review_evidence": {
     "spec_review": "Local subagent Ohm reviewed C-15 and returned PASS. Important findings were addressed by adding result_check_failed and record_failed coverage, bounding adapter issues, and using RECORDED consistently. Narrow re-review returned PASS with no remaining blockers.",
     "code_quality_review": "Local subagent Jason reviewed C-15 and returned PASS. Important findings were addressed by adding result_check_failed and record_failed coverage and bounding adapter failure output. Narrow re-review returned PASS with no remaining blockers.",
