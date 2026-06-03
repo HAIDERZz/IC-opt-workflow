@@ -19,9 +19,9 @@ ALLOWED_SUBAGENT_STATES = {"available", "not_available"}
 REVIEW_EVIDENCE_KEYS = ("spec_review", "code_quality_review")
 FORBIDDEN_STAGED_PREFIXES = ("docs/OCEAN_DOC_", "docs/toolchain_evidence/")
 REQUIRED_FORBIDDEN_ACTIONS = {
-    "run Virtuoso", "run Spectre", "run OCEAN", "run SSH", "run Claude CLI",
-    "run virtuoso-bridge-lite", "use network", "run subprocess-backed C-7 adapter",
     "parse PSF", "rewrite OCEAN formulas",
+    "commit raw input.scs", "commit protected include sidecars", "commit PSF/raw data",
+    "commit full Cadence logs",
 }
 CURRENT_STATUS_RE = re.compile(r"^\s*-?\s*current status\s*:", re.IGNORECASE)
 
@@ -120,7 +120,8 @@ def _check_referenced_files(root: Path, state: dict[str, Any], errors: list[str]
         if not isinstance(rel_path, str):
             errors.append("progress_files entries must be strings")
             continue
-        _check_progress_file(root, rel_path, state, errors, current_scope, next_action)
+        require_next_action = rel_path == "docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md"
+        _check_progress_file(root, rel_path, state, errors, current_scope, next_action, require_next_action)
 
 
 def _check_existing_text_file(root: Path, rel_path: str, label: str, errors: list[str], required_text: str | None = None) -> None:
@@ -135,7 +136,7 @@ def _check_existing_text_file(root: Path, rel_path: str, label: str, errors: lis
         errors.append(f"{rel_path} does not mention current_scope")
 
 
-def _check_progress_file(root: Path, rel_path: str, state: dict[str, Any], errors: list[str], current_scope: str | None, next_action: str | None) -> None:
+def _check_progress_file(root: Path, rel_path: str, state: dict[str, Any], errors: list[str], current_scope: str | None, next_action: str | None, require_next_action: bool) -> None:
     path = root / rel_path
     if not path.exists():
         errors.append(f"progress file does not exist: {rel_path}")
@@ -143,7 +144,7 @@ def _check_progress_file(root: Path, rel_path: str, state: dict[str, Any], error
     text = path.read_text()
     if current_scope and current_scope not in text:
         errors.append(f"{rel_path} does not mention current_scope")
-    if next_action and next_action not in text:
+    if require_next_action and next_action and next_action not in text:
         errors.append(f"{rel_path} does not mention next_allowed_action")
     if state.get("review_status") != "reviewed":
         for line in text.splitlines():

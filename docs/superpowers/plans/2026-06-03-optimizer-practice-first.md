@@ -200,6 +200,8 @@ scipy=1.17.1
 
 ## Task 4: Native Optimizer Full-Loop Practice
 
+**Status:** Complete, verified-only.
+
 **Intent:** Run a real optimizer flow, not a hand-picked point sequence.
 
 Create only a temporary practice script under `/tmp`, for example:
@@ -233,6 +235,37 @@ The evaluation function may use the already proven Spectre + OCEAN path, but it 
 - Each successful evaluation has Spectre and OCEAN scalar evidence.
 - The optimizer returns a best candidate and best objective.
 - Failures, if any, use a finite penalty and preserve logs.
+
+Verified evidence:
+
+- Temporary practice script: `/tmp/ic_auto_opt_optimizer_practice/run_turbo_bridge_test_inv.py`.
+- Output directory: `/tmp/ic_auto_opt_optimizer_practice/turbo_bridge_test_inv_001/`.
+- Launch command:
+
+```bash
+./.venv/bin/python /tmp/ic_auto_opt_optimizer_practice/run_turbo_bridge_test_inv.py
+```
+
+- The run used local `Turbo1`, `PARAMS = ["FN", "WN", "FP", "WP"]`, bounds `[2, 0.3u, 2, 0.3u]` to `[12, 3u, 12, 3u]`, `n_init=8`, `max_evals=9`, and `batch_size=1`.
+- Every candidate was evaluated through Hermes package/check/record contracts plus the C-7 Spectre/OCEAN adapter. Python did not parse PSF and did not rewrite formulas.
+- `evaluation_count = 9`, `post_initial_evaluations = 1`, `successful_evaluations = 9`, `penalty_evaluations = 0`.
+- All nine evaluations produced OCEAN scalar metrics and finite objectives. Seven were `real_constraint_fail`; two were `real_pass`.
+- Best candidate came from the post-initial TuRBO suggestion:
+
+```text
+FN = 12
+WN = 1.3u
+FP = 2
+WP = 2.5u
+objective = 4.183168953894332e-14
+```
+
+- Evidence files:
+
+```text
+/tmp/ic_auto_opt_optimizer_practice/turbo_bridge_test_inv_001/summary.json
+/tmp/ic_auto_opt_optimizer_practice/turbo_bridge_test_inv_001/evaluations.jsonl
+```
 
 **Stop Condition:** If the only way to run this is to bypass too much of the known-good result context, stop and record the missing integration seam instead of forcing a fake success.
 

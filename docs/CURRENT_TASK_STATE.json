@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "current_scope": "Optimizer Practice-First Plan",
-  "current_status": "Optimizer Practice-First Task 3 is complete, verified-only. The optimizer skill was read and confirms black-box optimization, TuRBO/scipy backend choices, TuRBO's minimum 2 * n_params initialization guidance, minimization semantics, and finite failure penalties. A project-local Linux .venv was created and kept untracked via .gitignore. CPU-only torch, gpytorch, numpy, and scipy were installed into .venv. Local TuRBO imports with .venv/bin/python: Turbo1, torch=2.12.0+cpu, gpytorch=1.15.2, numpy=2.4.6, scipy=1.17.1. No Hermes optimizer code, real tools, C-7 adapter run, PSF parser, formula rewrite, or broad framework asset was added. Development cadence is now Lean Evidence Gate: update CURRENT_TASK_STATE every task; update NEXT log when state changes; update COMPACT/EXECUTION only at compaction, milestone, route-change, or user-requested summary boundaries.",
+  "current_status": "Optimizer Practice-First Task 4 is complete, verified-only. A temporary /tmp runner used local Turbo1 with PARAMS [FN, WN, FP, WP], approved bridge_test_inv bounds, n_init=8, max_evals=9, and batch_size=1. It ran 9 real evaluations through Hermes package/check/record contracts plus the C-7 Spectre/OCEAN adapter. All 9 evaluations produced OCEAN scalar metrics and finite objectives; 7 were real_constraint_fail and 2 were real_pass. The post-initial TuRBO suggestion at eval 9 became best: FN=12, WN=1.3u, FP=2, WP=2.5u, objective=4.183168953894332e-14. No Hermes optimizer code, PSF parser, formula rewrite, broad schema/framework asset, or raw Cadence artifact commit was added.",
   "review_status": "verified-only",
   "subagent_dispatch": "available",
   "active_spec": "docs/superpowers/plans/2026-06-03-optimizer-practice-first.md",
@@ -12,22 +12,13 @@
     "docs/EXECUTION_PROGRESS_2026-05-29.md",
     "docs/COMPACT_RESUME_CHECKPOINT.md"
   ],
-  "next_allowed_action": "wait for user confirmation, then execute Optimizer Practice-First Task 4 only",
+  "next_allowed_action": "wait for user confirmation, then execute Optimizer Practice-First Task 5 only",
   "forbidden_actions": [
-    "run Virtuoso",
-    "run Spectre",
-    "run OCEAN",
-    "run SSH",
-    "run Claude CLI",
-    "run virtuoso-bridge-lite",
-    "use network",
-    "run subprocess-backed C-7 adapter",
-    "parse PSF",
-    "rewrite OCEAN formulas",
-    "write new optimizer algorithms before practice evidence",
+    "start Hermes optimizer productization before Task 5 decision note",
+    "create new optimizer algorithms",
     "create broad optimizer schemas or framework assets",
     "flatten or redesign the Maestro/ADE netlist layout",
-    "parse PSF in Python",
+    "parse PSF",
     "rewrite OCEAN formulas",
     "commit raw input.scs",
     "commit protected include sidecars",
@@ -37,23 +28,22 @@
     "stage docs/toolchain_evidence/"
   ],
   "required_pre_commit_checks": [
-    "risk-tiered checks per AGENTS.md Lean Evidence Gate",
     "python3 tools/check_development_cadence.py",
-    "git diff --check"
+    "git diff --check",
+    "git status --short"
   ],
   "route_audit": {
     "active_plan": "docs/superpowers/plans/2026-06-03-optimizer-practice-first.md",
     "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
-    "alignment": "Aligned with the locked practice-first route: optimizer development must start from a successful real optimizer practice that invokes optimizer.skill guidance and local TuRBO, not from speculative optimizer code or hand-picked point tests.",
-    "drift": "None. Task 3 only established the local Python environment required by the practice-first plan and verified that local TuRBO imports. It did not add optimizer code or change the Spectre/OCEAN adapter route. Cadence update: AGENTS.md now uses Lean Evidence Gate to reduce repetitive progress-file updates and review/check overhead."
+    "alignment": "Aligned. Task 4 used the proven C-7 Spectre/OCEAN path as the simulation foundation and exercised a native TuRBO loop before any Hermes optimizer productization.",
+    "drift": "None. The temporary practice runner stayed under /tmp, preserved the Maestro/ADE netlist bundle, returned finite penalties on failure paths, and did not add product code."
   },
-  "latest_valid_commit": "docs: adopt lean evidence gate",
+  "latest_valid_commit": "docs: record optimizer full-loop practice",
   "review_evidence": {
     "c7_real_tool_closure": "Real Spectre + OCEAN adapter closure passed in /tmp/ic_auto_opt_c7_fixed_001/bridge_test_inv. Hermes check-real-run, check-metric-results, and record-real-result passed. Metrics: rise=7.52016846017672e-11 s, fall=1.078998721053984e-10 s, DC=0.0002588877964196586 W.",
-    "optimizer_practice_plan": "Docs-only plan created and corrected at docs/superpowers/plans/2026-06-03-optimizer-practice-first.md. It now requires optimizer.skill-guided local TuRBO practice with n_init=8, max_evals=9, batch_size=1 before Hermes optimizer productization. No optimizer code or real tools were run while writing the plan.",
-    "task_1_baseline_package_shape": "Task 1 verified /tmp/ic_auto_opt_optimizer_practice/bridge_test_inv. Commands passed: hermes-workflow init, validate, package, prepare-netlist, dry-run, preflight-health, approve, and prepare-real-run --run-id real_001. Evidence paths: runs/real/real_001/netlist/input.scs, netlist/ade_e.scs, netlist/amap/, metric_extraction_request.json. PSF was absent before Task 2 as expected.",
-    "task_2_single_point_replay": "Task 2 verified /tmp/ic_auto_opt_optimizer_practice/bridge_test_inv_baseline_001. Commands passed: C-7 adapter via csh-sourced Cadence env, hermes-workflow check-real-run, check-metric-results, and record-real-result for real_001. Metrics matched C-7 closure exactly: rise=7.52016846017672e-11 s, fall=1.078998721053984e-10 s, DC=0.0002588877964196586 W. The initial full-range lower-bound attempt returned rise/fall non_scalar while other parameter points produced scalars through the same flow; it is preserved as evidence that optimizer practice must penalize candidate-level performance failures, not as formula drift.",
-    "task_3_optimizer_skill_and_turbo_environment_gate": "Task 3 verified optimizer skill guidance and local TuRBO import. Created project-local .venv, installed CPU-only torch=2.12.0+cpu, gpytorch=1.15.2, numpy=2.4.6, scipy=1.17.1, and confirmed .venv/bin/python can import Turbo1 from /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/TuRBO. .venv is ignored by .gitignore and must not be committed.",
-    "lean_evidence_gate": "AGENTS.md Current Development Cadence now uses Lean Evidence Gate: risk-tiered review/checks, CURRENT_TASK_STATE as the always-updated resume anchor, NEXT log only when state changes, COMPACT/EXECUTION only at compaction or milestone boundaries, and compact six-line task reports."
+    "optimizer_practice_task_1": "Task 1 verified /tmp/ic_auto_opt_optimizer_practice/bridge_test_inv package shape through init, validate, package, prepare-netlist, dry-run, preflight-health, approve, and prepare-real-run --run-id real_001.",
+    "optimizer_practice_task_2": "Task 2 verified /tmp/ic_auto_opt_optimizer_practice/bridge_test_inv_baseline_001 through C-7 adapter, check-real-run, check-metric-results, and record-real-result. Baseline metrics matched C-7 closure exactly. The lower-bound point produced non_scalar rise/fall and is treated as candidate-level performance failure evidence, not formula/layout drift.",
+    "optimizer_practice_task_3": "Task 3 verified optimizer skill guidance and local TuRBO import with project-local .venv: torch=2.12.0+cpu, gpytorch=1.15.2, numpy=2.4.6, scipy=1.17.1.",
+    "optimizer_practice_task_4": "Task 4 ran ./.venv/bin/python /tmp/ic_auto_opt_optimizer_practice/run_turbo_bridge_test_inv.py. Evidence: /tmp/ic_auto_opt_optimizer_practice/turbo_bridge_test_inv_001/summary.json and evaluations.jsonl. evaluation_count=9, post_initial_evaluations=1, successful_evaluations=9, penalty_evaluations=0. Best candidate: FN=12, WN=1.3u, FP=2, WP=2.5u, objective=4.183168953894332e-14."
   }
 }

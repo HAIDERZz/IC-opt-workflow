@@ -479,8 +479,21 @@ Task 3 optimizer skill and TuRBO environment gate:
 - Route audit: aligned with the practice-first plan and top-level plan. No Hermes optimizer code, real tools, C-7 adapter run, PSF parser, formula rewrite, or broad framework asset was added.
 - next_allowed_action: wait for user confirmation, then execute Optimizer Practice-First Task 4 only.
 
+Task 4 native optimizer full-loop practice:
+
+- Status: complete, verified-only.
+- Temporary script: `/tmp/ic_auto_opt_optimizer_practice/run_turbo_bridge_test_inv.py`.
+- Evidence directory: `/tmp/ic_auto_opt_optimizer_practice/turbo_bridge_test_inv_001/`.
+- Launch command: `./.venv/bin/python /tmp/ic_auto_opt_optimizer_practice/run_turbo_bridge_test_inv.py`.
+- The run used `Turbo1`, `PARAMS = ["FN", "WN", "FP", "WP"]`, approved variable bounds, `n_init=8`, `max_evals=9`, and `batch_size=1`.
+- All evaluations used Hermes package/check/record contracts plus the C-7 Spectre/OCEAN adapter. No PSF parsing or formula rewrite was introduced.
+- Result: `evaluation_count=9`, `post_initial_evaluations=1`, `successful_evaluations=9`, `penalty_evaluations=0`.
+- Best post-initial TuRBO candidate: `FN=12`, `WN=1.3u`, `FP=2`, `WP=2.5u`, `objective=4.183168953894332e-14`.
+- Seven rows were `real_constraint_fail` and two were `real_pass`; all had finite OCEAN scalar metrics.
+- next_allowed_action: wait for user confirmation, then execute Optimizer Practice-First Task 5 only.
+
 ## Resume Prompt
 
 ```text
-请继续 IC auto optimization workflow。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。先阅读 docs/CURRENT_TASK_STATE.json、AGENTS.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/plans/2026-06-03-optimizer-practice-first.md。当前活动节点是 Optimizer Practice-First Plan，状态为 Task 3 complete/verified-only。Task 3 已创建项目本地 Linux `.venv`，安装 CPU-only `torch=2.12.0+cpu`、`gpytorch=1.15.2`、`numpy=2.4.6`、`scipy=1.17.1`，并确认 `.venv/bin/python` 可以从 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/TuRBO import `Turbo1`。下一步只能在用户确认后执行 Optimizer Practice-First Task 4：Native Optimizer Full-Loop Practice。不要写新 Hermes optimizer 算法，不要创建 broad schema/framework，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。不要用 Python 解析 PSF，不要让 agent 翻译或重写 Calculator/OCEAN 公式。
+请继续 IC auto optimization workflow。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。先阅读 docs/CURRENT_TASK_STATE.json、AGENTS.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/plans/2026-06-03-optimizer-practice-first.md。当前活动节点是 Optimizer Practice-First Plan，状态为 Task 4 complete/verified-only。Task 4 已通过 `/tmp/ic_auto_opt_optimizer_practice/run_turbo_bridge_test_inv.py` 跑通真实 TuRBO + Hermes + Spectre/OCEAN practice：9 次评价、8 个 init + 1 个 post-initial TuRBO suggestion、9 个 OCEAN scalar evidence、0 个 penalty，best candidate 为 `FN=12, WN=1.3u, FP=2, WP=2.5u`，objective=`4.183168953894332e-14`。下一步只能在用户确认后执行 Optimizer Practice-First Task 5：Productization Decision。不要写新 Hermes optimizer 算法，不要创建 broad schema/framework，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。不要用 Python 解析 PSF，不要让 agent 翻译或重写 Calculator/OCEAN 公式。
 ```
