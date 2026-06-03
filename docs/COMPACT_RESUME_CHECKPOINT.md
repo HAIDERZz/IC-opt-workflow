@@ -103,7 +103,6 @@ Current execution state:
 - C-10 real-run failure/retry policy contract is complete and reviewed.
 - C-11 local smoke design spec exists: `docs/superpowers/specs/2026-06-03-local-real-run-smoke-design.md`.
 - C-11 local smoke implementation plan exists: `docs/superpowers/plans/2026-06-03-local-real-run-smoke.md`.
-- C-11 Task 1 test-only smoke helpers are complete and reviewed. Added `tests/real_run_smoke_helpers.py` and the seed helper smoke test in `tests/test_local_real_run_smoke.py`; focused pytest and ruff checks passed.
 - Plan C process hardening lightweight cadence guard is complete; verified-only. It adds `docs/CURRENT_TASK_STATE.json`, `tools/check_development_cadence.py`, and `docs/superpowers/specs/2026-06-03-process-hardening-lightweight-cadence-design.md`.
 - Current scope: Plan C C-11 local smoke redevelopment Task 1
 - Current status: C-11 redevelopment reset in progress; verified-only
