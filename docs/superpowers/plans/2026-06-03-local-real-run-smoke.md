@@ -564,7 +564,7 @@ Expected: commit succeeds. Do not stage local OCEAN research or toolchain eviden
 - Modify: `docs/EXECUTION_PROGRESS_2026-05-29.md`
 - Modify: `docs/COMPACT_RESUME_CHECKPOINT.md`
 
-- [ ] **Step 1: Add the failing failure/retry smoke test**
+- [x] **Step 1: Add the failing failure/retry smoke test**
 
 Append to `tests/test_local_real_run_smoke.py`:
 
@@ -667,7 +667,7 @@ def test_c11_controlled_failure_retry_records_retry_success(tmp_path):
 
 If imports become duplicated, consolidate them at the top of `tests/test_local_real_run_smoke.py` before running ruff.
 
-- [ ] **Step 2: Run the new test and verify it fails or passes for the right reason**
+- [x] **Step 2: Run the new test and verify it fails or passes for the right reason**
 
 Run:
 
@@ -677,7 +677,7 @@ python3 -m pytest tests/test_local_real_run_smoke.py::test_c11_controlled_failur
 
 Expected: the test should pass if C-10 and the Task 1 helper are aligned. If it fails, the failure must identify a real mismatch in C-10/C-9/C-8 integration; fix only the minimal mismatch and update the C-11 spec/plan if the route changes.
 
-- [ ] **Step 3: Run focused recovery and next-run regressions**
+- [x] **Step 3: Run focused recovery and next-run regressions**
 
 Run:
 
@@ -687,7 +687,7 @@ python3 -m pytest tests/test_local_real_run_smoke.py tests/test_real_run_recover
 
 Expected: all selected tests pass.
 
-- [ ] **Step 4: Run focused lint**
+- [x] **Step 4: Run focused lint**
 
 Run:
 
@@ -697,7 +697,7 @@ python3 -m ruff check tests/real_run_smoke_helpers.py tests/test_local_real_run_
 
 Expected: all checks pass.
 
-- [ ] **Step 5: Update task status and node files**
+- [x] **Step 5: Update task status and node files**
 
 In this plan, mark Task 3 steps as complete.
 
@@ -711,7 +711,7 @@ Update the current node in `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md` to:
 
 Add matching C-11 Task 3 checkpoint bullets to `docs/EXECUTION_PROGRESS_2026-05-29.md` and `docs/COMPACT_RESUME_CHECKPOINT.md`.
 
-- [ ] **Step 6: Commit Task 3**
+- [x] **Step 6: Commit Task 3**
 
 Run:
 
