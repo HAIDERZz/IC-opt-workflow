@@ -101,7 +101,8 @@ Current execution state:
 - C-10 final review fixes: unsafe declared result artifacts now classify as `tool_result_partial` with retry/stop actions; symlinked `recovery_decision.json` files are rejected in assessment read paths and write-path preflights.
 - C-10 real-run failure/retry policy contract is complete and reviewed.
 - C-11 local smoke design spec exists: `docs/superpowers/specs/2026-06-03-local-real-run-smoke-design.md`.
-- Current next action: review the C-11 design spec, then write the C-11 implementation plan after user approval. Keep C-11 local/fake controlled first; do not jump straight to real Virtuoso/Spectre/OCEAN/agent integration.
+- C-11 local smoke implementation plan exists: `docs/superpowers/plans/2026-06-03-local-real-run-smoke.md`.
+- Current next action: execute C-11 Task 1 test-only smoke helpers using Subagent-Driven Development, then stop for report/review/commit/node update. Keep C-11 local/fake controlled first; do not jump straight to real Virtuoso/Spectre/OCEAN/agent integration.
 - Real `input.scs` examples under `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example` are local-only references and must not be committed.
 
 ## Files Already Read
@@ -143,6 +144,7 @@ Current execution state:
 - Active C-10 design spec: `ic-auto-opt-workflow/docs/superpowers/specs/2026-06-02-real-run-failure-retry-policy-contract-design.md`
 - Active C-10 implementation plan: `ic-auto-opt-workflow/docs/superpowers/plans/2026-06-02-real-run-failure-retry-policy-contract.md`
 - Active C-11 design spec: `ic-auto-opt-workflow/docs/superpowers/specs/2026-06-03-local-real-run-smoke-design.md`
+- Active C-11 implementation plan: `ic-auto-opt-workflow/docs/superpowers/plans/2026-06-03-local-real-run-smoke.md`
 
 Plan A, Plan B, Plan C C-1, Plan C C-2, Plan C C-3, Plan C C-4, Plan C C-5, and Plan C C-5.5 are complete. C-5.5 passed the dual-agent simulation gate. C-6, C-7, C-8, C-9, and C-10 are complete and reviewed.
 
