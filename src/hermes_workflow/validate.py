@@ -310,6 +310,17 @@ def _validate_continuous_variable(
                 )
             )
         else:
+            if _has_whitespace_unit_suffix(raw):
+                issues.append(
+                    _issue(
+                        "variables.yaml",
+                        f"{path}.{field_name}",
+                        (
+                            f"{name} {field_name} must use a Spectre-safe "
+                            "attached unit suffix such as 0.3u, not 0.3 um"
+                        ),
+                    )
+                )
             parsed.append(value)
 
     if issues:
@@ -344,6 +355,13 @@ def _parse_continuous(raw: str) -> tuple[Decimal, str] | None:
     except InvalidOperation:
         return None
     return value, match.group("unit") or ""
+
+
+def _has_whitespace_unit_suffix(raw: str) -> bool:
+    match = CONTINUOUS_RE.match(raw)
+    if match is None or match.group("unit") is None:
+        return False
+    return match.start("unit") > match.end("value")
 
 
 def _validate_metrics(metrics_config: MetricsConfig) -> list[ValidationIssue]:

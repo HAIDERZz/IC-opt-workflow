@@ -42,7 +42,7 @@ def generate_continuous_grid(lower_raw: str, upper_raw: str, step_raw: str) -> l
         # place if the original had decimals.
         text = f"{value:f}"
         if lower_unit:
-            return f"{text} {lower_unit}"
+            return f"{text}{lower_unit}"
         return text
 
     values: list[str] = []

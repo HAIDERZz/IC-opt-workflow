@@ -54,9 +54,9 @@ tran tran stop=10n
     assert "{{" not in rendered
     assert "}}" not in rendered
     assert "FN=2" in rendered
-    assert "WN=0.3 um" in rendered
+    assert "WN=0.3u" in rendered
     assert "FP=2" in rendered
-    assert "WP=0.3 um" in rendered
+    assert "WP=0.3u" in rendered
     assert not (project_dir / "ledger" / "experiment_ledger.jsonl").exists()
     assert not (project_dir / "state" / "optimizer_state.json").exists()
     assert not (project_dir / "state" / "best_candidate.json").exists()

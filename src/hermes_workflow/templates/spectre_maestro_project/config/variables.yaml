@@ -9,9 +9,9 @@ variables:
 
   - name: WN
     kind: continuous_step
-    lower: "0.3 um"
-    upper: "3 um"
-    step: "0.2 um"
+    lower: "0.3u"
+    upper: "3u"
+    step: "0.2u"
 
   - name: FP
     kind: integer
@@ -21,6 +21,6 @@ variables:
 
   - name: WP
     kind: continuous_step
-    lower: "0.3 um"
-    upper: "3 um"
-    step: "0.2 um"
+    lower: "0.3u"
+    upper: "3u"
+    step: "0.2u"

@@ -69,19 +69,21 @@ This plan must not:
 
 ## Task 2: Spectre-Safe Unit Formatting Guard
 
+**Status:** Complete, verified-only.
+
 **Files:**
 - Modify: `src/hermes_workflow/validate.py`
 - Modify: `src/hermes_workflow/templates/spectre_maestro_project/config/variables.yaml`
 - Test: variable validation tests
 
-- [ ] **Step 1: Add a failing test**
+- [x] **Step 1: Add a failing test**
   - Use a variable value such as `"0.3 um"` and assert validation rejects it with a clear error.
 
-- [ ] **Step 2: Make shipped template values Spectre-safe**
+- [x] **Step 2: Make shipped template values Spectre-safe**
   - Replace whitespace-separated units with compact Spectre suffixes such as `0.3u`, `3u`, and `0.2u`.
   - Keep user intent unchanged.
 
-- [ ] **Step 3: Verify**
+- [x] **Step 3: Verify**
   - Run focused validation/template tests.
   - Run: `python3 -m pytest tests -q`
   - Run: `python3 -m ruff check src tests tools`

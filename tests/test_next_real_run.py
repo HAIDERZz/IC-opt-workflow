@@ -270,8 +270,8 @@ def test_prepare_next_real_run_writes_real_002_package(tmp_path: Path) -> None:
     assert candidate["parameters"] == {
         "FN": "11",
         "FP": "11",
-        "WN": "0.3 um",
-        "WP": "2.9 um",
+        "WN": "0.3u",
+        "WP": "2.9u",
     }
     assert manifest["run_id"] == "real_002"
     assert manifest["candidate_id"] == "real_002"

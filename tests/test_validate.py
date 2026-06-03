@@ -151,13 +151,31 @@ def test_continuous_step_accepts_attached_unit_suffixes(tmp_path: Path) -> None:
     assert report.issues == []
 
 
-def test_continuous_step_allows_off_grid_upper_bound(tmp_path: Path) -> None:
+def test_continuous_step_rejects_whitespace_unit_suffixes(tmp_path: Path) -> None:
     project_dir = copy_fixture_project(tmp_path)
     variables_path = project_dir / "config" / "variables.yaml"
     payload = read_yaml(variables_path)
     payload["variables"][1]["lower"] = "0.3 um"
-    payload["variables"][1]["upper"] = "1.0 um"
+    payload["variables"][1]["upper"] = "3 um"
     payload["variables"][1]["step"] = "0.2 um"
+    write_yaml(variables_path, payload)
+
+    report = validate_project_files(project_dir)
+
+    assert report.ok is False
+    assert any(
+        "WN lower must use a Spectre-safe attached unit suffix" in issue.message
+        for issue in report.issues
+    )
+
+
+def test_continuous_step_allows_off_grid_upper_bound(tmp_path: Path) -> None:
+    project_dir = copy_fixture_project(tmp_path)
+    variables_path = project_dir / "config" / "variables.yaml"
+    payload = read_yaml(variables_path)
+    payload["variables"][1]["lower"] = "0.3u"
+    payload["variables"][1]["upper"] = "1.0u"
+    payload["variables"][1]["step"] = "0.2u"
     write_yaml(variables_path, payload)
 
     report = validate_project_files(project_dir)
@@ -170,7 +188,7 @@ def test_continuous_step_units_must_match(tmp_path: Path) -> None:
     project_dir = copy_fixture_project(tmp_path)
     variables_path = project_dir / "config" / "variables.yaml"
     payload = read_yaml(variables_path)
-    payload["variables"][1]["step"] = "200 nm"
+    payload["variables"][1]["step"] = "200n"
     write_yaml(variables_path, payload)
 
     report = validate_project_files(project_dir)

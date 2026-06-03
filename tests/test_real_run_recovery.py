@@ -295,7 +295,7 @@ def _write_manual_retry_package(
             "candidate_id": candidate_file_id or candidate_id,
             "retry_of_run_id": "real_001",
             "retry_attempt_number": 2,
-            "parameters": {"FN": "2", "WN": "0.3 um", "FP": "2", "WP": "0.3 um"},
+            "parameters": {"FN": "2", "WN": "0.3u", "FP": "2", "WP": "0.3u"},
         },
     )
 

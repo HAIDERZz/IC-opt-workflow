@@ -316,11 +316,12 @@ class TestIntegerGrid:
 
 class TestContinuousGrid:
     def test_continuous_grid_with_units(self) -> None:
-        grid = generate_continuous_grid("0.3 um", "3 um", "0.2 um")
-        assert grid[0] == "0.3 um"
-        assert grid[-1] in ("2.9 um", "2.7 um", "3.0 um")
+        grid = generate_continuous_grid("0.3u", "3u", "0.2u")
+        assert grid[0] == "0.3u"
+        assert grid[-1] in ("2.9u", "2.7u", "3.0u")
         for value in grid:
-            assert "um" in value
+            assert value.endswith("u")
+            assert " " not in value
 
     def test_continuous_grid_unitless(self) -> None:
         grid = generate_continuous_grid("0.0", "1.0", "0.25")
@@ -328,9 +329,9 @@ class TestContinuousGrid:
         assert len(grid) >= 5
 
     def test_continuous_grid_single_point(self) -> None:
-        grid = generate_continuous_grid("1.0 um", "1.0 um", "0.1 um")
+        grid = generate_continuous_grid("1.0u", "1.0u", "0.1u")
         assert len(grid) >= 1
-        assert grid[0].startswith("1.0")
+        assert grid[0] == "1.0u"
 
     def test_continuous_grid_invalid_value(self) -> None:
         with pytest.raises(ValueError, match="cannot parse"):
@@ -433,9 +434,9 @@ class TestGenerateCandidates:
                     '    step: "1"',
                     "  - name: WN",
                     "    kind: continuous_step",
-                    '    lower: "0.3 um"',
-                    '    upper: "0.3 um"',
-                    '    step: "0.2 um"',
+                    '    lower: "0.3u"',
+                    '    upper: "0.3u"',
+                    '    step: "0.2u"',
                     "  - name: FP",
                     "    kind: integer",
                     '    lower: "2"',
@@ -443,9 +444,9 @@ class TestGenerateCandidates:
                     '    step: "1"',
                     "  - name: WP",
                     "    kind: continuous_step",
-                    '    lower: "0.3 um"',
-                    '    upper: "0.3 um"',
-                    '    step: "0.2 um"',
+                    '    lower: "0.3u"',
+                    '    upper: "0.3u"',
+                    '    step: "0.2u"',
                     "",
                 ]
             ),

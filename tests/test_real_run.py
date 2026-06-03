@@ -218,18 +218,18 @@ def test_prepare_real_run_writes_first_real_run_package(tmp_path: Path) -> None:
     assert "{{" not in rendered
     assert "}}" not in rendered
     assert "FN=2" in rendered
-    assert "WN=0.3 um" in rendered
+    assert "WN=0.3u" in rendered
     assert "FP=2" in rendered
-    assert "WP=0.3 um" in rendered
+    assert "WP=0.3u" in rendered
     assert candidate == {
         "schema_version": "1.0",
         "candidate_id": "real_001",
         "source": "lower_bound_first_real_run",
         "parameters": {
             "FN": "2",
-            "WN": "0.3 um",
+            "WN": "0.3u",
             "FP": "2",
-            "WP": "0.3 um",
+            "WP": "0.3u",
         },
     }
     assert manifest["schema_version"] == "1.0"
@@ -464,9 +464,9 @@ def test_prepare_real_run_rejects_placeholder_candidate_values(
             "source": "lower_bound_first_real_run",
             "parameters": {
                 "FN": "{{WN}}",
-                "WN": "0.3 um",
+                "WN": "0.3u",
                 "FP": "2",
-                "WP": "0.3 um",
+                "WP": "0.3u",
             },
         }
 
