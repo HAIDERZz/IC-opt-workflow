@@ -11,6 +11,8 @@ from hermes_workflow.optimizer_loop import (
     ADAPTER_SUCCEEDED,
     METRIC_CHECK_FAILED,
     RECORDED,
+    RECORD_FAILED,
+    RESULT_CHECK_FAILED,
     OptimizerLoopAdapterResult,
     run_single_optimizer_cycle,
 )
@@ -112,6 +114,27 @@ def test_single_optimizer_cycle_stops_on_adapter_failure(tmp_path: Path) -> None
     ).exists()
 
 
+def test_single_optimizer_cycle_stops_on_result_check_failure(tmp_path: Path) -> None:
+    project_dir = _create_ready_project(tmp_path)
+    _record_real_001(project_dir)
+
+    def no_result_adapter(
+        _project_dir: Path,
+        _run_id: str,
+    ) -> OptimizerLoopAdapterResult:
+        return OptimizerLoopAdapterResult(status=ADAPTER_SUCCEEDED)
+
+    report = run_single_optimizer_cycle(
+        project_dir,
+        adapter_runner=no_result_adapter,
+        created_at_utc="2026-06-04T01:00:00Z",
+    )
+
+    assert report.status == RESULT_CHECK_FAILED
+    assert report.issues
+    assert len(_ledger_rows(project_dir)) == 1
+
+
 def test_single_optimizer_cycle_stops_on_metric_check_failure(tmp_path: Path) -> None:
     project_dir = _create_ready_project(tmp_path)
     _record_real_001(project_dir)
@@ -146,6 +169,29 @@ def test_single_optimizer_cycle_stops_on_metric_check_failure(tmp_path: Path) ->
 
     assert report.status == METRIC_CHECK_FAILED
     assert report.issues
+    assert len(_ledger_rows(project_dir)) == 1
+
+
+def test_single_optimizer_cycle_stops_on_record_failure(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    project_dir = _create_ready_project(tmp_path)
+    _record_real_001(project_dir)
+
+    monkeypatch.setattr(
+        "hermes_workflow.optimizer_loop.record_real_result",
+        lambda *_args, **_kwargs: SimpleNamespace(status="fail", issues=["record failed"]),
+    )
+
+    report = run_single_optimizer_cycle(
+        project_dir,
+        adapter_runner=_fake_success_adapter,
+        created_at_utc="2026-06-04T01:00:00Z",
+    )
+
+    assert report.status == RECORD_FAILED
+    assert report.issues == ("record failed",)
     assert len(_ledger_rows(project_dir)) == 1
 
 
@@ -185,7 +231,9 @@ def test_real_optimizer_loop_tool_stops_on_adapter_failure(tmp_path: Path) -> No
     tool = _load_loop_tool()
 
     def fake_runner(_command, **_kwargs):
-        return SimpleNamespace(returncode=1, stdout="failed\n", stderr="")
+        stdout = "".join(f"stdout line {index}\n" for index in range(10))
+        stderr = "stderr line " + ("x" * 600) + "\n"
+        return SimpleNamespace(returncode=1, stdout=stdout, stderr=stderr)
 
     exit_code = tool.main(
         [
@@ -202,6 +250,11 @@ def test_real_optimizer_loop_tool_stops_on_adapter_failure(tmp_path: Path) -> No
     assert len(_ledger_rows(project_dir)) == 1
     report = _load_json(project_dir / "reports" / "optimizer_loop_report.json")
     assert report["cycles"][0]["status"] == ADAPTER_FAILED
+    assert len(report["cycles"][0]["issues"]) == tool.MAX_ADAPTER_ISSUE_LINES
+    assert all(
+        len(issue) <= tool.MAX_ADAPTER_ISSUE_CHARS
+        for issue in report["cycles"][0]["issues"]
+    )
 
 
 def test_real_optimizer_loop_tool_rejects_empty_budget(tmp_path: Path) -> None:

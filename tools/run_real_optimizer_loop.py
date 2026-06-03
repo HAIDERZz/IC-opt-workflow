@@ -14,11 +14,14 @@ from hermes_workflow.optimizer_loop import (
     ADAPTER_SUCCEEDED,
     OptimizerLoopAdapterResult,
     OptimizerLoopCycleReport,
+    RECORDED,
     run_single_optimizer_cycle,
 )
 
 
 REPORT_PATH = "reports/optimizer_loop_report.json"
+MAX_ADAPTER_ISSUE_LINES = 6
+MAX_ADAPTER_ISSUE_CHARS = 500
 
 
 def main(argv: Sequence[str] | None = None, *, command_runner=subprocess.run) -> int:
@@ -49,11 +52,11 @@ def main(argv: Sequence[str] | None = None, *, command_runner=subprocess.run) ->
             f"cycle {index}: {report.status} "
             f"candidate={report.candidate_id} run={report.run_id}"
         )
-        if report.status != "recorded":
+        if report.status != RECORDED:
             break
 
     _write_loop_report(project_dir, args.max_new_evaluations, cycles)
-    return 0 if cycles and all(cycle.status == "recorded" for cycle in cycles) else 1
+    return 0 if cycles and all(cycle.status == RECORDED for cycle in cycles) else 1
 
 
 def _adapter_runner(cadence_cshrc: Path, *, command_runner) -> Any:
@@ -75,17 +78,28 @@ def _adapter_runner(cadence_cshrc: Path, *, command_runner) -> Any:
         )
         if result.returncode == 0:
             return OptimizerLoopAdapterResult(status=ADAPTER_SUCCEEDED)
-        issues = tuple(
-            line
-            for line in (result.stdout, result.stderr)
-            if isinstance(line, str) and line.strip()
-        )
+        issues = _bounded_issue_lines(result.stdout, result.stderr)
         return OptimizerLoopAdapterResult(
             status="failed",
             issues=issues or (f"adapter exited {result.returncode}",),
         )
 
     return run
+
+
+def _bounded_issue_lines(*streams: str | None) -> tuple[str, ...]:
+    issues: list[str] = []
+    for stream in streams:
+        if not isinstance(stream, str):
+            continue
+        for line in stream.splitlines():
+            text = line.strip()
+            if not text:
+                continue
+            issues.append(text[:MAX_ADAPTER_ISSUE_CHARS])
+            if len(issues) >= MAX_ADAPTER_ISSUE_LINES:
+                return tuple(issues)
+    return tuple(issues)
 
 
 def _write_loop_report(

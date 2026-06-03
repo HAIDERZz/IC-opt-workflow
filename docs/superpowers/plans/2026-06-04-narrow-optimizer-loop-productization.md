@@ -129,7 +129,7 @@ Task 3 execution note:
 
 **Risk:** Low to medium.
 
-- [ ] Actions:
+- [x] Actions:
 
 - Update `docs/CURRENT_TASK_STATE.json`.
 - Append a concise entry to `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`.
@@ -141,3 +141,10 @@ Acceptance:
 
 - C-15 remains a small loop driver around proven contracts.
 - No broad optimizer framework or speculative assets are introduced.
+
+Task 4 execution note:
+
+- Final verification passed with focused C-15 tests, adjacent contract regressions, ruff, cadence checker, and `git diff --check`.
+- Initial local spec/code-quality review passed and identified no Critical findings. Important coverage/reporting improvements were still applied: direct `result_check_failed` and `record_failed` tests now cover the remaining fail-closed branches, adapter stdout/stderr issues are bounded in the loop report, and the CLI uses the `RECORDED` constant instead of a string literal.
+- Local spec re-review and local code-quality re-review both passed with no remaining blockers.
+- C-15 remains narrow: no broad optimizer framework, daemon, scheduler, PSF parser, formula rewrite, or native-layout replacement was added.
