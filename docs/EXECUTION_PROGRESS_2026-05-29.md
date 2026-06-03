@@ -988,7 +988,8 @@ Next required action:
 - C-11 local smoke implementation plan exists: `docs/superpowers/plans/2026-06-03-local-real-run-smoke.md`.
 - C-11 Task 1 test-only smoke helpers are complete and reviewed. Added `tests/real_run_smoke_helpers.py` and the seed helper smoke test in `tests/test_local_real_run_smoke.py`; focused pytest and ruff checks passed.
 - C-11 Task 2 library happy-path smoke is complete and reviewed. Added the local/fake happy-path test that records `real_001`, prepares `real_002`, validates fake returned artifacts through `check-real-run` and `check-metric-results`, records the result, and asserts ledger/state/report evidence plus the unresolved-run guard. Focused smoke, regression, and ruff checks passed.
-- Next recommended action: wait for user confirmation before C-11 Task 3 controlled failure/retry smoke.
+- C-11 Task 3 controlled failure/retry smoke is complete and reviewed. Added the local/fake failure/retry test that prepares `real_002`, writes a failed result manifest, verifies C-10 retry classification and C-9 blocking, prepares retry `real_003`, records retry success through existing checks and C-8, verifies source resolution, and confirms C-9 can prepare `real_004`. Focused smoke, recovery/next-run regression, and ruff checks passed.
+- Next recommended action: wait for user confirmation before C-11 Task 4 CLI smoke, docs, and final gate.
 - C-11 remains a local/fake controlled smoke first: chain C-9 -> fake C-7-style returned artifacts -> C-5/C-6 checks -> C-8 with one controlled C-10 failure/retry case. Do not jump straight to real Virtuoso/Spectre/OCEAN/agent integration.
 
 ## Locked Role Model
