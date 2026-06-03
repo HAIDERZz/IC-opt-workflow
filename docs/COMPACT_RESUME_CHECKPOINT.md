@@ -466,13 +466,21 @@ Status: planned, verified-only.
 - Task 1 passed Hermes `init`, `validate`, `package`, `prepare-netlist`, `dry-run`, `preflight-health`, `approve`, and `prepare-real-run --run-id real_001`.
 - Verified `runs/real/real_001/netlist/input.scs`, `netlist/ade_e.scs`, `netlist/amap/`, unchanged approved metric expressions, and declared `expected_psf_dir = runs/real/real_001/psf`.
 - No Spectre, OCEAN, C-7 adapter, TuRBO, or optimizer loop was run in Task 1.
-- Next allowed action: wait for user confirmation, then execute Optimizer Practice-First Task 2 only.
+- Task 2 single-point replay sanity check is complete, verified-only.
+- Initial replay on `/tmp/ic_auto_opt_optimizer_practice/bridge_test_inv` failed with `rise/fall non_scalar` because it used template default lower-bound parameters, not the C-7 closure baseline candidate.
+- Successful replay workspace: `/tmp/ic_auto_opt_optimizer_practice/bridge_test_inv_baseline_001`.
+- Successful baseline parameters: `FN=4`, `WN=0.6u`, `FP=4`, `WP=1.2u`.
+- C-7 adapter, Spectre, OCEAN, `check-real-run`, `check-metric-results`, and `record-real-result` all passed.
+- Metrics exactly matched C-7 closure: `rise=7.52016846017672e-11 s`, `fall=1.078998721053984e-10 s`, `DC=0.0002588877964196586 W`.
+- Ledger has one checked real row and `optimizer_state.current_evaluations = 1`.
+- No Hermes code, OCEAN formula, adapter layout, or PSF parser change was made.
+- Next allowed action: wait for user confirmation, then execute Optimizer Practice-First Task 3 only.
 
 ## Next Step
 
 Plan A, Plan B, Plan C C-1, Plan C C-2, Plan C C-3, Plan C C-4, Plan C C-5, and Plan C C-5.5 are complete as of 2026-06-01. C-6, C-7, C-8, and C-9 are complete and reviewed as of 2026-06-02. C-10 real-run failure/retry policy contract is complete and reviewed as of 2026-06-03. C-11 local/fake smoke is complete. C-7 real-tool closure is complete and committed as `d440c95`.
 
-Current next step: execute `docs/superpowers/plans/2026-06-03-optimizer-practice-first.md` Task 2 after user confirmation. Do not commit raw input decks, protected include files, PSF/raw data, full Cadence logs, `docs/OCEAN_DOC_*`, or `docs/toolchain_evidence/`. Do not parse PSF or translate OCEAN formulas in Python.
+Current next step: execute `docs/superpowers/plans/2026-06-03-optimizer-practice-first.md` Task 3 after user confirmation. Do not commit raw input decks, protected include files, PSF/raw data, full Cadence logs, `docs/OCEAN_DOC_*`, or `docs/toolchain_evidence/`. Do not parse PSF or translate OCEAN formulas in Python.
 
 Read the handoff files first:
 
@@ -498,5 +506,5 @@ Use this prompt after compact:
 7. ic-auto-opt-workflow/docs/superpowers/plans/2026-06-03-controlled-real-tool-agent-practice.md
 8. 如需背景，再读 ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。当前活动节点是 Optimizer Practice-First Plan，状态为 Task 1 complete/verified-only。先读 docs/CURRENT_TASK_STATE.json、AGENTS.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/plans/2026-06-03-optimizer-practice-first.md。C-7 real-tool closure 已完成并提交为 d440c95。Task 1 已在 /tmp/ic_auto_opt_optimizer_practice/bridge_test_inv 重建 clean real_001 package，未运行真实工具。下一步只能在用户确认后执行 Optimizer Practice-First Task 2：Single-Point Replay Sanity Check，会运行 C-7 adapter/Spectre/OCEAN。注意：real_001 只是地基检查；正式 Hermes optimizer 开发前必须完成一次真实 optimizer practice，依据 virtuoso-bridge-lite/skills/optimizer/SKILL.md，并调用本地 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/TuRBO 的 TuRBO。不要写新 optimizer 算法，不要创建 broad schema/framework，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。不要用 Python 解析 PSF，不要让 agent 翻译或重写 Calculator/OCEAN 公式。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。当前活动节点是 Optimizer Practice-First Plan，状态为 Task 2 complete/verified-only。先读 docs/CURRENT_TASK_STATE.json、AGENTS.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/plans/2026-06-03-optimizer-practice-first.md。C-7 real-tool closure 已完成并提交为 d440c95。Task 2 已在 /tmp/ic_auto_opt_optimizer_practice/bridge_test_inv_baseline_001 完成 C-7 adapter/Spectre/OCEAN/check/record 单点重放；第一次 full-range lower-bound replay 失败是 candidate 不一致导致的 non_scalar，不是公式或 OCEAN 脚本问题。下一步只能在用户确认后执行 Optimizer Practice-First Task 3：Optimizer Skill And TuRBO Environment Gate。注意：real_001 只是地基检查；正式 Hermes optimizer 开发前必须完成一次真实 optimizer practice，依据 virtuoso-bridge-lite/skills/optimizer/SKILL.md，并调用本地 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/TuRBO 的 TuRBO。不要写新 optimizer 算法，不要创建 broad schema/framework，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。不要用 Python 解析 PSF，不要让 agent 翻译或重写 Calculator/OCEAN 公式。
 ```

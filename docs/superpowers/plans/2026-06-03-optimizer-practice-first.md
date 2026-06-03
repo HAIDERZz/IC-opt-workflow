@@ -121,6 +121,8 @@ hermes-workflow prepare-real-run "$PRACTICE_PROJECT" --run-id real_001
 
 ## Task 2: Single-Point Replay Sanity Check
 
+**Status:** Complete, verified-only.
+
 **Intent:** Confirm the clean practice workspace reproduces the already proven real simulation/metric chain.
 
 **Commands:**
@@ -139,6 +141,14 @@ hermes-workflow record-real-result "$PRACTICE_PROJECT" --run-id real_001
 - `ledger/experiment_ledger.jsonl` has exactly one checked real row.
 - `state/optimizer_state.json` has `current_evaluations = 1`.
 - Metrics are close to the known-good C-7 closure values unless the deck intentionally changed.
+- First attempt on `/tmp/ic_auto_opt_optimizer_practice/bridge_test_inv` failed with `rise/fall non_scalar` because it used template default lower-bound parameters `FN=2`, `WN=0.3u`, `FP=2`, `WP=0.3u`, not the C-7 closure baseline candidate.
+- Successful replay used `/tmp/ic_auto_opt_optimizer_practice/bridge_test_inv_baseline_001` with C-7 closure baseline parameters `FN=4`, `WN=0.6u`, `FP=4`, `WP=1.2u`.
+- Successful replay metrics exactly matched C-7 closure:
+  - `rise = 7.52016846017672e-11 s`
+  - `fall = 1.078998721053984e-10 s`
+  - `DC = 0.0002588877964196586 W`
+- `record-real-result` wrote one ledger row and `state/optimizer_state.json` with `current_evaluations = 1`.
+- `state/best_candidate.json` was absent after this replay because the recorded result had `simulation_status = real_constraint_fail`; this does not block the single-point tool-chain sanity check.
 
 **Stop Condition:** If this fails, compare against C-7 closure evidence first. Do not proceed to optimizer practice.
 

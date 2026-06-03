@@ -443,7 +443,7 @@ Status: planned, verified-only.
 - Before Hermes optimizer development, the practice must use `virtuoso-bridge-lite/skills/optimizer/SKILL.md` and local TuRBO at `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/TuRBO`.
 - For four `bridge_test_inv` variables, the minimum TuRBO practice budget is `n_init=8`, `max_evals=9`, `batch_size=1`, so at least one candidate is chosen after TuRBO's initial sample set.
 - No new optimizer algorithm, schema, broad framework, PSF parser, or formula rewrite is authorized by this plan.
-next_allowed_action: wait for user confirmation, then execute Optimizer Practice-First Task 2 only.
+next_allowed_action: wait for user confirmation, then execute Optimizer Practice-First Task 3 only.
 
 Task 1 baseline package shape checkpoint:
 
@@ -454,6 +454,19 @@ Task 1 baseline package shape checkpoint:
 - Verified package shape: `runs/real/real_001/netlist/input.scs`, sidecars such as `netlist/ade_e.scs`, and `netlist/amap/`.
 - Verified `metric_extraction_request.json` keeps approved expressions unchanged and declares `expected_psf_dir` as `runs/real/real_001/psf`.
 - No Spectre, OCEAN, C-7 adapter, TuRBO, or optimizer loop was run in Task 1.
+
+Task 2 single-point replay checkpoint:
+
+- Status: complete, verified-only.
+- Initial replay on `/tmp/ic_auto_opt_optimizer_practice/bridge_test_inv` failed with `rise/fall non_scalar`.
+- Root cause: that workspace used template default lower-bound parameters `FN=2`, `WN=0.3u`, `FP=2`, `WP=0.3u`, not the C-7 closure baseline candidate. OCEAN script and metric request matched the closure path, so this was not formula drift.
+- Successful replay workspace: `/tmp/ic_auto_opt_optimizer_practice/bridge_test_inv_baseline_001`.
+- Successful baseline parameters: `FN=4`, `WN=0.6u`, `FP=4`, `WP=1.2u`.
+- Passed commands: C-7 adapter through the sourced Cadence shell, `hermes-workflow check-real-run`, `check-metric-results`, and `record-real-result`.
+- Metrics exactly matched C-7 closure: `rise=7.52016846017672e-11 s`, `fall=1.078998721053984e-10 s`, `DC=0.0002588877964196586 W`.
+- Ledger has one checked real row and `state/optimizer_state.json` has `current_evaluations = 1`.
+- `state/best_candidate.json` is absent because the checked row is `real_constraint_fail`; this does not block Task 2.
+- No Hermes code, OCEAN formula, adapter layout, or PSF parser change was made.
 
 ## Resume Prompt
 
