@@ -459,7 +459,7 @@ Task 2 single-point replay checkpoint:
 
 - Status: complete, verified-only.
 - Initial replay on `/tmp/ic_auto_opt_optimizer_practice/bridge_test_inv` returned `rise/fall non_scalar` for `FN=2`, `WN=0.3u`, `FP=2`, `WP=0.3u`.
-- Root cause: this candidate's output swing does not reach the 0.9 V threshold required by the approved rise/fall formulas. Because the same OCEAN script, metric request, and Maestro/ADE layout still produce scalars for the known-good C-7 closure baseline, this is candidate-level infeasibility/performance failure, not OCEAN/formula/layout drift.
+- Interpretation: because the same OCEAN script, metric request, Maestro/ADE layout, and approved formulas still produce scalars for other parameter points, this is candidate-level performance failure, not OCEAN/formula/layout drift. A parameter point that cannot produce the required scalar metrics should be treated as not satisfying the performance target.
 - Optimizer practice must treat this class of metric failure as a finite penalty or constraint failure for the candidate, not as a workflow/tool-chain failure.
 - Successful replay workspace: `/tmp/ic_auto_opt_optimizer_practice/bridge_test_inv_baseline_001`.
 - Successful baseline parameters: `FN=4`, `WN=0.6u`, `FP=4`, `WP=1.2u`.

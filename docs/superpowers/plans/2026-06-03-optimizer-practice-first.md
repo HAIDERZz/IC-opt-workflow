@@ -142,7 +142,7 @@ hermes-workflow record-real-result "$PRACTICE_PROJECT" --run-id real_001
 - `state/optimizer_state.json` has `current_evaluations = 1`.
 - Metrics are close to the known-good C-7 closure values unless the deck intentionally changed.
 - First attempt on `/tmp/ic_auto_opt_optimizer_practice/bridge_test_inv` returned `rise/fall non_scalar` for template default lower-bound parameters `FN=2`, `WN=0.3u`, `FP=2`, `WP=0.3u`.
-- This is a candidate-level infeasibility/performance failure: the simulated output swing does not reach the 0.9 V threshold required by the approved rise/fall formulas. It is not an OCEAN, formula, request, or layout failure when the known-good baseline candidate still produces scalars.
+- This is a candidate-level performance failure: when the same OCEAN script, request, layout, and approved formulas produce scalars for other parameter points, a parameter point that cannot produce the required scalar metrics should be treated as not satisfying the performance target. It is not an OCEAN, formula, request, or layout failure by itself.
 - Optimizer practice must convert this class of metric failure into a finite penalty or constraint failure for that candidate, not stop the whole workflow as a tool-chain failure.
 - Successful replay used `/tmp/ic_auto_opt_optimizer_practice/bridge_test_inv_baseline_001` with C-7 closure baseline parameters `FN=4`, `WN=0.6u`, `FP=4`, `WP=1.2u`.
 - Successful replay metrics exactly matched C-7 closure:
