@@ -1,0 +1,41 @@
+{
+  "schema_version": "1.0",
+  "current_scope": "Plan C process hardening lightweight cadence guard",
+  "current_status": "process hardening complete; verified-only",
+  "review_status": "verified-only",
+  "subagent_dispatch": "not_available",
+  "active_spec": "docs/superpowers/specs/2026-06-03-process-hardening-lightweight-cadence-design.md",
+  "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
+  "progress_files": [
+    "docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md",
+    "docs/EXECUTION_PROGRESS_2026-05-29.md",
+    "docs/COMPACT_RESUME_CHECKPOINT.md"
+  ],
+  "next_allowed_action": "decide whether to redo C-11 or draft next approved real-tool/agent practice scope",
+  "forbidden_actions": [
+    "run Virtuoso",
+    "run Spectre",
+    "run OCEAN",
+    "run SSH",
+    "run Claude CLI",
+    "run virtuoso-bridge-lite",
+    "use network",
+    "run subprocess-backed C-7 adapter",
+    "parse PSF",
+    "rewrite OCEAN formulas",
+    "stage docs/OCEAN_DOC_*",
+    "stage docs/toolchain_evidence/"
+  ],
+  "required_pre_commit_checks": [
+    "python3 tools/check_development_cadence.py",
+    "python3 -m pytest tests/test_development_cadence_checker.py -q",
+    "python3 -m ruff check tools/check_development_cadence.py tests/test_development_cadence_checker.py",
+    "git diff --check",
+    "wc -l tools/check_development_cadence.py",
+    "git status --short"
+  ],
+  "review_evidence": {
+    "spec_review": null,
+    "code_quality_review": null
+  }
+}

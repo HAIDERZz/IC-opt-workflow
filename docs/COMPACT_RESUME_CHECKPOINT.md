@@ -12,6 +12,7 @@ As of 2026-05-29, implementation has started on branch `plan-a-hermes-file-contr
 Read this newer execution handoff first:
 
 ```text
+ic-auto-opt-workflow/docs/CURRENT_TASK_STATE.json
 ic-auto-opt-workflow/docs/EXECUTION_PROGRESS_2026-05-29.md
 ic-auto-opt-workflow/docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md
 ic-auto-opt-workflow/AGENTS.md
@@ -107,7 +108,10 @@ Current execution state:
 - C-11 Task 3 controlled failure/retry smoke is complete and reviewed. Added the local/fake failure/retry test that prepares `real_002`, writes a failed result manifest, verifies C-10 retry classification and C-9 blocking, prepares retry `real_003`, records retry success through existing checks and C-8, verifies source resolution, and confirms C-9 can prepare `real_004`. Focused smoke, recovery/next-run regression, and ruff checks passed.
 - C-11 Task 4 CLI smoke, docs, and final gate is complete and reviewed. Added the narrow local/fake CLI smoke that prepares `real_002`, checks fake returned artifacts, records the result through supervisor-facing CLI commands, and verifies the ledger update. Full pytest, ruff, and diff checks passed.
 - C-11 local/fake controlled smoke is complete. It verifies the C-9 -> fake C-7-style returned artifacts -> C-5/C-6 checks -> C-8 happy path and one C-10 failure/retry path without real Virtuoso/Spectre/OCEAN/SSH/agent/bridge execution. The next scope must be a separate real-tool/agent practice plan.
-- Current next action: choose the next real-tool/agent practice scope; do not run real tools until the next design spec is approved.
+- Plan C process hardening lightweight cadence guard is complete; verified-only. It adds `docs/CURRENT_TASK_STATE.json`, `tools/check_development_cadence.py`, and `docs/superpowers/specs/2026-06-03-process-hardening-lightweight-cadence-design.md`.
+- Current scope: Plan C process hardening lightweight cadence guard
+- Current status: process hardening complete; verified-only
+- Current next action: decide whether to redo C-11 or draft next approved real-tool/agent practice scope.
 - Real `input.scs` examples under `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example` are local-only references and must not be committed.
 
 ## Files Already Read
@@ -419,7 +423,7 @@ optimizer:
 
 Plan A, Plan B, Plan C C-1, Plan C C-2, Plan C C-3, Plan C C-4, Plan C C-5, and Plan C C-5.5 are complete as of 2026-06-01. C-6, C-7, C-8, and C-9 are complete and reviewed as of 2026-06-02. C-10 real-run failure/retry policy contract is complete and reviewed as of 2026-06-03.
 
-Current next step: choose the next real-tool/agent practice scope; do not run real tools until the next design spec is approved. C-11 local/fake controlled smoke is complete and reviewed. It verifies the C-9 -> fake C-7-style returned artifacts -> C-5/C-6 checks -> C-8 happy path and one C-10 failure/retry path without real Virtuoso/Spectre/OCEAN/SSH/agent/bridge execution. Do not redo Plan A Tasks 1-9 or completed Plan B/C modules unless new review feedback appears.
+Current next step: decide whether to redo C-11 or draft next approved real-tool/agent practice scope. Before continuing, read `docs/CURRENT_TASK_STATE.json` and run `python3 tools/check_development_cadence.py`. C-11 local/fake controlled smoke is complete, but the active process-hardening node is `verified-only` unless true review evidence is later recorded. Do not run real tools until the next design spec is approved. Do not redo Plan A Tasks 1-9 or completed Plan B/C modules unless new review feedback appears.
 
 Read the handoff files first:
 
@@ -437,11 +441,12 @@ Use this prompt after compact:
 ```text
 请继续 IC auto optimization workflow。先阅读：
 1. ic-auto-opt-workflow/AGENTS.md
-2. ic-auto-opt-workflow/docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md
-3. ic-auto-opt-workflow/docs/EXECUTION_PROGRESS_2026-05-29.md
-4. ic-auto-opt-workflow/docs/COMPACT_RESUME_CHECKPOINT.md
-5. ic-auto-opt-workflow/docs/superpowers/plans/2026-06-02-real-run-failure-retry-policy-contract.md
-6. 如需背景，再读 ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md
+2. ic-auto-opt-workflow/docs/CURRENT_TASK_STATE.json
+3. ic-auto-opt-workflow/docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md
+4. ic-auto-opt-workflow/docs/EXECUTION_PROGRESS_2026-05-29.md
+5. ic-auto-opt-workflow/docs/COMPACT_RESUME_CHECKPOINT.md
+6. ic-auto-opt-workflow/docs/superpowers/specs/2026-06-03-process-hardening-lightweight-cadence-design.md
+7. 如需背景，再读 ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。Plan A Task 1-9、Plan B mock optimization loop、Plan C C-1 netlist template contract、C-2 dry-run candidate renderer、C-3 execution package preflight readiness、C-4 post-approval real-run execution contract、C-5 real-run result handoff contract、C-5.5 dual-agent result handoff simulation gate、C-6 Spectre + OCEAN metric result contract、C-7 Spectre + OCEAN execution adapter、C-8 real result ledger/state update、C-9 next real-run package contract、C-10 real-run failure/retry policy contract、C-11 local/fake controlled smoke 均已完成并通过 review/final gate。C-11 验证 C-9 -> fake C-7-style returned artifacts -> C-5/C-6 checks -> C-8 happy path 和一个 C-10 failure/retry path，但没有运行真实 Virtuoso/Spectre/OCEAN/SSH/agent/bridge。下一步请选择单独的 real-tool/agent practice scope；在新的 design spec 获批前不要运行真实工具。Spectre + OCEAN backend 已通过工具链证据验证。不要让 agent 重写公式，metrics.yaml 中的公式必须是用户/项目批准的精确公式。真实 input.scs 示例在 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example 下，仅供本地参考，请勿将其提交到仓库。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。当前活动节点是 Plan C process hardening lightweight cadence guard，状态为 verified-only；如果没有真实 review evidence，不要写 reviewed。运行或更新任务前先执行 python3 tools/check_development_cadence.py。下一步是 decide whether to redo C-11 or draft next approved real-tool/agent practice scope。在新的 design spec 获批前不要运行真实 Virtuoso/Spectre/OCEAN/SSH/agent/bridge，不要调用 C-7 subprocess adapter，不要解析 PSF，不要重写 Calculator/OCEAN 公式。真实 input.scs 示例在 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example 下，仅供本地参考，请勿将其提交到仓库。
 ```

@@ -991,7 +991,10 @@ Next required action:
 - C-11 Task 3 controlled failure/retry smoke is complete and reviewed. Added the local/fake failure/retry test that prepares `real_002`, writes a failed result manifest, verifies C-10 retry classification and C-9 blocking, prepares retry `real_003`, records retry success through existing checks and C-8, verifies source resolution, and confirms C-9 can prepare `real_004`. Focused smoke, recovery/next-run regression, and ruff checks passed.
 - C-11 Task 4 CLI smoke, docs, and final gate is complete and reviewed. Added the narrow local/fake CLI smoke that prepares `real_002`, checks fake returned artifacts, records the result through supervisor-facing CLI commands, and verifies the ledger update. Full pytest, ruff, and diff checks passed.
 - C-11 local/fake controlled smoke is complete. It verifies the C-9 -> fake C-7-style returned artifacts -> C-5/C-6 checks -> C-8 happy path and one C-10 failure/retry path without real Virtuoso/Spectre/OCEAN/SSH/agent/bridge execution. The next scope must be a separate real-tool/agent practice plan.
-- Next recommended action: choose the next real-tool/agent practice scope; do not run real tools until the next design spec is approved.
+- Plan C process hardening lightweight cadence guard is complete; verified-only. It adds `docs/CURRENT_TASK_STATE.json`, a 200-line-budget cadence checker, and a process-hardening design spec so future context resumes have a single current-state anchor and cannot falsely claim `reviewed` without evidence.
+- Current scope: Plan C process hardening lightweight cadence guard
+- Current status: process hardening complete; verified-only
+- Next recommended action: decide whether to redo C-11 or draft next approved real-tool/agent practice scope.
 
 ## Locked Role Model
 
@@ -1014,9 +1017,10 @@ Do not use "Hermes agent" as a role name in future specs or plans. If older docu
 ```text
 请继续执行 IC auto optimization workflow。先阅读：
 1. ic-auto-opt-workflow/docs/OPENCODE_HANDOFF_2026-05-29.md
-2. ic-auto-opt-workflow/docs/EXECUTION_PROGRESS_2026-05-29.md
-3. ic-auto-opt-workflow/docs/COMPACT_RESUME_CHECKPOINT.md
-4. ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md
+2. ic-auto-opt-workflow/docs/CURRENT_TASK_STATE.json
+3. ic-auto-opt-workflow/docs/EXECUTION_PROGRESS_2026-05-29.md
+4. ic-auto-opt-workflow/docs/COMPACT_RESUME_CHECKPOINT.md
+5. ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。请先阅读 AGENTS.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md。Hermes File Contract MVP 的 Plan A Task 1-9 已完成；Plan B mock optimization loop 已完成；Plan C C-1/C-2/C-3/C-4/C-5/C-5.5/C-6/C-7/C-8/C-9/C-10/C-11 local/fake controlled smoke 均已完成并通过相应 verification/review gate。C-11 已验证 C-9 -> fake C-7-style returned artifacts -> C-5/C-6 checks -> C-8 happy path 和一个 C-10 failure/retry path，且没有运行真实 Virtuoso/Spectre/OCEAN/SSH/agent/bridge。下一步请选择单独的 real-tool/agent practice scope；在新的 design spec 获批前不要运行真实工具。Spectre + OCEAN backend 已通过真实工具链证据验证。不要提交或复制本地真实 input.scs 示例，不要让 agent 重写公式，不要用 Python 解析 PSF 或重写 Calculator/OCEAN 公式。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。请先阅读 docs/CURRENT_TASK_STATE.json、AGENTS.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md。当前活动节点是 Plan C process hardening lightweight cadence guard，状态为 verified-only；如果没有真实 review evidence，不要写 reviewed。运行或更新任务前先执行 python3 tools/check_development_cadence.py。下一步是 decide whether to redo C-11 or draft next approved real-tool/agent practice scope。在新的 design spec 获批前不要运行真实工具。不要提交或复制本地真实 input.scs 示例，不要让 agent 重写公式，不要用 Python 解析 PSF 或重写 Calculator/OCEAN 公式。
 ```
