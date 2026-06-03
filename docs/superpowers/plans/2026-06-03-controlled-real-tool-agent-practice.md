@@ -214,7 +214,7 @@ Expected:
 
 If the formulas are not acceptable for the real exported deck, stop and ask the user for the approved C-12 `metrics.yaml` before continuing. Do not discover or rewrite formulas during C-12 execution.
 
-- [ ] **Step 7: Confirm exported input deck is present**
+- [x] **Step 7: Confirm exported input deck is present**
 
 Run:
 
@@ -232,9 +232,9 @@ If this fails, stop and ask the user or execution agent to place the real export
 
 Do not copy local `input.scs` examples into the repository and do not commit the deck.
 
-Task 1 stopped here on 2026-06-03: the file was missing after `hermes-workflow init`, so Step 8 and later steps must wait until the real exported deck is placed at the path above.
+Task 1 resumed here on 2026-06-03 after the real exported deck was placed at the path above.
 
-- [ ] **Step 8: Capture local-only input hash**
+- [x] **Step 8: Capture local-only input hash**
 
 Run:
 
@@ -247,7 +247,7 @@ Expected:
 - `$C12_EVIDENCE/exported_input_scs.sha256` exists
 - only the hash file is created under `/tmp`; it is not staged
 
-- [ ] **Step 9: Update progress docs for Task 1**
+- [x] **Step 9: Update progress docs for Task 1**
 
 Record:
 
@@ -265,7 +265,7 @@ Update:
 
 Set `review_status` to `verified-only` until review evidence is recorded.
 
-- [ ] **Step 10: Verify and commit Task 1 docs**
+- [x] **Step 10: Verify and commit Task 1 docs**
 
 Run:
 
@@ -285,7 +285,7 @@ Expected:
 Commit:
 
 ```bash
-git add docs/CURRENT_TASK_STATE.json docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md docs/EXECUTION_PROGRESS_2026-05-29.md docs/COMPACT_RESUME_CHECKPOINT.md docs/superpowers/plans/2026-06-03-controlled-real-tool-agent-practice.md
+git add docs/CURRENT_TASK_STATE.json docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md docs/EXECUTION_PROGRESS_2026-05-29.md docs/COMPACT_RESUME_CHECKPOINT.md docs/PROJECT_WORKFLOW_OVERVIEW.md docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md docs/superpowers/plans/2026-06-03-controlled-real-tool-agent-practice.md
 git commit -m "docs: record c12 practice input gate"
 ```
 

@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "current_scope": "Plan C C-12 Task 1 practice workspace and input gate",
-  "current_status": "C-12 Task 1 blocked at exported input.scs gate",
+  "current_status": "C-12 Task 1 complete and reviewed",
   "review_status": "reviewed",
   "subagent_dispatch": "available",
   "active_spec": "docs/superpowers/specs/2026-06-03-controlled-real-tool-agent-practice-design.md",
@@ -12,7 +12,7 @@
     "docs/EXECUTION_PROGRESS_2026-05-29.md",
     "docs/COMPACT_RESUME_CHECKPOINT.md"
   ],
-  "next_allowed_action": "place the real exported input.scs at /tmp/ic_auto_opt_c12/bridge_test_inv/netlists/exported/input.scs, then rerun C-12 Task 1 Step 7",
+  "next_allowed_action": "user confirmation to start C-12 Task 2 Hermes preflight and approved real-run package",
   "forbidden_actions": [
     "run Virtuoso",
     "run Spectre",
@@ -33,9 +33,9 @@
     "git status --short"
   ],
   "review_evidence": {
-    "spec_review": "Plato 019e8d35-a238-7980-ba60-607d6457152d approved C-12 Task 1 blocker recording with no Critical, Important, or Minor findings. Route audit aligned and not drifted.",
-    "code_quality_review": "Aristotle 019e8d36-b189-7a02-aa9f-fb52a510daef approved the modified tracked-file changes. Important residual risk: untracked docs/OCEAN_DOC_* and docs/toolchain_evidence/ remain an accidental-commit risk, so commits must use explicit pathspecs.",
-    "task_1_blocker": "C-12 Task 1 completed local workspace creation, Hermes CLI availability check, Hermes init, fixed cell contract check, and approved formula text check. It stopped at Step 7 because /tmp/ic_auto_opt_c12/bridge_test_inv/netlists/exported/input.scs is missing. No real tools were run, no adapter was called, no PSF was parsed, and no formula was rewritten.",
+    "spec_review": "Epicurus 019e8d56-4dd7-7712-b7ae-abdc6fc88c02 approved C-12 Task 1 input gate completion after the Step 10 pathspec Minor was fixed; no open Critical, Important, or Minor findings. Route remains aligned.",
+    "code_quality_review": "Ohm 019e8d58-ba6e-7b42-91fe-ef05eb5b611e approved C-12 Task 1 docs/status changes with no Critical, Important, or Minor findings. Residual risk: approval was based on supplied facts, so final commit uses explicit pathspecs to avoid untracked evidence.",
+    "task_1_input_gate_completion": "C-12 Task 1 confirmed /tmp/ic_auto_opt_c12/bridge_test_inv/netlists/exported/input.scs exists and wrote the local-only hash file to /tmp/ic_auto_opt_c12/evidence/2026-06-03-c12-controlled-real-tool-agent-practice/exported_input_scs.sha256. No real tools were run, no adapter was called, no PSF was parsed, and no formula was rewritten.",
     "previous_task_3_spec_review": "Ptolemy 019e8cc5-30bf-7022-bca2-657b57fec88a approved C-11 Task 3 spec compliance after stale handoff prompts were fixed; no remaining Critical, Important, or Minor findings.",
     "previous_task_3_code_quality_review": "Heisenberg 019e8cc8-c26b-7ef2-8fd4-d5679088521d approved C-11 Task 3 code quality with no Critical, Important, or Minor findings."
   }
