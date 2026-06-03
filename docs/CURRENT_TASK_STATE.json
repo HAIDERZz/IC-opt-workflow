@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
-  "current_scope": "Candidate-Injection Package Contract Tasks 1-2",
-  "current_status": "Tasks 1 and 2 are implemented and verified-only. Added candidate request validation plus package preparation through the existing real_run package writer. The implementation validates explicit candidate JSON against config/variables.yaml, rejects duplicate candidate ids and parameter tuples from the ledger, writes runs/real/<run_id>/candidate_request.json as package evidence, records candidate_request_sha256 in candidate.json and real_run_manifest.json, and preserves config/variables.yaml.",
+  "current_scope": "Candidate-Injection Package Contract Task 3",
+  "current_status": "Task 3 is implemented and verified-only. Added hermes-workflow prepare-candidate-real-run CLI wiring and focused fake C-7 handoff smoke coverage. The fake handoff smoke prepares an explicit candidate package, writes sanitized result and metric manifests that preserve the explicit optimizer candidate_id, checks real-run and metric-result contracts, records the result, and verifies ledger rows real_001 and real_002.",
   "review_status": "verified-only",
   "subagent_dispatch": "available",
   "active_spec": "docs/superpowers/specs/2026-06-04-candidate-injection-package-contract-design.md",
@@ -12,7 +12,7 @@
     "docs/EXECUTION_PROGRESS_2026-05-29.md",
     "docs/COMPACT_RESUME_CHECKPOINT.md"
   ],
-  "next_allowed_action": "wait for user confirmation, then execute Candidate-Injection Package Contract Task 3 only",
+  "next_allowed_action": "wait for user confirmation, then execute Candidate-Injection Package Contract Task 4 final verification and review gate only",
   "forbidden_actions": [
     "start Hermes optimizer productization before candidate-injection package contract implementation is complete",
     "create new optimizer algorithms",
@@ -45,15 +45,16 @@
     "active_spec": "docs/superpowers/specs/2026-06-04-candidate-injection-package-contract-design.md",
     "active_plan": "docs/superpowers/plans/2026-06-04-candidate-injection-package-contract.md",
     "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
-    "alignment": "Aligned. Tasks 1-2 implement the candidate request validation and package writer pieces from the active design spec and implementation plan. They reuse the existing real_run package writer and keep explicit optimizer candidates inside the approved run-package boundary.",
-    "drift": "None. No optimizer algorithm productization, real-tool execution, PSF parsing, OCEAN formula rewriting, C-4 replacement, or C-9 replacement was added. Prepared-run duplicate checks are implemented, while unresolved-run guard still correctly fails first for pending packages."
+    "alignment": "Aligned. Task 3 exposes the candidate-injection package writer through the CLI and verifies compatibility with the existing C-7-style result handoff, metric-result check, and record-real-result contracts using fake sanitized artifacts only.",
+    "drift": "None. No optimizer algorithm productization, real-tool execution, PSF parsing, OCEAN formula rewriting, C-4 replacement, or C-9 replacement was added. The implementation plan was corrected to use local fake handoff writers because the existing next-real-run helper writers intentionally set candidate_id to run_id, which would violate the explicit candidate-injection contract."
   },
-  "latest_valid_commit": "feat: prepare candidate injection real runs",
+  "latest_valid_commit": "feat: add candidate real run CLI",
   "review_evidence": {
     "optimizer_practice_task_4": "Task 4 ran ./.venv/bin/python /tmp/ic_auto_opt_optimizer_practice/run_turbo_bridge_test_inv.py. Evidence: /tmp/ic_auto_opt_optimizer_practice/turbo_bridge_test_inv_001/summary.json and evaluations.jsonl. evaluation_count=9, post_initial_evaluations=1, successful_evaluations=9, penalty_evaluations=0. Best candidate: FN=12, WN=1.3u, FP=2, WP=2.5u, objective=4.183168953894332e-14.",
     "optimizer_practice_task_5": "Task 5 wrote docs/debug/2026-06-03-optimizer-practice-first-result.md and chose Productization Decision B: add an explicit candidate-injection package contract first.",
     "candidate_injection_design": "Design spec written at docs/superpowers/specs/2026-06-04-candidate-injection-package-contract-design.md. It defines candidate request schema, validation, run-id policy, dedupe policy, package outputs, CLI, error handling, and fake-tool-only testing strategy.",
     "candidate_injection_plan": "Implementation plan written at docs/superpowers/plans/2026-06-04-candidate-injection-package-contract.md. It has four tasks: validation, package writer, CLI/fake handoff smoke, and final verification/review gate.",
-    "candidate_injection_tasks_1_2": "Tasks 1-2 implemented in src/hermes_workflow/real_run.py with tests in tests/test_candidate_injection_real_run.py. Verification passed: python3 -m pytest tests/test_candidate_injection_real_run.py -q; python3 -m pytest tests/test_next_real_run.py tests/test_real_run.py -q; python3 -m ruff check src tests tools; python3 tools/check_development_cadence.py; git diff --check."
+    "candidate_injection_tasks_1_2": "Tasks 1-2 implemented in src/hermes_workflow/real_run.py with tests in tests/test_candidate_injection_real_run.py. Verification passed: python3 -m pytest tests/test_candidate_injection_real_run.py -q; python3 -m pytest tests/test_next_real_run.py tests/test_real_run.py -q; python3 -m ruff check src tests tools; python3 tools/check_development_cadence.py; git diff --check.",
+    "candidate_injection_task_3": "Task 3 implemented CLI wiring in src/hermes_workflow/cli.py and fake C-7 handoff smoke coverage in tests/test_candidate_injection_real_run.py. Red test observed: python3 -m pytest tests/test_candidate_injection_real_run.py -q failed with missing CLI command exit 2. Verification passed: python3 -m pytest tests/test_candidate_injection_real_run.py -q; python3 -m pytest tests/test_cli.py tests/test_candidate_injection_real_run.py -q; python3 -m pytest tests/test_next_real_run.py tests/test_real_result_record.py tests/test_metric_results.py -q; python3 -m ruff check src tests tools."
   }
 }

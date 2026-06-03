@@ -4,9 +4,19 @@ import json
 from pathlib import Path
 
 import pytest
+from typer.testing import CliRunner
 
+from hermes_workflow.cli import app
+from hermes_workflow.metric_results import check_metric_results
 from hermes_workflow.package import sha256_file
 from hermes_workflow.real_run import prepare_candidate_real_run
+from hermes_workflow.real_result_record import record_real_result
+from hermes_workflow.reports import (
+    MetricResultCheckStatus,
+    RealResultRecordStatus,
+    RealRunCheckStatus,
+)
+from hermes_workflow.result_handoff import check_real_run
 from tests.test_next_real_run import _create_ready_project, _record_real_001
 
 
@@ -42,6 +52,112 @@ def _candidate_request(
         },
     )
     return path
+
+
+def _write_candidate_result_manifest(project_dir: Path, *, run_id: str) -> None:
+    run_dir = project_dir / "runs" / "real" / run_id
+    prepared = _load_json(run_dir / "real_run_manifest.json")
+    candidate = _load_json(run_dir / "candidate.json")
+    psf_dir = run_dir / "psf"
+    metrics_dir = run_dir / "metrics"
+    psf_dir.mkdir(parents=True, exist_ok=True)
+    metrics_dir.mkdir(parents=True, exist_ok=True)
+    (psf_dir / "spectre.out").write_text(
+        "sanitized spectre output\n",
+        encoding="utf-8",
+    )
+    (metrics_dir / "ocean.log").write_text(
+        "sanitized ocean log\n",
+        encoding="utf-8",
+    )
+    (metrics_dir / "ocean_scalars.tsv").write_text(
+        "metric\tvalue\tunit\tstatus\texpression_sha256\tmessage\n",
+        encoding="utf-8",
+    )
+    (run_dir / "spectre.stdout").write_text("sanitized stdout\n", encoding="utf-8")
+    (run_dir / "spectre.stderr").write_text("", encoding="utf-8")
+    _write_json(
+        run_dir / "result_manifest.json",
+        {
+            "schema_version": "1.0",
+            "run_id": run_id,
+            "candidate_id": candidate["candidate_id"],
+            "status": "succeeded",
+            "started_at_utc": "2026-06-04T00:30:00Z",
+            "completed_at_utc": "2026-06-04T00:31:00Z",
+            "simulator": {
+                "engine": "spectre_x",
+                "preset": "ax",
+                "command_label": "spectre_ocean_adapter",
+            },
+            "prepared_input_scs": prepared["rendered_input_scs"],
+            "prepared_input_sha256": prepared["rendered_input_sha256"],
+            "log_file": f"runs/real/{run_id}/spectre.stdout",
+            "artifact_files": [
+                f"runs/real/{run_id}/spectre.stderr",
+                f"runs/real/{run_id}/psf/spectre.out",
+                f"runs/real/{run_id}/metrics/ocean.log",
+                f"runs/real/{run_id}/metrics/ocean_scalars.tsv",
+            ],
+            "result_data": {
+                "kind": "spectre_psf",
+                "psf_dir": f"runs/real/{run_id}/psf",
+                "spectre_out": f"runs/real/{run_id}/psf/spectre.out",
+            },
+            "metric_result_manifest": (
+                f"runs/real/{run_id}/metrics/metric_result_manifest.json"
+            ),
+        },
+    )
+
+
+def _write_candidate_metric_result_manifest(project_dir: Path, *, run_id: str) -> None:
+    run_dir = project_dir / "runs" / "real" / run_id
+    request_path = run_dir / "metric_extraction_request.json"
+    request = _load_json(request_path)
+    candidate = _load_json(run_dir / "candidate.json")
+    metrics_dir = run_dir / "metrics"
+    script_path = metrics_dir / "metric_probe.ocn"
+    script_path.write_text("sanitized ocean script\n", encoding="utf-8")
+    request_by_name = {metric["name"]: metric for metric in request["metrics"]}
+    values = {"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-6}
+    _write_json(
+        metrics_dir / "metric_result_manifest.json",
+        {
+            "schema_version": "1.0",
+            "run_id": run_id,
+            "candidate_id": candidate["candidate_id"],
+            "backend": "spectre_ocean_batch",
+            "status": "succeeded",
+            "request_file": f"runs/real/{run_id}/metric_extraction_request.json",
+            "request_sha256": sha256_file(request_path),
+            "psf_dir": f"runs/real/{run_id}/psf",
+            "ocean": {
+                "mode": "nograph_replay",
+                "return_code": 0,
+                "script_file": f"runs/real/{run_id}/metrics/metric_probe.ocn",
+                "script_sha256": sha256_file(script_path),
+                "log_file": f"runs/real/{run_id}/metrics/ocean.log",
+                "scalar_output_file": f"runs/real/{run_id}/metrics/ocean_scalars.tsv",
+            },
+            "metrics": [
+                {
+                    "name": name,
+                    "status": "succeeded",
+                    "value": value,
+                    "value_text": f"{value:.12g}",
+                    "unit": request_by_name[name]["unit"],
+                    "result": request_by_name[name]["result"],
+                    "expression": request_by_name[name]["expression"],
+                    "expression_sha256": request_by_name[name]["expression_sha256"],
+                    "expression_source": request_by_name[name]["expression_source"],
+                    "issues": [],
+                }
+                for name, value in values.items()
+            ],
+            "issues": [],
+        },
+    )
 
 
 def test_prepare_candidate_real_run_rejects_missing_parameter(
@@ -257,3 +373,91 @@ def test_prepare_candidate_real_run_rejects_unresolved_prepared_parameters_first
             candidate_file=second,
             run_id="real_003",
         )
+
+
+def test_prepare_candidate_real_run_cli_success(tmp_path: Path) -> None:
+    project_dir = _create_ready_project(tmp_path)
+    _record_real_001(project_dir)
+    request = _candidate_request(project_dir)
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "prepare-candidate-real-run",
+            str(project_dir),
+            "--candidate-file",
+            str(request),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "candidate real run package prepared" in result.output
+    assert "run: runs/real/real_002" in result.output
+    assert "manifest: runs/real/real_002/real_run_manifest.json" in result.output
+    assert "candidate: runs/real/real_002/candidate.json" in result.output
+    assert (
+        "candidate request: runs/real/real_002/candidate_request.json"
+        in result.output
+    )
+
+
+def test_prepare_candidate_real_run_cli_rejects_unresolved_baseline(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_project(tmp_path)
+    request = _candidate_request(project_dir)
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "prepare-candidate-real-run",
+            str(project_dir),
+            "--candidate-file",
+            str(request),
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "unresolved real run exists" in result.output
+
+
+def test_candidate_package_accepts_fake_c7_result_and_records(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_project(tmp_path)
+    _record_real_001(project_dir)
+    request = _candidate_request(project_dir)
+    package = prepare_candidate_real_run(
+        project_dir,
+        candidate_file=request,
+        created_at_utc="2026-06-04T00:00:00Z",
+    )
+    _write_candidate_result_manifest(project_dir, run_id=package.run_id)
+    _write_candidate_metric_result_manifest(project_dir, run_id=package.run_id)
+
+    real_report = check_real_run(project_dir, run_id=package.run_id)
+    metric_report = check_metric_results(project_dir, run_id=package.run_id)
+    record_report = record_real_result(
+        project_dir,
+        run_id=package.run_id,
+        recorded_at_utc="2026-06-04T00:40:00Z",
+    )
+
+    assert real_report.status == RealRunCheckStatus.PASS
+    assert metric_report.status == MetricResultCheckStatus.PASS
+    assert record_report.status == RealResultRecordStatus.PASS
+    assert record_report.candidate_id == "candidate_000009"
+    ledger_rows = [
+        json.loads(line)
+        for line in (project_dir / "ledger" / "experiment_ledger.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
+    ]
+    assert [row["run_id"] for row in ledger_rows] == ["real_001", "real_002"]
+    assert ledger_rows[1]["candidate_id"] == "candidate_000009"
+    assert ledger_rows[1]["parameters"] == {
+        "FN": "12",
+        "WN": "1.3u",
+        "FP": "2",
+        "WP": "2.5u",
+    }

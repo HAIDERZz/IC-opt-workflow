@@ -740,7 +740,7 @@ Stop for user confirmation.
 - Modify: `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`
 - Modify: `docs/superpowers/plans/2026-06-04-candidate-injection-package-contract.md`
 
-- [ ] **Step 1: Add failing CLI and fake handoff smoke tests**
+- [x] **Step 1: Add failing CLI and fake handoff smoke tests**
 
 Append tests:
 
@@ -788,10 +788,12 @@ def test_prepare_candidate_real_run_cli_failure_without_ledger(tmp_path: Path) -
     assert "unresolved real run exists" in result.output
 ```
 
-Add a fake C-7 compatibility smoke. Use existing helper writers by importing them:
+Add a fake C-7 compatibility smoke. Use local fake result writers in this test file
+instead of importing `tests.test_next_real_run` helper writers, because the existing
+helpers intentionally set `candidate_id` to the run id and would not preserve the
+explicit optimizer candidate id required by this contract:
 
 ```python
-from tests.test_next_real_run import _write_metric_result_manifest, _write_result_manifest
 from hermes_workflow.result_handoff import check_real_run
 from hermes_workflow.metric_results import check_metric_results
 from hermes_workflow.real_result_record import record_real_result
@@ -811,8 +813,8 @@ def test_candidate_package_accepts_fake_c7_result_and_records(tmp_path: Path) ->
         created_at_utc="2026-06-04T00:00:00Z",
     )
 
-    _write_result_manifest(project_dir, run_id=package.run_id)
-    _write_metric_result_manifest(project_dir, run_id=package.run_id)
+    _write_candidate_result_manifest(project_dir, run_id=package.run_id)
+    _write_candidate_metric_result_manifest(project_dir, run_id=package.run_id)
 
     real_report = check_real_run(project_dir, run_id=package.run_id)
     metric_report = check_metric_results(project_dir, run_id=package.run_id)
@@ -839,7 +841,7 @@ def test_candidate_package_accepts_fake_c7_result_and_records(tmp_path: Path) ->
     assert ledger_rows[1]["parameters"] == {"FN": "12", "WN": "1.3u", "FP": "2", "WP": "2.5u"}
 ```
 
-- [ ] **Step 2: Run tests and confirm CLI command is missing**
+- [x] **Step 2: Run tests and confirm CLI command is missing**
 
 Run:
 
@@ -849,7 +851,7 @@ python3 -m pytest tests/test_candidate_injection_real_run.py -q
 
 Expected: CLI test fails because command does not exist.
 
-- [ ] **Step 3: Add CLI command**
+- [x] **Step 3: Add CLI command**
 
 Modify `src/hermes_workflow/cli.py` import:
 
@@ -905,7 +907,7 @@ def prepare_candidate_real_run_command(
     )
 ```
 
-- [ ] **Step 4: Run targeted CLI and fake handoff tests**
+- [x] **Step 4: Run targeted CLI and fake handoff tests**
 
 Run:
 
@@ -916,7 +918,7 @@ python3 -m pytest tests/test_next_real_run.py tests/test_real_result_record.py t
 
 Expected: pass.
 
-- [ ] **Step 5: Update task state and commit Task 3**
+- [x] **Step 5: Update task state and commit Task 3**
 
 Update:
 

@@ -16,7 +16,11 @@ from hermes_workflow.package import (
     build_execution_package,
     create_project_from_template,
 )
-from hermes_workflow.real_run import prepare_next_real_run, prepare_real_run
+from hermes_workflow.real_run import (
+    prepare_candidate_real_run,
+    prepare_next_real_run,
+    prepare_real_run,
+)
 from hermes_workflow.real_run_recovery import (
     assess_real_run_recovery,
     prepare_real_run_retry,
@@ -262,6 +266,47 @@ def prepare_next_real_run_command(
     typer.echo(f"run: {package.run_dir.relative_to(project_dir)}")
     typer.echo(f"manifest: {package.manifest_path.relative_to(project_dir)}")
     typer.echo(f"candidate: {package.candidate_path.relative_to(project_dir)}")
+
+
+@app.command("prepare-candidate-real-run")
+def prepare_candidate_real_run_command(
+    project_dir: Annotated[
+        Path,
+        typer.Argument(
+            help="Project directory with at least one recorded checked real result."
+        ),
+    ],
+    candidate_file: Annotated[
+        Path,
+        typer.Option(
+            "--candidate-file",
+            help="JSON file containing one explicit optimizer candidate request.",
+        ),
+    ],
+    run_id: Annotated[
+        str | None,
+        typer.Option(
+            "--run-id",
+            help="Optional candidate real-run package id such as real_002.",
+        ),
+    ] = None,
+) -> None:
+    try:
+        package = prepare_candidate_real_run(
+            project_dir,
+            candidate_file=candidate_file,
+            run_id=run_id,
+        )
+    except (FileExistsError, FileNotFoundError, OSError, ValueError) as exc:
+        _exit_with_error(exc)
+    typer.echo("candidate real run package prepared")
+    typer.echo(f"run: {package.run_dir.relative_to(project_dir)}")
+    typer.echo(f"manifest: {package.manifest_path.relative_to(project_dir)}")
+    typer.echo(f"candidate: {package.candidate_path.relative_to(project_dir)}")
+    typer.echo(
+        "candidate request: "
+        f"{package.run_dir.relative_to(project_dir) / 'candidate_request.json'}"
+    )
 
 
 @app.command("assess-real-run-recovery")
