@@ -400,6 +400,7 @@ def _write_real_run_package(
     created_run_dir = not run_dir.exists()
     try:
         run_dir.mkdir(parents=True, exist_ok=True)
+        _copy_exported_netlist_bundle(bundle, run_dir)
         rendered_text = (
             rendered_text_override
             if rendered_text_override is not None
@@ -461,6 +462,35 @@ def _write_real_run_package(
         manifest_payload=manifest_payload,
         metric_request_payload=metric_request_payload,
     )
+
+
+def _copy_exported_netlist_bundle(bundle: ContractBundle, run_dir: Path) -> None:
+    exported_input = _project_path(
+        bundle,
+        bundle.project_config.netlist.exported_input_scs,
+    )
+    exported_root = exported_input.parent
+    if exported_root.is_symlink():
+        raise FileExistsError(
+            f"exported netlist bundle must not contain symlinks: {exported_root}"
+        )
+    if not exported_root.exists():
+        return
+
+    for source in sorted(exported_root.rglob("*")):
+        if source.is_symlink():
+            raise FileExistsError(
+                f"exported netlist bundle must not contain symlinks: {source}"
+            )
+        relative = source.relative_to(exported_root)
+        destination = run_dir / relative
+        if source.is_dir():
+            destination.mkdir(parents=True, exist_ok=True)
+            continue
+        if not source.is_file():
+            raise ValueError(f"exported netlist bundle file is not regular: {source}")
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, destination)
 
 
 def _render_template(template_text: str, candidate: dict[str, str]) -> str:

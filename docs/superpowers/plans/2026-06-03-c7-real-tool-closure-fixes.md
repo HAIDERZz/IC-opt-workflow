@@ -47,20 +47,22 @@ This plan must not:
 
 ## Task 1: Exported Netlist Bundle Sidecars
 
+**Status:** Complete, verified-only.
+
 **Files:**
 - Modify: `src/hermes_workflow/package.py`
 - Modify: `src/hermes_workflow/real_run.py`
 - Test: existing package/real-run tests that cover netlist export copying
 
-- [ ] **Step 1: Add a failing test**
+- [x] **Step 1: Add a failing test**
   - Create a fixture project whose `netlists/exported/input.scs` contains `include "ade_e.scs"` and whose export directory contains `ade_e.scs`.
   - Expected before fix: the prepared real-run directory contains only `input.scs`.
 
-- [ ] **Step 2: Preserve the exported netlist bundle**
+- [x] **Step 2: Preserve the exported netlist bundle**
   - Copy safe regular files from `netlists/exported/` into the prepared real-run directory alongside `input.scs`.
   - Reject symlinks, absolute paths, path traversal, and missing include sidecars.
 
-- [ ] **Step 3: Verify**
+- [x] **Step 3: Verify**
   - Run: `python3 -m pytest tests -q`
   - Run: `python3 -m ruff check src tests tools`
   - Run: `git diff --check`

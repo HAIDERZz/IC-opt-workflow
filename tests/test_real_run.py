@@ -261,6 +261,63 @@ def test_prepare_real_run_writes_first_real_run_package(tmp_path: Path) -> None:
     assert not (project_dir / "state" / "best_candidate.json").exists()
 
 
+def test_prepare_real_run_copies_exported_netlist_sidecars(tmp_path: Path) -> None:
+    project_dir = _create_project(tmp_path)
+    _approve_project(project_dir)
+    _write_template(project_dir)
+    exported_dir = project_dir / "netlists" / "exported"
+    (exported_dir / "input.scs").write_text(
+        'include "ade_e.scs"\nparameters FN=2\n',
+        encoding="utf-8",
+    )
+    (exported_dir / "ade_e.scs").write_text(
+        "simulatorOptions options\n",
+        encoding="utf-8",
+    )
+    (exported_dir / "amap").mkdir()
+    (exported_dir / "amap" / "designData.json").write_text(
+        "{}\n",
+        encoding="utf-8",
+    )
+    (exported_dir / ".modelFiles").write_text(
+        "model file sidecar\n",
+        encoding="utf-8",
+    )
+
+    prepare_real_run(project_dir, created_at_utc="2026-05-31T00:20:00Z")
+
+    run_dir = project_dir / "runs" / "real" / "real_001"
+    assert (run_dir / "ade_e.scs").read_text(encoding="utf-8") == (
+        "simulatorOptions options\n"
+    )
+    assert (run_dir / "amap" / "designData.json").read_text(encoding="utf-8") == "{}\n"
+    assert (run_dir / ".modelFiles").read_text(encoding="utf-8") == (
+        "model file sidecar\n"
+    )
+    assert "FN=2" in (run_dir / "input.scs").read_text(encoding="utf-8")
+
+
+def test_prepare_real_run_rejects_exported_netlist_sidecar_symlink(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_project(tmp_path)
+    _approve_project(project_dir)
+    _write_template(project_dir)
+    exported_dir = project_dir / "netlists" / "exported"
+    (exported_dir / "input.scs").write_text("parameters FN=2\n", encoding="utf-8")
+    target = tmp_path / "protected.scs"
+    target.write_text("external sidecar\n", encoding="utf-8")
+    (exported_dir / "ade_e.scs").symlink_to(target)
+
+    with pytest.raises(
+        FileExistsError,
+        match="exported netlist bundle must not contain symlinks",
+    ):
+        prepare_real_run(project_dir, created_at_utc="2026-05-31T00:20:00Z")
+
+    assert not (project_dir / "runs" / "real" / "real_001").exists()
+
+
 def test_prepare_real_run_writes_metric_extraction_request(tmp_path: Path) -> None:
     project_dir = _create_project(tmp_path)
     _approve_project(project_dir)

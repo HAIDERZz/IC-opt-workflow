@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "current_scope": "C-7 Real Tool Closure Fixes",
-  "current_status": "The scoped Spectre =log command fix was committed as 51fc057. C-7 Real Tool Closure Fixes Task 0 evidence inventory is complete: local bundle /tmp/ic_auto_opt_real_tool_evidence contains inverter, mixer, C-7 debug, and C-12 practice evidence with hashes, and docs/debug/2026-06-03-real-tool-evidence-index.md records the sanitized index. Remaining blockers are exported netlist sidecars, Spectre-safe unit formatting, metric namespace/formula contract, and one final real closure smoke.",
+  "current_status": "C-7 Real Tool Closure Fixes Task 1 is complete, verified-only. prepare-real-run now copies safe regular files from netlists/exported into the real run directory before writing the rendered input.scs, preserving sidecars such as ade_e.scs and nested amap files while rejecting symlinked exported bundle entries. Focused real-run, next-run, recovery, C-7 adapter, ruff, and diff checks passed.",
   "review_status": "verified-only",
   "subagent_dispatch": "available",
   "active_spec": "docs/superpowers/specs/2026-06-03-controlled-real-tool-agent-practice-design.md",
@@ -12,7 +12,7 @@
     "docs/EXECUTION_PROGRESS_2026-05-29.md",
     "docs/COMPACT_RESUME_CHECKPOINT.md"
   ],
-  "next_allowed_action": "start C-7 Real Tool Closure Fixes Task 1 exported netlist bundle sidecars; do not run real tools until sidecar/unit/formula contract fixes are complete and user authorizes the closure smoke",
+  "next_allowed_action": "start C-7 Real Tool Closure Fixes Task 2 Spectre-safe unit formatting guard; do not run real tools until sidecar/unit/formula contract fixes are complete and user authorizes the closure smoke",
   "forbidden_actions": [
     "run Virtuoso",
     "run Spectre",
