@@ -271,6 +271,8 @@ objective = 4.183168953894332e-14
 
 ## Task 5: Productization Decision
 
+**Status:** Complete, verified-only.
+
 **Intent:** Convert real optimizer practice into one narrow next development scope.
 
 Write a short practice note:
@@ -296,6 +298,20 @@ A. Native optimizer practice passed; design a narrow Hermes/bridge optimizer ada
 B. Native optimizer passed but Hermes lacks explicit candidate injection; add that contract first.
 C. TuRBO or optimizer.skill integration failed; fix the environment/invocation before Hermes optimizer development.
 D. Spectre/OCEAN failed inside optimizer loop; fix the tool boundary before optimizer development.
+```
+
+Decision: **B. Native optimizer passed but Hermes lacks explicit candidate injection; add that contract first.**
+
+Rationale:
+
+- Task 4 proved the native optimizer route: local `Turbo1` ran `9` evaluations, including `1` post-initial suggestion, with all metrics produced by OCEAN through the C-7 adapter and recorded through Hermes contracts.
+- The temporary script had to prepare each candidate by creating an isolated project and locking `config/variables.yaml` lower/upper values to the candidate. That is acceptable practice evidence but not a production interface.
+- The smallest next scope is therefore an explicit candidate-injection package contract: optimizer-selected parameters should become a deterministic `runs/real/<run_id>/` package for that exact candidate without rewriting project-level variable ranges.
+
+Practice note:
+
+```text
+docs/debug/2026-06-03-optimizer-practice-first-result.md
 ```
 
 ## Completion Criteria

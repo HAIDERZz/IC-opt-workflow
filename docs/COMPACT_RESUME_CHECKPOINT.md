@@ -453,7 +453,7 @@ optimizer:
 
 Current scope: `Optimizer Practice-First Plan`.
 
-Status: planned, verified-only.
+Status: complete, verified-only.
 
 - C-7 real-tool closure is complete and committed as `d440c95 fix: preserve ADE netlist layout for real runs`.
 - Active plan: `docs/superpowers/plans/2026-06-03-optimizer-practice-first.md`.
@@ -479,13 +479,22 @@ Status: planned, verified-only.
 - Created project-local Linux `.venv`, installed CPU-only `torch=2.12.0+cpu`, `gpytorch=1.15.2`, `numpy=2.4.6`, and `scipy=1.17.1`, and ignored `.venv/` via `.gitignore`.
 - `.venv/bin/python` imports local `Turbo1` from `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/TuRBO`.
 - No Hermes optimizer code, real tools, C-7 adapter run, PSF parser, formula rewrite, or broad framework asset was added.
-- Next allowed action: wait for user confirmation, then execute Optimizer Practice-First Task 4 only.
+- Task 4 native optimizer full-loop practice is complete, verified-only.
+- Temporary script: `/tmp/ic_auto_opt_optimizer_practice/run_turbo_bridge_test_inv.py`.
+- Evidence directory: `/tmp/ic_auto_opt_optimizer_practice/turbo_bridge_test_inv_001/`.
+- Task 4 used local `Turbo1`, Hermes package/check/record contracts, and the C-7 Spectre/OCEAN adapter for 9 evaluations, including 1 post-initial TuRBO suggestion.
+- All 9 evaluations produced OCEAN scalar metrics and finite objectives; 7 were `real_constraint_fail`, 2 were `real_pass`, and 0 used finite penalty.
+- Best candidate: `FN=12`, `WN=1.3u`, `FP=2`, `WP=2.5u`, objective `4.183168953894332e-14`.
+- Task 5 productization decision is complete, verified-only.
+- Practice note: `docs/debug/2026-06-03-optimizer-practice-first-result.md`.
+- Decision: `B. Native optimizer passed but Hermes lacks explicit candidate injection; add that contract first.`
+- Next allowed action: wait for user confirmation, then write a narrow candidate-injection package contract design spec only.
 
 ## Next Step
 
 Plan A, Plan B, Plan C C-1, Plan C C-2, Plan C C-3, Plan C C-4, Plan C C-5, and Plan C C-5.5 are complete as of 2026-06-01. C-6, C-7, C-8, and C-9 are complete and reviewed as of 2026-06-02. C-10 real-run failure/retry policy contract is complete and reviewed as of 2026-06-03. C-11 local/fake smoke is complete. C-7 real-tool closure is complete and committed as `d440c95`.
 
-Current next step: execute `docs/superpowers/plans/2026-06-03-optimizer-practice-first.md` Task 3 after user confirmation. Do not commit raw input decks, protected include files, PSF/raw data, full Cadence logs, `docs/OCEAN_DOC_*`, or `docs/toolchain_evidence/`. Do not parse PSF or translate OCEAN formulas in Python.
+Current next step: write a narrow candidate-injection package contract design spec after user confirmation. Do not commit raw input decks, protected include files, PSF/raw data, full Cadence logs, `docs/OCEAN_DOC_*`, or `docs/toolchain_evidence/`. Do not parse PSF or translate OCEAN formulas in Python.
 
 Read the handoff files first:
 
@@ -511,5 +520,5 @@ Use this prompt after compact:
 7. ic-auto-opt-workflow/docs/superpowers/plans/2026-06-03-controlled-real-tool-agent-practice.md
 8. 如需背景，再读 ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。当前活动节点是 Optimizer Practice-First Plan，状态为 Task 3 complete/verified-only。先读 docs/CURRENT_TASK_STATE.json、AGENTS.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/plans/2026-06-03-optimizer-practice-first.md。C-7 real-tool closure 已完成并提交为 d440c95。Task 2 已在 /tmp/ic_auto_opt_optimizer_practice/bridge_test_inv_baseline_001 完成 C-7 adapter/Spectre/OCEAN/check/record 单点重放。Task 3 已创建项目本地 Linux `.venv`，安装 CPU-only `torch=2.12.0+cpu`、`gpytorch=1.15.2`、`numpy=2.4.6`、`scipy=1.17.1`，并确认 `.venv/bin/python` 可以从 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/TuRBO import `Turbo1`。下一步只能在用户确认后执行 Optimizer Practice-First Task 4：Native Optimizer Full-Loop Practice。注意：Task 4 是正式 Hermes optimizer 开发前的真实 optimizer practice，必须依据 virtuoso-bridge-lite/skills/optimizer/SKILL.md，并调用本地 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/TuRBO 的 TuRBO。不要写新 Hermes optimizer 算法，不要创建 broad schema/framework，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。不要用 Python 解析 PSF，不要让 agent 翻译或重写 Calculator/OCEAN 公式。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。当前活动节点是 Optimizer Practice-First Plan，状态为 Task 5 complete/verified-only。Task 4 已通过 `/tmp/ic_auto_opt_optimizer_practice/run_turbo_bridge_test_inv.py` 跑通真实 TuRBO + Hermes + Spectre/OCEAN practice：9 次评价、8 个 init + 1 个 post-initial TuRBO suggestion、9 个 OCEAN scalar evidence、0 个 penalty，best candidate 为 `FN=12, WN=1.3u, FP=2, WP=2.5u`，objective=`4.183168953894332e-14`。Task 5 已写 `docs/debug/2026-06-03-optimizer-practice-first-result.md`，产品化决策为 B：native optimizer passed but Hermes lacks explicit candidate injection; add that contract first。下一步只能在用户确认后写一个窄 candidate-injection package contract design spec。不要写新 Hermes optimizer 算法，不要创建 broad schema/framework，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。不要用 Python 解析 PSF，不要让 agent 翻译或重写 Calculator/OCEAN 公式。
 ```

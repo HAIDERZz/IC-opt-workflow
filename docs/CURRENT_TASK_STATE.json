@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "current_scope": "Optimizer Practice-First Plan",
-  "current_status": "Optimizer Practice-First Task 4 is complete, verified-only. A temporary /tmp runner used local Turbo1 with PARAMS [FN, WN, FP, WP], approved bridge_test_inv bounds, n_init=8, max_evals=9, and batch_size=1. It ran 9 real evaluations through Hermes package/check/record contracts plus the C-7 Spectre/OCEAN adapter. All 9 evaluations produced OCEAN scalar metrics and finite objectives; 7 were real_constraint_fail and 2 were real_pass. The post-initial TuRBO suggestion at eval 9 became best: FN=12, WN=1.3u, FP=2, WP=2.5u, objective=4.183168953894332e-14. No Hermes optimizer code, PSF parser, formula rewrite, broad schema/framework asset, or raw Cadence artifact commit was added.",
+  "current_status": "Optimizer Practice-First Task 5 is complete, verified-only. Productization decision note was written at docs/debug/2026-06-03-optimizer-practice-first-result.md. Decision is B: native optimizer practice passed, but Hermes lacks an explicit candidate-injection package contract. Task 4 proved the real route with local Turbo1, 9 evaluations, 1 post-initial TuRBO suggestion, 9 OCEAN scalar evaluations, 0 penalties, and best candidate FN=12, WN=1.3u, FP=2, WP=2.5u, objective=4.183168953894332e-14. The practice workaround locked each candidate by rewriting per-eval config/variables.yaml lower/upper values in isolated /tmp projects; this should not become the product interface.",
   "review_status": "verified-only",
   "subagent_dispatch": "available",
   "active_spec": "docs/superpowers/plans/2026-06-03-optimizer-practice-first.md",
@@ -12,9 +12,9 @@
     "docs/EXECUTION_PROGRESS_2026-05-29.md",
     "docs/COMPACT_RESUME_CHECKPOINT.md"
   ],
-  "next_allowed_action": "wait for user confirmation, then execute Optimizer Practice-First Task 5 only",
+  "next_allowed_action": "wait for user confirmation, then write a narrow candidate-injection package contract design spec only",
   "forbidden_actions": [
-    "start Hermes optimizer productization before Task 5 decision note",
+    "start Hermes optimizer productization before candidate-injection design spec",
     "create new optimizer algorithms",
     "create broad optimizer schemas or framework assets",
     "flatten or redesign the Maestro/ADE netlist layout",
@@ -35,15 +35,16 @@
   "route_audit": {
     "active_plan": "docs/superpowers/plans/2026-06-03-optimizer-practice-first.md",
     "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
-    "alignment": "Aligned. Task 4 used the proven C-7 Spectre/OCEAN path as the simulation foundation and exercised a native TuRBO loop before any Hermes optimizer productization.",
-    "drift": "None. The temporary practice runner stayed under /tmp, preserved the Maestro/ADE netlist bundle, returned finite penalties on failure paths, and did not add product code."
+    "alignment": "Aligned. The top-level plan requires optimizer execution through approved adapter boundaries after deterministic Hermes contracts and real practice evidence. Task 5 keeps that route by choosing a narrow candidate-injection contract before any optimizer product code.",
+    "drift": "None. The productization decision explicitly rejects broad optimizer framework work and records the practice workaround as evidence for the next narrow contract."
   },
-  "latest_valid_commit": "docs: record optimizer full-loop practice",
+  "latest_valid_commit": "docs: record optimizer productization decision",
   "review_evidence": {
     "c7_real_tool_closure": "Real Spectre + OCEAN adapter closure passed in /tmp/ic_auto_opt_c7_fixed_001/bridge_test_inv. Hermes check-real-run, check-metric-results, and record-real-result passed. Metrics: rise=7.52016846017672e-11 s, fall=1.078998721053984e-10 s, DC=0.0002588877964196586 W.",
     "optimizer_practice_task_1": "Task 1 verified /tmp/ic_auto_opt_optimizer_practice/bridge_test_inv package shape through init, validate, package, prepare-netlist, dry-run, preflight-health, approve, and prepare-real-run --run-id real_001.",
     "optimizer_practice_task_2": "Task 2 verified /tmp/ic_auto_opt_optimizer_practice/bridge_test_inv_baseline_001 through C-7 adapter, check-real-run, check-metric-results, and record-real-result. Baseline metrics matched C-7 closure exactly. The lower-bound point produced non_scalar rise/fall and is treated as candidate-level performance failure evidence, not formula/layout drift.",
     "optimizer_practice_task_3": "Task 3 verified optimizer skill guidance and local TuRBO import with project-local .venv: torch=2.12.0+cpu, gpytorch=1.15.2, numpy=2.4.6, scipy=1.17.1.",
-    "optimizer_practice_task_4": "Task 4 ran ./.venv/bin/python /tmp/ic_auto_opt_optimizer_practice/run_turbo_bridge_test_inv.py. Evidence: /tmp/ic_auto_opt_optimizer_practice/turbo_bridge_test_inv_001/summary.json and evaluations.jsonl. evaluation_count=9, post_initial_evaluations=1, successful_evaluations=9, penalty_evaluations=0. Best candidate: FN=12, WN=1.3u, FP=2, WP=2.5u, objective=4.183168953894332e-14."
+    "optimizer_practice_task_4": "Task 4 ran ./.venv/bin/python /tmp/ic_auto_opt_optimizer_practice/run_turbo_bridge_test_inv.py. Evidence: /tmp/ic_auto_opt_optimizer_practice/turbo_bridge_test_inv_001/summary.json and evaluations.jsonl. evaluation_count=9, post_initial_evaluations=1, successful_evaluations=9, penalty_evaluations=0. Best candidate: FN=12, WN=1.3u, FP=2, WP=2.5u, objective=4.183168953894332e-14.",
+    "optimizer_practice_task_5": "Task 5 wrote docs/debug/2026-06-03-optimizer-practice-first-result.md and chose Productization Decision B: add an explicit candidate-injection package contract first."
   }
 }
