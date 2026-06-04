@@ -48,7 +48,7 @@
     "alignment": "Aligned. C-30 only updated the execution-agent task packet so the C-29 OpenBox backend can be handed off without manual interpretation while preserving C-25/C-26 audit.",
     "drift": "No route drift. TuRBO remains implemented and the default backend for package-optimizer-task unless --backend openbox is explicit."
   },
-  "latest_valid_commit": "1fa8ef1",
+  "latest_valid_commit": "8eaeba2",
   "review_evidence": {
     "optimizer_skill_real_practice": "Complete, verified-only. Temporary practice at /tmp/ic_auto_opt_optimizer_skill_flow_001 ran Turbo1.optimize() for 100 evaluations with 8 initialization and 92 trust-region evaluations. 73 candidates were recorded through real Spectre/OCEAN, 24 duplicate quantized candidates were skipped, and 3 metric non-scalar candidates were converted to finite penalties. Best candidate was real_011: FN=11, WN=1.9u, FP=9, WP=0.5u, rise=72.489655ps, fall=64.569947ps, DC=301.334349uW, objective=4.1300765965648685e-14.",
     "archive_doc": "docs/debug/2026-06-04-optimizer-skill-real-flow-practice.md",
