@@ -48,7 +48,7 @@
     "alignment": "Aligned as a route decision checkpoint. The top-level goal remains a lightweight agent workflow for IC optimization, and the evidence spike only evaluates whether OpenBox is a better backend seam for stepped variables, constraints, batch suggestions, and post-run interpretation.",
     "drift": "No production route change has been made. TuRBO remains the implemented backend. OpenBox is only cloned as a local reference and validated with fake inverter probes in /tmp."
   },
-  "latest_valid_commit": "2ecd98d",
+  "latest_valid_commit": "804a3aa",
   "review_evidence": {
     "optimizer_skill_real_practice": "Complete, verified-only. Temporary practice at /tmp/ic_auto_opt_optimizer_skill_flow_001 ran Turbo1.optimize() for 100 evaluations with 8 initialization and 92 trust-region evaluations. 73 candidates were recorded through real Spectre/OCEAN, 24 duplicate quantized candidates were skipped, and 3 metric non-scalar candidates were converted to finite penalties. Best candidate was real_011: FN=11, WN=1.9u, FP=9, WP=0.5u, rise=72.489655ps, fall=64.569947ps, DC=301.334349uW, objective=4.1300765965648685e-14.",
     "archive_doc": "docs/debug/2026-06-04-optimizer-skill-real-flow-practice.md",
