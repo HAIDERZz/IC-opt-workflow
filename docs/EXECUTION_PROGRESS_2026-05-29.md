@@ -1110,6 +1110,8 @@ Next required action:
 
 - OpenBox Backend Evidence Spike: complete, verified-only. Evidence note: `docs/debug/2026-06-05-openbox-backend-evidence-spike.md`. Local-only fake inverter probes ran in `/tmp/ic_auto_opt_openbox_spike/.venv`; no production code, real tools, execution agents, PSF parsing, or OCEAN formula rewrite occurred. Single ask-and-tell probe produced 40 candidates with 0 grid issues and 0 duplicates; batch ask-and-tell produced 10 batches of 4 with 0 grid issues and 0 duplicates. Constraints were recorded in history. Current decision: OpenBox is viable enough for a narrow C-27 backend seam MVP discussion, but TuRBO remains the implemented backend.
 
+- C-27 OpenBox Backend Seam MVP: design spec written, verified-only. Spec: `docs/superpowers/specs/2026-06-05-openbox-backend-seam-mvp-design.md`. Scope is a fake OpenBox backend seam and backend-neutral optimizer artifact path only. No production code, real tools, execution agents, TuRBO replacement, PSF parsing, or OCEAN formula rewrite occurred. next_allowed_action: write C-27 OpenBox backend seam MVP implementation plan; do not implement code, replace TuRBO, or run real tools before that plan exists.
+
 ## Locked Role Model
 
 Status: locked as of 2026-06-02.
