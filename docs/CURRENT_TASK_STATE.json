@@ -1,18 +1,18 @@
 {
   "schema_version": "1.0",
   "current_scope": "C-27 OpenBox Backend Seam MVP",
-  "current_status": "C-27 design spec has been written at docs/superpowers/specs/2026-06-05-openbox-backend-seam-mvp-design.md. It scopes only a fake OpenBox backend seam and backend-neutral artifacts. No production optimizer code, real tools, execution agents, PSF parsing, OCEAN formula rewriting, or TuRBO replacement has occurred. The next action is to write the narrow C-27 implementation plan.",
+  "current_status": "C-27 design spec and implementation plan have been written. C-27 scopes only a fake OpenBox backend seam, backend-neutral artifacts, acceptance/completion compatibility, and optional lazy OpenBox dependency handling. No production optimizer code, real tools, execution agents, PSF parsing, OCEAN formula rewriting, or TuRBO replacement has occurred.",
   "review_status": "verified-only",
   "subagent_dispatch": "available",
   "active_spec": "docs/superpowers/specs/2026-06-05-openbox-backend-seam-mvp-design.md",
-  "active_plan": "docs/superpowers/specs/2026-06-05-openbox-backend-seam-mvp-design.md",
+  "active_plan": "docs/superpowers/plans/2026-06-05-openbox-backend-seam-mvp.md",
   "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
   "progress_files": [
     "docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md",
     "docs/EXECUTION_PROGRESS_2026-05-29.md",
     "docs/COMPACT_RESUME_CHECKPOINT.md"
   ],
-  "next_allowed_action": "write C-27 OpenBox backend seam MVP implementation plan; do not implement code, replace TuRBO, or run real tools before that plan exists",
+  "next_allowed_action": "execute C-27 Task 1 Backend-Neutral Optimizer Artifact Loader; do not start Task 2, replace TuRBO, or run real tools before Task 1 is complete",
   "forbidden_actions": [
     "start broad optimizer framework work",
     "replace TuRBO before OpenBox evidence spike approval",
@@ -43,10 +43,10 @@
   ],
   "route_audit": {
     "active_spec": "docs/superpowers/specs/2026-06-05-openbox-backend-seam-mvp-design.md",
-    "active_plan": "docs/superpowers/specs/2026-06-05-openbox-backend-seam-mvp-design.md",
+    "active_plan": "docs/superpowers/plans/2026-06-05-openbox-backend-seam-mvp.md",
     "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
     "alignment": "Aligned. C-27 keeps the project as a lightweight agent workflow by adding only an optimizer backend seam and fake OpenBox artifact path. Existing Spectre/OCEAN, candidate package, acceptance audit, and completion report contracts remain the foundation.",
-    "drift": "No production route change has been made. TuRBO remains the implemented real backend. OpenBox is only approved for fake backend seam planning until the implementation plan exists."
+    "drift": "No production route change has been made. TuRBO remains the implemented real backend. OpenBox is only approved for C-27 fake backend seam implementation tasks."
   },
   "latest_valid_commit": "d6dd4e3",
   "review_evidence": {
@@ -86,6 +86,7 @@
     "c26_implementation": "Complete and committed at ca1c9c1. Added src/hermes_workflow/optimizer_completion.py, tests/test_optimizer_completion.py, and hermes-workflow summarize-optimizer-run. Final verification passed: python3 -m pytest tests/test_optimizer_completion.py tests/test_optimizer_acceptance.py tests/test_optimizer_task_package.py tests/test_native_turbo.py -q; python3 -m ruff check src tests tools; python3 tools/check_development_cadence.py; git diff --check.",
     "openbox_decision_checkpoint": "OpenBox cloned as read-only reference at /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/openbox_reference/open-box, commit 2ab34cc. Decision document added at docs/OPENBOX_OPTIMIZER_BACKEND_DECISION_CHECKPOINT_2026-06-05.md. Development is paused before C-27 until the backend decision or evidence-spike scope is approved.",
     "openbox_evidence_spike": "Complete, verified-only. Evidence note docs/debug/2026-06-05-openbox-backend-evidence-spike.md records isolated /tmp OpenBox probes. Single ask-and-tell probe: 40 candidates, 23 feasible, 17 constraint_failed, 0 grid issues, 0 duplicates, constraints recorded in history, get_importance available. Batch ask-and-tell probe: 10 batches of 4, 40 candidates, 24 feasible, 16 constraint_failed, 0 grid issues, 0 duplicates, constraints recorded in history. No production code, real tools, execution agents, PSF parsing, or OCEAN formula rewrites occurred.",
-    "c27_design": "Written, verified-only. Design spec docs/superpowers/specs/2026-06-05-openbox-backend-seam-mvp-design.md scopes a fake OpenBox backend seam, backend-neutral optimizer artifacts, acceptance/completion compatibility, and lazy optional OpenBox dependency handling. It does not authorize real tools, TuRBO replacement, broad optimizer framework work, PSF parsing, or OCEAN formula rewriting."
+    "c27_design": "Written, verified-only. Design spec docs/superpowers/specs/2026-06-05-openbox-backend-seam-mvp-design.md scopes a fake OpenBox backend seam, backend-neutral optimizer artifacts, acceptance/completion compatibility, and lazy optional OpenBox dependency handling. It does not authorize real tools, TuRBO replacement, broad optimizer framework work, PSF parsing, or OCEAN formula rewriting.",
+    "c27_plan": "Written, verified-only. Implementation plan docs/superpowers/plans/2026-06-05-openbox-backend-seam-mvp.md scopes five tasks: backend-neutral artifact loader, fake OpenBox runner, acceptance/completion compatibility, CLI fake smoke, and final verification/docs/review. Task 1 is the next allowed implementation step."
   }
 }
