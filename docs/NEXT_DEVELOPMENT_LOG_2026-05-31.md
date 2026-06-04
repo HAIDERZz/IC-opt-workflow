@@ -1191,8 +1191,18 @@ C-23 Optimizer Execution-Agent Task Packet MVP:
 - Route audit: aligned with the top-level practice-first route. Drift corrected before closeout: returned artifact names now match native runner constants and `hand-pick` is forbidden-action language.
 - next_allowed_action: wait for user confirmation, then run one local worker-agent handoff using the generated optimizer task packet.
 
+C-24 Generated Optimizer Task Packet Handoff Acceptance:
+
+- Status: implementation plan complete, verified-only.
+- Plan: `docs/superpowers/plans/2026-06-04-generated-optimizer-task-packet-handoff-acceptance.md`.
+- Goal: validate the C-23 Hermes-generated optimizer task packet in one local worker-agent handoff, then accept or reject from supervisor/Hermes manifest-level audit.
+- Scope: Task 1 prepares a clean local `/tmp` workspace and generates the packet only; Task 2 is the first real worker-agent execution step; Task 3 audits returned reports/manifests; Task 4 closes or writes the smallest focused fix.
+- Boundary: no Claude execution agent, no hand-picked points, no new optimizer algorithm/scheduler, no PSF parsing, no OCEAN formula rewrite, no native-layout replacement, and no raw Cadence artifact commit.
+- Route audit: aligned with C-23, C-19/C-20 handoff evidence, C-21 retry handling, and the top-level practice-first route. Drift: none.
+- next_allowed_action: execute C-24 Task 1 workspace and generated packet gate only; do not run the local worker-agent or real tools until Task 1 is complete and the user confirms Task 2.
+
 ## Resume Prompt
 
 ```text
-请继续 IC auto optimization workflow。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。先阅读 docs/CURRENT_TASK_STATE.json、AGENTS.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/plans/2026-06-04-real-tool-acceptance.md，并按需阅读 docs/superpowers/specs/2026-06-04-single-candidate-optimizer-suggestion-design.md、docs/superpowers/plans/2026-06-04-single-candidate-optimizer-suggestion.md、docs/superpowers/specs/2026-06-04-candidate-injection-package-contract-design.md、docs/superpowers/plans/2026-06-04-candidate-injection-package-contract.md。当前活动节点是 C-14 Real-Tool Acceptance，Task 1 已完成并 verified-only。下一步只能在用户确认后执行 C-14 Task 2 seed real-tool run；Task 2 会运行真实 Spectre/OCEAN/C-7 adapter。不要写 broad optimizer framework，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。不要用 Python 解析 PSF，不要让 agent 翻译或重写 Calculator/OCEAN 公式。
+请继续 IC auto optimization workflow。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。先阅读 AGENTS.md、docs/CURRENT_TASK_STATE.json、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/plans/2026-06-04-generated-optimizer-task-packet-handoff-acceptance.md。当前活动节点是 C-24 Generated Optimizer Task Packet Handoff Acceptance，implementation plan 已完成，状态 verified-only。下一步只能执行 C-24 Task 1：准备 clean local workspace 并生成 C-23 optimizer task packet；Task 1 不运行真实工具、不派 worker-agent。不要进入 Task 2 local worker-agent real-tool execution，直到 Task 1 完成并得到用户确认。不要调用 Claude CLI 作为 execution agent，不要写 broad optimizer framework，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。不要用 Python 解析 PSF，不要让 agent 翻译或重写 Calculator/OCEAN 公式。
 ```

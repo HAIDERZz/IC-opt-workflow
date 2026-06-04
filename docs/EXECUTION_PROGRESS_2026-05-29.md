@@ -1072,6 +1072,10 @@ Next required action:
 - current_scope: C-23 Optimizer Execution-Agent Task Packet MVP complete.
 - next_allowed_action: wait for user confirmation, then run one local worker-agent handoff using the generated optimizer task packet.
 
+- C-24 Generated Optimizer Task Packet Handoff Acceptance checkpoint: implementation plan complete, verified-only. Plan `docs/superpowers/plans/2026-06-04-generated-optimizer-task-packet-handoff-acceptance.md` scopes one generated C-23 task-packet handoff to a local worker agent and supervisor/Hermes manifest-level audit. Task 1 is workspace and packet generation only; Task 2 is the first real worker-agent execution step.
+- current_scope: C-24 Generated Optimizer Task Packet Handoff Acceptance.
+- next_allowed_action: execute C-24 Task 1 workspace and generated packet gate only; do not run the local worker-agent or real tools until Task 1 is complete and the user confirms Task 2.
+
 ## Locked Role Model
 
 Status: locked as of 2026-06-02.

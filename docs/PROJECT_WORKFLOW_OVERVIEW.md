@@ -31,6 +31,7 @@
 - C-21 OCEAN retry policy 已完成：adapter 会对 OCEAN command/license failure 做 OCEAN-only retry，不重跑 Spectre；`metric_result_manifest.json` 记录 `ocean.attempts` 和 `ocean.return_codes`。
 - C-22 execution task wording alignment 已完成：生成的 execution task 使用 generic execution-agent wording，并要求 manifest-level audit。
 - C-23 Optimizer Execution-Agent Task Packet MVP 已完成：`hermes-workflow package-optimizer-task` 会生成 `execution_package/OPTIMIZER_EXECUTION_TASK.md` 与 `execution_package/optimizer_execution_manifest.json`，复用 `run-native-turbo --parallel`，不新增 optimizer algorithm、scheduler、daemon、PSF parser 或 OCEAN formula rewrite。
+- C-24 Generated Optimizer Task Packet Handoff Acceptance implementation plan 已完成：下一步只执行 Task 1 workspace 和 generated packet gate；Task 2 才是本地 worker-agent 真实执行，不得提前运行真实工具。
 - `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example` 下的真实 `input.scs` 示例只作为本地参考，不能提交进仓库。
 
 ## 1. 项目概览
@@ -393,7 +394,7 @@ hermes-workflow prepare-real-run-retry projects/bridge_test_inv --failed-run-id 
 hermes-workflow resolve-real-run-failure projects/bridge_test_inv --run-id real_002 --decision abandon_candidate --reason "skip failed candidate"
 ```
 
-C-11 到 C-23 已把 fake/local smoke、真实 C-7 closure、optimizer practice-first、native TuRBO runner、batch parallel evaluator、execution-agent handoff、OCEAN retry，以及 generated optimizer execution-agent task packet 串起来。当前 next step 是在用户确认后，使用 C-23 生成的 optimizer task packet 跑一次本地 worker-agent handoff，并由 supervisor/Hermes 做 manifest-level audit。不要启动 broad optimizer framework；不要提交 raw input deck、protected sidecar、PSF/raw、完整 Cadence log、`docs/OCEAN_DOC_*` 或 `docs/toolchain_evidence/`；不要在 Python 中解析 PSF 或翻译 OCEAN 公式。
+C-11 到 C-24 已把 fake/local smoke、真实 C-7 closure、optimizer practice-first、native TuRBO runner、batch parallel evaluator、execution-agent handoff、OCEAN retry、generated optimizer execution-agent task packet，以及 generated packet handoff acceptance plan 串起来。当前 next step 是 C-24 Task 1：准备 clean local workspace 并生成 C-23 optimizer task packet；Task 1 不运行真实工具、不派 worker-agent。不要启动 broad optimizer framework；不要提交 raw input deck、protected sidecar、PSF/raw、完整 Cadence log、`docs/OCEAN_DOC_*` 或 `docs/toolchain_evidence/`；不要在 Python 中解析 PSF 或翻译 OCEAN 公式。
 
 ## 4. 能否严格约束主管 agent 和执行 agent 的行为
 
