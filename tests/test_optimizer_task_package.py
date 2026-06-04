@@ -92,3 +92,31 @@ def test_package_optimizer_task_cli_writes_task_and_manifest(tmp_path: Path) -> 
     assert (
         project_dir / "execution_package" / "optimizer_execution_manifest.json"
     ).exists()
+
+
+def test_optimizer_execution_task_keeps_forbidden_actions_in_forbidden_section(
+    tmp_path: Path,
+) -> None:
+    project_dir = tmp_path / "bridge_test_inv"
+    create_project_from_template(project_dir)
+
+    package = build_optimizer_execution_task_package(
+        project_dir,
+        max_evals=100,
+        cadence_cshrc=Path("/home/zzchen/cadence_ic231_env.csh"),
+    )
+
+    task_text = package.task_path.read_text(encoding="utf-8")
+    required_behavior = task_text.split("## Required Behavior", 1)[1].split(
+        "## Spectre/OCEAN Settings Audit",
+        1,
+    )[0]
+    forbidden_actions = task_text.split("## Forbidden Actions", 1)[1]
+
+    assert "Claude Code" not in task_text
+    assert "hand-pick" not in required_behavior
+    assert "parse PSF" not in required_behavior
+    assert "rewrite OCEAN" not in required_behavior
+    assert "Do not hand-pick candidate points." in forbidden_actions
+    assert "Do not parse PSF in Python." in forbidden_actions
+    assert "Do not rewrite OCEAN formulas." in forbidden_actions

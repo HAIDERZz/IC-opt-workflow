@@ -1166,7 +1166,7 @@ C-21 OCEAN Metric Extraction Retry Policy:
 
 C-22 Execution-Agent Task Package Alignment:
 
-- Status: Task 2 complete, verified-only, committed in the current HEAD.
+- Status: Task 3 complete, verified-only, committed in the current HEAD.
 - Plan: `docs/superpowers/plans/2026-06-04-execution-agent-task-package-alignment.md`.
 - Change: generated `execution_package/EXECUTION_TASK.md` now uses generic execution-agent wording instead of Claude-specific wording.
 - Added rule: `Command exit status alone is not acceptance evidence`; `Manifest-level audit is required for any real-tool run`.
@@ -1184,9 +1184,10 @@ C-23 Optimizer Execution-Agent Task Packet MVP:
 - Plan drift found and corrected: returned artifact names now match the existing native runner constants, `reports/native_turbo_optimizer_report.json` and `reports/native_turbo_optimizer_evaluations.jsonl`, instead of the older C-19 handoff wording.
 - Task 2 added `hermes-workflow package-optimizer-task PROJECT_DIR --max-evals N --cadence-cshrc PATH --parallel/--sequential`.
 - The CLI only writes the optimizer execution task packet and manifest. It does not run Virtuoso, Spectre, OCEAN, SSH, bridge tools, execution agents, or the native optimizer.
+- Task 3 added local fake handoff smoke coverage for the generated task packet. The packet now keeps `hand-pick`, `parse PSF`, and `rewrite OCEAN` out of required behavior and only as forbidden-action language.
 - Boundary: reuse `run-native-turbo --parallel`; do not add optimizer algorithms, real-tool execution, daemon/scheduler framework, PSF parsing, OCEAN formula rewriting, or native-layout replacement.
-- Route audit: aligned with the top-level practice-first route. Drift: none in Task 2.
-- next_allowed_action: start C-23 Task 3 local fake handoff smoke after user confirmation.
+- Route audit: aligned with the top-level practice-first route. Drift corrected in Task 3 plan wording: `hand-pick` must be present as a forbidden action, not absent from the packet.
+- next_allowed_action: start C-23 Task 4 final verification and commit gate after user confirmation.
 
 ## Resume Prompt
 

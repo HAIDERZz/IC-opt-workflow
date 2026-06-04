@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "current_scope": "C-23 Optimizer Execution-Agent Task Packet MVP",
-  "current_status": "C-23 Task 2 is complete, verified-only, and committed in the current HEAD. Added package-optimizer-task CLI wiring for the optimizer execution-agent task packet. The command only writes the task packet and manifest; it does not run real tools.",
+  "current_status": "C-23 Task 3 is complete, verified-only, and committed in the current HEAD. Added local fake handoff smoke coverage for the generated optimizer execution-agent task packet and moved the hand-pick prohibition into the forbidden-actions section.",
   "review_status": "verified-only",
   "subagent_dispatch": "available",
   "active_spec": "docs/superpowers/plans/2026-06-04-optimizer-execution-agent-task-packet.md",
@@ -12,7 +12,7 @@
     "docs/EXECUTION_PROGRESS_2026-05-29.md",
     "docs/COMPACT_RESUME_CHECKPOINT.md"
   ],
-  "next_allowed_action": "start C-23 Task 3 local fake handoff smoke after user confirmation",
+  "next_allowed_action": "start C-23 Task 4 final verification and commit gate after user confirmation",
   "forbidden_actions": [
     "start broad optimizer framework work",
     "hand-pick 100 optimizer points instead of using native Turbo1.optimize()",
@@ -44,8 +44,8 @@
     "active_spec": "docs/superpowers/plans/2026-06-04-optimizer-execution-agent-task-packet.md",
     "active_plan": "docs/superpowers/plans/2026-06-04-optimizer-execution-agent-task-packet.md",
     "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
-    "alignment": "Aligned. C-23 Task 2 exposes the Task 1 renderer through a Hermes CLI command without changing the optimizer runner.",
-    "drift": "None in Task 2. No real tools, optimizer algorithm, PSF parser, OCEAN formula rewrite, or layout replacement was added."
+    "alignment": "Aligned. C-23 Task 3 validates the generated task packet language without changing the optimizer runner.",
+    "drift": "Plan wording drift corrected: hand-pick should not be absent from the packet because it is an important forbidden action. It must be absent from the required behavior section and present only in forbidden actions."
   },
   "latest_valid_commit": "current HEAD",
   "review_evidence": {
@@ -72,6 +72,7 @@
     "c22_task1": "Complete, verified-only, committed in the current HEAD. Updated generated execution_package/EXECUTION_TASK.md wording to the generic execution-agent role and added the manifest-level audit rule from C-20. Focused red/green test passed: python3 -m pytest tests/test_package.py::test_build_execution_package_writes_execution_task -q.",
     "c23_plan": "Written, verified-only. C-23 will generate a standard optimizer execution-agent task packet for the existing run-native-turbo --parallel path, including manifest-level audit requirements and Spectre settings expectations.",
     "c23_task1": "Complete, verified-only, committed in the current HEAD. Added src/hermes_workflow/optimizer_task_package.py and tests/test_optimizer_task_package.py. The renderer writes execution_package/OPTIMIZER_EXECUTION_TASK.md and execution_package/optimizer_execution_manifest.json with the existing run-native-turbo command, Spectre settings, manifest-level audit rule, and required returned artifacts from native_turbo constants.",
-    "c23_task2": "Complete, verified-only, committed in the current HEAD. Added hermes-workflow package-optimizer-task PROJECT_DIR --max-evals N --cadence-cshrc PATH --parallel/--sequential. Focused CLI test passed and no real tools were run."
+    "c23_task2": "Complete, verified-only, committed in the current HEAD. Added hermes-workflow package-optimizer-task PROJECT_DIR --max-evals N --cadence-cshrc PATH --parallel/--sequential. Focused CLI test passed and no real tools were run.",
+    "c23_task3": "Complete, verified-only, committed in the current HEAD. Added local fake handoff smoke coverage that rejects Claude-specific wording and keeps hand-pick, parse PSF, and rewrite OCEAN as forbidden-action language rather than required behavior."
   }
 }

@@ -118,7 +118,6 @@ Created at UTC: `{payload["created_at_utc"]}`
 ## Required Behavior
 
 - Use native `Turbo1.optimize()` through `run-native-turbo`.
-- Do not hand-pick candidate points.
 - Preserve native Maestro/ADE exported netlist structure.
 - Command exit status alone is not acceptance evidence.
 - Manifest-level audit is required for any real-tool run.
@@ -137,6 +136,7 @@ Created at UTC: `{payload["created_at_utc"]}`
 
 ## Forbidden Actions
 
+- Do not hand-pick candidate points.
 - Do not parse PSF in Python.
 - Do not rewrite OCEAN formulas.
 - Do not change approved metric formulas.

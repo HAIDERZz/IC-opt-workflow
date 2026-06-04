@@ -188,6 +188,8 @@ Expected: pass.
 
 **Risk:** Low. Local-only packet inspection.
 
+**Status:** Complete, verified-only.
+
 **Files:**
 
 - Modify: `tests/test_optimizer_task_package.py`
@@ -195,20 +197,19 @@ Expected: pass.
 - Modify: `docs/CURRENT_TASK_STATE.json`
 - Modify: `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`
 
-- [ ] **Step 1: Add smoke test**
+- [x] **Step 1: Add smoke test**
 
 Add a test that reads the generated task packet and confirms it does not mention:
 
 ```text
 Claude Code
-hand-pick
-parse PSF
-rewrite OCEAN
 ```
 
-The first two must be absent. The last two should appear only as forbidden actions.
+The smoke test also confirms that `hand-pick`, `parse PSF`, and `rewrite OCEAN`
+do not appear in the required behavior section and appear only as forbidden
+actions.
 
-- [ ] **Step 2: Verify focused and adjacent tests**
+- [x] **Step 2: Verify focused and adjacent tests**
 
 Run:
 
