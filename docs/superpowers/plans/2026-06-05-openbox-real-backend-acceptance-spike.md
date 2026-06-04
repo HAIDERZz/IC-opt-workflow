@@ -41,7 +41,7 @@ No production Python module is planned for C-28.
 - Modify: `docs/CURRENT_TASK_STATE.json`
 - Modify: `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`
 
-- [ ] **Step 1: Confirm OpenBox import path**
+- [x] **Step 1: Confirm OpenBox import path**
 
 Run in the intended Python environment:
 
@@ -57,7 +57,7 @@ Expected:
 - Exit `0`: proceed.
 - Exit `2`: stop and ask the user whether to use an existing OpenBox venv or install OpenBox in an isolated environment.
 
-- [ ] **Step 2: Prepare a local-only known-good project**
+- [x] **Step 2: Prepare a local-only known-good project**
 
 Use the same native Maestro/ADE/Spectre layout that passed previous TuRBO real acceptance. The local project must live under:
 
@@ -86,7 +86,7 @@ state/
 ledger/experiment_ledger.jsonl
 ```
 
-- [ ] **Step 3: Record Task 1 status**
+- [x] **Step 3: Record Task 1 status**
 
 Update `docs/CURRENT_TASK_STATE.json`:
 
@@ -100,7 +100,7 @@ Update `docs/CURRENT_TASK_STATE.json`:
 }
 ```
 
-- [ ] **Step 4: Verify Task 1**
+- [x] **Step 4: Verify Task 1**
 
 Run:
 
@@ -120,7 +120,7 @@ Expected: cadence and diff checks pass; raw local project artifacts are not stag
 - Local-only script: `/tmp/ic_auto_opt_c28_openbox_real/run_openbox_real_spike.py`
 - Local-only run artifacts under `/tmp/ic_auto_opt_c28_openbox_real/bridge_test_inv/`
 
-- [ ] **Step 1: Create a local-only spike script**
+- [x] **Step 1: Create a local-only spike script**
 
 The script must:
 
@@ -143,7 +143,7 @@ The script must not:
 - Hand-pick candidates.
 - Change Spectre settings.
 
-- [ ] **Step 2: Run one real OpenBox batch optimizer acceptance**
+- [x] **Step 2: Run one real OpenBox batch optimizer acceptance**
 
 Run only after explicit user confirmation:
 
@@ -173,7 +173,7 @@ Stop immediately for:
 - Existing CLI outputs under `/tmp/ic_auto_opt_c28_openbox_real/bridge_test_inv/reports/`
 - Create: `docs/debug/2026-06-05-openbox-real-backend-acceptance-spike.md`
 
-- [ ] **Step 1: Run C-25 acceptance**
+- [x] **Step 1: Run C-25 acceptance**
 
 ```bash
 .venv/bin/hermes-workflow check-optimizer-run /tmp/ic_auto_opt_c28_openbox_real/bridge_test_inv
@@ -184,7 +184,7 @@ Expected:
 - Exit `0` if artifacts are acceptable.
 - Writes `reports/optimizer_run_acceptance_report.json`.
 
-- [ ] **Step 2: Run C-26 completion decision**
+- [x] **Step 2: Run C-26 completion decision**
 
 ```bash
 .venv/bin/hermes-workflow summarize-optimizer-run /tmp/ic_auto_opt_c28_openbox_real/bridge_test_inv
@@ -195,7 +195,7 @@ Expected:
 - Writes `reports/optimizer_completion_report.json`.
 - Reports `best_observed`, not global optimum unless the full finite grid was exhausted.
 
-- [ ] **Step 3: Compare against TuRBO baseline**
+- [x] **Step 3: Compare against TuRBO baseline**
 
 Use the accepted TuRBO baseline records in `docs/CURRENT_TASK_STATE.json` and existing debug notes.
 
@@ -211,7 +211,7 @@ Compare:
 - C-26 continuation decision
 - Spectre settings audit
 
-- [ ] **Step 4: Write sanitized evidence note**
+- [x] **Step 4: Write sanitized evidence note**
 
 Create:
 
@@ -244,7 +244,7 @@ Do not paste raw Cadence logs.
 - Modify: `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`
 - Modify: `docs/EXECUTION_PROGRESS_2026-05-29.md`
 
-- [ ] **Step 1: Update state**
+- [x] **Step 1: Update state**
 
 Set `current_scope` to:
 
@@ -258,7 +258,7 @@ Set `next_allowed_action` according to the evidence:
 - `pause OpenBox real backend and keep TuRBO real route` if decision is `keep_openbox_fake_only_for_now`.
 - `reject OpenBox real backend for now` if decision is `reject_openbox_real_backend_for_now`.
 
-- [ ] **Step 2: Run final local checks**
+- [x] **Step 2: Run final local checks**
 
 Run:
 
@@ -273,7 +273,7 @@ Expected:
 - Cadence and diff checks pass.
 - No raw local artifacts are staged.
 
-- [ ] **Step 3: Commit docs-only closeout if evidence note is written**
+- [x] **Step 3: Commit docs-only closeout if evidence note is written**
 
 Only commit sanitized docs and state updates:
 

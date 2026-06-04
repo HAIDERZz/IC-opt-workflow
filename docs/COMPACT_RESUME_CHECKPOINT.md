@@ -555,7 +555,7 @@ Plan A, Plan B, and Plan C C-1 through C-26 are complete. C-26 is committed at `
 
 current_scope: C-28 OpenBox Real Backend Acceptance Spike
 
-Current state is after C-28 planning. The current TuRBO-backed optimizer route remains the implemented real backend. OpenBox has a fake-only backend seam and backend-neutral artifact path from C-27. C-28 will run one narrow real-tool evidence spike only after Task 2 is explicitly confirmed.
+Current state is after C-28 completion. The current TuRBO-backed optimizer route remains implemented, but OpenBox has now passed a narrow real-tool evidence spike using the same Hermes Spectre/OCEAN execution and audit path. C-28 authorizes planning C-29 OpenBox productization; it does not itself replace TuRBO.
 
 OpenBox local reference:
 
@@ -612,7 +612,18 @@ C-28 planning result:
 - Scope: one local-only OpenBox ask-and-tell real-tool spike using the existing Spectre/OCEAN execution path and backend-neutral artifacts.
 - Boundary: no TuRBO replacement, no `native_turbo` deletion, no production OpenBox runner, no broad optimizer framework, no PSF parsing, no OCEAN formula rewrite.
 
-Current next step: execute C-28 Task 1 Environment And Known-Good Project Gate. Do not run real OpenBox/Spectre/OCEAN, replace TuRBO, delete `native_turbo`, call an execution agent, or start broad optimizer framework work before Task 1 is complete and Task 2 is explicitly confirmed. Do not commit raw input decks, protected include files, PSF/raw data, full Cadence logs, `docs/OCEAN_DOC_*`, or `docs/toolchain_evidence/`. Do not parse PSF or translate OCEAN formulas in Python.
+C-28 completion result:
+
+- Sanitized evidence note: `docs/debug/2026-06-05-openbox-real-backend-acceptance-spike.md`.
+- Local run directory: `/tmp/ic_auto_opt_c28_openbox_real/bridge_test_inv`.
+- Local runner: `/tmp/ic_auto_opt_c28_openbox_real/run_openbox_real_spike.py`.
+- Results: 100 evaluations, 43 feasible, 51 constraint_failed, 6 metric_check_failed, 0 real_check_failed, 0 duplicate replacements.
+- Best observed: `real_071`, `FN=12`, `WN=2.7u`, `FP=7`, `WP=0.7u`, objective `4.1325534822170306e-14`.
+- C-25 acceptance: accepted; 100 result manifests, 100 metric manifests, stable `preset=ax`, `threads_per_run=10`, `parallel_jobs=10`, `output_format=psfxl`.
+- C-26 decision: `accept_best_observed`, confidence `medium`, `global_optimum_claim=false`.
+- Productization notes: OpenBox stepped continuous variables must use Hermes quantization's effective grid upper value, and real project bundles must preserve `netlists/templates/template.scs`.
+
+Current next step: write C-29 OpenBox productization plan. Do not replace TuRBO, delete `native_turbo`, call an execution agent, or start broad optimizer framework work without a narrow approved plan. Do not commit raw input decks, protected include files, PSF/raw data, full Cadence logs, `docs/OCEAN_DOC_*`, or `docs/toolchain_evidence/`. Do not parse PSF or translate OCEAN formulas in Python.
 
 Read the handoff files first:
 
@@ -637,5 +648,5 @@ Use this prompt after compact:
 6. ic-auto-opt-workflow/docs/OPENBOX_OPTIMIZER_BACKEND_DECISION_CHECKPOINT_2026-06-05.md
 7. 如需背景，再读 ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-28 OpenBox Real Backend Acceptance Spike design spec 和 implementation plan 已完成：docs/superpowers/specs/2026-06-05-openbox-real-backend-acceptance-spike-design.md、docs/superpowers/plans/2026-06-05-openbox-real-backend-acceptance-spike.md。下一步是 execute C-28 Task 1 Environment And Known-Good Project Gate。不要在 Task 1 跑真实 OpenBox/Spectre/OCEAN；不要替换 TuRBO，不要删除 native_turbo，不要创建 broad optimizer framework，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-28 OpenBox Real Backend Acceptance Spike 已完成：docs/superpowers/specs/2026-06-05-openbox-real-backend-acceptance-spike-design.md、docs/superpowers/plans/2026-06-05-openbox-real-backend-acceptance-spike.md、docs/debug/2026-06-05-openbox-real-backend-acceptance-spike.md。结果：100 real evaluations，43 feasible，51 constraint_failed，6 metric_check_failed，0 real_check_failed，0 duplicate replacements；C-25 accepted；C-26 decision 是 accept_best_observed 且 global_optimum_claim=false。下一步是 write C-29 OpenBox productization plan。不要直接替换 TuRBO，不要删除 native_turbo，不要创建 broad optimizer framework，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
 ```

@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "current_scope": "C-28 OpenBox Real Backend Acceptance Spike",
-  "current_status": "C-28 design spec and implementation plan have been written. C-28 is a narrow real-tool evidence spike to decide whether OpenBox deserves production backend work. It does not replace TuRBO, delete native_turbo, create a broad optimizer framework, parse PSF, rewrite OCEAN formulas, or run real tools before the Task 2 confirmation point.",
+  "current_status": "C-28 complete, verified-only. OpenBox ask-and-tell generated 100 real candidates through the existing Hermes Spectre/OCEAN path with 43 feasible, 51 constraint_failed, 6 metric_check_failed, 0 real_check_failed, and 0 duplicate replacements. C-25 accepted the artifacts and C-26 returned accept_best_observed with global_optimum_claim=false. Decision: proceed to a narrow C-29 OpenBox productization plan; TuRBO has not been replaced.",
   "review_status": "verified-only",
   "subagent_dispatch": "available",
   "active_spec": "docs/superpowers/specs/2026-06-05-openbox-real-backend-acceptance-spike-design.md",
@@ -12,7 +12,7 @@
     "docs/EXECUTION_PROGRESS_2026-05-29.md",
     "docs/COMPACT_RESUME_CHECKPOINT.md"
   ],
-  "next_allowed_action": "execute C-28 Task 1 Environment And Known-Good Project Gate; do not run real OpenBox/Spectre/OCEAN, replace TuRBO, delete native_turbo, or broaden the optimizer framework before Task 1 is complete and Task 2 is explicitly confirmed",
+  "next_allowed_action": "write C-29 OpenBox productization plan; keep the existing Spectre/OCEAN execution path and C-25/C-26 audit contracts, do not replace TuRBO or broaden the optimizer framework without a narrow approved plan",
   "forbidden_actions": [
     "start broad optimizer framework work",
     "replace TuRBO before OpenBox evidence spike approval",
@@ -45,8 +45,8 @@
     "active_spec": "docs/superpowers/specs/2026-06-05-openbox-real-backend-acceptance-spike-design.md",
     "active_plan": "docs/superpowers/plans/2026-06-05-openbox-real-backend-acceptance-spike.md",
     "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
-    "alignment": "Aligned. C-28 is practice-first evidence gathering for the optimizer backend decision. Existing Spectre/OCEAN execution, candidate packaging, acceptance audit, and completion reports remain the foundation.",
-    "drift": "No production route change has been made. TuRBO remains the implemented real backend. C-28 may run a local-only OpenBox real-tool spike after explicit Task 2 confirmation, but it does not authorize productization."
+    "alignment": "Aligned. C-28 completed practice-first evidence gathering for the optimizer backend decision. Existing Spectre/OCEAN execution, candidate packaging, acceptance audit, and completion reports remained the foundation.",
+    "drift": "No production route change has been made. TuRBO remains the implemented real backend. C-28 evidence authorizes planning C-29 OpenBox productization, not an implicit replacement."
   },
   "latest_valid_commit": "2d9eeb6",
   "review_evidence": {
@@ -90,6 +90,7 @@
     "c27_plan": "Written, verified-only. Implementation plan docs/superpowers/plans/2026-06-05-openbox-backend-seam-mvp.md scopes five tasks: backend-neutral artifact loader, fake OpenBox runner, acceptance/completion compatibility, CLI fake smoke, and final verification/docs/review.",
     "c27_complete": "Complete, verified-only. Added src/hermes_workflow/optimizer_artifacts.py, src/hermes_workflow/openbox_backend.py, backend-neutral artifact loading for C-25/C-26, fake-only OpenBox acceptance, and hermes-workflow run-openbox-fake. Verification passed: python3 -m pytest -q (544 passed, 1 skipped); python3 -m ruff check targeted C-27 files. Optional OpenBox import smoke skipped because openbox is not installed in the active environment. No real tools or TuRBO replacement occurred.",
     "c28_design": "Written, verified-only. Design spec docs/superpowers/specs/2026-06-05-openbox-real-backend-acceptance-spike-design.md scopes one local-only OpenBox real backend acceptance spike against the existing Spectre/OCEAN path. It does not authorize TuRBO replacement or broad framework work.",
-    "c28_plan": "Written, verified-only. Implementation plan docs/superpowers/plans/2026-06-05-openbox-real-backend-acceptance-spike.md scopes four tasks: environment/project gate, local-only OpenBox ask-and-tell real run after confirmation, C-25/C-26 audit and TuRBO baseline comparison, and closeout decision."
+    "c28_plan": "Written, verified-only. Implementation plan docs/superpowers/plans/2026-06-05-openbox-real-backend-acceptance-spike.md scopes four tasks: environment/project gate, local-only OpenBox ask-and-tell real run after confirmation, C-25/C-26 audit and TuRBO baseline comparison, and closeout decision.",
+    "c28_complete": "Complete, verified-only. Local runner /tmp/ic_auto_opt_c28_openbox_real/run_openbox_real_spike.py used OpenBox ask-and-tell to generate 100 candidates, then evaluated them through the existing Hermes Spectre/OCEAN path. Results: 43 feasible, 51 constraint_failed, 6 metric_check_failed, 0 real_check_failed, 0 duplicate replacements. Best observed real_071: FN=12, WN=2.7u, FP=7, WP=0.7u, objective=4.1325534822170306e-14. C-25 accepted the artifacts; C-26 decision was accept_best_observed with confidence=medium and global_optimum_claim=false. Sanitized note: docs/debug/2026-06-05-openbox-real-backend-acceptance-spike.md. Productization notes: OpenBox continuous_step upper bounds must use the same Hermes quantization grid effective upper value, and real project bundles must preserve netlists/templates/template.scs."
   }
 }

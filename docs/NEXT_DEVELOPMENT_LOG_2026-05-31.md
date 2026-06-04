@@ -1316,8 +1316,25 @@ C-28 OpenBox Real Backend Acceptance Spike:
 - Route audit: aligned with practice-first. Existing Spectre/OCEAN execution, candidate package, C-25 acceptance, and C-26 completion remain the foundation.
 - next_allowed_action: execute C-28 Task 1 Environment And Known-Good Project Gate; do not run real OpenBox/Spectre/OCEAN, replace TuRBO, delete native_turbo, or broaden the optimizer framework before Task 1 is complete and Task 2 is explicitly confirmed
 
+C-28 OpenBox Real Backend Acceptance Spike Completion:
+
+- Status: complete, verified-only.
+- Sanitized evidence: `docs/debug/2026-06-05-openbox-real-backend-acceptance-spike.md`.
+- Local run directory: `/tmp/ic_auto_opt_c28_openbox_real/bridge_test_inv`.
+- Local runner: `/tmp/ic_auto_opt_c28_openbox_real/run_openbox_real_spike.py`.
+- Scope: OpenBox ask-and-tell generated candidates; existing Hermes candidate package, Spectre/OCEAN adapter, C-25 acceptance, and C-26 completion contracts handled execution and audit.
+- Variable condition: OpenBox used the same approved four-variable space as TuRBO/Hermes (`FN`, `WN`, `FP`, `WP`). No `FN=FP` coupling was added.
+- Results: 100 evaluations, 43 feasible, 51 constraint_failed, 6 metric_check_failed, 0 real_check_failed, 0 duplicate replacements.
+- Best observed: `real_071`, `FN=12`, `WN=2.7u`, `FP=7`, `WP=0.7u`, objective `4.1325534822170306e-14`.
+- Settings audit: C-25 accepted stable `preset=ax`, `threads_per_run=10`, `parallel_jobs=10`, `output_format=psfxl`.
+- C-26 decision: `accept_best_observed`, confidence `medium`, `global_optimum_claim=false`.
+- Baseline comparison: C-24 TuRBO retry best observed was `4.305718220077049e-14`; C-18 batch TuRBO best observed was `4.2413224774045756e-14`. For this evidence run, OpenBox produced a better best observed point and fewer metric_check_failed rows than C-24.
+- Productization notes: OpenBox `Real(q=...)` must use Hermes quantization's effective grid upper value for stepped continuous variables, and any real project bundle must preserve `netlists/templates/template.scs` in addition to `netlists/exported/`.
+- Route audit: aligned. OpenBox is now evidence-backed enough for a narrow productization plan, but TuRBO remains implemented and has not been replaced.
+- next_allowed_action: write C-29 OpenBox productization plan; keep the existing Spectre/OCEAN execution path and C-25/C-26 audit contracts, do not replace TuRBO or broaden the optimizer framework without a narrow approved plan
+
 ## Resume Prompt
 
 ```text
-请继续 IC auto optimization workflow。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。先阅读 AGENTS.md、docs/CURRENT_TASK_STATE.json、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/specs/2026-06-05-openbox-real-backend-acceptance-spike-design.md、docs/superpowers/plans/2026-06-05-openbox-real-backend-acceptance-spike.md、docs/debug/2026-06-05-openbox-backend-evidence-spike.md。C-28 OpenBox Real Backend Acceptance Spike design spec 和 implementation plan 已完成。下一步是 execute C-28 Task 1 Environment And Known-Good Project Gate; do not run real OpenBox/Spectre/OCEAN, replace TuRBO, delete native_turbo, or broaden the optimizer framework before Task 1 is complete and Task 2 is explicitly confirmed。不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。不要解析 PSF，不要重写 OCEAN 公式。
+请继续 IC auto optimization workflow。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。先阅读 AGENTS.md、docs/CURRENT_TASK_STATE.json、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/specs/2026-06-05-openbox-real-backend-acceptance-spike-design.md、docs/superpowers/plans/2026-06-05-openbox-real-backend-acceptance-spike.md、docs/debug/2026-06-05-openbox-real-backend-acceptance-spike.md。C-28 OpenBox Real Backend Acceptance Spike 已完成：100 real evaluations，43 feasible，51 constraint_failed，6 metric_check_failed，0 real_check_failed，0 duplicate replacements；C-25 accepted；C-26 decision 是 accept_best_observed 且 global_optimum_claim=false。下一步是 write C-29 OpenBox productization plan。不要直接替换 TuRBO，不要删除 native_turbo，不要启动 broad optimizer framework，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。不要解析 PSF，不要重写 OCEAN 公式。
 ```
