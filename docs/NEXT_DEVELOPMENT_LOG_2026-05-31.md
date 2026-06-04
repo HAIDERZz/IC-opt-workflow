@@ -1136,6 +1136,21 @@ C-19 Execution-Agent Optimizer Practice Acceptance:
 - Route audit: aligned with the top-level practice-first route. Drift resolved. No broad optimizer framework, formula change, PSF parsing, or native Maestro/ADE layout replacement occurred.
 - next_allowed_action: wait for user confirmation before choosing the next narrow practice-backed productization or execution-agent validation scope.
 
+C-20 Execution-Agent Autonomous Handoff Acceptance:
+
+- Status: complete, verified-only.
+- Plan: `docs/superpowers/plans/2026-06-04-execution-agent-autonomous-handoff-acceptance.md`.
+- Sanitized audit: `docs/debug/2026-06-04-c20-execution-agent-autonomous-handoff-acceptance.md`.
+- Goal: validate the original supervisor-to-execution-agent boundary with a fresh local worker subagent that receives only a concise task packet and runs the existing `run-native-turbo --parallel --max-evals 100` command.
+- Attempt 1 followed the command but was rejected by supervisor audit: the run happened under sandbox restrictions, 100 result manifests failed, and metric manifests were missing. This exposed a task-packet weakness: command exit 0 and stdout are not sufficient acceptance evidence.
+- The task packet was corrected to require non-sandbox execution and manifest-level audit.
+- Attempt 2 used a fresh local worker subagent. It completed 100 optimizer evaluations with 100 trace rows, 100 result manifests succeeded, 100 metric manifests produced, 80 metric manifests succeeded, and 20 metric manifests failed.
+- Optimizer status counts: `31 feasible`, `49 constraint_failed`, `20 metric_check_failed`.
+- Settings audit passed: `preset=ax`, `threads_per_run=10`, `parallel_jobs=10`, `output_format=psfxl`.
+- The execution agent correctly surfaced a residual real-tool blocker: `real_057` and `real_075` had OCEAN command/license failures; the other 18 metric failures were candidate-level scalar/non-scalar failures.
+- Conclusion: autonomous handoff behavior is accepted. Fully green real-tool acceptance needs a narrow OCEAN-only retry/concurrency policy.
+- next_allowed_action: wait for user confirmation, then write a narrow C-21 OCEAN metric extraction retry/concurrency policy scope; do not start broad optimizer framework work.
+
 ## Resume Prompt
 
 ```text
