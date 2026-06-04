@@ -2,7 +2,7 @@
 
 ## 当前项目节点
 
-截至 2026-06-03：
+截至 2026-06-04：
 
 - Plan A Hermes File Contract MVP 已完成到 Task 9。Hermes 部分没有 Plan A Task 10。
 - Plan B mock optimization loop 已完成并提交。
@@ -25,6 +25,12 @@
 - C-12 implementation plan 已批准并执行到 Task 4：`docs/superpowers/plans/2026-06-03-controlled-real-tool-agent-practice.md`。计划分为本地 workspace/input gate、Hermes preflight/package、用户确认后的 C-7 adapter 真工具调用、Hermes check/record/recovery、sanitized evidence/final gate 五个任务。
 - C-12 Task 3 execution-agent/C-7 adapter invocation 已完成并 reviewed：用户明确确认后，adapter 对 `/tmp/ic_auto_opt_c12/bridge_test_inv/runs/real/real_001` 运行，写出了 failed `result_manifest.json` 和本地 hash evidence；没有产生 metric manifest 或 OCEAN scalar 输出。`spectre.stdout` 报 `SPECTRE-132`，原因是当前 adapter 的 `-log psf/spectre.out` 参数在该 Spectre 调用中被解释为第二个 input file。
 - C-12 Task 4 Hermes check/recovery handling 已完成并 reviewed：用户确认先做轻量 Task 4 后，Hermes `check-real-run` 接受了 failed handoff manifest 的结构，`check-metric-results` 因仿真未成功且缺少 `metric_result_manifest` fail-closed，`record-real-result` 被跳过，`assess-real-run-recovery` 将 `real_001` 分类为 `tool_result_failed` 并推荐 `retry_same_candidate`。未重跑 adapter，未修补 returned artifacts，未解析 PSF，未改写公式，也未记录 unchecked failed result。下一步应是 scoped C-7 adapter command-compatibility fix。
+- C-7 real-tool closure 已完成：真实问题不是 OCEAN 公式，而是 adapter 扁平化 Maestro/ADE 结果布局。当前实现保留 `runs/real/<run_id>/netlist/` working directory 与 sibling `psf/`，并保持 approved OCEAN 公式不变。
+- C-13 到 C-18 已将 optimizer 路线从单点/小循环推进到 native TuRBO batch runner：当前接受的优化执行路线是本地 `Turbo1.optimize()`、batch-aware candidate evaluator、最多 `spectre.parallel_jobs` 个并行 Spectre/OCEAN workers、每个 Spectre process 使用 `spectre.threads_per_run` 映射到 `+mt`，并顺序记录 package/ledger/state。
+- C-19 和 C-20 已验证 supervisor-to-execution-agent handoff：执行 agent 只拿 concise task packet，运行既有 `run-native-turbo --parallel --max-evals 100` 路线，并返回 manifests 给 supervisor/Hermes audit。C-20 暴露并修正了“命令 exit 0 不是 acceptance evidence”的流程问题。
+- C-21 OCEAN retry policy 已完成：adapter 会对 OCEAN command/license failure 做 OCEAN-only retry，不重跑 Spectre；`metric_result_manifest.json` 记录 `ocean.attempts` 和 `ocean.return_codes`。
+- C-22 execution task wording alignment 已完成：生成的 execution task 使用 generic execution-agent wording，并要求 manifest-level audit。
+- C-23 Optimizer Execution-Agent Task Packet MVP 已完成：`hermes-workflow package-optimizer-task` 会生成 `execution_package/OPTIMIZER_EXECUTION_TASK.md` 与 `execution_package/optimizer_execution_manifest.json`，复用 `run-native-turbo --parallel`，不新增 optimizer algorithm、scheduler、daemon、PSF parser 或 OCEAN formula rewrite。
 - `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example` 下的真实 `input.scs` 示例只作为本地参考，不能提交进仓库。
 
 ## 1. 项目概览
@@ -220,7 +226,7 @@ flowchart TD
 
 - `src/hermes_workflow/cli.py`
   当前提供：
-  `init`、`validate`、`prepare-netlist`、`dry-run`、`preflight-health`、`package`、`approve`、`prepare-real-run`、`prepare-next-real-run`、`assess-real-run-recovery`、`prepare-real-run-retry`、`resolve-real-run-failure`、`check-real-run`、`check-metric-results`、`record-real-result`、`mock-run`。
+  `init`、`validate`、`prepare-netlist`、`dry-run`、`preflight-health`、`package`、`approve`、`prepare-real-run`、`prepare-next-real-run`、`prepare-candidate-real-run`、`suggest-candidate`、`run-native-turbo`、`package-optimizer-task`、`assess-real-run-recovery`、`prepare-real-run-retry`、`resolve-real-run-failure`、`check-real-run`、`check-metric-results`、`record-real-result`、`mock-run`。
 
 ### Review gate 工具层
 
@@ -387,7 +393,7 @@ hermes-workflow prepare-real-run-retry projects/bridge_test_inv --failed-run-id 
 hermes-workflow resolve-real-run-failure projects/bridge_test_inv --run-id real_002 --decision abandon_candidate --reason "skip failed candidate"
 ```
 
-C-11 local/fake controlled smoke 已完成并 reviewed。它验证 C-9 -> fake C-7-style returned artifacts -> C-5/C-6 checks -> C-8 happy path 和一个 C-10 failure/retry path。C-12 controlled real-tool/agent practice design spec 和 implementation plan 已写好；当前 C-12 Task 4 已完成并 reviewed，Hermes 已将真实 C-7 adapter 边界返回的 failed `result_manifest.json` 归类为 `tool_result_failed`，且没有记录 unchecked failed result。不要直接继续真实工具重跑；下一步应开一个 scoped C-7 adapter command-compatibility fix。
+C-11 到 C-23 已把 fake/local smoke、真实 C-7 closure、optimizer practice-first、native TuRBO runner、batch parallel evaluator、execution-agent handoff、OCEAN retry，以及 generated optimizer execution-agent task packet 串起来。当前 next step 是在用户确认后，使用 C-23 生成的 optimizer task packet 跑一次本地 worker-agent handoff，并由 supervisor/Hermes 做 manifest-level audit。不要启动 broad optimizer framework；不要提交 raw input deck、protected sidecar、PSF/raw、完整 Cadence log、`docs/OCEAN_DOC_*` 或 `docs/toolchain_evidence/`；不要在 Python 中解析 PSF 或翻译 OCEAN 公式。
 
 ## 4. 能否严格约束主管 agent 和执行 agent 的行为
 

@@ -1176,7 +1176,7 @@ C-22 Execution-Agent Task Package Alignment:
 
 C-23 Optimizer Execution-Agent Task Packet MVP:
 
-- Status: Task 1 complete, verified-only, committed in the current HEAD.
+- Status: complete, verified-only, committed in the current HEAD.
 - Plan: `docs/superpowers/plans/2026-06-04-optimizer-execution-agent-task-packet.md`.
 - Goal: productize the proven C-19/C-20 hand-written optimizer execution-agent task packet into a Hermes-generated packet.
 - Task 1 added `src/hermes_workflow/optimizer_task_package.py` and focused tests in `tests/test_optimizer_task_package.py`.
@@ -1186,6 +1186,7 @@ C-23 Optimizer Execution-Agent Task Packet MVP:
 - The CLI only writes the optimizer execution task packet and manifest. It does not run Virtuoso, Spectre, OCEAN, SSH, bridge tools, execution agents, or the native optimizer.
 - Task 3 added local fake handoff smoke coverage for the generated task packet. The packet now keeps `hand-pick`, `parse PSF`, and `rewrite OCEAN` out of required behavior and only as forbidden-action language.
 - Task 4 final verification passed: `python3 -m pytest tests/test_optimizer_task_package.py tests/test_package.py tests/test_native_turbo.py -q`, `python3 -m ruff check src tests tools`, `python3 tools/check_development_cadence.py`, and `git diff --check`.
+- Post-sync local review found one handoff portability issue: generated commands could preserve a relative project path and render shell commands with plain string joining. Fixed by resolving `project_dir`/`cadence_cshrc` before payload generation and using shell-safe command rendering. Follow-up verification passed with `38 passed, 1 skipped` for C-23 focused regression plus ruff, cadence checker, and `git diff --check`.
 - Boundary: reuse `run-native-turbo --parallel`; do not add optimizer algorithms, real-tool execution, daemon/scheduler framework, PSF parsing, OCEAN formula rewriting, or native-layout replacement.
 - Route audit: aligned with the top-level practice-first route. Drift corrected before closeout: returned artifact names now match native runner constants and `hand-pick` is forbidden-action language.
 - next_allowed_action: wait for user confirmation, then run one local worker-agent handoff using the generated optimizer task packet.

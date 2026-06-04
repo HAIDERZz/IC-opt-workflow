@@ -1067,9 +1067,10 @@ Next required action:
 - current_scope: C-22 Execution-Agent Task Package Alignment.
 - next_allowed_action: wait for user confirmation before choosing the next narrow real-practice-backed optimizer or execution-agent validation step.
 
-- C-23 Optimizer Execution-Agent Task Packet MVP checkpoint: narrow implementation plan written, verified-only; implementation has not started. The plan productizes the proven C-19/C-20 hand-written optimizer execution-agent packet into a Hermes-generated packet for the existing `run-native-turbo --parallel` path.
-- current_scope: C-23 Optimizer Execution-Agent Task Packet MVP.
-- next_allowed_action: start C-23 Task 1 renderer and manifest contract after user confirmation.
+- C-23 Optimizer Execution-Agent Task Packet MVP checkpoint: complete, verified-only, committed in the current HEAD. Hermes now generates `execution_package/OPTIMIZER_EXECUTION_TASK.md` and `execution_package/optimizer_execution_manifest.json` for the proven `run-native-turbo --parallel` optimizer handoff path. The generated packet includes manifest-level audit requirements, Spectre settings expectations, native runner returned artifact names, and forbidden-action language for hand-picked points, PSF parsing, and OCEAN formula rewriting.
+- C-23 post-sync local review fix: generated optimizer task packet commands now use absolute project/cadence paths and shell-safe command rendering, so a worker agent can run the copied command from a different cwd.
+- current_scope: C-23 Optimizer Execution-Agent Task Packet MVP complete.
+- next_allowed_action: wait for user confirmation, then run one local worker-agent handoff using the generated optimizer task packet.
 
 ## Locked Role Model
 

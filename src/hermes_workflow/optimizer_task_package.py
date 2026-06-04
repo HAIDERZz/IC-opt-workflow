@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import shlex
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -38,8 +39,8 @@ def build_optimizer_execution_task_package(
     if max_evals < 1:
         raise ValueError("max_evals must be >= 1")
 
-    project_dir = Path(project_dir)
-    cadence_cshrc = Path(cadence_cshrc)
+    project_dir = Path(project_dir).resolve()
+    cadence_cshrc = Path(cadence_cshrc).expanduser().resolve()
     bundle = assert_valid_project(project_dir)
     execution_dir = project_dir / "execution_package"
     execution_dir.mkdir(parents=True, exist_ok=True)
@@ -98,7 +99,7 @@ def _command(
 
 
 def _render_task(payload: dict) -> str:
-    command = " ".join(payload["command"])
+    command = shlex.join(payload["command"])
     settings = payload["spectre_settings"]
     artifacts = "\n".join(
         f"- `{artifact}`" for artifact in payload["required_returned_artifacts"]

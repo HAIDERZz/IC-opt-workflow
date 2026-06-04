@@ -94,6 +94,32 @@ def test_package_optimizer_task_cli_writes_task_and_manifest(tmp_path: Path) -> 
     ).exists()
 
 
+def test_optimizer_task_package_uses_absolute_shell_safe_command(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    project_dir = Path("bridge_test_inv")
+    create_project_from_template(project_dir)
+    cadence_cshrc = tmp_path / "cadence env.csh"
+
+    package = build_optimizer_execution_task_package(
+        project_dir,
+        max_evals=100,
+        cadence_cshrc=cadence_cshrc,
+        created_at_utc="2026-06-04T00:00:00Z",
+    )
+
+    task_text = package.task_path.read_text(encoding="utf-8")
+    manifest_payload = package.payload
+
+    assert manifest_payload["project_dir"] == str(project_dir.resolve())
+    assert manifest_payload["cadence_cshrc"] == str(cadence_cshrc.resolve())
+    assert manifest_payload["command"][2] == str(project_dir.resolve())
+    assert manifest_payload["command"][-1] == str(cadence_cshrc.resolve())
+    assert f"'{cadence_cshrc.resolve()}'" in task_text
+
+
 def test_optimizer_execution_task_keeps_forbidden_actions_in_forbidden_section(
     tmp_path: Path,
 ) -> None:

@@ -260,6 +260,23 @@ Alignment: C-23 productizes the proven C-19/C-20 handoff packet without changing
 Drift: none. No real tools, new optimizer algorithm, PSF parser, OCEAN formula rewrite, or layout replacement.
 ```
 
+- [x] **Step 3: Post-sync local review fix**
+
+After syncing project progress and planning anchors, local review found one
+handoff portability issue: generated commands could preserve a relative project
+path and render shell commands with plain string joining. The task packet now
+resolves `project_dir` and `cadence_cshrc` before payload generation and uses
+shell-safe command rendering.
+
+Verification:
+
+```bash
+python3 -m pytest tests/test_optimizer_task_package.py tests/test_package.py tests/test_native_turbo.py -q
+python3 -m ruff check src tests tools
+python3 tools/check_development_cadence.py
+git diff --check
+```
+
 - [x] **Step 3: Commit**
 
 Task 1 through Task 3 were already committed independently. Use explicit
