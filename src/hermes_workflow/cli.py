@@ -236,6 +236,13 @@ def package_optimizer_task_command(
             help="Whether the execution agent should use batch parallel mode.",
         ),
     ] = True,
+    backend: Annotated[
+        str,
+        typer.Option(
+            "--backend",
+            help="Optimizer backend for the execution task: native-turbo or openbox.",
+        ),
+    ] = "native-turbo",
 ) -> None:
     try:
         package = build_optimizer_execution_task_package(
@@ -243,6 +250,7 @@ def package_optimizer_task_command(
             max_evals=max_evals,
             cadence_cshrc=cadence_cshrc,
             parallel=parallel,
+            optimizer_backend=backend,
         )
     except (OSError, ValueError) as exc:
         _exit_with_error(exc)

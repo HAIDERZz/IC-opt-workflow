@@ -1,18 +1,18 @@
 {
   "schema_version": "1.0",
-  "current_scope": "C-29 OpenBox Production Backend complete",
-  "current_status": "C-29 implementation is complete, verified-only. Productized OpenBox ask-and-tell candidate generation with effective stepped-grid upper bounds, no hidden FN=FP coupling, shared fake/real batch runner, real evaluator integration through existing Hermes Spectre/OCEAN candidate package and record path, and CLI run-openbox-real. Real acceptance completed 100 evaluations and passed C-25/C-26.",
+  "current_scope": "C-30 OpenBox Execution-Agent Task Packet complete",
+  "current_status": "C-30 implementation is complete, verified-only. package-optimizer-task now preserves native TuRBO as the default and supports explicit --backend openbox task packets with run-openbox-real, OpenBox dependency-blocker wording, no-silent-fallback instructions, and post-run C-25/C-26 audit commands.",
   "review_status": "verified-only",
   "subagent_dispatch": "available",
-  "active_spec": "docs/superpowers/specs/2026-06-05-openbox-production-backend-design.md",
-  "active_plan": "docs/superpowers/plans/2026-06-05-openbox-production-backend.md",
+  "active_spec": "docs/superpowers/specs/2026-06-05-openbox-execution-agent-task-packet-design.md",
+  "active_plan": "docs/superpowers/plans/2026-06-05-openbox-execution-agent-task-packet.md",
   "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
   "progress_files": [
     "docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md",
     "docs/EXECUTION_PROGRESS_2026-05-29.md",
     "docs/COMPACT_RESUME_CHECKPOINT.md"
   ],
-  "next_allowed_action": "wait for user confirmation, then choose the next narrow post-C-29 step; recommended next is C-30 OpenBox execution-agent task packet/dependency handoff, not TuRBO deletion or broad optimizer framework work",
+  "next_allowed_action": "wait for user confirmation before any real execution-agent OpenBox handoff acceptance run or next narrow optimizer productization step",
   "forbidden_actions": [
     "start broad optimizer framework work",
     "replace TuRBO before OpenBox evidence spike approval",
@@ -42,13 +42,13 @@
     "git status --short"
   ],
   "route_audit": {
-    "active_spec": "docs/superpowers/specs/2026-06-05-openbox-production-backend-design.md",
-    "active_plan": "docs/superpowers/plans/2026-06-05-openbox-production-backend.md",
+    "active_spec": "docs/superpowers/specs/2026-06-05-openbox-execution-agent-task-packet-design.md",
+    "active_plan": "docs/superpowers/plans/2026-06-05-openbox-execution-agent-task-packet.md",
     "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
-    "alignment": "Aligned. C-29 productizes only the C-28 evidence-backed OpenBox candidate-generation backend and keeps the proven Hermes Spectre/OCEAN execution path, C-25 acceptance, and C-26 completion reports.",
-    "drift": "No route drift. TuRBO remains implemented and available; OpenBox was added as a productized backend, not made a forced global replacement."
+    "alignment": "Aligned. C-30 only updated the execution-agent task packet so the C-29 OpenBox backend can be handed off without manual interpretation while preserving C-25/C-26 audit.",
+    "drift": "No route drift. TuRBO remains implemented and the default backend for package-optimizer-task unless --backend openbox is explicit."
   },
-  "latest_valid_commit": "dffd5df",
+  "latest_valid_commit": "1fa8ef1",
   "review_evidence": {
     "optimizer_skill_real_practice": "Complete, verified-only. Temporary practice at /tmp/ic_auto_opt_optimizer_skill_flow_001 ran Turbo1.optimize() for 100 evaluations with 8 initialization and 92 trust-region evaluations. 73 candidates were recorded through real Spectre/OCEAN, 24 duplicate quantized candidates were skipped, and 3 metric non-scalar candidates were converted to finite penalties. Best candidate was real_011: FN=11, WN=1.9u, FP=9, WP=0.5u, rise=72.489655ps, fall=64.569947ps, DC=301.334349uW, objective=4.1300765965648685e-14.",
     "archive_doc": "docs/debug/2026-06-04-optimizer-skill-real-flow-practice.md",
@@ -94,6 +94,7 @@
     "c28_complete": "Complete, verified-only. Local runner /tmp/ic_auto_opt_c28_openbox_real/run_openbox_real_spike.py used OpenBox ask-and-tell to generate 100 candidates, then evaluated them through the existing Hermes Spectre/OCEAN path. Results: 43 feasible, 51 constraint_failed, 6 metric_check_failed, 0 real_check_failed, 0 duplicate replacements. Best observed real_071: FN=12, WN=2.7u, FP=7, WP=0.7u, objective=4.1325534822170306e-14. C-25 accepted the artifacts; C-26 decision was accept_best_observed with confidence=medium and global_optimum_claim=false. Sanitized note: docs/debug/2026-06-05-openbox-real-backend-acceptance-spike.md. Productization notes: OpenBox continuous_step upper bounds must use the same Hermes quantization grid effective upper value, and real project bundles must preserve netlists/templates/template.scs.",
     "c29_design": "Written, verified-only. Design spec docs/superpowers/specs/2026-06-05-openbox-production-backend-design.md scopes productizing only OpenBox candidate generation and ask-and-tell observation updates while preserving the existing Hermes Spectre/OCEAN real execution path. It explicitly forbids TuRBO replacement, hidden FN=FP coupling, PSF parsing, OCEAN formula rewriting, and broad optimizer framework work.",
     "c29_plan": "Written, verified-only. Implementation plan docs/superpowers/plans/2026-06-05-openbox-production-backend.md scopes seven tasks: search-space contract, shared ask-and-tell runner core, real evaluator integration, CLI wiring/dependency gate, local no-real-tool smoke, real OpenBox acceptance rerun after explicit confirmation, and closeout.",
-    "c29_complete": "Complete, verified-only. Added run-openbox-real, effective OpenBox stepped-grid upper handling, no hidden FN=FP fallback, shared fake/real OpenBox batch runner, and real evaluator integration through existing Spectre/OCEAN candidate package and record path. Real acceptance on /tmp/ic_auto_opt_c29_openbox_real/bridge_test_inv completed 100 evaluations: 43 feasible, 51 constraint_failed, 6 metric_check_failed, 0 real_check_failed, 0 duplicate replacements; C-25 accepted; C-26 decision accept_best_observed with confidence medium and global_optimum_claim=false. Sanitized evidence: docs/debug/2026-06-05-openbox-production-backend-real-acceptance.md."
+    "c29_complete": "Complete, verified-only. Added run-openbox-real, effective OpenBox stepped-grid upper handling, no hidden FN=FP fallback, shared fake/real OpenBox batch runner, and real evaluator integration through existing Spectre/OCEAN candidate package and record path. Real acceptance on /tmp/ic_auto_opt_c29_openbox_real/bridge_test_inv completed 100 evaluations: 43 feasible, 51 constraint_failed, 6 metric_check_failed, 0 real_check_failed, 0 duplicate replacements; C-25 accepted; C-26 decision accept_best_observed with confidence medium and global_optimum_claim=false. Sanitized evidence: docs/debug/2026-06-05-openbox-production-backend-real-acceptance.md.",
+    "c30_complete": "Complete, verified-only. Added design spec docs/superpowers/specs/2026-06-05-openbox-execution-agent-task-packet-design.md and implementation plan docs/superpowers/plans/2026-06-05-openbox-execution-agent-task-packet.md. package-optimizer-task now accepts --backend native-turbo|openbox, preserves native TuRBO as default, and renders OpenBox execution-agent packets with run-openbox-real, dependency-blocker wording, no-silent-fallback instructions, backend-neutral required artifacts, and post-run check-optimizer-run/summarize-optimizer-run audit commands. Verification passed: python3 -m pytest -q (551 passed, 1 skipped); python3 -m ruff check src tests tools; python3 tools/check_development_cadence.py; git diff --check."
   }
 }

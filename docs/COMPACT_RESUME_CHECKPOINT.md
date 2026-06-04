@@ -648,6 +648,20 @@ C-29 completion result:
 
 Current next step: wait for user confirmation, then choose the next narrow post-C-29 step; recommended next is C-30 OpenBox execution-agent task packet/dependency handoff, not TuRBO deletion or broad optimizer framework work.
 
+C-30 completion result:
+
+- Status: complete, verified-only.
+- current_scope: C-30 OpenBox Execution-Agent Task Packet complete.
+- Design spec: `docs/superpowers/specs/2026-06-05-openbox-execution-agent-task-packet-design.md`.
+- Implementation plan: `docs/superpowers/plans/2026-06-05-openbox-execution-agent-task-packet.md`.
+- Scope: backend-aware optimizer execution-agent task packet only.
+- Native TuRBO remains the default backend for `package-optimizer-task`.
+- Explicit OpenBox package selection uses `package-optimizer-task --backend openbox`.
+- OpenBox package renders `run-openbox-real`, OpenBox dependency-blocker instructions, no-silent-fallback wording, and post-run `check-optimizer-run` / `summarize-optimizer-run` audit commands.
+- Boundary: no real tools, no optimizer algorithm changes, no TuRBO deletion, no PSF parsing, no OCEAN formula rewriting, no broad optimizer framework.
+- Verification passed: `python3 -m pytest -q` (`551 passed, 1 skipped`), `python3 -m ruff check src tests tools`, `python3 tools/check_development_cadence.py`, and `git diff --check`.
+- Current next step: wait for user confirmation before any real execution-agent OpenBox handoff acceptance run or next narrow optimizer productization step.
+
 Read the handoff files first:
 
 ```text
@@ -669,9 +683,8 @@ Use this prompt after compact:
 3. ic-auto-opt-workflow/docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md
 4. ic-auto-opt-workflow/docs/EXECUTION_PROGRESS_2026-05-29.md
 5. ic-auto-opt-workflow/docs/COMPACT_RESUME_CHECKPOINT.md
-6. ic-auto-opt-workflow/docs/superpowers/specs/2026-06-05-openbox-production-backend-design.md
-7. ic-auto-opt-workflow/docs/superpowers/plans/2026-06-05-openbox-production-backend.md
-8. ic-auto-opt-workflow/docs/debug/2026-06-05-openbox-production-backend-real-acceptance.md
+6. ic-auto-opt-workflow/docs/superpowers/specs/2026-06-05-openbox-execution-agent-task-packet-design.md
+7. ic-auto-opt-workflow/docs/superpowers/plans/2026-06-05-openbox-execution-agent-task-packet.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-29 OpenBox Production Backend 已完成并通过本地测试、真实 OpenBox 100-eval acceptance、C-25 acceptance、C-26 completion summary。下一步是 wait for user confirmation, then choose the next narrow post-C-29 step; recommended next is C-30 OpenBox execution-agent task packet/dependency handoff, not TuRBO deletion or broad optimizer framework work。不要直接替换 TuRBO，不要删除 native_turbo，不要创建 broad optimizer framework，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-30 OpenBox Execution-Agent Task Packet 已完成。下一步是 wait for user confirmation before any real execution-agent OpenBox handoff acceptance run or next narrow optimizer productization step。不要运行真实 Virtuoso/Spectre/OCEAN/SSH/virtuoso-bridge，除非用户明确批准；不要直接替换 TuRBO，不要删除 native_turbo，不要创建 broad optimizer framework，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
 ```

@@ -44,6 +44,7 @@ def test_build_optimizer_execution_task_package_writes_task_and_manifest(
     assert "parallel_jobs" in task_text
     assert "ledger/experiment_ledger.jsonl" in task_text
     assert manifest_payload["schema_version"] == "1.0"
+    assert manifest_payload["backend"] == "native_turbo"
     assert manifest_payload["created_at_utc"] == "2026-06-04T00:00:00Z"
     assert manifest_payload["max_evals"] == 100
     assert manifest_payload["parallel"] is True
@@ -63,6 +64,64 @@ def test_build_optimizer_execution_task_package_writes_task_and_manifest(
     assert manifest_payload["required_returned_artifacts"] == [
         "reports/native_turbo_optimizer_report.json",
         "reports/native_turbo_optimizer_evaluations.jsonl",
+        "state/optimizer_state.json",
+        "ledger/experiment_ledger.jsonl",
+    ]
+    assert manifest_payload["audit_commands"] == [
+        ["hermes-workflow", "check-optimizer-run", str(project_dir)],
+        ["hermes-workflow", "summarize-optimizer-run", str(project_dir)],
+    ]
+
+
+def test_build_optimizer_execution_task_package_writes_openbox_backend(
+    tmp_path: Path,
+) -> None:
+    project_dir = tmp_path / "bridge_test_inv"
+    create_project_from_template(project_dir)
+
+    package = build_optimizer_execution_task_package(
+        project_dir,
+        max_evals=100,
+        cadence_cshrc=Path("/home/zzchen/cadence_ic231_env.csh"),
+        optimizer_backend="openbox",
+        created_at_utc="2026-06-04T00:00:00Z",
+    )
+
+    task_text = package.task_path.read_text(encoding="utf-8")
+    manifest_payload = package.payload
+
+    assert "run-openbox-real" in task_text
+    assert "run-native-turbo" not in task_text
+    assert "--max-evals 100" in task_text
+    assert "--batch-size 10" in task_text
+    assert "--parallel-jobs 10" in task_text
+    assert "OpenBox must be installed" in task_text
+    assert "report a dependency blocker" in task_text
+    assert "Do not silently fall back to TuRBO" in task_text
+    assert "hermes-workflow check-optimizer-run" in task_text
+    assert "hermes-workflow summarize-optimizer-run" in task_text
+    assert "reports/optimizer_run_report.json" in task_text
+    assert "reports/optimizer_evaluations.jsonl" in task_text
+
+    assert manifest_payload["backend"] == "openbox"
+    assert manifest_payload["batch_size"] == 10
+    assert manifest_payload["parallel_jobs"] == 10
+    assert manifest_payload["command"] == [
+        "hermes-workflow",
+        "run-openbox-real",
+        str(project_dir),
+        "--max-evals",
+        "100",
+        "--batch-size",
+        "10",
+        "--parallel-jobs",
+        "10",
+        "--cadence-cshrc",
+        "/home/zzchen/cadence_ic231_env.csh",
+    ]
+    assert manifest_payload["required_returned_artifacts"] == [
+        "reports/optimizer_run_report.json",
+        "reports/optimizer_evaluations.jsonl",
         "state/optimizer_state.json",
         "ledger/experiment_ledger.jsonl",
     ]
@@ -92,6 +151,31 @@ def test_package_optimizer_task_cli_writes_task_and_manifest(tmp_path: Path) -> 
     assert (
         project_dir / "execution_package" / "optimizer_execution_manifest.json"
     ).exists()
+
+
+def test_package_optimizer_task_cli_writes_openbox_manifest(tmp_path: Path) -> None:
+    project_dir = tmp_path / "bridge_test_inv"
+    create_project_from_template(project_dir)
+
+    result = runner.invoke(
+        app,
+        [
+            "package-optimizer-task",
+            str(project_dir),
+            "--max-evals",
+            "100",
+            "--cadence-cshrc",
+            "/home/zzchen/cadence_ic231_env.csh",
+            "--backend",
+            "openbox",
+        ],
+    )
+
+    assert result.exit_code == 0
+    manifest_path = project_dir / "execution_package" / "optimizer_execution_manifest.json"
+    manifest_payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert manifest_payload["backend"] == "openbox"
+    assert manifest_payload["command"][1] == "run-openbox-real"
 
 
 def test_optimizer_task_package_uses_absolute_shell_safe_command(
@@ -146,3 +230,26 @@ def test_optimizer_execution_task_keeps_forbidden_actions_in_forbidden_section(
     assert "Do not hand-pick candidate points." in forbidden_actions
     assert "Do not parse PSF in Python." in forbidden_actions
     assert "Do not rewrite OCEAN formulas." in forbidden_actions
+
+
+def test_optimizer_execution_task_keeps_openbox_fallback_in_required_behavior(
+    tmp_path: Path,
+) -> None:
+    project_dir = tmp_path / "bridge_test_inv"
+    create_project_from_template(project_dir)
+
+    package = build_optimizer_execution_task_package(
+        project_dir,
+        max_evals=100,
+        cadence_cshrc=Path("/home/zzchen/cadence_ic231_env.csh"),
+        optimizer_backend="openbox",
+    )
+
+    task_text = package.task_path.read_text(encoding="utf-8")
+    required_behavior = task_text.split("## Required Behavior", 1)[1].split(
+        "## Spectre/OCEAN Settings Audit",
+        1,
+    )[0]
+
+    assert "Do not silently fall back to TuRBO" in required_behavior
+    assert "Do not hand-pick candidate points." not in required_behavior
