@@ -1176,12 +1176,15 @@ C-22 Execution-Agent Task Package Alignment:
 
 C-23 Optimizer Execution-Agent Task Packet MVP:
 
-- Status: narrow implementation plan written, verified-only; implementation has not started.
+- Status: Task 1 complete, verified-only, committed in the current HEAD.
 - Plan: `docs/superpowers/plans/2026-06-04-optimizer-execution-agent-task-packet.md`.
 - Goal: productize the proven C-19/C-20 hand-written optimizer execution-agent task packet into a Hermes-generated packet.
+- Task 1 added `src/hermes_workflow/optimizer_task_package.py` and focused tests in `tests/test_optimizer_task_package.py`.
+- Generated artifacts: `execution_package/OPTIMIZER_EXECUTION_TASK.md` and `execution_package/optimizer_execution_manifest.json`.
+- Plan drift found and corrected: returned artifact names now match the existing native runner constants, `reports/native_turbo_optimizer_report.json` and `reports/native_turbo_optimizer_evaluations.jsonl`, instead of the older C-19 handoff wording.
 - Boundary: reuse `run-native-turbo --parallel`; do not add optimizer algorithms, real-tool execution, daemon/scheduler framework, PSF parsing, OCEAN formula rewriting, or native-layout replacement.
-- Route audit: aligned with the top-level practice-first route. Drift: none.
-- next_allowed_action: start C-23 Task 1 renderer and manifest contract after user confirmation.
+- Route audit: aligned with the top-level practice-first route. Drift corrected before implementation.
+- next_allowed_action: start C-23 Task 2 CLI wiring after user confirmation.
 
 ## Resume Prompt
 

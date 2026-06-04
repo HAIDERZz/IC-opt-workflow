@@ -46,12 +46,14 @@ Forbidden:
 
 **Risk:** Medium. File-writing contract, but no real tools.
 
+**Status:** Complete, verified-only.
+
 **Files:**
 
 - Create: `src/hermes_workflow/optimizer_task_package.py`
 - Create: `tests/test_optimizer_task_package.py`
 
-- [ ] **Step 1: Write failing renderer test**
+- [x] **Step 1: Write failing renderer test**
 
 Add a test that initializes the fixture project, calls the new writer, and asserts:
 
@@ -76,7 +78,7 @@ python3 -m pytest tests/test_optimizer_task_package.py -q
 
 Expected: fails because the module does not exist.
 
-- [ ] **Step 2: Implement minimal writer**
+- [x] **Step 2: Implement minimal writer**
 
 Add:
 
@@ -110,16 +112,17 @@ The manifest must include:
 - `spectre_settings`
 - `required_returned_artifacts`
 
-Required returned artifacts:
+Required returned artifacts match the existing native runner constants
+`REPORT_RELATIVE` and `EVALUATIONS_RELATIVE`:
 
 ```text
-reports/native_turbo_summary.json
-reports/native_turbo_trace.jsonl
+reports/native_turbo_optimizer_report.json
+reports/native_turbo_optimizer_evaluations.jsonl
 state/optimizer_state.json
 ledger/experiment_ledger.jsonl
 ```
 
-- [ ] **Step 3: Verify focused test passes**
+- [x] **Step 3: Verify focused test passes**
 
 Run:
 
