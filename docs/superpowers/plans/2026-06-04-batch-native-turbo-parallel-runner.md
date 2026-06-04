@@ -227,19 +227,21 @@ Expected: all pass.
 
 **Risk:** High.
 
-**Status:** Not started.
+**Status:** Complete, verified-only.
 
 **Files:**
 
 - Modify: `src/hermes_workflow/native_turbo.py`
 - Modify: `tests/test_native_turbo.py`
 
-- [ ] **Step 1: Add failing test that proves the batch factory receives batch size**
+- [x] **Step 1: Add failing test that proves the batch factory receives batch size**
 
 Add:
 
 ```python
-def test_run_batch_native_turbo_uses_optimizer_batch_size(tmp_path: Path) -> None:
+def test_run_batch_native_turbo_optimization_uses_optimizer_batch_size(
+    tmp_path: Path,
+) -> None:
     project_dir = tmp_path / "bridge_test_inv"
     create_project_from_template(project_dir)
     observed_batch_sizes: list[int] = []
@@ -274,12 +276,12 @@ def test_run_batch_native_turbo_uses_optimizer_batch_size(tmp_path: Path) -> Non
 Run:
 
 ```bash
-python3 -m pytest tests/test_native_turbo.py::test_run_batch_native_turbo_uses_optimizer_batch_size -q
+python3 -m pytest tests/test_native_turbo.py::test_run_batch_native_turbo_optimization_uses_optimizer_batch_size -q
 ```
 
 Expected: fail because `run_batch_native_turbo_optimization` does not exist.
 
-- [ ] **Step 2: Add batch optimization entry point**
+- [x] **Step 2: Add batch optimization entry point**
 
 In `native_turbo.py`, add:
 
@@ -295,20 +297,17 @@ def run_batch_native_turbo_optimization(
     threads_per_run: int | None = None,
 ) -> NativeTurboRunResult:
     project_dir = Path(project_dir)
-    contract = load_native_turbo_contract(project_dir)
-    spectre = assert_valid_project(project_dir).spectre.spectre
+    bundle = assert_valid_project(project_dir)
+    spectre = bundle.spectre.spectre
     selected_parallel_jobs = parallel_jobs or spectre.parallel_jobs
     selected_threads_per_run = threads_per_run or spectre.threads_per_run
-    selected_batch_evaluator = batch_evaluator or make_real_candidate_batch_evaluator(
-        project_dir,
-        cadence_cshrc=cadence_cshrc,
-        max_workers=min(contract.optimizer.optimizer.batch_size, selected_parallel_jobs),
-    )
+    if batch_evaluator is None:
+        raise ValueError("batch_evaluator is required until C-18 Task 3")
     runner = NativeTurboBatchRunner(
-        variables=contract.variables,
-        metrics=contract.metrics,
-        optimizer=contract.optimizer,
-        batch_evaluator=selected_batch_evaluator,
+        variables=bundle.variables,
+        metrics=bundle.metrics,
+        optimizer=bundle.optimizer,
+        batch_evaluator=batch_evaluator,
         batch_turbo_factory=batch_turbo_factory or _default_batch_turbo_factory,
         max_evals=max_evals,
         parallel_jobs=selected_parallel_jobs,
@@ -325,11 +324,11 @@ def run_batch_native_turbo_optimization(
     )
 ```
 
-The code may import the spectre bundle shape from existing `assert_valid_project`.
-If the exact attribute path differs, use the already validated bundle object
-rather than reparsing files ad hoc.
+Plan correction: Task 2 does not create the real batch evaluator. Until Task 3
+adds `make_real_candidate_batch_evaluator`, `run_batch_native_turbo_optimization`
+requires an injected `batch_evaluator` and fails closed otherwise.
 
-- [ ] **Step 3: Add default batch TuRBO factory**
+- [x] **Step 3: Add default batch TuRBO factory**
 
 Add `_default_batch_turbo_factory(**kwargs)` in `native_turbo.py`.
 
@@ -354,17 +353,28 @@ fX_next = np.array([[value] for value in fX_next_values])
 Initialization must likewise call `f_batch` in chunks no larger than
 `self.batch_size`.
 
-- [ ] **Step 4: Run focused tests**
+- [x] **Step 4: Run focused tests**
 
 Run:
 
 ```bash
-python3 -m pytest tests/test_native_turbo.py::test_run_batch_native_turbo_uses_optimizer_batch_size -q
+python3 -m pytest tests/test_native_turbo.py::test_run_batch_native_turbo_optimization_uses_optimizer_batch_size -q
+python3 -m pytest tests/test_native_turbo.py::test_default_batch_turbo_factory_calls_f_batch_by_chunk -q
 python3 -m pytest tests/test_native_turbo.py -q
 python3 -m ruff check src/hermes_workflow/native_turbo.py tests/test_native_turbo.py
 ```
 
-Expected: all pass.
+Expected: focused tests pass or the system `python3` default-factory test skips
+when torch/gpytorch are unavailable; the `.venv/bin/python` direct check must
+prove `_default_batch_turbo_factory` calls `f_batch` in chunks.
+
+If system `python3` skips the default-factory test because torch/gpytorch are
+unavailable, run the same factory behavior through project `.venv/bin/python`
+with a direct script and verify the observed calls are:
+
+```text
+[("initialization", 2), ("initialization", 2), ("turbo_trust_region", 2)]
+```
 
 ## Task 3: Parallel Real Batch Evaluator
 

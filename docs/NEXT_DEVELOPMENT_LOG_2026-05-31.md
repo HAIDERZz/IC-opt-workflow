@@ -5,9 +5,9 @@
 - Repository: `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow`
 - Branch: `plan-a-hermes-file-contract-mvp`
 - Current scope: C-18 Batch Native TuRBO Parallel Runner
-- Current status: verified-only; C-18 Task 1 Batch Runner Seam And Trace Metadata is complete. It adds the fake-tested batch runner seam and batch trace metadata without running real tools.
-- Next required action: execute C-18 Task 2 Local BatchTurbo1 Wrapper after user confirmation
-- next_allowed_action: wait for user confirmation, then execute C-18 Task 2 Local BatchTurbo1 Wrapper; do not run real tools before fake/unit tasks pass and the user explicitly confirms C-18 real acceptance
+- Current status: verified-only; C-18 Task 2 Local BatchTurbo1 Wrapper is complete. It adds the batch optimization entry point and a local batch-aware `Turbo1` wrapper without running real tools.
+- Next required action: execute C-18 Task 3 Parallel Real Batch Evaluator after user confirmation
+- next_allowed_action: wait for user confirmation, then execute C-18 Task 3 Parallel Real Batch Evaluator; do not run real tools before fake/unit tasks pass and the user explicitly confirms C-18 real acceptance
 
 C-3 Task 6 final verification is complete. C-4 is confirmed as a contract-only first real-run package; it must not run Spectre, Virtuoso, subprocesses, or the optimizer loop. C-4 is now complete and reviewed. C-5 validates the execution agent's returned `result_manifest.json` and declared artifacts without running Spectre or parsing metrics. C-5.5 rehearsed the C-4/C-5 handoff with simulated execution-agent and Hermes-observer roles. After C-5.5, the project paused implementation to validate the real metric backend. Spectre + OCEAN is now confirmed as the backend route: standalone Spectre generates PSF, batch OCEAN opens the PSF and evaluates exact user/project-approved formulas, and Python only records OCEAN-produced scalar outputs and provenance. C-6 turned that route into deterministic file contracts and a Hermes validator without physical adapter wiring. C-7 added an explicit execution-side adapter and tool entry point while preserving the rule that Hermes workflow tooling still validates returned files after execution. C-8 records checked real metric results into optimizer ledger/state after `check-real-run` and `check-metric-results` pass, while preserving the contract-only boundary. C-9 prepares the next real-run package from strict ledger/state and deterministic optimizer initialization sequence, while still not running real tools or writing ledger/state. C-10 classifies failed/partial/pending real-run packages, writes explicit recovery decisions, prepares retry packages, exposes supervisor-facing recovery CLI commands, and blocks C-9 from advancing while unresolved real-run packages exist. C-10 final review fixes aligned unsafe artifact classification with the spec and hardened symlinked recovery decision reads.
 
@@ -185,6 +185,38 @@ real adapter parallelism yet.
 
 next_allowed_action: wait for user confirmation, then execute C-18 Task 2 Local
 BatchTurbo1 Wrapper
+
+## C-18 Task 2 Checkpoint 2026-06-04
+
+C-18 Task 2 is complete, verified-only.
+
+Implemented:
+
+- `run_batch_native_turbo_optimization`, currently requiring an injected
+  `batch_evaluator` until Task 3 adds the real parallel evaluator;
+- `_default_batch_turbo_factory`, a local subclass/wrapper around native
+  `Turbo1` that keeps candidate generation and replaces the evaluation point
+  with `f_batch(...)` chunks for initialization and trust-region batches.
+
+Verification:
+
+```text
+python3 -m pytest tests/test_native_turbo.py::test_run_batch_native_turbo_optimization_uses_optimizer_batch_size -q
+python3 -m pytest tests/test_native_turbo.py::test_default_batch_turbo_factory_calls_f_batch_by_chunk -q  # skipped under system python when torch/gpytorch unavailable
+project .venv direct _default_batch_turbo_factory chunk check  # passed with initialization 2, initialization 2, trust-region 2
+python3 -m pytest tests/test_native_turbo.py -q
+python3 -m ruff check src/hermes_workflow/native_turbo.py tests/test_native_turbo.py
+```
+
+Route audit: aligned with the C-18 design spec and top-level practice-first
+route. Drift: none. The active plan was synchronized to make Task 2 fail closed
+without an injected `batch_evaluator` until Task 3 creates the real parallel
+batch evaluator. Task 2 did not run Virtuoso/Spectre/OCEAN/SSH/bridge, parse
+PSF, rewrite OCEAN formulas, change native Maestro/ADE layout, or add real
+adapter parallelism yet.
+
+next_allowed_action: wait for user confirmation, then execute C-18 Task 3
+Parallel Real Batch Evaluator
 
 ## Route Consistency Audit 2026-06-03
 

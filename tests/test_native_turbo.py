@@ -12,10 +12,12 @@ from hermes_workflow.native_turbo import (
     NativeTurboObservation,
     NativeTurboBatchRunner,
     NativeTurboRunner,
+    _default_batch_turbo_factory,
     evaluate_candidate_objective,
     evaluate_real_candidate,
     load_native_turbo_contract,
     quantize_candidate,
+    run_batch_native_turbo_optimization,
     run_native_turbo_optimization,
 )
 from hermes_workflow.package import create_project_from_template
@@ -118,19 +120,23 @@ class _FakeBatchTurbo:
 
     def optimize(self) -> None:
         self.optimize_called = True
-        self.f_batch(
+        base_batches = [
             [
-                [2.0, 0.3],
-                [2.1, 0.31],
-                [2.0, 0.3],
+                [2.0, 0.3, 2.0, 0.3],
+                [2.1, 0.31, 2.1, 0.31],
+                [2.0, 0.3, 2.0, 0.3],
             ],
+            [
+                [4.0, 0.7, 4.0, 0.7],
+                [5.0, 0.8, 5.0, 0.8],
+            ],
+        ]
+        self.f_batch(
+            [point[: len(self.lb)] for point in base_batches[0]],
             selection_phase="initialization",
         )
         self.f_batch(
-            [
-                [4.0, 0.7],
-                [5.0, 0.8],
-            ],
+            [point[: len(self.lb)] for point in base_batches[1]],
             selection_phase="turbo_trust_region",
         )
 
@@ -501,6 +507,78 @@ def test_run_native_turbo_optimization_writes_compact_trace_files(tmp_path: Path
     assert report["best_candidate"]["status"] == "feasible"
     assert len(lines) == 5
     assert result.report_path == project_dir / "reports/native_turbo_optimizer_report.json"
+
+
+def test_run_batch_native_turbo_optimization_uses_optimizer_batch_size(
+    tmp_path: Path,
+) -> None:
+    project_dir = tmp_path / "bridge_test_inv"
+    create_project_from_template(project_dir)
+    observed_batch_sizes: list[int] = []
+
+    def batch_evaluator(candidates) -> list[NativeTurboObservation]:
+        return [
+            NativeTurboObservation(
+                metrics={"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-6},
+            )
+            for _candidate in candidates
+        ]
+
+    class CapturingBatchTurbo(_FakeBatchTurbo):
+        def __init__(self, **kwargs) -> None:
+            observed_batch_sizes.append(kwargs["batch_size"])
+            super().__init__(**kwargs)
+
+    result = run_batch_native_turbo_optimization(
+        project_dir,
+        batch_evaluator=batch_evaluator,
+        batch_turbo_factory=CapturingBatchTurbo,
+        max_evals=5,
+        parallel_jobs=3,
+        threads_per_run=10,
+    )
+
+    assert observed_batch_sizes == [10]
+    assert result.evaluation_count == 5
+    assert result.report_path == project_dir / "reports/native_turbo_optimizer_report.json"
+
+
+def test_default_batch_turbo_factory_calls_f_batch_by_chunk() -> None:
+    pytest.importorskip("torch")
+    pytest.importorskip("gpytorch")
+    np = pytest.importorskip("numpy")
+    calls: list[tuple[str, int]] = []
+
+    def f_batch(raw_batch, *, selection_phase: str) -> list[float]:
+        calls.append((selection_phase, len(raw_batch)))
+        return [float(len(calls) * 10 + index) for index, _raw in enumerate(raw_batch)]
+
+    turbo = _default_batch_turbo_factory(
+        f_batch=f_batch,
+        lb=np.array([0.0, 0.0]),
+        ub=np.array([1.0, 1.0]),
+        n_init=4,
+        max_evals=6,
+        batch_size=2,
+        verbose=False,
+        n_training_steps=30,
+    )
+
+    turbo._create_candidates = lambda *args, **kwargs: (  # noqa: SLF001
+        np.array([[0.1, 0.1], [0.9, 0.9]]),
+        np.array([[0.0, 1.0], [1.0, 0.0]]),
+        {},
+    )
+    turbo._select_candidates = lambda x_cand, _y_cand: x_cand[: turbo.batch_size]  # noqa: SLF001
+
+    turbo.optimize()
+
+    assert calls == [
+        ("initialization", 2),
+        ("initialization", 2),
+        ("turbo_trust_region", 2),
+    ]
+    assert turbo.fX.shape == (6, 1)
 
 
 def test_prepare_explicit_candidate_real_run_allows_first_optimizer_candidate(

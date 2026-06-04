@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "current_scope": "C-18 Batch Native TuRBO Parallel Runner",
-  "current_status": "C-18 Task 1 Batch Runner Seam And Trace Metadata is complete, verified-only. Added the batch candidate dataclass, batch evaluator type, batch trace metadata fields, and a fake-tested NativeTurboBatchRunner seam without touching real Spectre/OCEAN adapter execution.",
+  "current_status": "C-18 Task 2 Local BatchTurbo1 Wrapper is complete, verified-only. Added run_batch_native_turbo_optimization with injected batch evaluator support and a local _default_batch_turbo_factory that preserves native Turbo1 candidate generation while calling f_batch in initialization and trust-region chunks.",
   "review_status": "verified-only",
   "subagent_dispatch": "available",
   "active_spec": "docs/superpowers/specs/2026-06-04-batch-native-turbo-parallel-runner-design.md",
@@ -12,7 +12,7 @@
     "docs/EXECUTION_PROGRESS_2026-05-29.md",
     "docs/COMPACT_RESUME_CHECKPOINT.md"
   ],
-  "next_allowed_action": "wait for user confirmation, then execute C-18 Task 2 Local BatchTurbo1 Wrapper; do not run real tools before fake/unit tasks pass and the user explicitly confirms C-18 real acceptance",
+  "next_allowed_action": "wait for user confirmation, then execute C-18 Task 3 Parallel Real Batch Evaluator; do not run real tools before fake/unit tasks pass and the user explicitly confirms C-18 real acceptance",
   "forbidden_actions": [
     "start broad optimizer framework work",
     "create daemon or service orchestration",
@@ -42,10 +42,10 @@
     "active_spec": "docs/superpowers/specs/2026-06-04-batch-native-turbo-parallel-runner-design.md",
     "active_plan": "docs/superpowers/plans/2026-06-04-batch-native-turbo-parallel-runner.md",
     "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
-    "alignment": "Aligned. C-18 Task 1 adds only the batch runner seam and trace metadata needed before real batch TuRBO integration. It preserves approved formulas, native Maestro/ADE layout, feasibility-first objective semantics, quantized-candidate de-duplication, and Spectre threads_per_run versus parallel_jobs separation.",
-    "drift": "None. The plan test was corrected to use a true duplicate raw point for duplicate-skip coverage; implementation stayed within the C-18 design and did not touch real-tool adapter execution."
+    "alignment": "Aligned. C-18 Task 2 adds only the local batch-aware Turbo1 wrapper and batch optimization entry point needed before real batch evaluation. It preserves approved formulas, native Maestro/ADE layout, feasibility-first objective semantics, quantized-candidate de-duplication, and Spectre threads_per_run versus parallel_jobs separation.",
+    "drift": "None. The plan was synchronized to fail closed when no batch_evaluator is injected until Task 3 creates the real batch evaluator; no real-tool adapter execution was added."
   },
-  "latest_valid_commit": "e5434f1 docs: design batch native turbo parallel runner",
+  "latest_valid_commit": "89c9e51 feat: add batch native turbo runner seam",
   "review_evidence": {
     "optimizer_skill_real_practice": "Complete, verified-only. Temporary practice at /tmp/ic_auto_opt_optimizer_skill_flow_001 ran Turbo1.optimize() for 100 evaluations with 8 initialization and 92 trust-region evaluations. 73 candidates were recorded through real Spectre/OCEAN, 24 duplicate quantized candidates were skipped, and 3 metric non-scalar candidates were converted to finite penalties. Best candidate was real_011: FN=11, WN=1.9u, FP=9, WP=0.5u, rise=72.489655ps, fall=64.569947ps, DC=301.334349uW, objective=4.1300765965648685e-14.",
     "archive_doc": "docs/debug/2026-06-04-optimizer-skill-real-flow-practice.md",
@@ -56,6 +56,7 @@
     "c17_acceptance_archive": "docs/debug/2026-06-04-native-turbo-runner-real-acceptance.md",
     "c18_design": "docs/superpowers/specs/2026-06-04-batch-native-turbo-parallel-runner-design.md",
     "c18_plan": "docs/superpowers/plans/2026-06-04-batch-native-turbo-parallel-runner.md",
-    "c18_task1": "Complete, verified-only. Added NativeTurboBatchCandidate, BatchEvaluator, batch trace metadata fields, and NativeTurboBatchRunner. Focused TDD verification passed: python3 -m pytest tests/test_native_turbo.py::test_batch_runner_records_batch_metadata_and_order -q. Adjacent verification passed: python3 -m pytest tests/test_native_turbo.py -q and python3 -m ruff check src/hermes_workflow/native_turbo.py tests/test_native_turbo.py."
+    "c18_task1": "Complete, verified-only. Added NativeTurboBatchCandidate, BatchEvaluator, batch trace metadata fields, and NativeTurboBatchRunner. Focused TDD verification passed: python3 -m pytest tests/test_native_turbo.py::test_batch_runner_records_batch_metadata_and_order -q. Adjacent verification passed: python3 -m pytest tests/test_native_turbo.py -q and python3 -m ruff check src/hermes_workflow/native_turbo.py tests/test_native_turbo.py.",
+    "c18_task2": "Complete, verified-only. Added run_batch_native_turbo_optimization and _default_batch_turbo_factory. Focused verification passed: python3 -m pytest tests/test_native_turbo.py::test_run_batch_native_turbo_optimization_uses_optimizer_batch_size -q. System python default-factory test skipped when torch/gpytorch were unavailable, and .venv/bin/python direct check proved f_batch chunk calls: initialization batch 2, initialization batch 2, trust-region batch 2. Adjacent verification passed: python3 -m pytest tests/test_native_turbo.py -q and python3 -m ruff check src/hermes_workflow/native_turbo.py tests/test_native_turbo.py."
   }
 }

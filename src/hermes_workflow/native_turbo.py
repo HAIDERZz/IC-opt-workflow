@@ -6,6 +6,7 @@ import random
 import shlex
 import subprocess
 import sys
+from copy import deepcopy
 from dataclasses import asdict, dataclass
 from decimal import Decimal
 from pathlib import Path
@@ -537,6 +538,44 @@ def run_native_turbo_optimization(
     )
 
 
+def run_batch_native_turbo_optimization(
+    project_dir: Path,
+    *,
+    max_evals: int | None = None,
+    cadence_cshrc: Path | None = None,
+    batch_evaluator: BatchEvaluator | None = None,
+    batch_turbo_factory: Callable[..., object] | None = None,
+    parallel_jobs: int | None = None,
+    threads_per_run: int | None = None,
+) -> NativeTurboRunResult:
+    project_dir = Path(project_dir)
+    bundle = assert_valid_project(project_dir)
+    selected_parallel_jobs = parallel_jobs or bundle.spectre.spectre.parallel_jobs
+    selected_threads_per_run = threads_per_run or bundle.spectre.spectre.threads_per_run
+    if batch_evaluator is None:
+        raise ValueError("batch_evaluator is required until C-18 Task 3")
+
+    runner = NativeTurboBatchRunner(
+        variables=bundle.variables,
+        metrics=bundle.metrics,
+        optimizer=bundle.optimizer,
+        batch_evaluator=batch_evaluator,
+        batch_turbo_factory=batch_turbo_factory or _default_batch_turbo_factory,
+        max_evals=max_evals,
+        parallel_jobs=selected_parallel_jobs,
+        threads_per_run=selected_threads_per_run,
+    )
+    result = runner.run()
+    report_path, evaluations_path = write_native_turbo_reports(project_dir, result)
+    return NativeTurboRunResult(
+        evaluation_count=result.evaluation_count,
+        traces=result.traces,
+        best_trace=result.best_trace,
+        report_path=report_path,
+        evaluations_path=evaluations_path,
+    )
+
+
 def evaluate_real_candidate(
     project_dir: Path,
     *,
@@ -868,6 +907,102 @@ def _default_turbo_factory(**kwargs):
     from turbo import Turbo1
 
     return Turbo1(**kwargs)
+
+
+def _default_batch_turbo_factory(**kwargs):
+    if str(DEFAULT_TURBO_PATH) not in sys.path:
+        sys.path.insert(0, str(DEFAULT_TURBO_PATH))
+    import numpy as np
+    from turbo import Turbo1
+    from turbo.utils import from_unit_cube, latin_hypercube, to_unit_cube
+
+    f_batch = kwargs.pop("f_batch")
+
+    class BatchTurbo1(Turbo1):
+        def __init__(self, *, f_batch, **turbo_kwargs) -> None:
+            self.f_batch = f_batch
+            super().__init__(f=lambda _x: math.inf, **turbo_kwargs)
+
+        def _evaluate_rows(self, rows, *, selection_phase: str):
+            values = self.f_batch(
+                [list(row) for row in rows],
+                selection_phase=selection_phase,
+            )
+            if len(values) != len(rows):
+                raise RuntimeError("batch objective returned an unexpected value count")
+            return np.array([[float(value)] for value in values])
+
+        def optimize(self):
+            while self.n_evals < self.max_evals:
+                if len(self._fX) > 0 and self.verbose:
+                    n_evals, fbest = self.n_evals, self._fX.min()
+                    print(f"{n_evals}) Restarting with fbest = {fbest:.4}")
+                    sys.stdout.flush()
+
+                self._restart()
+
+                init_count = min(self.n_init, self.max_evals - self.n_evals)
+                X_init = latin_hypercube(init_count, self.dim)
+                X_init = from_unit_cube(X_init, self.lb, self.ub)
+                init_chunks = [
+                    self._evaluate_rows(
+                        X_init[start : start + self.batch_size],
+                        selection_phase=INITIALIZATION_PHASE,
+                    )
+                    for start in range(0, init_count, self.batch_size)
+                ]
+                fX_init = np.vstack(init_chunks)
+
+                self.n_evals += init_count
+                self._X = deepcopy(X_init)
+                self._fX = deepcopy(fX_init)
+
+                self.X = np.vstack((self.X, deepcopy(X_init)))
+                self.fX = np.vstack((self.fX, deepcopy(fX_init)))
+
+                if self.verbose:
+                    fbest = self._fX.min()
+                    print(f"Starting from fbest = {fbest:.4}")
+                    sys.stdout.flush()
+
+                while self.n_evals < self.max_evals and self.length >= self.length_min:
+                    X = to_unit_cube(deepcopy(self._X), self.lb, self.ub)
+                    fX = deepcopy(self._fX).ravel()
+                    current_batch_size = min(self.batch_size, self.max_evals - self.n_evals)
+                    original_batch_size = self.batch_size
+                    self.batch_size = current_batch_size
+                    try:
+                        X_cand, y_cand, _hypers = self._create_candidates(
+                            X,
+                            fX,
+                            length=self.length,
+                            n_training_steps=self.n_training_steps,
+                            hypers={},
+                        )
+                        X_next = self._select_candidates(X_cand, y_cand)
+                    finally:
+                        self.batch_size = original_batch_size
+
+                    X_next = from_unit_cube(X_next, self.lb, self.ub)
+                    fX_next = self._evaluate_rows(
+                        X_next,
+                        selection_phase=TRUST_REGION_PHASE,
+                    )
+
+                    self._adjust_length(fX_next)
+                    self.n_evals += len(X_next)
+                    self._X = np.vstack((self._X, X_next))
+                    self._fX = np.vstack((self._fX, fX_next))
+
+                    if self.verbose and fX_next.min() < self.fX.min():
+                        n_evals, fbest = self.n_evals, fX_next.min()
+                        print(f"{n_evals}) New best: {fbest:.4}")
+                        sys.stdout.flush()
+
+                    self.X = np.vstack((self.X, deepcopy(X_next)))
+                    self.fX = np.vstack((self.fX, deepcopy(fX_next)))
+
+    return BatchTurbo1(f_batch=f_batch, **kwargs)
 
 
 def _run_default_adapter(
