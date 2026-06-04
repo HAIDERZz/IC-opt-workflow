@@ -1083,6 +1083,14 @@ Next required action:
 - current_scope: C-25 Optimizer Run Acceptance Audit.
 - next_allowed_action: execute C-25 Task 1 library acceptance report only; do not run real tools or start broad optimizer framework work.
 
+- C-25 Optimizer Run Acceptance Audit completion: complete, verified-only.
+- Added `src/hermes_workflow/optimizer_acceptance.py`, `tests/test_optimizer_acceptance.py`, and `hermes-workflow check-optimizer-run PROJECT_DIR`.
+- The command reads existing native TuRBO report/trace/result/metric manifests and writes `reports/optimizer_run_acceptance_report.json`.
+- Local C-24 retry shape smoke passed on `/tmp/ic_auto_opt_c24_retry/bridge_test_inv` with `optimizer run accepted`.
+- Verification passed: `python3 -m pytest tests/test_optimizer_acceptance.py tests/test_optimizer_task_package.py tests/test_native_turbo.py -q`, `python3 -m ruff check src tests tools`, `python3 tools/check_development_cadence.py`, and `git diff --check`.
+- current_scope: C-25 Optimizer Run Acceptance Audit complete.
+- next_allowed_action: wait for user confirmation before choosing the next narrow practice-backed step; do not start broad optimizer framework work.
+
 ## Locked Role Model
 
 Status: locked as of 2026-06-02.

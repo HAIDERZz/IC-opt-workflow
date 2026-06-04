@@ -551,13 +551,13 @@ Status: complete, verified-only.
 
 ## Next Step
 
-Plan A, Plan B, and Plan C C-1 through C-24 are complete. C-25 design spec and implementation plan are written. The current accepted optimizer route uses native `Turbo1.optimize()`, the existing `run-native-turbo --parallel` runner, bounded Spectre/OCEAN workers, OCEAN-only retry for command/license failures, Hermes-generated execution task packets, and manifest-level supervisor/Hermes audit.
+Plan A, Plan B, and Plan C C-1 through C-25 are complete. The current accepted optimizer route uses native `Turbo1.optimize()`, the existing `run-native-turbo --parallel` runner, bounded Spectre/OCEAN workers, OCEAN-only retry for command/license failures, Hermes-generated execution task packets, and manifest-level supervisor/Hermes audit.
 
 C-24 validated the C-23 generated optimizer task packet handoff. The first worker attempt was rejected because sandboxed Spectre failed before metric extraction with pipe/socket permission errors. Task 2R reran the same packet semantics through the approved non-sandbox Cadence path on `/tmp/ic_auto_opt_c24_retry/bridge_test_inv` and completed `100` evaluations: `36 feasible`, `43 constraint_failed`, `21 metric_check_failed`; `100` result manifests succeeded; `100` metric manifests were produced; settings audit passed with `preset=ax`, `threads_per_run=10`, `parallel_jobs=10`, and `output_format=psfxl`. Sanitized audit: `docs/debug/2026-06-04-c24-generated-task-packet-handoff.md`.
 
-C-25 scopes the next narrow productization step: `hermes-workflow check-optimizer-run PROJECT_DIR`, a deterministic audit command that reads existing native TuRBO report/trace/result/metric manifests and writes `reports/optimizer_run_acceptance_report.json`. It productizes the C-24 manual supervisor/Hermes audit and does not run real tools.
+C-25 productized the manual supervisor/Hermes audit as `hermes-workflow check-optimizer-run PROJECT_DIR`, a deterministic command that reads existing native TuRBO report/trace/result/metric manifests and writes `reports/optimizer_run_acceptance_report.json`. It passed focused fake-artifact tests and local C-24 retry shape smoke on `/tmp/ic_auto_opt_c24_retry/bridge_test_inv` with `optimizer run accepted`.
 
-Current next step: execute C-25 Task 1 library acceptance report only. Build on `run-native-turbo --parallel`; do not start broad optimizer framework work. Do not commit raw input decks, protected include files, PSF/raw data, full Cadence logs, `docs/OCEAN_DOC_*`, or `docs/toolchain_evidence/`. Do not parse PSF or translate OCEAN formulas in Python.
+Current next step: wait for user confirmation before choosing the next narrow practice-backed step. Build on `run-native-turbo --parallel`; do not start broad optimizer framework work. Do not commit raw input decks, protected include files, PSF/raw data, full Cadence logs, `docs/OCEAN_DOC_*`, or `docs/toolchain_evidence/`. Do not parse PSF or translate OCEAN formulas in Python.
 
 Read the handoff files first:
 
@@ -585,5 +585,5 @@ Use this prompt after compact:
 9. ic-auto-opt-workflow/docs/superpowers/plans/2026-06-04-optimizer-execution-agent-task-packet.md
 10. 如需背景，再读 ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-25 Optimizer Run Acceptance Audit design spec 和 implementation plan 已完成，状态 verified-only。下一步只能执行 C-25 Task 1：library acceptance report。不要运行 Virtuoso/Spectre/OCEAN/SSH/bridge/执行 agent，不要调用 Claude CLI 作为 execution agent，不要写 broad optimizer framework，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。不要用 Python 解析 PSF，不要让 agent 翻译或重写 Calculator/OCEAN 公式。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-25 Optimizer Run Acceptance Audit 已完成，状态 verified-only。新增 hermes-workflow check-optimizer-run PROJECT_DIR，用于读取 existing native TuRBO report/trace/result/metric manifests 并写 reports/optimizer_run_acceptance_report.json；本地 C-24 retry workspace 形状验收通过。下一步等待用户选择新的窄 scope，不要自行进入 broad optimizer framework 或真实工具运行。不要调用 Claude CLI 作为 execution agent，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。不要用 Python 解析 PSF，不要让 agent 翻译或重写 Calculator/OCEAN 公式。
 ```

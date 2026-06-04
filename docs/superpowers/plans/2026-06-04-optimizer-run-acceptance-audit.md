@@ -47,14 +47,14 @@ Forbidden:
 
 **Risk:** Medium. Deterministic report/check logic, no real tools.
 
-**Status:** Pending.
+**Status:** Complete, verified-only.
 
 **Files:**
 
 - Create: `src/hermes_workflow/optimizer_acceptance.py`
 - Create: `tests/test_optimizer_acceptance.py`
 
-- [ ] **Step 1: Write accepted-run fixture test**
+- [x] **Step 1: Write accepted-run fixture test**
 
 Add a helper in `tests/test_optimizer_acceptance.py` that writes a minimal fake project:
 
@@ -104,7 +104,7 @@ python3 -m pytest tests/test_optimizer_acceptance.py -q
 
 Expected: fail because `optimizer_acceptance` does not exist.
 
-- [ ] **Step 2: Implement minimal report model and checker**
+- [x] **Step 2: Implement minimal report model and checker**
 
 Create `src/hermes_workflow/optimizer_acceptance.py` with:
 
@@ -152,7 +152,7 @@ Minimum behavior for Task 1:
 - write `reports/optimizer_run_acceptance_report.json`;
 - do not reject solely because `state/optimizer_state.json` says `running`.
 
-- [ ] **Step 3: Verify Task 1**
+- [x] **Step 3: Verify Task 1**
 
 Run:
 
@@ -167,14 +167,14 @@ Expected: pass.
 
 **Risk:** Medium. Acceptance logic safety.
 
-**Status:** Pending.
+**Status:** Complete, verified-only.
 
 **Files:**
 
 - Modify: `tests/test_optimizer_acceptance.py`
 - Modify: `src/hermes_workflow/optimizer_acceptance.py`
 
-- [ ] **Step 1: Add focused rejection tests**
+- [x] **Step 1: Add focused rejection tests**
 
 Add tests for:
 
@@ -196,7 +196,7 @@ assert report.status == "rejected"
 assert any("evaluation count mismatch" in issue for issue in report.issues)
 ```
 
-- [ ] **Step 2: Implement missing guards**
+- [x] **Step 2: Implement missing guards**
 
 Update `check_optimizer_run()` so these cases are blocking issues:
 
@@ -206,7 +206,7 @@ Update `check_optimizer_run()` so these cases are blocking issues:
 - settings drift across result manifests;
 - report says completed but no result manifests succeeded.
 
-- [ ] **Step 3: Verify Task 2**
+- [x] **Step 3: Verify Task 2**
 
 Run:
 
@@ -221,14 +221,14 @@ Expected: pass.
 
 **Risk:** Medium. CLI integration only; no real tools.
 
-**Status:** Pending.
+**Status:** Complete, verified-only.
 
 **Files:**
 
 - Modify: `src/hermes_workflow/cli.py`
 - Modify: `tests/test_optimizer_acceptance.py`
 
-- [ ] **Step 1: Add CLI test**
+- [x] **Step 1: Add CLI test**
 
 Add:
 
@@ -256,7 +256,7 @@ def test_check_optimizer_run_cli_exits_nonzero_for_rejected_run(tmp_path: Path) 
     assert "optimizer run rejected" in result.stdout
 ```
 
-- [ ] **Step 2: Add CLI command**
+- [x] **Step 2: Add CLI command**
 
 In `src/hermes_workflow/cli.py`, add:
 
@@ -274,7 +274,7 @@ The command should:
 - exit `1` when `status == rejected`;
 - not run real tools.
 
-- [ ] **Step 3: Verify Task 3**
+- [x] **Step 3: Verify Task 3**
 
 Run:
 
@@ -289,7 +289,7 @@ Expected: pass.
 
 **Risk:** Low-to-medium. Local artifact shape check; no real tools.
 
-**Status:** Pending.
+**Status:** Complete, verified-only.
 
 **Files:**
 
@@ -297,7 +297,7 @@ Expected: pass.
 - Modify: `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`
 - Modify: this plan file.
 
-- [ ] **Step 1: Run checker on accepted C-24 retry workspace if available**
+- [x] **Step 1: Run checker on accepted C-24 retry workspace if available**
 
 If `/tmp/ic_auto_opt_c24_retry/bridge_test_inv` exists, run:
 
@@ -315,7 +315,7 @@ optimizer run accepted
 If the local `/tmp` workspace is absent, skip this step and state that C-24
 shape smoke was skipped because raw evidence is local-only.
 
-- [ ] **Step 2: Final verification**
+- [x] **Step 2: Final verification**
 
 Run:
 
@@ -329,7 +329,7 @@ git status --short
 
 Expected: pass, with only intended tracked changes.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 Use explicit pathspecs:
 
@@ -349,3 +349,18 @@ git commit -m "feat: add optimizer run acceptance audit"
 - Spec coverage: covers deterministic report/trace/manifest audit, CLI output, candidate-level metric failure handling, state snapshot handling, and C-24 evidence basis.
 - Boundary check: no real tools, optimizer algorithm, scheduler, PSF parser, formula rewrite, or native-layout replacement.
 - Drift check: this plan productizes the C-24 manual supervisor/Hermes audit; it does not add a new optimizer route.
+
+## Completion Note
+
+- Implemented `src/hermes_workflow/optimizer_acceptance.py`.
+- Added `hermes-workflow check-optimizer-run PROJECT_DIR`.
+- Added focused fake-artifact tests for accepted runs, trace/report mismatch,
+  missing manifests, Spectre setting drift, result failure/status mismatch,
+  candidate-level metric failures, and CLI exit behavior.
+- Local C-24 shape smoke passed on
+  `/tmp/ic_auto_opt_c24_retry/bridge_test_inv`:
+  `optimizer run accepted`.
+- Final verification passed:
+  `python3 -m pytest tests/test_optimizer_acceptance.py tests/test_optimizer_task_package.py tests/test_native_turbo.py -q`,
+  `python3 -m ruff check src tests tools`,
+  `python3 tools/check_development_cadence.py`, and `git diff --check`.
