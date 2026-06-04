@@ -79,6 +79,8 @@ All raw execution evidence stays local-only under:
 
 **Risk:** Low. This task writes a precise task packet and does not run real tools.
 
+**Status:** Complete, verified-only.
+
 **Files:**
 
 - Modify: `docs/superpowers/plans/2026-06-04-execution-agent-optimizer-practice-acceptance.md`
@@ -87,7 +89,7 @@ All raw execution evidence stays local-only under:
 - Modify as required by cadence checker: `docs/EXECUTION_PROGRESS_2026-05-29.md`
 - Modify as required by cadence checker: `docs/COMPACT_RESUME_CHECKPOINT.md`
 
-- [ ] **Step 1: Verify repo state**
+- [x] **Step 1: Verify repo state**
 
 Run:
 
@@ -103,7 +105,7 @@ Expected:
 - cadence checker passes before the C-19 state update or reports only the expected current-node drift caused by this task;
 - no protected local raw evidence is staged.
 
-- [ ] **Step 2: Write local-only handoff packet**
+- [x] **Step 2: Write local-only handoff packet**
 
 Create:
 
@@ -165,7 +167,7 @@ Expected:
 - the packet exists only under `/tmp`;
 - no repo raw artifacts are created.
 
-- [ ] **Step 3: Prepare a clean local project**
+- [x] **Step 3: Prepare a clean local project**
 
 Run:
 
@@ -184,7 +186,7 @@ Expected:
 - `$C19_PROJECT/netlists/exported/amap/` remains when present in the source;
 - prior C-18 run outputs are not copied.
 
-- [ ] **Step 4: Record Task 1 state and stop**
+- [x] **Step 4: Record Task 1 state and stop**
 
 Update:
 
@@ -212,7 +214,7 @@ Commit:
 
 ```bash
 git add docs/superpowers/plans/2026-06-04-execution-agent-optimizer-practice-acceptance.md docs/CURRENT_TASK_STATE.json docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md docs/EXECUTION_PROGRESS_2026-05-29.md docs/COMPACT_RESUME_CHECKPOINT.md
-git commit -m "docs: plan execution agent optimizer acceptance"
+git commit -m "docs: prepare c19 execution handoff"
 ```
 
 ## Task 2: Real Execution-Agent Optimizer Run

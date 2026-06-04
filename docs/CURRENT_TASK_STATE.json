@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "current_scope": "C-19 Execution-Agent Optimizer Practice Acceptance",
-  "current_status": "C-19 Execution-Agent Optimizer Practice Acceptance plan is written, verified-only. C-19 is the next narrow real-use validation: prepare one execution-agent handoff packet, run the existing run-native-turbo --parallel 100-evaluation command through the execution boundary after user confirmation, audit returned reports, and only fix blocking bugs proven by that real run.",
+  "current_status": "C-19 Task 1 Prepare Execution-Agent Handoff Packet is complete, verified-only. A local-only handoff packet was written under /tmp/ic_auto_opt_c19/evidence/execution_agent_optimizer_acceptance_001, and a clean C-19 practice project was copied from the C-18 accepted project while preserving native Maestro/ADE exported netlist sidecars and removing prior runs/reports/state/data outputs.",
   "review_status": "verified-only",
   "subagent_dispatch": "available",
   "active_spec": "docs/superpowers/plans/2026-06-04-execution-agent-optimizer-practice-acceptance.md",
@@ -12,7 +12,7 @@
     "docs/EXECUTION_PROGRESS_2026-05-29.md",
     "docs/COMPACT_RESUME_CHECKPOINT.md"
   ],
-  "next_allowed_action": "execute C-19 Task 1: Prepare Execution-Agent Handoff Packet; do not run the C-19 real-tool optimizer command until Task 1 is complete and the user confirms Task 2",
+  "next_allowed_action": "wait for user confirmation, then execute C-19 Task 2: Real Execution-Agent Optimizer Run; do not run the C-19 real-tool optimizer command before that confirmation",
   "forbidden_actions": [
     "start broad optimizer framework work",
     "hand-pick 100 optimizer points instead of using native Turbo1.optimize()",
@@ -44,10 +44,10 @@
     "active_spec": "docs/superpowers/plans/2026-06-04-execution-agent-optimizer-practice-acceptance.md",
     "active_plan": "docs/superpowers/plans/2026-06-04-execution-agent-optimizer-practice-acceptance.md",
     "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
-    "alignment": "Aligned. C-19 does not add a new framework; it uses the C-18 run-native-turbo --parallel path to validate the original supervisor-agent to execution-agent handoff goal against real tooling.",
+    "alignment": "Aligned. C-19 Task 1 prepared only the handoff packet and clean /tmp practice project required before the real execution-agent optimizer run. No new framework, real tool execution, formula rewrite, PSF parsing, or native layout flattening occurred.",
     "drift": "None open. C-19 intentionally uses the implementation plan itself as the scoped active spec to avoid creating speculative overlapping design assets."
   },
-  "latest_valid_commit": "cc6bd6e feat: add batch native turbo parallel runner",
+  "latest_valid_commit": "d7b3cee docs: plan execution agent optimizer acceptance",
   "review_evidence": {
     "optimizer_skill_real_practice": "Complete, verified-only. Temporary practice at /tmp/ic_auto_opt_optimizer_skill_flow_001 ran Turbo1.optimize() for 100 evaluations with 8 initialization and 92 trust-region evaluations. 73 candidates were recorded through real Spectre/OCEAN, 24 duplicate quantized candidates were skipped, and 3 metric non-scalar candidates were converted to finite penalties. Best candidate was real_011: FN=11, WN=1.9u, FP=9, WP=0.5u, rise=72.489655ps, fall=64.569947ps, DC=301.334349uW, objective=4.1300765965648685e-14.",
     "archive_doc": "docs/debug/2026-06-04-optimizer-skill-real-flow-practice.md",
@@ -62,6 +62,7 @@
     "c18_task2": "Complete, verified-only. Added run_batch_native_turbo_optimization and _default_batch_turbo_factory. Focused verification passed: python3 -m pytest tests/test_native_turbo.py::test_run_batch_native_turbo_optimization_uses_optimizer_batch_size -q. System python default-factory test skipped when torch/gpytorch were unavailable, and .venv/bin/python direct check proved f_batch chunk calls: initialization batch 2, initialization batch 2, trust-region batch 2. Adjacent verification passed: python3 -m pytest tests/test_native_turbo.py -q and python3 -m ruff check src/hermes_workflow/native_turbo.py tests/test_native_turbo.py.",
     "c18_task3": "Complete, verified-only. Added execute_and_check_real_candidate, make_real_candidate_batch_evaluator, sequential recording outside worker threads, non-persisted per-worker check reports, and a default-off allow_unresolved_batch_runs flag for batch preparation only. Verification passed: python3 -m pytest tests/test_native_turbo.py::test_real_batch_evaluator_caps_parallel_adapter_calls -q; python3 -m pytest tests/test_native_turbo.py tests/test_real_result_record.py tests/test_metric_results.py -q; python3 -m pytest tests/test_candidate_injection_real_run.py tests/test_real_run_recovery.py -q; python3 -m ruff check src/hermes_workflow/native_turbo.py src/hermes_workflow/real_run.py tests/test_native_turbo.py.",
     "c18_complete": "Complete, verified-only. Added run-native-turbo --parallel, report batch_summary, sanitized acceptance note docs/debug/2026-06-04-batch-native-turbo-parallel-acceptance.md, and real acceptance on /tmp/ic_auto_opt_c18_batch_native_turbo_001/bridge_test_inv. Real run completed 100 evaluations: 36 feasible, 50 constraint_failed, 14 metric_check_failed; phase counts initialization 16 and turbo_trust_region 84; batch_count 11; max worker metadata 10; Spectre audit preset ax, threads_per_run 10, parallel_jobs 10, output_format psfxl for all 100 prepared manifests. Full verification passed: python3 -m pytest -q (513 passed, 1 skipped) and python3 -m ruff check .",
-    "c19_plan": "Complete, verified-only. Added docs/superpowers/plans/2026-06-04-execution-agent-optimizer-practice-acceptance.md as the next narrow practice-backed scope. C-19 validates execution-agent handoff using the existing run-native-turbo --parallel 100-evaluation path, not a new optimizer framework."
+    "c19_plan": "Complete, verified-only. Added docs/superpowers/plans/2026-06-04-execution-agent-optimizer-practice-acceptance.md as the next narrow practice-backed scope. C-19 validates execution-agent handoff using the existing run-native-turbo --parallel 100-evaluation path, not a new optimizer framework.",
+    "c19_task1": "Complete, verified-only. Wrote local-only execution-agent task packet at /tmp/ic_auto_opt_c19/evidence/execution_agent_optimizer_acceptance_001/EXECUTION_AGENT_TASK.md and prepared clean practice project /tmp/ic_auto_opt_c19/bridge_test_inv from the accepted C-18 project. Native netlists/exported/input.scs, ade_e.scs, and amap/ were preserved; old runs/reports/state/data outputs were removed. Verification passed: git status --short, python3 tools/check_development_cadence.py, git diff --check. No real Spectre/OCEAN/Virtuoso/SSH/bridge run occurred."
   }
 }
