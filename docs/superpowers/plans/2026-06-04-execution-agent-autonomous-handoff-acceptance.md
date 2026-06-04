@@ -103,4 +103,4 @@ Supervisor audit result:
 
 - [x] Update current-state and progress nodes.
 - [x] Run verification.
-- [ ] Commit plan, sanitized note, and progress files.
+- [x] Commit plan, sanitized note, and progress files.
