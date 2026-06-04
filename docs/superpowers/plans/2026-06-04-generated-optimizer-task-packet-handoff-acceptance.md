@@ -45,13 +45,13 @@ Forbidden:
 
 **Risk:** Low. Local file preparation only; no real tools.
 
-**Status:** Pending.
+**Status:** Complete.
 
-- [ ] **Step 1: Prepare local workspace**
+- [x] **Step 1: Prepare local workspace**
 
 Use a clean `/tmp/ic_auto_opt_c24/bridge_test_inv` workspace based on the latest accepted real-tool project shape. Preserve native `netlists/exported/input.scs`, `ade_e.scs`, and `amap/`. Remove stale `runs/`, `reports/`, `state/`, and `ledger/` outputs unless the selected source intentionally provides a clean initial state.
 
-- [ ] **Step 2: Generate the C-23 optimizer task packet**
+- [x] **Step 2: Generate the C-23 optimizer task packet**
 
 Run from the repo:
 
@@ -66,7 +66,7 @@ Expected outputs:
 /tmp/ic_auto_opt_c24/bridge_test_inv/execution_package/optimizer_execution_manifest.json
 ```
 
-- [ ] **Step 3: Gate the packet before worker handoff**
+- [x] **Step 3: Gate the packet before worker handoff**
 
 Verify:
 
@@ -83,13 +83,22 @@ Acceptance:
 - packet forbids hand-picked points, PSF parsing, and OCEAN formula rewriting;
 - no real Spectre/OCEAN/Virtuoso/worker execution has occurred in Task 1.
 
+Task 1 result:
+
+- Initial workspace: `/tmp/ic_auto_opt_c24/bridge_test_inv`.
+- Retry workspace used for accepted rerun: `/tmp/ic_auto_opt_c24_retry/bridge_test_inv`.
+- Generated packet artifacts:
+  - `execution_package/OPTIMIZER_EXECUTION_TASK.md`
+  - `execution_package/optimizer_execution_manifest.json`
+- Packet used absolute project and Cadence cshrc paths, preserved the existing `run-native-turbo --parallel` route, and kept manifest-level audit as required behavior.
+
 ## Task 2: Local Worker-Agent Execution
 
 **Risk:** High. Real tools and local worker-agent handoff.
 
-**Status:** Pending.
+**Status:** Complete after one rejected sandbox attempt and one accepted non-sandbox rerun.
 
-- [ ] **Step 1: Dispatch one local worker agent**
+- [x] **Step 1: Dispatch one local worker agent**
 
 Give the worker only:
 
@@ -100,7 +109,7 @@ Give the worker only:
 
 The worker must not receive hidden chat context. It must run the command from the generated packet, use non-sandbox Cadence execution if required, and return artifact paths plus a concise manifest-level summary.
 
-- [ ] **Step 2: Run the generated command**
+- [x] **Step 2: Run the generated command**
 
 Expected command shape:
 
@@ -117,13 +126,19 @@ state/optimizer_state.json
 ledger/experiment_ledger.jsonl
 ```
 
+Task 2 result:
+
+- First attempt on `/tmp/ic_auto_opt_c24/bridge_test_inv` was rejected. Spectre failed in the sandbox before metric extraction with `cannot create pipe [Operation not permitted]` and `can't create server socket`.
+- Rerun `Task 2R` on `/tmp/ic_auto_opt_c24_retry/bridge_test_inv` used the same generated packet semantics and ran through the approved non-sandbox real-tool path.
+- Rerun completed `100` optimizer evaluations and returned the required report, trace, state, and ledger artifacts.
+
 ## Task 3: Supervisor/Hermes Acceptance Audit
 
 **Risk:** Medium. Audit only; no rerun unless the returned evidence is incomplete.
 
-**Status:** Pending.
+**Status:** Complete.
 
-- [ ] **Step 1: Audit returned artifacts**
+- [x] **Step 1: Audit returned artifacts**
 
 Check:
 
@@ -134,7 +149,7 @@ Check:
 - Spectre settings are consistent: `preset=ax`, `threads_per_run=10`, `parallel_jobs=10`, `output_format=psfxl`;
 - no worker evidence indicates hand-picked candidate points, PSF parsing, or formula rewriting.
 
-- [ ] **Step 2: Write sanitized audit note**
+- [x] **Step 2: Write sanitized audit note**
 
 Write only sanitized summary evidence to:
 
@@ -144,21 +159,32 @@ docs/debug/2026-06-04-c24-generated-task-packet-handoff.md
 
 Do not commit raw local artifacts.
 
+Task 3 result:
+
+- Sanitized audit note: `docs/debug/2026-06-04-c24-generated-task-packet-handoff.md`.
+- Accepted report: `/tmp/ic_auto_opt_c24_retry/bridge_test_inv/reports/native_turbo_optimizer_report.json`.
+- Evaluation count: `100`.
+- Result manifests: `100`, all succeeded.
+- Metric manifests: `100`, with `79 succeeded` and `21 failed` candidate-level metric results.
+- Optimizer status counts: `36 feasible`, `43 constraint_failed`, `21 metric_check_failed`.
+- Settings audit: `preset=ax`, `threads_per_run=10`, `parallel_jobs=10`, `output_format=psfxl`.
+- Best accepted candidate: `real_021`, `FN=10`, `WN=1.1u`, `FP=9`, `WP=0.5u`, objective `4.305718220077049e-14`.
+
 ## Task 4: Closeout Or Focused Fix Decision
 
 **Risk:** Low-to-medium. Docs and decision.
 
-**Status:** Pending.
+**Status:** Complete.
 
-- [ ] **Step 1: If accepted, close C-24**
+- [x] **Step 1: If accepted, close C-24**
 
 Record that the generated task packet handoff path is accepted.
 
-- [ ] **Step 2: If blocked, write the smallest bug fix scope**
+- [x] **Step 2: If blocked, write the smallest bug fix scope**
 
 If C-24 exposes a bug, write one narrow fix scope tied to the observed failure. Do not create a broad execution framework.
 
-- [ ] **Step 3: Final verification**
+- [x] **Step 3: Final verification**
 
 Run:
 
@@ -169,3 +195,10 @@ git status --short
 ```
 
 For code changes, also run focused pytest/ruff before any commit.
+
+Task 4 result:
+
+- C-24 is accepted.
+- No production code fix was required.
+- The only observed blocker was an invalid sandbox execution environment in the first worker attempt. The accepted route requires non-sandbox Cadence execution for Spectre/OCEAN.
+- No raw local Cadence artifacts were committed.

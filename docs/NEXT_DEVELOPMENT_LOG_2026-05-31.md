@@ -1201,6 +1201,23 @@ C-24 Generated Optimizer Task Packet Handoff Acceptance:
 - Route audit: aligned with C-23, C-19/C-20 handoff evidence, C-21 retry handling, and the top-level practice-first route. Drift: none.
 - next_allowed_action: execute C-24 Task 1 workspace and generated packet gate only; do not run the local worker-agent or real tools until Task 1 is complete and the user confirms Task 2.
 
+C-24 Generated Optimizer Task Packet Handoff Acceptance Completion:
+
+- Status: complete, verified-only.
+- Plan: `docs/superpowers/plans/2026-06-04-generated-optimizer-task-packet-handoff-acceptance.md`.
+- Sanitized audit: `docs/debug/2026-06-04-c24-generated-task-packet-handoff.md`.
+- Task 1 generated the C-23 optimizer execution task packet and manifest from a clean local workspace.
+- Task 2 first worker attempt on `/tmp/ic_auto_opt_c24/bridge_test_inv` was rejected. Spectre failed before metric extraction because the worker ran Cadence under sandbox restrictions: `cannot create pipe [Operation not permitted]` and `can't create server socket`.
+- Task 2R reran the same generated-packet semantics on `/tmp/ic_auto_opt_c24_retry/bridge_test_inv` through the approved non-sandbox Cadence path.
+- Task 2R completed `100` native TuRBO optimizer evaluations with `100` result manifests succeeded and `100` metric manifests produced.
+- Metric manifests: `79 succeeded`, `21 failed` as candidate-level metric failures.
+- Optimizer status counts: `36 feasible`, `43 constraint_failed`, `21 metric_check_failed`.
+- Settings audit passed: `preset=ax`, `threads_per_run=10`, `parallel_jobs=10`, `output_format=psfxl`.
+- Best accepted candidate: `real_021`, `FN=10`, `WN=1.1u`, `FP=9`, `WP=0.5u`, objective `4.305718220077049e-14`.
+- State note: `state/optimizer_state.json` remains a running optimizer snapshot in this runner, consistent with C-18/C-21. C-24 acceptance is based on the completed native TuRBO report, JSONL trace, result manifests, metric manifests, and settings audit.
+- Route audit: aligned with the top-level practice-first route. Drift: none. The first failed attempt was an invalid sandbox execution environment, not optimizer, OCEAN formula, PSF parser, or native-layout drift.
+- next_allowed_action: wait for user confirmation, then choose the next narrow practice-backed productization or acceptance step after C-24; do not start a broad optimizer framework.
+
 ## Resume Prompt
 
 ```text

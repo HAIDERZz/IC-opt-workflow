@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "current_scope": "C-24 Generated Optimizer Task Packet Handoff Acceptance",
-  "current_status": "C-24 implementation plan is written and verified-only. C-24 will validate that the C-23 Hermes-generated optimizer execution-agent task packet can drive one local worker-agent handoff over the proven run-native-turbo --parallel route, followed by supervisor/Hermes manifest-level audit. No C-24 real tools or worker execution have run yet.",
+  "current_status": "C-24 is complete and accepted, verified-only. The generated C-23 optimizer task packet drove the proven run-native-turbo --parallel route through a non-sandbox real-tool rerun and supervisor/Hermes manifest-level audit. The first worker attempt was rejected because sandboxed Spectre failed before metric extraction; Task 2R reran the same packet semantics through the approved non-sandbox Cadence path and completed 100 evaluations.",
   "review_status": "verified-only",
   "subagent_dispatch": "available",
   "active_spec": "docs/superpowers/plans/2026-06-04-generated-optimizer-task-packet-handoff-acceptance.md",
@@ -12,14 +12,14 @@
     "docs/EXECUTION_PROGRESS_2026-05-29.md",
     "docs/COMPACT_RESUME_CHECKPOINT.md"
   ],
-  "next_allowed_action": "execute C-24 Task 1 workspace and generated packet gate only; do not run the local worker-agent or real tools until Task 1 is complete and the user confirms Task 2",
+  "next_allowed_action": "wait for user confirmation, then choose the next narrow practice-backed productization or acceptance step after C-24; do not start a broad optimizer framework",
   "forbidden_actions": [
     "start broad optimizer framework work",
     "hand-pick 100 optimizer points instead of using native Turbo1.optimize()",
     "start a new broad optimizer framework",
     "create daemon or service orchestration",
     "replace TuRBO",
-    "run C-24 Task 2 local worker-agent execution before Task 1 packet gate is complete and the user confirms",
+    "rerun C-24 without preserving the accepted non-sandbox Cadence execution requirement",
     "run Virtuoso before explicit task confirmation",
     "run SSH before explicit task confirmation",
     "run Claude CLI as an execution agent",
@@ -44,8 +44,8 @@
     "active_spec": "docs/superpowers/plans/2026-06-04-generated-optimizer-task-packet-handoff-acceptance.md",
     "active_plan": "docs/superpowers/plans/2026-06-04-generated-optimizer-task-packet-handoff-acceptance.md",
     "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
-    "alignment": "Aligned. C-24 is the direct acceptance step after C-23: generate the optimizer task packet, hand it to one local worker agent, and audit manifests. It reuses run-native-turbo --parallel and does not add optimizer framework code.",
-    "drift": "None. C-24 is a narrow practice-backed handoff acceptance plan, not a new optimizer algorithm, scheduler, PSF parser, formula rewrite, or layout replacement."
+    "alignment": "Aligned. C-24 completed the direct acceptance step after C-23: generated optimizer task packet, local worker-agent handoff attempt, non-sandbox real-tool rerun, and manifest-level audit. It reused run-native-turbo --parallel and did not add optimizer framework code.",
+    "drift": "None. The rejected first attempt exposed an invalid sandbox execution environment rather than optimizer, OCEAN formula, PSF, or layout drift. The accepted Task 2R route preserves the proven non-sandbox Cadence execution requirement."
   },
   "latest_valid_commit": "current HEAD",
   "review_evidence": {
@@ -76,6 +76,7 @@
     "c23_task3": "Complete, verified-only, committed in the current HEAD. Added local fake handoff smoke coverage that rejects Claude-specific wording and keeps hand-pick, parse PSF, and rewrite OCEAN as forbidden-action language rather than required behavior.",
     "c23_task4": "Complete, verified-only, committed in the current HEAD. Final verification passed: python3 -m pytest tests/test_optimizer_task_package.py tests/test_package.py tests/test_native_turbo.py -q; python3 -m ruff check src tests tools; python3 tools/check_development_cadence.py; git diff --check.",
     "c23_post_sync_review": "Complete, verified-only. Local review found that generated optimizer task commands could preserve a relative project path and render shell commands with plain string join. Fixed by resolving project_dir/cadence_cshrc before payload generation and using shell-safe command rendering. Verification passed: python3 -m pytest tests/test_optimizer_task_package.py tests/test_package.py tests/test_native_turbo.py -q (38 passed, 1 skipped); python3 -m ruff check src tests tools; python3 tools/check_development_cadence.py; git diff --check.",
-    "c24_plan": "Written, verified-only. Added docs/superpowers/plans/2026-06-04-generated-optimizer-task-packet-handoff-acceptance.md. C-24 scopes one generated task packet local worker-agent handoff and supervisor/Hermes manifest-level audit. Task 1 is workspace and packet generation only; Task 2 is the first real worker-agent execution step."
+    "c24_plan": "Written, verified-only. Added docs/superpowers/plans/2026-06-04-generated-optimizer-task-packet-handoff-acceptance.md. C-24 scopes one generated task packet local worker-agent handoff and supervisor/Hermes manifest-level audit. Task 1 is workspace and packet generation only; Task 2 is the first real worker-agent execution step.",
+    "c24_complete": "Complete, verified-only. Task 1 generated the optimizer execution packet. Task 2 first worker attempt on /tmp/ic_auto_opt_c24/bridge_test_inv was rejected because sandboxed Spectre failed before metric extraction with pipe/socket permission errors. Task 2R on /tmp/ic_auto_opt_c24_retry/bridge_test_inv used the same packet semantics through the approved non-sandbox Cadence path and completed 100 evaluations. Audit passed with 100 result manifests succeeded, 100 metric manifests produced, 79 metric manifests succeeded, 21 candidate-level metric failures, 36 feasible, 43 constraint_failed, 21 metric_check_failed, preset=ax, threads_per_run=10, parallel_jobs=10, output_format=psfxl. Best candidate was real_021: FN=10, WN=1.1u, FP=9, WP=0.5u, objective=4.305718220077049e-14. Sanitized note: docs/debug/2026-06-04-c24-generated-task-packet-handoff.md."
   }
 }

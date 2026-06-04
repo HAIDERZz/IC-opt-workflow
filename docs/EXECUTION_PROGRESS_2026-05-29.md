@@ -1073,8 +1073,9 @@ Next required action:
 - next_allowed_action: wait for user confirmation, then run one local worker-agent handoff using the generated optimizer task packet.
 
 - C-24 Generated Optimizer Task Packet Handoff Acceptance checkpoint: implementation plan complete, verified-only. Plan `docs/superpowers/plans/2026-06-04-generated-optimizer-task-packet-handoff-acceptance.md` scopes one generated C-23 task-packet handoff to a local worker agent and supervisor/Hermes manifest-level audit. Task 1 is workspace and packet generation only; Task 2 is the first real worker-agent execution step.
-- current_scope: C-24 Generated Optimizer Task Packet Handoff Acceptance.
-- next_allowed_action: execute C-24 Task 1 workspace and generated packet gate only; do not run the local worker-agent or real tools until Task 1 is complete and the user confirms Task 2.
+- C-24 Generated Optimizer Task Packet Handoff Acceptance completion: complete, verified-only. Task 1 generated the packet. The first Task 2 worker attempt was rejected because sandboxed Spectre failed before OCEAN with pipe/socket permission errors. Task 2R reran the same generated-packet semantics through the approved non-sandbox Cadence path and completed 100 evaluations: 36 feasible, 43 constraint_failed, 21 metric_check_failed; 100 result manifests succeeded; 100 metric manifests were produced; 79 metric manifests succeeded; settings audit passed with preset=ax, threads_per_run=10, parallel_jobs=10, output_format=psfxl. Sanitized audit: `docs/debug/2026-06-04-c24-generated-task-packet-handoff.md`.
+- current_scope: C-24 Generated Optimizer Task Packet Handoff Acceptance complete.
+- next_allowed_action: wait for user confirmation, then choose the next narrow practice-backed productization or acceptance step; do not start a broad optimizer framework.
 
 ## Locked Role Model
 

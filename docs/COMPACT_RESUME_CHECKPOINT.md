@@ -551,9 +551,11 @@ Status: complete, verified-only.
 
 ## Next Step
 
-Plan A, Plan B, and Plan C C-1 through C-23 are complete. C-24 implementation planning is complete. The current accepted optimizer route uses native `Turbo1.optimize()`, the existing `run-native-turbo --parallel` runner, bounded Spectre/OCEAN workers, OCEAN-only retry for command/license failures, and manifest-level supervisor/Hermes audit. C-23 productized the optimizer execution-agent packet into Hermes-generated `execution_package/OPTIMIZER_EXECUTION_TASK.md` and `execution_package/optimizer_execution_manifest.json`.
+Plan A, Plan B, and Plan C C-1 through C-24 are complete. The current accepted optimizer route uses native `Turbo1.optimize()`, the existing `run-native-turbo --parallel` runner, bounded Spectre/OCEAN workers, OCEAN-only retry for command/license failures, Hermes-generated execution task packets, and manifest-level supervisor/Hermes audit.
 
-Current next step: execute C-24 Task 1 workspace and generated packet gate only. Build on `run-native-turbo --parallel`; do not start broad optimizer framework work. Do not commit raw input decks, protected include files, PSF/raw data, full Cadence logs, `docs/OCEAN_DOC_*`, or `docs/toolchain_evidence/`. Do not parse PSF or translate OCEAN formulas in Python. Do not run the local worker-agent or real tools until Task 1 is complete and the user confirms Task 2.
+C-24 validated the C-23 generated optimizer task packet handoff. The first worker attempt was rejected because sandboxed Spectre failed before metric extraction with pipe/socket permission errors. Task 2R reran the same packet semantics through the approved non-sandbox Cadence path on `/tmp/ic_auto_opt_c24_retry/bridge_test_inv` and completed `100` evaluations: `36 feasible`, `43 constraint_failed`, `21 metric_check_failed`; `100` result manifests succeeded; `100` metric manifests were produced; settings audit passed with `preset=ax`, `threads_per_run=10`, `parallel_jobs=10`, and `output_format=psfxl`. Sanitized audit: `docs/debug/2026-06-04-c24-generated-task-packet-handoff.md`.
+
+Current next step: wait for user confirmation, then choose the next narrow practice-backed productization or acceptance step. Build on `run-native-turbo --parallel`; do not start broad optimizer framework work. Do not commit raw input decks, protected include files, PSF/raw data, full Cadence logs, `docs/OCEAN_DOC_*`, or `docs/toolchain_evidence/`. Do not parse PSF or translate OCEAN formulas in Python.
 
 Read the handoff files first:
 
@@ -579,5 +581,5 @@ Use this prompt after compact:
 7. ic-auto-opt-workflow/docs/superpowers/plans/2026-06-04-optimizer-execution-agent-task-packet.md
 8. 如需背景，再读 ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-24 Generated Optimizer Task Packet Handoff Acceptance implementation plan 已完成，状态 verified-only。下一步只能执行 C-24 Task 1：准备 clean local workspace 并生成 C-23 optimizer task packet；Task 1 不运行真实工具、不派 worker-agent。不要进入 Task 2 local worker-agent real-tool execution，直到 Task 1 完成并得到用户确认。不要调用 Claude CLI 作为 execution agent，不要写 broad optimizer framework，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。不要用 Python 解析 PSF，不要让 agent 翻译或重写 Calculator/OCEAN 公式。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-24 Generated Optimizer Task Packet Handoff Acceptance 已完成，状态 verified-only。C-24 证明 Hermes 生成的 optimizer execution packet 可以驱动 `run-native-turbo --parallel --max-evals 100`，但真实 Cadence 执行必须走非沙箱环境；沙箱 Spectre 会因 pipe/socket 权限失败。下一步等待用户确认后选择新的窄范围 productization/acceptance step。不要调用 Claude CLI 作为 execution agent，不要写 broad optimizer framework，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。不要用 Python 解析 PSF，不要让 agent 翻译或重写 Calculator/OCEAN 公式。
 ```
