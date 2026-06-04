@@ -20,11 +20,12 @@ ic-auto-opt-workflow/AGENTS.md
 
 Current execution state:
 
-- Current scope: C-18 Batch Native TuRBO Parallel Runner.
-- Current status: C-18 is complete, verified-only, with real 100-evaluation batch acceptance.
-- Current next action: decide the next narrow productization or real-use validation scope after C-18.
+- Current scope: C-19 Execution-Agent Optimizer Practice Acceptance.
+- Current status: C-19 implementation plan is written, verified-only.
+- Current next action: execute C-19 Task 1: Prepare Execution-Agent Handoff Packet; do not run the C-19 real-tool optimizer command until Task 1 is complete and the user confirms Task 2.
 - C-18 keeps native `Turbo1.optimize()` as the optimizer route and adds a batch-aware Hermes evaluator so TuRBO batch candidates run Spectre/OCEAN concurrently up to `spectre.parallel_jobs`.
 - Each Spectre process still uses `spectre.threads_per_run` as `+mt`. Do not confuse Spectre internal threads with parallel Spectre process count.
+- C-19 uses the existing C-18 `run-native-turbo --parallel` path to validate the original supervisor-agent to execution-agent handoff goal. It must not create another optimizer framework.
 - Task 1 complete and reviewed.
 - Task 2 complete and reviewed.
 - Task 3 complete and reviewed.

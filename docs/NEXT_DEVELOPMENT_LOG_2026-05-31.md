@@ -4,12 +4,32 @@
 
 - Repository: `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow`
 - Branch: `plan-a-hermes-file-contract-mvp`
-- Current scope: C-18 Batch Native TuRBO Parallel Runner
-- Current status: verified-only; C-18 Batch Native TuRBO Parallel Runner is complete, including real 100-evaluation acceptance.
-- Next required action: decide the next narrow real-use validation or productization scope after C-18.
-- next_allowed_action: decide the next narrow productization or real-use validation scope after C-18; build on run-native-turbo --parallel and do not start broad optimizer framework work without user confirmation
+- Current scope: C-19 Execution-Agent Optimizer Practice Acceptance
+- Current status: verified-only; C-19 implementation plan is written.
+- Next required action: execute C-19 Task 1: Prepare Execution-Agent Handoff Packet.
+- next_allowed_action: execute C-19 Task 1: Prepare Execution-Agent Handoff Packet; do not run the C-19 real-tool optimizer command until Task 1 is complete and the user confirms Task 2
 
 C-3 Task 6 final verification is complete. C-4 is confirmed as a contract-only first real-run package; it must not run Spectre, Virtuoso, subprocesses, or the optimizer loop. C-4 is now complete and reviewed. C-5 validates the execution agent's returned `result_manifest.json` and declared artifacts without running Spectre or parsing metrics. C-5.5 rehearsed the C-4/C-5 handoff with simulated execution-agent and Hermes-observer roles. After C-5.5, the project paused implementation to validate the real metric backend. Spectre + OCEAN is now confirmed as the backend route: standalone Spectre generates PSF, batch OCEAN opens the PSF and evaluates exact user/project-approved formulas, and Python only records OCEAN-produced scalar outputs and provenance. C-6 turned that route into deterministic file contracts and a Hermes validator without physical adapter wiring. C-7 added an explicit execution-side adapter and tool entry point while preserving the rule that Hermes workflow tooling still validates returned files after execution. C-8 records checked real metric results into optimizer ledger/state after `check-real-run` and `check-metric-results` pass, while preserving the contract-only boundary. C-9 prepares the next real-run package from strict ledger/state and deterministic optimizer initialization sequence, while still not running real tools or writing ledger/state. C-10 classifies failed/partial/pending real-run packages, writes explicit recovery decisions, prepares retry packages, exposes supervisor-facing recovery CLI commands, and blocks C-9 from advancing while unresolved real-run packages exist. C-10 final review fixes aligned unsafe artifact classification with the spec and hardened symlinked recovery decision reads.
+
+## C-19 Execution-Agent Optimizer Practice Acceptance Plan 2026-06-04
+
+C-19 implementation plan is complete, verified-only.
+
+Plan:
+
+```text
+docs/superpowers/plans/2026-06-04-execution-agent-optimizer-practice-acceptance.md
+```
+
+Purpose:
+
+- Validate the original supervisor-agent to execution-agent collaboration goal using the now-proven C-18 `run-native-turbo --parallel` path.
+- Keep execution agent work meaningful: receive the task packet, preserve native Maestro/ADE netlist layout, run the existing real 100-evaluation optimizer command, and return reports/evidence.
+- Avoid another speculative framework layer. C-19 authorizes only the handoff packet, one real execution-agent run after user confirmation, supervisor/Hermes report audit, and surgical fixes for blockers proven by that run.
+
+Route audit: aligned with the top-level practice-first correction and the locked role model. Drift: none open. C-19 intentionally uses this narrow implementation plan as the active scoped spec to avoid adding overlapping design assets.
+
+next_allowed_action: execute C-19 Task 1: Prepare Execution-Agent Handoff Packet; do not run the C-19 real-tool optimizer command until Task 1 is complete and the user confirms Task 2
 
 ## Optimizer Skill Real Flow Practice 2026-06-04
 
