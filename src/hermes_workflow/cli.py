@@ -21,6 +21,7 @@ from hermes_workflow.openbox_backend import (
 )
 from hermes_workflow.optimizer_acceptance import check_optimizer_run
 from hermes_workflow.optimizer_completion import summarize_optimizer_run
+from hermes_workflow.optimizer_insights import generate_optimizer_insight_report
 from hermes_workflow.optimizer_suggestion import suggest_candidate_request
 from hermes_workflow.optimizer_task_package import (
     build_optimizer_execution_task_package,
@@ -609,6 +610,32 @@ def summarize_optimizer_run_command(
     for issue in report.issues:
         typer.echo(issue)
     typer.echo("report: reports/optimizer_completion_report.json")
+    raise typer.Exit(code=1)
+
+
+@app.command("visualize-optimizer-run")
+def visualize_optimizer_run_command(
+    project_dir: Annotated[
+        Path,
+        typer.Argument(help="Project directory with accepted optimizer artifacts."),
+    ],
+) -> None:
+    try:
+        report = generate_optimizer_insight_report(project_dir)
+    except (OSError, ValueError) as exc:
+        _exit_with_error(exc)
+    if report.status == "pass":
+        typer.echo("optimizer insight report written")
+        typer.echo("report: reports/optimizer_insight_report.json")
+        typer.echo("markdown: reports/optimizer_insight_report.md")
+        for plot_name, plot_path in sorted(report.plots.items()):
+            typer.echo(f"{plot_name}: {plot_path}")
+        return
+
+    typer.echo("optimizer insight report failed")
+    for issue in report.issues:
+        typer.echo(issue)
+    typer.echo("report: reports/optimizer_insight_report.json")
     raise typer.Exit(code=1)
 
 

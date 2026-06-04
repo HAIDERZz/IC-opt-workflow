@@ -1,18 +1,18 @@
 {
   "schema_version": "1.0",
-  "current_scope": "C-30 OpenBox Execution-Agent Task Packet complete",
-  "current_status": "C-30 implementation is complete, verified-only. package-optimizer-task now preserves native TuRBO as the default and supports explicit --backend openbox task packets with run-openbox-real, OpenBox dependency-blocker wording, no-silent-fallback instructions, and post-run C-25/C-26 audit commands.",
+  "current_scope": "C-31 Optimizer Post-Run Visualization And Insight Report complete",
+  "current_status": "C-31 implementation is complete, verified-only. Added dependency-light post-run optimizer insight reports with JSON, Markdown, and static SVG plots for convergence, status distribution, and parameter/objective scatter. Reports summarize observed variable/target correlations without claiming causality or global optimality.",
   "review_status": "verified-only",
   "subagent_dispatch": "available",
-  "active_spec": "docs/superpowers/specs/2026-06-05-openbox-execution-agent-task-packet-design.md",
-  "active_plan": "docs/superpowers/plans/2026-06-05-openbox-execution-agent-task-packet.md",
+  "active_spec": "docs/superpowers/specs/2026-06-05-optimizer-post-run-visualization-insight-design.md",
+  "active_plan": "docs/superpowers/plans/2026-06-05-optimizer-post-run-visualization-insight.md",
   "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
   "progress_files": [
     "docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md",
     "docs/EXECUTION_PROGRESS_2026-05-29.md",
     "docs/COMPACT_RESUME_CHECKPOINT.md"
   ],
-  "next_allowed_action": "wait for user confirmation before any real execution-agent OpenBox handoff acceptance run or next narrow optimizer productization step",
+  "next_allowed_action": "wait for user confirmation before choosing the next narrow step; recommended options are a single production usage guide/one-command workflow wrapper or optional OpenBox advanced surrogate/SHAP visualization spike",
   "forbidden_actions": [
     "start broad optimizer framework work",
     "replace TuRBO before OpenBox evidence spike approval",
@@ -42,13 +42,13 @@
     "git status --short"
   ],
   "route_audit": {
-    "active_spec": "docs/superpowers/specs/2026-06-05-openbox-execution-agent-task-packet-design.md",
-    "active_plan": "docs/superpowers/plans/2026-06-05-openbox-execution-agent-task-packet.md",
+    "active_spec": "docs/superpowers/specs/2026-06-05-optimizer-post-run-visualization-insight-design.md",
+    "active_plan": "docs/superpowers/plans/2026-06-05-optimizer-post-run-visualization-insight.md",
     "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
-    "alignment": "Aligned. C-30 only updated the execution-agent task packet so the C-29 OpenBox backend can be handed off without manual interpretation while preserving C-25/C-26 audit.",
-    "drift": "No route drift. TuRBO remains implemented and the default backend for package-optimizer-task unless --backend openbox is explicit."
+    "alignment": "Aligned. C-31 adds post-run interpretation for existing accepted optimizer artifacts and does not alter optimizer execution or real-tool behavior.",
+    "drift": "No route drift. Advanced OpenBox SHAP/surrogate HTML remains optional future work rather than a hard dependency."
   },
-  "latest_valid_commit": "8eaeba2",
+  "latest_valid_commit": "0247428",
   "review_evidence": {
     "optimizer_skill_real_practice": "Complete, verified-only. Temporary practice at /tmp/ic_auto_opt_optimizer_skill_flow_001 ran Turbo1.optimize() for 100 evaluations with 8 initialization and 92 trust-region evaluations. 73 candidates were recorded through real Spectre/OCEAN, 24 duplicate quantized candidates were skipped, and 3 metric non-scalar candidates were converted to finite penalties. Best candidate was real_011: FN=11, WN=1.9u, FP=9, WP=0.5u, rise=72.489655ps, fall=64.569947ps, DC=301.334349uW, objective=4.1300765965648685e-14.",
     "archive_doc": "docs/debug/2026-06-04-optimizer-skill-real-flow-practice.md",
@@ -95,6 +95,7 @@
     "c29_design": "Written, verified-only. Design spec docs/superpowers/specs/2026-06-05-openbox-production-backend-design.md scopes productizing only OpenBox candidate generation and ask-and-tell observation updates while preserving the existing Hermes Spectre/OCEAN real execution path. It explicitly forbids TuRBO replacement, hidden FN=FP coupling, PSF parsing, OCEAN formula rewriting, and broad optimizer framework work.",
     "c29_plan": "Written, verified-only. Implementation plan docs/superpowers/plans/2026-06-05-openbox-production-backend.md scopes seven tasks: search-space contract, shared ask-and-tell runner core, real evaluator integration, CLI wiring/dependency gate, local no-real-tool smoke, real OpenBox acceptance rerun after explicit confirmation, and closeout.",
     "c29_complete": "Complete, verified-only. Added run-openbox-real, effective OpenBox stepped-grid upper handling, no hidden FN=FP fallback, shared fake/real OpenBox batch runner, and real evaluator integration through existing Spectre/OCEAN candidate package and record path. Real acceptance on /tmp/ic_auto_opt_c29_openbox_real/bridge_test_inv completed 100 evaluations: 43 feasible, 51 constraint_failed, 6 metric_check_failed, 0 real_check_failed, 0 duplicate replacements; C-25 accepted; C-26 decision accept_best_observed with confidence medium and global_optimum_claim=false. Sanitized evidence: docs/debug/2026-06-05-openbox-production-backend-real-acceptance.md.",
-    "c30_complete": "Complete, verified-only. Added design spec docs/superpowers/specs/2026-06-05-openbox-execution-agent-task-packet-design.md and implementation plan docs/superpowers/plans/2026-06-05-openbox-execution-agent-task-packet.md. package-optimizer-task now accepts --backend native-turbo|openbox, preserves native TuRBO as default, and renders OpenBox execution-agent packets with run-openbox-real, dependency-blocker wording, no-silent-fallback instructions, backend-neutral required artifacts, and post-run check-optimizer-run/summarize-optimizer-run audit commands. Verification passed: python3 -m pytest -q (551 passed, 1 skipped); python3 -m ruff check src tests tools; python3 tools/check_development_cadence.py; git diff --check."
+    "c30_complete": "Complete, verified-only. Added design spec docs/superpowers/specs/2026-06-05-openbox-execution-agent-task-packet-design.md and implementation plan docs/superpowers/plans/2026-06-05-openbox-execution-agent-task-packet.md. package-optimizer-task now accepts --backend native-turbo|openbox, preserves native TuRBO as default, and renders OpenBox execution-agent packets with run-openbox-real, dependency-blocker wording, no-silent-fallback instructions, backend-neutral required artifacts, and post-run check-optimizer-run/summarize-optimizer-run audit commands. Verification passed: python3 -m pytest -q (551 passed, 1 skipped); python3 -m ruff check src tests tools; python3 tools/check_development_cadence.py; git diff --check.",
+    "c31_complete": "Complete, verified-only. Added design spec docs/superpowers/specs/2026-06-05-optimizer-post-run-visualization-insight-design.md and implementation plan docs/superpowers/plans/2026-06-05-optimizer-post-run-visualization-insight.md. Added src/hermes_workflow/optimizer_insights.py and hermes-workflow visualize-optimizer-run. The command reads existing optimizer artifacts and writes reports/optimizer_insight_report.json, reports/optimizer_insight_report.md, reports/optimizer_visuals/convergence.svg, reports/optimizer_visuals/status_distribution.svg, and reports/optimizer_visuals/parameter_objective_scatter.svg. C-31 uses standard-library SVG only; OpenBox advanced surrogate/SHAP visualization is recorded as a future optional add-on. Focused verification passed: python3 -m pytest tests/test_optimizer_insights.py tests/test_optimizer_completion.py tests/test_optimizer_acceptance.py tests/test_optimizer_task_package.py -q and targeted ruff."
   }
 }

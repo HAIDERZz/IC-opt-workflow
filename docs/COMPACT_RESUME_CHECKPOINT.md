@@ -662,6 +662,23 @@ C-30 completion result:
 - Verification passed: `python3 -m pytest -q` (`551 passed, 1 skipped`), `python3 -m ruff check src tests tools`, `python3 tools/check_development_cadence.py`, and `git diff --check`.
 - Current next step: wait for user confirmation before any real execution-agent OpenBox handoff acceptance run or next narrow optimizer productization step.
 
+C-31 completion result:
+
+- Status: complete, verified-only.
+- current_scope: C-31 Optimizer Post-Run Visualization And Insight Report complete.
+- Design spec: `docs/superpowers/specs/2026-06-05-optimizer-post-run-visualization-insight-design.md`.
+- Implementation plan: `docs/superpowers/plans/2026-06-05-optimizer-post-run-visualization-insight.md`.
+- Code: `src/hermes_workflow/optimizer_insights.py` and CLI `hermes-workflow visualize-optimizer-run PROJECT_DIR`.
+- Outputs:
+  - `reports/optimizer_insight_report.json`
+  - `reports/optimizer_insight_report.md`
+  - `reports/optimizer_visuals/convergence.svg`
+  - `reports/optimizer_visuals/status_distribution.svg`
+  - `reports/optimizer_visuals/parameter_objective_scatter.svg`
+- Scope: static SVG/JSON/Markdown post-run report from existing optimizer artifacts. No real tools and no optimizer algorithm changes.
+- Advanced OpenBox SHAP/surrogate HTML is not a C-31 hard dependency; it remains a future optional add-on.
+- Current next step: wait for user confirmation before choosing the next narrow step; recommended options are a single production usage guide/one-command workflow wrapper or optional OpenBox advanced surrogate/SHAP visualization spike.
+
 Read the handoff files first:
 
 ```text
@@ -683,8 +700,8 @@ Use this prompt after compact:
 3. ic-auto-opt-workflow/docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md
 4. ic-auto-opt-workflow/docs/EXECUTION_PROGRESS_2026-05-29.md
 5. ic-auto-opt-workflow/docs/COMPACT_RESUME_CHECKPOINT.md
-6. ic-auto-opt-workflow/docs/superpowers/specs/2026-06-05-openbox-execution-agent-task-packet-design.md
-7. ic-auto-opt-workflow/docs/superpowers/plans/2026-06-05-openbox-execution-agent-task-packet.md
+6. ic-auto-opt-workflow/docs/superpowers/specs/2026-06-05-optimizer-post-run-visualization-insight-design.md
+7. ic-auto-opt-workflow/docs/superpowers/plans/2026-06-05-optimizer-post-run-visualization-insight.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-30 OpenBox Execution-Agent Task Packet 已完成。下一步是 wait for user confirmation before any real execution-agent OpenBox handoff acceptance run or next narrow optimizer productization step。不要运行真实 Virtuoso/Spectre/OCEAN/SSH/virtuoso-bridge，除非用户明确批准；不要直接替换 TuRBO，不要删除 native_turbo，不要创建 broad optimizer framework，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-31 Optimizer Post-Run Visualization And Insight Report 已完成。下一步是 wait for user confirmation before choosing the next narrow step; recommended options are a single production usage guide/one-command workflow wrapper or optional OpenBox advanced surrogate/SHAP visualization spike。不要运行真实 Virtuoso/Spectre/OCEAN/SSH/virtuoso-bridge，除非用户明确批准；不要直接替换 TuRBO，不要删除 native_turbo，不要创建 broad optimizer framework，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
 ```
