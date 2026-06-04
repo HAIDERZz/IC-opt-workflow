@@ -217,6 +217,79 @@ def prepare_candidate_real_run(
     )
 
 
+def prepare_explicit_candidate_real_run(
+    project_dir: Path,
+    *,
+    candidate_id: str,
+    source: str,
+    parameters: dict[str, str],
+    run_id: str | None = None,
+    metadata: dict[str, object] | None = None,
+    created_at_utc: str | None = None,
+) -> RealRunPackage:
+    project_dir = Path(project_dir)
+    if run_id is not None:
+        _validate_run_id(run_id)
+    manifest = _load_execution_manifest(project_dir)
+    instruction = _load_supervisor_instruction(project_dir)
+    _assert_approved(instruction)
+    approved_hashes = _approved_hashes(manifest, instruction)
+    _assert_config_hashes(project_dir, approved_hashes)
+    selected_run_id = _select_explicit_run_id(project_dir, run_id)
+
+    from hermes_workflow.real_run_recovery import assert_no_unresolved_real_runs
+
+    assert_no_unresolved_real_runs(project_dir)
+    request = CandidateInjectionRequest(
+        schema_version="1.0",
+        candidate_id=candidate_id,
+        source=source,
+        parameters=parameters,
+        metadata=metadata or {},
+    )
+    request_text = _json_text(request.model_dump())
+    bundle = assert_valid_project(project_dir)
+    _assert_candidate_parameters_match_bundle(bundle, request.parameters)
+    ledger_rows = _read_ledger_rows_if_present(project_dir)
+    state_path = project_dir / OPTIMIZER_STATE_PATH
+    if ledger_rows or state_path.exists():
+        state = _load_optimizer_state_or_raise(project_dir)
+        _assert_optimizer_state_matches_bundle(bundle, state, ledger_rows)
+    _assert_candidate_is_unique(project_dir, request, ledger_rows)
+    request_relative = f"{REAL_RUN_ROOT}/{selected_run_id}/candidate_request.json"
+    request_sha256 = _sha256_text(request_text)
+    candidate = {
+        "schema_version": "1.0",
+        "candidate_id": request.candidate_id,
+        "source": "explicit_candidate_request",
+        "requested_source": request.source,
+        "parameters": request.parameters,
+        "metadata": request.metadata,
+    }
+    return _write_real_run_package(
+        bundle,
+        selected_run_id,
+        candidate,
+        created_at_utc or _utc_now(),
+        instruction,
+        approved_hashes,
+        manifest_extra={
+            "candidate_source": "explicit_candidate_request",
+            "selection_policy": "native_turbo_explicit_candidate",
+            "candidate_request_file": request_relative,
+            "candidate_request_sha256": request_sha256,
+            "ledger_snapshot_sha256": _sha256_existing_or_empty(
+                project_dir / LEDGER_PATH
+            ),
+            "optimizer_state_sha256": _sha256_existing_or_empty(
+                project_dir / OPTIMIZER_STATE_PATH
+            ),
+            "previous_evaluations": len(ledger_rows),
+        },
+        candidate_request_text=request_text,
+    )
+
+
 def _validate_run_id(run_id: str) -> str:
     if not RUN_ID_RE.match(run_id):
         raise ValueError(f"run_id must match real_[0-9]{{3}}: {run_id}")
@@ -286,6 +359,13 @@ def _read_ledger_rows_or_raise(project_dir: Path) -> list[LedgerRow]:
     if not rows:
         raise ValueError("ledger has no recorded evaluations")
     return rows
+
+
+def _read_ledger_rows_if_present(project_dir: Path) -> list[LedgerRow]:
+    ledger_path = project_dir / LEDGER_PATH
+    if not ledger_path.exists():
+        return []
+    return _read_ledger_rows_or_raise(project_dir)
 
 
 def _load_optimizer_state_or_raise(project_dir: Path) -> OptimizerState:
@@ -457,6 +537,20 @@ def _select_candidate_run_id(project_dir: Path, run_id: str | None) -> str:
     run_dir = project_dir / REAL_RUN_ROOT / selected
     if run_dir.exists() or run_dir.is_symlink():
         raise FileExistsError(f"candidate real run directory already exists: {run_dir}")
+    return selected
+
+
+def _select_explicit_run_id(project_dir: Path, run_id: str | None) -> str:
+    if run_id is None:
+        root = project_dir / REAL_RUN_ROOT
+        next_id = 1
+        while (root / f"real_{next_id:03d}").exists():
+            next_id += 1
+        return f"real_{next_id:03d}"
+    selected = _validate_run_id(run_id)
+    run_dir = project_dir / REAL_RUN_ROOT / selected
+    if run_dir.exists() or run_dir.is_symlink():
+        raise FileExistsError(f"explicit real run directory already exists: {run_dir}")
     return selected
 
 

@@ -11,6 +11,7 @@ from hermes_workflow.health import write_preflight_health
 from hermes_workflow.metric_results import check_metric_results
 from hermes_workflow.mock_optimizer import run_mock_optimization
 from hermes_workflow.netlists import prepare_netlist
+from hermes_workflow.native_turbo import run_native_turbo_optimization
 from hermes_workflow.optimizer_suggestion import suggest_candidate_request
 from hermes_workflow.package import (
     TemplateError,
@@ -558,3 +559,38 @@ def mock_run_command(
         _exit_with_error(exc)
     typer.echo(f"mock optimization completed: {state.current_evaluations}/{state.max_evaluations} evaluations")
     typer.echo(f"best candidate: {state.best_candidate_id or 'none'}")
+
+
+@app.command("run-native-turbo")
+def run_native_turbo_command(
+    project_dir: Annotated[
+        Path,
+        typer.Argument(help="Project directory with approved real-tool contracts."),
+    ],
+    max_evals: Annotated[
+        int | None,
+        typer.Option("--max-evals", help="Override optimizer evaluation budget."),
+    ] = None,
+    cadence_cshrc: Annotated[
+        Path | None,
+        typer.Option(
+            "--cadence-cshrc",
+            help="Optional Cadence cshrc sourced before running the adapter.",
+        ),
+    ] = None,
+) -> None:
+    try:
+        result = run_native_turbo_optimization(
+            project_dir,
+            max_evals=max_evals,
+            cadence_cshrc=cadence_cshrc,
+        )
+    except (OSError, RuntimeError, ValueError) as exc:
+        _exit_with_error(exc)
+    typer.echo(
+        f"native turbo optimization completed: {result.evaluation_count} evaluations"
+    )
+    if result.report_path is not None:
+        typer.echo(f"report: {result.report_path.relative_to(project_dir)}")
+    if result.evaluations_path is not None:
+        typer.echo(f"evaluations: {result.evaluations_path.relative_to(project_dir)}")

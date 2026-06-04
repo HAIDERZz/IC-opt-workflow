@@ -58,6 +58,8 @@ No real tools.
 
 **Risk:** Medium.
 
+**Status:** Complete, verified-only.
+
 Implement a runner around local `Turbo1.optimize()` that:
 
 - calls TuRBO with `n_init = 2 * n_params`;
@@ -78,10 +80,12 @@ No real tools.
 
 **Risk:** High.
 
+**Status:** Complete, verified-only.
+
 Connect the runner to existing Hermes real-run contracts:
 
-- prepare the first explicit optimizer candidate without mutating project-level variables;
-- prepare later candidates through `prepare_candidate_real_run`;
+- prepare explicit optimizer-selected candidates without mutating project-level variables;
+- reuse the existing real-run package writer and approval/hash/uniqueness guards for every native TuRBO candidate;
 - run an injected adapter callable;
 - run `check-real-run`, `check-metric-results`, and `record-real-result`;
 - convert candidate-local metric failures to finite penalties and recovery decisions;
@@ -94,6 +98,8 @@ No Spectre/OCEAN in automated tests.
 ## Task 4: CLI Wiring
 
 **Risk:** Medium.
+
+**Status:** Complete, verified-only.
 
 Add:
 
@@ -117,6 +123,8 @@ Tests use fake runners only.
 
 **Risk:** High; user-confirmed only.
 
+**Status:** Complete, verified-only.
+
 Run one real practice on `bridge_test_inv` from a clean `/tmp` project:
 
 - `max_evals=100`;
@@ -137,5 +145,24 @@ Acceptance:
 
 ## Task 6: Closeout
 
+**Status:** Complete, verified-only.
+
 Run targeted tests, ruff, cadence check, and route audit. Commit only source,
 tests, and sanitized docs. Do not stage raw tool evidence.
+
+## Completion Note
+
+C-17 completed a clean 100-evaluation native TuRBO real-tool acceptance on
+`/tmp/ic_auto_opt_c17_native_turbo_002/bridge_test_inv`.
+
+Summary:
+
+- `Turbo1.optimize()` drove all evaluations: 8 initialization, 92 trust-region.
+- Status counts: 45 feasible, 43 constraint failed, 12 metric check failed.
+- Best candidate: `real_030`, `FN=12`, `FP=2`, `WN=1.7u`, `WP=2.7u`.
+- Best metrics: `rise=6.72081749122453e-11`, `fall=6.190153048273253e-11`,
+  `DC=0.0003265612598325413`.
+- Spectre settings stayed consistent across 100 manifests:
+  `preset=ax`, `threads_per_run=10`, `parallel_jobs=10`,
+  `output_format=psfxl`.
+- Raw Cadence artifacts remain local-only.
