@@ -1,27 +1,26 @@
 {
   "schema_version": "1.0",
-  "current_scope": "C-16 100-Point Real Optimizer Acceptance closeout",
-  "current_status": "C-16 Tasks 1-2 are complete with follow-up required. The real loop reached 100 recorded Spectre/OCEAN evaluations in /tmp/ic_auto_opt_c14/bridge_test_inv. Spectre/OCEAN contracts and settings passed, but optimizer acceptance is not clean because real_092 and real_094 silently fell back to initialization_fallback after TuRBO was available.",
+  "current_scope": "C-17 Native TuRBO Optimizer Runner MVP",
+  "current_status": "C-16 follow-up practice corrected the optimizer route. A real 100-evaluation practice now uses local Turbo1.optimize() as the optimizer driver and Hermes + Spectre/OCEAN as the black-box evaluator. C-17 design spec and implementation plan are written; code implementation has not started.",
   "review_status": "verified-only",
   "subagent_dispatch": "available",
-  "active_spec": "docs/superpowers/plans/2026-06-04-100-point-real-optimizer-acceptance.md",
-  "active_plan": "docs/superpowers/plans/2026-06-04-100-point-real-optimizer-acceptance.md",
+  "active_spec": "docs/superpowers/specs/2026-06-04-native-turbo-optimizer-runner-mvp-design.md",
+  "active_plan": "docs/superpowers/plans/2026-06-04-native-turbo-optimizer-runner-mvp.md",
   "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
   "progress_files": [
     "docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md",
     "docs/EXECUTION_PROGRESS_2026-05-29.md",
     "docs/COMPACT_RESUME_CHECKPOINT.md"
   ],
-  "next_allowed_action": "write or implement a narrow TuRBO suggestion robustness fix; do not run another broad 100-point acceptance until silent fallback is surfaced, retried, or classified",
+  "next_allowed_action": "execute C-17 Task 1: Core Objective And Candidate Quantization; do not run real tools until the C-17 fake/unit tasks pass and the user confirms real-tool acceptance",
   "forbidden_actions": [
     "start broad optimizer framework work",
-    "create new optimizer algorithms",
-    "create batch candidate orchestration without a narrow plan",
     "create daemon or service orchestration",
+    "replace TuRBO",
+    "run another broad real-tool acceptance before C-17 Task 1-4 pass",
     "run Virtuoso before explicit task confirmation",
-    "run another broad 100-point acceptance before TuRBO silent fallback is fixed or classified",
     "run SSH before explicit task confirmation",
-    "run Claude CLI as an execution agent before explicit task confirmation",
+    "run Claude CLI as an execution agent",
     "run virtuoso-bridge-lite before explicit task confirmation",
     "parse PSF",
     "rewrite OCEAN formulas",
@@ -35,24 +34,22 @@
     "stage docs/toolchain_evidence/"
   ],
   "required_pre_commit_checks": [
-    "python3 -m pytest tests/test_spectre_ocean_adapter.py tests/test_result_handoff.py tests/test_metric_results.py -q",
-    "python3 -m pytest tests/test_candidate_injection_real_run.py tests/test_real_run.py tests/test_next_real_run.py tests/test_real_result_record.py -q",
-    "python3 -m ruff check src tests tools",
     "python3 tools/check_development_cadence.py",
     "git diff --check",
     "git status --short"
   ],
   "route_audit": {
-    "active_spec": "docs/superpowers/plans/2026-06-04-100-point-real-optimizer-acceptance.md",
-    "active_plan": "docs/superpowers/plans/2026-06-04-100-point-real-optimizer-acceptance.md",
+    "active_spec": "docs/superpowers/specs/2026-06-04-native-turbo-optimizer-runner-mvp-design.md",
+    "active_plan": "docs/superpowers/plans/2026-06-04-native-turbo-optimizer-runner-mvp.md",
     "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
-    "alignment": "Partially aligned. C-16 reached 100 real Spectre/OCEAN evaluations using the C-15 loop and C-7 adapter, preserving native layout and Cadence-backed metrics.",
-    "drift": "Optimizer acceptance is not clean: system python3 lacked torch/gpytorch and caused pre-fix fallback, then real_092 and real_094 silently fell back after TuRBO was available. Next work must be a narrow TuRBO suggestion robustness fix, not another broad framework."
+    "alignment": "Aligned after correction. The next productization step uses optimizer.skill's native Turbo1.optimize() pattern with the proven Hermes + Spectre/OCEAN evaluator path, preserving approved formulas and native Maestro/ADE layout.",
+    "drift": "Previous C-15/C-16 one-candidate suggestion loop is no longer considered a valid optimizer acceptance path. C-17 must productize the native TuRBO practice path instead."
   },
-  "latest_valid_commit": "34c0258 docs: record C16 optimizer acceptance results",
+  "latest_valid_commit": "38d36e9 docs: update C16 current task pointer",
   "review_evidence": {
-    "task_0_status": "Complete, verified-only. Tests require metric_extraction_request.spectre.threads_per_run as per-process +mt and parallel_jobs as a concurrency cap, adapter argv +preset=ax/+mt=10 with requested output_format, result manifest setting recording, request/prepared setting drift rejection, and check-real-run simulator setting drift detection. parallel_jobs is not mapped to Spectre +mt. Final verification passed with 492 tests.",
-    "tasks_1_2_status": "Complete with follow-up required. 100 ledger rows recorded: 8 real_pass, 92 real_constraint_fail, 0 recorded tool failures, 0 recorded metric failures. Spectre settings were consistent for real_004 through real_100. real_057 onward mostly used TuRBO after .venv dependency fix, but real_092 and real_094 silently fell back to initialization_fallback.",
-    "sandbox_note": "Real Spectre/OCEAN adapter runs should use the approved external Cadence csh path. A sandboxed Spectre attempt failed before OCEAN with pipe/socket permission errors, while the same command shape succeeded outside the sandbox."
+    "optimizer_skill_real_practice": "Complete, verified-only. Temporary practice at /tmp/ic_auto_opt_optimizer_skill_flow_001 ran Turbo1.optimize() for 100 evaluations with 8 initialization and 92 trust-region evaluations. 73 candidates were recorded through real Spectre/OCEAN, 24 duplicate quantized candidates were skipped, and 3 metric non-scalar candidates were converted to finite penalties. Best candidate was real_011: FN=11, WN=1.9u, FP=9, WP=0.5u, rise=72.489655ps, fall=64.569947ps, DC=301.334349uW, objective=4.1300765965648685e-14.",
+    "archive_doc": "docs/debug/2026-06-04-optimizer-skill-real-flow-practice.md",
+    "c17_design": "docs/superpowers/specs/2026-06-04-native-turbo-optimizer-runner-mvp-design.md",
+    "c17_plan": "docs/superpowers/plans/2026-06-04-native-turbo-optimizer-runner-mvp.md"
   }
 }

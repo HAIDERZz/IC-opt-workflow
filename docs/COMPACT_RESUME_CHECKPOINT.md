@@ -20,6 +20,10 @@ ic-auto-opt-workflow/AGENTS.md
 
 Current execution state:
 
+- Current scope: C-17 Native TuRBO Optimizer Runner MVP.
+- Current status: C-16 follow-up practice corrected the optimizer route. Local `Turbo1.optimize()` drove 100 real evaluations through the Hermes + Spectre/OCEAN evaluator path. C-17 design spec and implementation plan are written; code implementation has not started.
+- Current next action: execute C-17 Task 1 Core Objective And Candidate Quantization.
+- Do not run real tools for C-17 until fake/unit tasks pass and the user confirms real-tool acceptance.
 - Task 1 complete and reviewed.
 - Task 2 complete and reviewed.
 - Task 3 complete and reviewed.
@@ -540,7 +544,7 @@ Status: complete, verified-only.
 
 Plan A, Plan B, Plan C C-1, Plan C C-2, Plan C C-3, Plan C C-4, Plan C C-5, and Plan C C-5.5 are complete as of 2026-06-01. C-6, C-7, C-8, and C-9 are complete and reviewed as of 2026-06-02. C-10 real-run failure/retry policy contract is complete and reviewed as of 2026-06-03. C-11 local/fake smoke is complete. C-7 real-tool closure is complete and committed as `d440c95`.
 
-Current next step: narrow TuRBO suggestion robustness fix. C-15 Tasks 1-4 are complete and reviewed. C-16 Task 0 is committed, and C-16 Tasks 1-2 reached 100 real Spectre/OCEAN evaluations in `/tmp/ic_auto_opt_c14/bridge_test_inv`. Important distinction: Spectre `+mt` is per-Spectre process thread count and comes from `spectre.threads_per_run`; `spectre.parallel_jobs` is the maximum simultaneous Spectre process cap and must not be mapped to `+mt`. Current intended settings are `+preset=ax`, `+mt=10`, `output_format=psfxl`, and `parallel_jobs=10`. C-16 found a real optimizer blocker: after `.venv` fixed TuRBO imports, `real_092` and `real_094` still silently fell back to `initialization_fallback`; do not run another broad 100-point acceptance until this fallback is surfaced, retried, or classified. Do not commit raw input decks, protected include files, PSF/raw data, full Cadence logs, `docs/OCEAN_DOC_*`, or `docs/toolchain_evidence/`. Do not parse PSF or translate OCEAN formulas in Python.
+Current next step: execute C-17 Task 1 Core Objective And Candidate Quantization. C-16 follow-up practice corrected the optimizer route: native `Turbo1.optimize()` drove 100 real evaluations through the proven Hermes + Spectre/OCEAN evaluator path. The previous one-candidate suggestion loop is not a valid optimizer proof. C-17 design spec and implementation plan are written. Do not run real tools until C-17 fake/unit tasks pass and the user confirms real-tool acceptance. Do not commit raw input decks, protected include files, PSF/raw data, full Cadence logs, `docs/OCEAN_DOC_*`, or `docs/toolchain_evidence/`. Do not parse PSF or translate OCEAN formulas in Python.
 
 Read the handoff files first:
 
@@ -562,9 +566,10 @@ Use this prompt after compact:
 3. ic-auto-opt-workflow/docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md
 4. ic-auto-opt-workflow/docs/EXECUTION_PROGRESS_2026-05-29.md
 5. ic-auto-opt-workflow/docs/COMPACT_RESUME_CHECKPOINT.md
-6. ic-auto-opt-workflow/docs/superpowers/specs/2026-06-03-controlled-real-tool-agent-practice-design.md
-7. ic-auto-opt-workflow/docs/superpowers/plans/2026-06-03-controlled-real-tool-agent-practice.md
-8. 如需背景，再读 ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md
+6. ic-auto-opt-workflow/docs/debug/2026-06-04-optimizer-skill-real-flow-practice.md
+7. ic-auto-opt-workflow/docs/superpowers/specs/2026-06-04-native-turbo-optimizer-runner-mvp-design.md
+8. ic-auto-opt-workflow/docs/superpowers/plans/2026-06-04-native-turbo-optimizer-runner-mvp.md
+9. 如需背景，再读 ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。当前活动节点是 C-16 100-Point Real Optimizer Acceptance closeout。Active plan/spec 是 `docs/superpowers/plans/2026-06-04-100-point-real-optimizer-acceptance.md`。C-16 已在 `/tmp/ic_auto_opt_c14/bridge_test_inv` 达到 100 条真实 Spectre/OCEAN ledger：8 个 `real_pass`、92 个 `real_constraint_fail`，无记录的 tool/metric failure。注意：Spectre `+mt` 是单个 Spectre 进程线程数，来自 `spectre.threads_per_run`；`spectre.parallel_jobs` 是同时发起几个 Spectre 的上限，不能混用。当前目标设置是 `+preset=ax`、`+mt=10`、`output_format=psfxl`、`parallel_jobs=10`。C-16 发现 optimizer blocker：系统 `python3` 缺 `torch/gpytorch` 导致 4-56 fallback；`.venv` 补齐 Hermes 依赖后 57-100 大多为 TuRBO，但 92/94 仍静默 fallback。下一步是窄修 TuRBO suggestion robustness。不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。不要用 Python 解析 PSF，不要让 agent 翻译或重写 Calculator/OCEAN 公式。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。当前活动节点是 C-17 Native TuRBO Optimizer Runner MVP。C-17 design spec 和 implementation plan 已完成，代码尚未开始。C-16 follow-up 已纠正 optimizer 路线：真正的 optimizer proof 必须使用 local `Turbo1.optimize()` 驱动候选，并把 Hermes + Spectre/OCEAN 作为 black-box evaluator；旧 C-15/C-16 one-candidate suggestion loop 不再算有效 optimizer proof。下一步从 C-17 Task 1: Core Objective And Candidate Quantization 开始。不要运行真实 Virtuoso/Spectre/OCEAN/SSH/bridge，直到 C-17 fake/unit tasks 通过且用户确认 real-tool acceptance。不要写 broad optimizer framework，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。不要用 Python 解析 PSF，不要让 agent 翻译或重写 Calculator/OCEAN 公式。C-17 必须保持 feasibility-first objective、quantized-candidate de-dup/replacement、explicit first optimizer candidate package、native Maestro/ADE layout、Spectre `threads_per_run` as `+mt` and `parallel_jobs` as concurrency cap。
 ```
