@@ -226,6 +226,8 @@ Expected: pass.
 
 **Risk:** Low-to-medium. No real tools.
 
+**Status:** Complete, verified-only.
+
 **Files:**
 
 - Modify: this plan file
@@ -233,7 +235,7 @@ Expected: pass.
 - Modify as needed by Lean Evidence Gate: `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`
 - Modify as needed by Lean Evidence Gate: `docs/COMPACT_RESUME_CHECKPOINT.md`
 
-- [ ] **Step 1: Run final verification**
+- [x] **Step 1: Run final verification**
 
 Run:
 
@@ -247,7 +249,7 @@ git status --short
 
 Expected: pass.
 
-- [ ] **Step 2: Record route audit**
+- [x] **Step 2: Record route audit**
 
 Record:
 
@@ -258,13 +260,14 @@ Alignment: C-23 productizes the proven C-19/C-20 handoff packet without changing
 Drift: none. No real tools, new optimizer algorithm, PSF parser, OCEAN formula rewrite, or layout replacement.
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
-Use explicit pathspecs:
+Task 1 through Task 3 were already committed independently. Use explicit
+pathspecs for this final docs-only closeout:
 
 ```bash
-git add src/hermes_workflow/optimizer_task_package.py src/hermes_workflow/cli.py tests/test_optimizer_task_package.py docs/superpowers/plans/2026-06-04-optimizer-execution-agent-task-packet.md docs/CURRENT_TASK_STATE.json docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md docs/COMPACT_RESUME_CHECKPOINT.md
-git commit -m "feat: package optimizer execution task"
+git add docs/superpowers/plans/2026-06-04-optimizer-execution-agent-task-packet.md docs/CURRENT_TASK_STATE.json docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md docs/COMPACT_RESUME_CHECKPOINT.md
+git commit -m "docs: close c23 optimizer task packet"
 ```
 
 Do not stage raw Cadence evidence or `/tmp` files.

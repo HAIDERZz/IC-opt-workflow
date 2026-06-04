@@ -21,8 +21,8 @@ ic-auto-opt-workflow/AGENTS.md
 Current execution state:
 
 - Current scope: C-23 Optimizer Execution-Agent Task Packet MVP.
-- Current status: C-23 narrow implementation plan is written, verified-only; implementation has not started. The plan productizes the proven C-19/C-20 hand-written optimizer execution-agent task packet into a Hermes-generated packet.
-- Current next action: start C-23 Task 1 renderer and manifest contract after user confirmation.
+- Current status: C-23 is complete, verified-only, and committed in the current HEAD. Hermes can now generate a standard optimizer execution-agent task packet for the existing `run-native-turbo --parallel` path.
+- Current next action: wait for user confirmation, then run one local worker-agent handoff using the generated optimizer task packet.
 - C-18 keeps native `Turbo1.optimize()` as the optimizer route and adds a batch-aware Hermes evaluator so TuRBO batch candidates run Spectre/OCEAN concurrently up to `spectre.parallel_jobs`.
 - Each Spectre process still uses `spectre.threads_per_run` as `+mt`. Do not confuse Spectre internal threads with parallel Spectre process count.
 - C-19 uses the existing C-18 `run-native-turbo --parallel` path to validate the original supervisor-agent to execution-agent handoff goal. It must not create another optimizer framework.
@@ -31,7 +31,7 @@ Current execution state:
 - C-20 used fresh local worker subagents as execution agents. Attempt 1 exposed that command exit 0 is not sufficient because sandboxed Spectre produced 100 failed result manifests. The corrected task packet required non-sandbox execution and manifest-level audit. Attempt 2 completed 100 evaluations with 100 result manifests succeeded, 80 metric manifests succeeded, 20 metric manifests failed, and settings audit passed. Two failures, `real_057` and `real_075`, were OCEAN command/license failures.
 - C-21 added OCEAN-only retry for that residual tool/license failure class. Real rerun on `/tmp/ic_auto_opt_c21/bridge_test_inv` completed 100 evaluations with 100 result manifests succeeded, 100 metric manifests produced, 86 metric manifests succeeded, 14 candidate-level non-scalar metric failures, and 0 final OCEAN command/license failures. This rerun did not need actual retries.
 - C-22 aligns the generated execution package task with the locked role model and C-20 evidence. It does not add a new handoff framework or run real tools.
-- C-23 is the next narrow step: generate a standard optimizer execution-agent task packet for the existing `run-native-turbo --parallel` path, including manifest-level audit and Spectre settings expectations. It does not run real tools or add optimizer framework code.
+- C-23 generated a standard optimizer execution-agent task packet for the existing `run-native-turbo --parallel` path, including manifest-level audit and Spectre settings expectations. It does not run real tools or add optimizer framework code.
 - Task 1 complete and reviewed.
 - Task 2 complete and reviewed.
 - Task 3 complete and reviewed.
@@ -552,7 +552,7 @@ Status: complete, verified-only.
 
 Plan A, Plan B, Plan C C-1, Plan C C-2, Plan C C-3, Plan C C-4, Plan C C-5, and Plan C C-5.5 are complete as of 2026-06-01. C-6, C-7, C-8, and C-9 are complete and reviewed as of 2026-06-02. C-10 real-run failure/retry policy contract is complete and reviewed as of 2026-06-03. C-11 local/fake smoke is complete. C-7 real-tool closure is complete and committed as `d440c95`.
 
-Current next step: C-23 Optimizer Execution-Agent Task Packet MVP Task 1. Build on `run-native-turbo --parallel`; do not start broad optimizer framework work. Do not commit raw input decks, protected include files, PSF/raw data, full Cadence logs, `docs/OCEAN_DOC_*`, or `docs/toolchain_evidence/`. Do not parse PSF or translate OCEAN formulas in Python.
+Current next step: wait for user confirmation, then run one local worker-agent handoff using the generated C-23 optimizer task packet. Build on `run-native-turbo --parallel`; do not start broad optimizer framework work. Do not commit raw input decks, protected include files, PSF/raw data, full Cadence logs, `docs/OCEAN_DOC_*`, or `docs/toolchain_evidence/`. Do not parse PSF or translate OCEAN formulas in Python.
 
 Read the handoff files first:
 
@@ -579,5 +579,5 @@ Use this prompt after compact:
 8. ic-auto-opt-workflow/docs/debug/2026-06-04-c21-ocean-metric-extraction-retry-policy.md
 9. 如需背景，再读 ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-23 Optimizer Execution-Agent Task Packet MVP plan 已写好，状态 verified-only，implementation 尚未开始。下一步从 C-23 Task 1 renderer and manifest contract 开始。C-23 只把 C-19/C-20 手写 optimizer execution-agent task packet 产品化成 Hermes 生成包，必须继续基于 `run-native-turbo --parallel` 和 native `Turbo1.optimize()` 路线；不要写 broad optimizer framework，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。不要用 Python 解析 PSF，不要让 agent 翻译或重写 Calculator/OCEAN 公式。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-23 Optimizer Execution-Agent Task Packet MVP 已完成，状态 verified-only，并已提交在 current HEAD。Hermes 现在可以生成标准 optimizer execution-agent task packet，继续基于 `run-native-turbo --parallel` 和 native `Turbo1.optimize()` 路线。下一步等待用户确认后，用生成的 C-23 task packet 跑一次 local worker-agent handoff。不要写 broad optimizer framework，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。不要用 Python 解析 PSF，不要让 agent 翻译或重写 Calculator/OCEAN 公式。
 ```
