@@ -16,6 +16,7 @@ from hermes_workflow.native_turbo import (
     run_native_turbo_optimization,
 )
 from hermes_workflow.optimizer_acceptance import check_optimizer_run
+from hermes_workflow.optimizer_completion import summarize_optimizer_run
 from hermes_workflow.optimizer_suggestion import suggest_candidate_request
 from hermes_workflow.optimizer_task_package import (
     build_optimizer_execution_task_package,
@@ -571,6 +572,31 @@ def check_optimizer_run_command(
     for issue in report.issues:
         typer.echo(issue)
     typer.echo("report: reports/optimizer_run_acceptance_report.json")
+    raise typer.Exit(code=1)
+
+
+@app.command("summarize-optimizer-run")
+def summarize_optimizer_run_command(
+    project_dir: Annotated[
+        Path,
+        typer.Argument(help="Project directory with accepted optimizer artifacts."),
+    ],
+) -> None:
+    try:
+        report = summarize_optimizer_run(project_dir)
+    except (OSError, ValueError) as exc:
+        _exit_with_error(exc)
+    if report.status == "pass":
+        typer.echo(f"optimizer completion decision: {report.decision}")
+        typer.echo(f"confidence: {report.confidence}")
+        typer.echo(f"global optimum claim: {str(report.global_optimum_claim).lower()}")
+        typer.echo("report: reports/optimizer_completion_report.json")
+        return
+
+    typer.echo("optimizer completion decision failed")
+    for issue in report.issues:
+        typer.echo(issue)
+    typer.echo("report: reports/optimizer_completion_report.json")
     raise typer.Exit(code=1)
 
 

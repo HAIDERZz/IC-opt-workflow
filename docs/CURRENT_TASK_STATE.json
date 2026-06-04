@@ -1,18 +1,18 @@
 {
   "schema_version": "1.0",
   "current_scope": "C-26 Optimizer Completion And Continuation Decision Report",
-  "current_status": "C-26 design spec is written, verified-only. C-26 will read an already accepted optimizer run and generate reports/optimizer_completion_report.json with the best observed candidate, status distribution, search-space estimate, improvement evidence, and a deterministic supervisor decision such as accept_best_observed, continue_more_evals, local_refine_around_best, restart_with_new_seed, switch_to_exhaustive_sweep, or stop_for_user_review. No implementation plan or code has started.",
+  "current_status": "C-26 implementation is complete locally and awaiting final verification plus commit. Added optimizer_completion_report generation and hermes-workflow summarize-optimizer-run for accepted optimizer artifacts. The report captures best observed candidate, status counts, finite search-space estimate, best-so-far improvement evidence, and deterministic supervisor decisions including accept_best_observed, continue_more_evals, switch_to_exhaustive_sweep, and stop_for_user_review.",
   "review_status": "verified-only",
   "subagent_dispatch": "available",
   "active_spec": "docs/superpowers/specs/2026-06-05-optimizer-completion-continuation-decision-design.md",
-  "active_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
+  "active_plan": "docs/superpowers/plans/2026-06-05-optimizer-completion-continuation-decision.md",
   "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
   "progress_files": [
     "docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md",
     "docs/EXECUTION_PROGRESS_2026-05-29.md",
     "docs/COMPACT_RESUME_CHECKPOINT.md"
   ],
-  "next_allowed_action": "review C-26 design spec, then write C-26 implementation plan only after user confirmation; do not implement code, run real tools, or start broad optimizer framework work",
+  "next_allowed_action": "run C-26 final verification and commit; do not run real tools, start C-27, or start broad optimizer framework work before C-26 is committed",
   "forbidden_actions": [
     "start broad optimizer framework work",
     "hand-pick 100 optimizer points instead of using native Turbo1.optimize()",
@@ -42,10 +42,10 @@
   ],
   "route_audit": {
     "active_spec": "docs/superpowers/specs/2026-06-05-optimizer-completion-continuation-decision-design.md",
-    "active_plan": "pending C-26 implementation plan",
+    "active_plan": "docs/superpowers/plans/2026-06-05-optimizer-completion-continuation-decision.md",
     "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
-    "alignment": "Aligned. C-26 is the narrow next step after C-25: C-25 accepts returned artifacts structurally, while C-26 explains optimizer quality and continuation decisions without running tools or adding optimizer algorithms.",
-    "drift": "None. C-26 is a read-only supervisor report design; it does not run Cadence tools, replace TuRBO, parse PSF, rewrite OCEAN formulas, or change native Maestro/ADE layout."
+    "alignment": "Aligned. C-26 remains the narrow next step after C-25: C-25 accepts returned artifacts structurally, while C-26 explains optimizer quality and continuation decisions without running tools or adding optimizer algorithms.",
+    "drift": "None. C-26 implementation is read-only over accepted optimizer artifacts. It does not run Cadence tools, replace TuRBO, parse PSF, rewrite OCEAN formulas, change metric/constraint definitions, or change native Maestro/ADE layout."
   },
   "latest_valid_commit": "current HEAD",
   "review_evidence": {
@@ -80,6 +80,8 @@
     "c24_complete": "Complete, verified-only. Task 1 generated the optimizer execution packet. Task 2 first worker attempt on /tmp/ic_auto_opt_c24/bridge_test_inv was rejected because sandboxed Spectre failed before metric extraction with pipe/socket permission errors. Task 2R on /tmp/ic_auto_opt_c24_retry/bridge_test_inv used the same packet semantics through the approved non-sandbox Cadence path and completed 100 evaluations. Audit passed with 100 result manifests succeeded, 100 metric manifests produced, 79 metric manifests succeeded, 21 candidate-level metric failures, 36 feasible, 43 constraint_failed, 21 metric_check_failed, preset=ax, threads_per_run=10, parallel_jobs=10, output_format=psfxl. Best candidate was real_021: FN=10, WN=1.1u, FP=9, WP=0.5u, objective=4.305718220077049e-14. Sanitized note: docs/debug/2026-06-04-c24-generated-task-packet-handoff.md.",
     "c25_plan": "Written, verified-only. Added docs/superpowers/specs/2026-06-04-optimizer-run-acceptance-audit-design.md and docs/superpowers/plans/2026-06-04-optimizer-run-acceptance-audit.md. C-25 scopes a deterministic check-optimizer-run command that reads existing native TuRBO report/trace/result/metric manifests and writes reports/optimizer_run_acceptance_report.json. It productizes the C-24 supervisor/Hermes manifest audit and does not run real tools.",
     "c25_complete": "Complete, verified-only. Added src/hermes_workflow/optimizer_acceptance.py, hermes-workflow check-optimizer-run PROJECT_DIR, and tests/test_optimizer_acceptance.py. The audit accepts reflected candidate-level metric failures, rejects report/trace mismatch, missing manifests, Spectre setting drift, result failure recorded as feasible, and missing metric manifest for successful results. Local C-24 retry shape smoke passed on /tmp/ic_auto_opt_c24_retry/bridge_test_inv with optimizer run accepted. Verification passed: python3 -m pytest tests/test_optimizer_acceptance.py tests/test_optimizer_task_package.py tests/test_native_turbo.py -q; python3 -m ruff check src tests tools; python3 tools/check_development_cadence.py; git diff --check.",
-    "c26_design": "Written, verified-only. Added docs/superpowers/specs/2026-06-05-optimizer-completion-continuation-decision-design.md. C-26 will generate a read-only optimizer_completion_report.json after C-25 acceptance, summarizing best observed candidate, optimizer status distribution, search-space coverage, improvement evidence, and a continuation decision. No real tools, implementation code, optimizer algorithm change, PSF parsing, or OCEAN formula rewrite occurred."
+    "c26_design": "Written, verified-only. Added docs/superpowers/specs/2026-06-05-optimizer-completion-continuation-decision-design.md. C-26 will generate a read-only optimizer_completion_report.json after C-25 acceptance, summarizing best observed candidate, optimizer status distribution, search-space coverage, improvement evidence, and a continuation decision. No real tools, implementation code, optimizer algorithm change, PSF parsing, or OCEAN formula rewrite occurred.",
+    "c26_plan": "Written, verified-only. Added docs/superpowers/plans/2026-06-05-optimizer-completion-continuation-decision.md. The plan scopes four tasks: report model and accepted artifact loader, deterministic decision rules, CLI wiring, and docs/final verification.",
+    "c26_implementation": "Complete locally, pending final verification and commit. Added src/hermes_workflow/optimizer_completion.py, tests/test_optimizer_completion.py, and hermes-workflow summarize-optimizer-run. Focused verification passed: python3 -m pytest tests/test_optimizer_completion.py -q; python3 -m ruff check src/hermes_workflow/optimizer_completion.py src/hermes_workflow/cli.py tests/test_optimizer_completion.py."
   }
 }

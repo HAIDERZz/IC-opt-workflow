@@ -1097,6 +1097,14 @@ Next required action:
 - Boundary: no real tools, optimizer algorithm change, broad framework, PSF parsing, OCEAN formula rewriting, metric/constraint changes, or native-layout replacement.
 - current_scope: C-26 Optimizer Completion And Continuation Decision Report.
 - next_allowed_action: review C-26 design spec, then write C-26 implementation plan only after user confirmation; do not implement code, run real tools, or start broad optimizer framework work.
+- C-26 Optimizer Completion And Continuation Decision Report implementation: complete locally, verified-only, pending final commit.
+- Added `src/hermes_workflow/optimizer_completion.py`, `tests/test_optimizer_completion.py`, and CLI `hermes-workflow summarize-optimizer-run PROJECT_DIR`.
+- The command reads existing accepted optimizer artifacts and writes `reports/optimizer_completion_report.json`.
+- Report output includes best observed candidate, optimizer status counts, finite search-space estimate, evaluated fraction, full-coverage/global-optimum claim flag, best-so-far improvement evidence, and deterministic supervisor decision.
+- First-version decisions are intentionally narrow: `accept_best_observed`, `continue_more_evals`, `switch_to_exhaustive_sweep`, and `stop_for_user_review`.
+- Focused verification passed: `python3 -m pytest tests/test_optimizer_completion.py -q`; `python3 -m ruff check src/hermes_workflow/optimizer_completion.py src/hermes_workflow/cli.py tests/test_optimizer_completion.py`.
+- current_scope: C-26 Optimizer Completion And Continuation Decision Report.
+- next_allowed_action: run C-26 final verification and commit; do not start C-27, real-tool work, or broad optimizer framework work before C-26 is committed.
 
 ## Locked Role Model
 

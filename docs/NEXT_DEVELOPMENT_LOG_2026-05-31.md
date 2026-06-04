@@ -1252,6 +1252,22 @@ C-26 Optimizer Completion And Continuation Decision Report Design:
 - Route audit: aligned with the top-level practice-first route. C-25 answers whether returned artifacts are valid; C-26 answers what the supervisor should do with an accepted optimizer result. Drift: none.
 - next_allowed_action: review C-26 design spec, then write C-26 implementation plan only after user confirmation; do not implement code, run real tools, or start broad optimizer framework work.
 
+C-26 Optimizer Completion And Continuation Decision Report Completion:
+
+- Status: complete locally, verified-only, pending final commit.
+- Design spec: `docs/superpowers/specs/2026-06-05-optimizer-completion-continuation-decision-design.md`.
+- Implementation plan: `docs/superpowers/plans/2026-06-05-optimizer-completion-continuation-decision.md`.
+- Code: `src/hermes_workflow/optimizer_completion.py`.
+- CLI: `hermes-workflow summarize-optimizer-run PROJECT_DIR`.
+- Tests: `tests/test_optimizer_completion.py`.
+- Behavior: reads existing C-25 accepted optimizer artifacts and writes `reports/optimizer_completion_report.json`.
+- Report contents: best observed candidate, optimizer status counts, finite search-space estimate, evaluated fraction, full-coverage/global-optimum claim flag, best-so-far improvement evidence, and deterministic supervisor decision.
+- First-version decisions: `accept_best_observed`, `continue_more_evals`, `switch_to_exhaustive_sweep`, and `stop_for_user_review`.
+- Boundary: no real tools, no optimizer candidate generation, no TuRBO algorithm change, no continuation execution, no exhaustive execution, no PSF parsing, no OCEAN formula rewriting, no metric or constraint changes, and no native Maestro/ADE layout changes.
+- Focused verification passed: `python3 -m pytest tests/test_optimizer_completion.py -q`; `python3 -m ruff check src/hermes_workflow/optimizer_completion.py src/hermes_workflow/cli.py tests/test_optimizer_completion.py`.
+- Route audit: aligned with the top-level practice-first route. C-26 adds the supervisor decision report after C-25 artifact acceptance. Drift: none.
+- next_allowed_action: run C-26 final verification and commit; do not run real tools, start C-27, or start broad optimizer framework work before C-26 is committed.
+
 ## Resume Prompt
 
 ```text
