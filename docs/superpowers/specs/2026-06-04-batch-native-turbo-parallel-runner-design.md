@@ -92,6 +92,15 @@ TuRBO batch candidate generation
 Only the real-tool adapter calls run in parallel. File-contract preparation and
 ledger/state recording stay sequential to avoid shared-file races.
 
+### Batch Preparation And C-10 Guard
+
+C-10's unresolved real-run guard remains the default behavior for ordinary
+single-run preparation. C-18's batch evaluator is the narrow exception: it may
+prepare multiple approved explicit candidate packages for the same TuRBO batch
+before launching workers. This exception must be explicit, local to the batch
+evaluator, and must not weaken the default supervisor-facing unresolved-run
+guard.
+
 ## Batch-Aware TuRBO Adapter
 
 The current C-17 runner passes a scalar objective `f(x)` into `Turbo1`.

@@ -10,12 +10,14 @@ from typer.testing import CliRunner
 from hermes_workflow.cli import app
 from hermes_workflow.native_turbo import (
     NativeTurboObservation,
+    NativeTurboBatchCandidate,
     NativeTurboBatchRunner,
     NativeTurboRunner,
     _default_batch_turbo_factory,
     evaluate_candidate_objective,
     evaluate_real_candidate,
     load_native_turbo_contract,
+    make_real_candidate_batch_evaluator,
     quantize_candidate,
     run_batch_native_turbo_optimization,
     run_native_turbo_optimization,
@@ -636,6 +638,75 @@ def test_real_candidate_evaluator_runs_fake_adapter_checks_and_records(
     assert observation.metrics == {"rise": 1.0, "fall": 1.0, "DC": 1.0}
     assert observation.result_manifest == "runs/real/real_001/result_manifest.json"
     assert (project_dir / "ledger" / "experiment_ledger.jsonl").exists()
+
+
+def test_real_batch_evaluator_caps_parallel_adapter_calls(tmp_path: Path) -> None:
+    project_dir = create_approved_real_project(tmp_path)
+    import shutil
+    import threading
+    import time
+
+    shutil.rmtree(project_dir / "runs")
+    active = 0
+    max_active = 0
+    lock = threading.Lock()
+
+    def adapter(project: Path, *, run_id: str, cadence_cshrc: Path | None) -> None:
+        nonlocal active, max_active
+        assert cadence_cshrc == Path("/tmp/fake.csh")
+        with lock:
+            active += 1
+            max_active = max(max_active, active)
+        time.sleep(0.02)
+        write_fake_result_manifest(project, run_id=run_id)
+        write_fake_metric_result_manifest(
+            project,
+            run_id=run_id,
+            values={"rise": 1.0, "fall": 1.0, "DC": 1.0},
+        )
+        with lock:
+            active -= 1
+
+    candidates = [
+        NativeTurboBatchCandidate(
+            evaluation_index=index,
+            run_id=f"real_{index:03d}",
+            candidate_id=f"candidate_{index:06d}",
+            batch_id="batch_001",
+            batch_slot=index,
+            batch_size=4,
+            selection_phase="initialization",
+            raw_x=[4.0, 0.5, 4.0, 1.1],
+            parameters={
+                "FN": str(3 + index),
+                "WN": "0.5u",
+                "FP": "4",
+                "WP": "1.1u",
+            },
+            replacement_issues=[],
+        )
+        for index in range(1, 5)
+    ]
+
+    evaluator = make_real_candidate_batch_evaluator(
+        project_dir,
+        cadence_cshrc=Path("/tmp/fake.csh"),
+        max_workers=2,
+        adapter=adapter,
+    )
+
+    observations = evaluator(candidates)
+
+    assert len(observations) == 4
+    assert [observation.status for observation in observations] == ["recorded"] * 4
+    assert all(observation.metrics for observation in observations)
+    assert max_active == 2
+    assert [
+        json.loads(line)["run_id"]
+        for line in (project_dir / "ledger" / "experiment_ledger.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
+    ] == ["real_001", "real_002", "real_003", "real_004"]
 
 
 def test_real_candidate_evaluator_classifies_written_metric_failure(

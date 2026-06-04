@@ -6,6 +6,7 @@ import random
 import shlex
 import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from copy import deepcopy
 from dataclasses import asdict, dataclass
 from decimal import Decimal
@@ -553,7 +554,14 @@ def run_batch_native_turbo_optimization(
     selected_parallel_jobs = parallel_jobs or bundle.spectre.spectre.parallel_jobs
     selected_threads_per_run = threads_per_run or bundle.spectre.spectre.threads_per_run
     if batch_evaluator is None:
-        raise ValueError("batch_evaluator is required until C-18 Task 3")
+        batch_evaluator = make_real_candidate_batch_evaluator(
+            project_dir,
+            cadence_cshrc=cadence_cshrc,
+            max_workers=min(
+                bundle.optimizer.optimizer.batch_size,
+                selected_parallel_jobs,
+            ),
+        )
 
     runner = NativeTurboBatchRunner(
         variables=bundle.variables,
@@ -594,6 +602,38 @@ def evaluate_real_candidate(
         run_id=run_id,
         metadata={"optimizer": "turbo"},
     )
+    observation = execute_and_check_real_candidate(
+        project_dir,
+        run_id=run_id,
+        cadence_cshrc=cadence_cshrc,
+        adapter=adapter,
+    )
+    if observation.status != "checked":
+        return observation
+    record_report = record_real_result(project_dir, run_id=run_id)
+    if record_report.status.value != "pass":
+        _try_abandon_candidate(project_dir, run_id, "record-real-result failed")
+        return NativeTurboObservation(
+            status="record_failed",
+            issues=record_report.issues,
+            result_manifest=observation.result_manifest,
+            metric_result_manifest=observation.metric_result_manifest,
+        )
+    return NativeTurboObservation(
+        status="recorded",
+        metrics=observation.metrics,
+        result_manifest=observation.result_manifest,
+        metric_result_manifest=observation.metric_result_manifest,
+    )
+
+
+def execute_and_check_real_candidate(
+    project_dir: Path,
+    *,
+    run_id: str,
+    cadence_cshrc: Path | None = None,
+    adapter: Callable[..., object] | None = None,
+) -> NativeTurboObservation:
     selected_adapter = adapter or _run_default_adapter
     adapter_error: str | None = None
     try:
@@ -601,7 +641,7 @@ def evaluate_real_candidate(
     except Exception as exc:
         adapter_error = str(exc)
 
-    real_report = check_real_run(project_dir, run_id=run_id)
+    real_report = check_real_run(project_dir, run_id=run_id, persist_report=False)
     if real_report.status.value != "pass":
         _try_abandon_candidate(project_dir, run_id, "real-run check failed")
         issues = real_report.issues or ([adapter_error] if adapter_error else [])
@@ -610,21 +650,16 @@ def evaluate_real_candidate(
             issues=issues,
             result_manifest=f"runs/real/{run_id}/result_manifest.json",
         )
-    metric_report = check_metric_results(project_dir, run_id=run_id)
+    metric_report = check_metric_results(
+        project_dir,
+        run_id=run_id,
+        persist_report=False,
+    )
     if metric_report.status.value != "pass":
         _try_abandon_candidate(project_dir, run_id, "metric-result check failed")
         return NativeTurboObservation(
             status="metric_check_failed",
             issues=metric_report.issues,
-            result_manifest=real_report.result_manifest,
-            metric_result_manifest=metric_report.metric_result_manifest,
-        )
-    record_report = record_real_result(project_dir, run_id=run_id)
-    if record_report.status.value != "pass":
-        _try_abandon_candidate(project_dir, run_id, "record-real-result failed")
-        return NativeTurboObservation(
-            status="record_failed",
-            issues=record_report.issues,
             result_manifest=real_report.result_manifest,
             metric_result_manifest=metric_report.metric_result_manifest,
         )
@@ -641,11 +676,91 @@ def evaluate_real_candidate(
             metric_result_manifest=metric_report.metric_result_manifest,
         )
     return NativeTurboObservation(
-        status="recorded",
+        status="checked",
         metrics=metrics,
         result_manifest=real_report.result_manifest,
         metric_result_manifest=metric_report.metric_result_manifest,
     )
+
+
+def make_real_candidate_batch_evaluator(
+    project_dir: Path,
+    *,
+    cadence_cshrc: Path | None,
+    max_workers: int,
+    adapter: Callable[..., object] | None = None,
+) -> BatchEvaluator:
+    project_dir = Path(project_dir)
+    selected_max_workers = max(1, max_workers)
+
+    def evaluate(
+        candidates: list[NativeTurboBatchCandidate],
+    ) -> list[NativeTurboObservation]:
+        for candidate in candidates:
+            prepare_explicit_candidate_real_run(
+                project_dir,
+                candidate_id=candidate.candidate_id,
+                source=NATIVE_TURBO_SOURCE,
+                parameters=candidate.parameters,
+                run_id=candidate.run_id,
+                metadata={
+                    "optimizer": "turbo",
+                    "batch_id": candidate.batch_id,
+                    "batch_slot": candidate.batch_slot,
+                    "selection_phase": candidate.selection_phase,
+                },
+                allow_unresolved_batch_runs=True,
+            )
+
+        observations: list[NativeTurboObservation | None] = [None] * len(candidates)
+        with ThreadPoolExecutor(max_workers=selected_max_workers) as executor:
+            future_to_index = {
+                executor.submit(
+                    execute_and_check_real_candidate,
+                    project_dir,
+                    run_id=candidate.run_id,
+                    cadence_cshrc=cadence_cshrc,
+                    adapter=adapter,
+                ): index
+                for index, candidate in enumerate(candidates)
+            }
+            for future in as_completed(future_to_index):
+                observations[future_to_index[future]] = future.result()
+
+        finalized: list[NativeTurboObservation] = []
+        for candidate, observation in zip(candidates, observations, strict=True):
+            if observation is None:
+                raise RuntimeError("batch candidate was not evaluated")
+            if observation.status != "checked":
+                finalized.append(observation)
+                continue
+            record_report = record_real_result(project_dir, run_id=candidate.run_id)
+            if record_report.status.value != "pass":
+                _try_abandon_candidate(
+                    project_dir,
+                    candidate.run_id,
+                    "record-real-result failed",
+                )
+                finalized.append(
+                    NativeTurboObservation(
+                        status="record_failed",
+                        issues=record_report.issues,
+                        result_manifest=observation.result_manifest,
+                        metric_result_manifest=observation.metric_result_manifest,
+                    )
+                )
+                continue
+            finalized.append(
+                NativeTurboObservation(
+                    status="recorded",
+                    metrics=observation.metrics,
+                    result_manifest=observation.result_manifest,
+                    metric_result_manifest=observation.metric_result_manifest,
+                )
+            )
+        return finalized
+
+    return evaluate
 
 
 def _try_abandon_candidate(project_dir: Path, run_id: str, reason: str) -> None:

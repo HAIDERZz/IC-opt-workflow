@@ -226,6 +226,7 @@ def prepare_explicit_candidate_real_run(
     run_id: str | None = None,
     metadata: dict[str, object] | None = None,
     created_at_utc: str | None = None,
+    allow_unresolved_batch_runs: bool = False,
 ) -> RealRunPackage:
     project_dir = Path(project_dir)
     if run_id is not None:
@@ -239,7 +240,8 @@ def prepare_explicit_candidate_real_run(
 
     from hermes_workflow.real_run_recovery import assert_no_unresolved_real_runs
 
-    assert_no_unresolved_real_runs(project_dir)
+    if not allow_unresolved_batch_runs:
+        assert_no_unresolved_real_runs(project_dir)
     request = CandidateInjectionRequest(
         schema_version="1.0",
         candidate_id=candidate_id,

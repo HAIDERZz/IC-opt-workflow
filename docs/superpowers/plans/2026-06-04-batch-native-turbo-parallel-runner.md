@@ -380,14 +380,15 @@ with a direct script and verify the observed calls are:
 
 **Risk:** High.
 
-**Status:** Not started.
+**Status:** Complete, verified-only.
 
 **Files:**
 
 - Modify: `src/hermes_workflow/native_turbo.py`
+- Modify: `src/hermes_workflow/real_run.py`
 - Modify: `tests/test_native_turbo.py`
 
-- [ ] **Step 1: Add failing parallel evaluator test**
+- [x] **Step 1: Add failing parallel evaluator test**
 
 Add:
 
@@ -439,7 +440,7 @@ def test_real_batch_evaluator_caps_parallel_adapter_calls(tmp_path: Path) -> Non
 
     assert len(observations) == 4
     assert all(observation.metrics for observation in observations)
-    assert max_active <= 2
+    assert max_active == 2
 ```
 
 Run:
@@ -450,7 +451,7 @@ python3 -m pytest tests/test_native_turbo.py::test_real_batch_evaluator_caps_par
 
 Expected: fail because `make_real_candidate_batch_evaluator` does not exist.
 
-- [ ] **Step 2: Split checked execution from recording**
+- [x] **Step 2: Split checked execution from recording**
 
 In `native_turbo.py`, add:
 
@@ -468,7 +469,7 @@ def execute_and_check_real_candidate(
         selected_adapter(project_dir, run_id=run_id, cadence_cshrc=cadence_cshrc)
     except Exception as exc:
         adapter_error = str(exc)
-    real_report = check_real_run(project_dir, run_id=run_id)
+    real_report = check_real_run(project_dir, run_id=run_id, persist_report=False)
     if real_report.status.value != "pass":
         _try_abandon_candidate(project_dir, run_id, "real-run check failed")
         return NativeTurboObservation(
@@ -476,7 +477,7 @@ def execute_and_check_real_candidate(
             issues=real_report.issues or ([adapter_error] if adapter_error else []),
             result_manifest=f"runs/real/{run_id}/result_manifest.json",
         )
-    metric_report = check_metric_results(project_dir, run_id=run_id)
+    metric_report = check_metric_results(project_dir, run_id=run_id, persist_report=False)
     if metric_report.status.value != "pass":
         _try_abandon_candidate(project_dir, run_id, "metric-result check failed")
         return NativeTurboObservation(
@@ -508,7 +509,7 @@ def execute_and_check_real_candidate(
 Update existing `evaluate_real_candidate` to call this helper and then call
 `record_real_result` for the single-run path.
 
-- [ ] **Step 3: Implement batch evaluator**
+- [x] **Step 3: Implement batch evaluator**
 
 Add:
 
@@ -529,6 +530,7 @@ def make_real_candidate_batch_evaluator(
                 parameters=candidate.parameters,
                 run_id=candidate.run_id,
                 metadata={"optimizer": "turbo", "batch_id": candidate.batch_id},
+                allow_unresolved_batch_runs=True,
             )
         observations: list[NativeTurboObservation | None] = [None] * len(candidates)
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -576,14 +578,21 @@ def make_real_candidate_batch_evaluator(
 
 Keep `record_real_result` outside worker threads.
 
-- [ ] **Step 4: Run focused and adjacent tests**
+Plan correction: C-10's unresolved-run guard blocks preparing multiple pending
+real-run packages. Task 3 therefore adds a default-off
+`allow_unresolved_batch_runs` keyword to `prepare_explicit_candidate_real_run`
+and uses it only from the C-18 batch evaluator. Ordinary single-run preparation
+keeps the existing guard.
+
+- [x] **Step 4: Run focused and adjacent tests**
 
 Run:
 
 ```bash
 python3 -m pytest tests/test_native_turbo.py::test_real_batch_evaluator_caps_parallel_adapter_calls -q
 python3 -m pytest tests/test_native_turbo.py tests/test_real_result_record.py tests/test_metric_results.py -q
-python3 -m ruff check src/hermes_workflow/native_turbo.py tests/test_native_turbo.py
+python3 -m pytest tests/test_candidate_injection_real_run.py tests/test_real_run_recovery.py -q
+python3 -m ruff check src/hermes_workflow/native_turbo.py src/hermes_workflow/real_run.py tests/test_native_turbo.py
 ```
 
 Expected: all pass.
