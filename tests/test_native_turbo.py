@@ -252,6 +252,24 @@ def test_quantize_candidate_snaps_and_formats_approved_variables() -> None:
     assert quantize_candidate(variables, [0.0, 3.0]) == {"FN": "2", "WN": "2u"}
 
 
+def test_quantize_candidate_clamps_off_grid_upper_to_last_approved_step() -> None:
+    variables = VariablesConfig(
+        schema_version="1.0",
+        variables=[
+            VariableSpec(
+                name="WN",
+                kind=VariableKind.CONTINUOUS_STEP,
+                lower="0.3u",
+                upper="3u",
+                step="0.2u",
+            ),
+        ],
+    )
+
+    assert quantize_candidate(variables, [3.0]) == {"WN": "2.9u"}
+    assert quantize_candidate(variables, [3.1]) == {"WN": "2.9u"}
+
+
 def test_missing_metric_returns_failure_penalty() -> None:
     result = evaluate_candidate_objective(
         _metrics_config(),

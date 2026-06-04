@@ -152,7 +152,8 @@ def quantize_candidate(
             upper = int(variable.upper)
             step = int(variable.step)
             offset = round((float(raw) - lower) / step)
-            value = _clamp_int(lower + offset * step, lower, upper)
+            max_offset = (upper - lower) // step
+            value = lower + _clamp_int(offset, 0, max_offset) * step
             parameters[variable.name] = str(value)
         else:
             lower, unit = _parse_decimal_unit(variable.lower)
@@ -161,8 +162,8 @@ def quantize_candidate(
             if upper_unit != unit or step_unit != unit:
                 raise ValueError(f"variable {variable.name} uses inconsistent units")
             offset = round((Decimal(str(raw)) - lower) / step)
-            value = lower + Decimal(offset) * step
-            value = max(lower, min(upper, value))
+            max_offset = int((upper - lower) / step)
+            value = lower + Decimal(_clamp_int(offset, 0, max_offset)) * step
             parameters[variable.name] = f"{value.normalize():f}{unit}"
     return parameters
 

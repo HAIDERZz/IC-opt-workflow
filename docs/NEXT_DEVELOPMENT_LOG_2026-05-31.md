@@ -1120,6 +1120,22 @@ C-16 100-Point Real Optimizer Acceptance Tasks 1-2:
 - Route audit: aligned with the practice-first top-level route. Drift found: C-16 is not a clean optimizer acceptance because silent post-TuRBO fallback occurred at `real_092` and `real_094`.
 - next_allowed_action: write or implement a narrow TuRBO suggestion robustness fix; do not run another broad 100-point acceptance until silent fallback is surfaced, retried, or classified
 
+C-19 Execution-Agent Optimizer Practice Acceptance:
+
+- Status: complete, verified-only.
+- Plan: `docs/superpowers/plans/2026-06-04-execution-agent-optimizer-practice-acceptance.md`.
+- Sanitized audit: `docs/debug/2026-06-04-c19-execution-agent-optimizer-acceptance.md`.
+- Task 1 prepared a local-only execution-agent handoff packet and clean practice project under `/tmp/ic_auto_opt_c19/`, preserving native `netlists/exported/input.scs`, `ade_e.scs`, and `amap/`.
+- Task 2 first run failed before real tools with `optimizer state is missing`.
+- Task 3 audit found the root cause: the copied C-18 project deleted `state/optimizer_state.json` but retained stale `ledger/experiment_ledger.jsonl` rows.
+- Task 4 Branch B fixed clean project prep by removing stale optimizer ledger rows and fixed native TuRBO candidate quantization so off-grid upper bounds clamp to the last approved grid step.
+- A sandboxed rerun was rejected as invalid evidence because Spectre failed with pipe/socket permission errors.
+- The clean non-sandbox rerun completed 100 real evaluations through the existing `run-native-turbo --parallel` command: `33 feasible`, `46 constraint_failed`, `21 metric_check_failed`.
+- Real-tool audit: 100 result manifests succeeded; 79 metric manifests succeeded and 21 failed as candidate-level metric failures; max worker metadata was 10; all result manifests used `preset=ax`, `threads_per_run=10`, `output_format=psfxl`; traces kept `parallel_jobs=10`.
+- Best accepted candidate: `real_041`, `FN=8`, `WN=2.3u`, `FP=9`, `WP=0.5u`, objective `4.169592842385839e-14`.
+- Route audit: aligned with the top-level practice-first route. Drift resolved. No broad optimizer framework, formula change, PSF parsing, or native Maestro/ADE layout replacement occurred.
+- next_allowed_action: commit C-19 Task 4 fix and sanitized evidence, then wait for user confirmation before choosing the next narrow practice-backed productization or execution-agent validation scope.
+
 ## Resume Prompt
 
 ```text

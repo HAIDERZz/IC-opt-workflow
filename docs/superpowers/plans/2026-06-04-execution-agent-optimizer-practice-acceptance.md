@@ -177,6 +177,7 @@ mkdir -p "$C19_EVIDENCE"
 test -d "$C19_SOURCE_PROJECT"
 cp -a "$C19_SOURCE_PROJECT" "$C19_PROJECT"
 rm -rf "$C19_PROJECT/runs" "$C19_PROJECT/reports" "$C19_PROJECT/state" "$C19_PROJECT/data"
+rm -f "$C19_PROJECT/ledger/experiment_ledger.jsonl"
 ```
 
 Expected:
@@ -184,7 +185,8 @@ Expected:
 - `$C19_PROJECT/netlists/exported/input.scs` exists;
 - `$C19_PROJECT/netlists/exported/ade_e.scs` exists when present in the source;
 - `$C19_PROJECT/netlists/exported/amap/` remains when present in the source;
-- prior C-18 run outputs are not copied.
+- prior C-18 run outputs are not copied;
+- stale optimizer ledger rows from the C-18 source project are not retained.
 
 - [x] **Step 4: Record Task 1 state and stop**
 
@@ -373,6 +375,11 @@ Expected:
 
 **Risk:** Depends on real evidence.
 
+**Status:** Complete, verified-only. Branch B was used. The stale optimizer
+ledger cleanup was fixed, native TuRBO continuous-step quantization was hardened
+for off-grid upper bounds, and one clean non-sandbox rerun completed 100 real
+evaluations.
+
 Only perform one of these branches.
 
 ### Branch A: Acceptance Passed
@@ -383,11 +390,32 @@ Only perform one of these branches.
 
 ### Branch B: Acceptance Blocked By A Real Bug
 
-- [ ] Write one concise blocker note under `docs/debug/`.
-- [ ] Fix only the blocking code path proven by Task 2/3 evidence.
-- [ ] Add the smallest targeted regression test.
-- [ ] Re-run the failed C-19 command once.
-- [ ] Commit the fix and sanitized evidence.
+- [x] Write one concise blocker note under `docs/debug/`.
+- [x] Fix only the blocking code path proven by Task 2/3 evidence.
+- [x] Add the smallest targeted regression test.
+- [x] Re-run the failed C-19 command once.
+- [x] Commit the fix and sanitized evidence.
+
+Task 4 closure notes:
+
+- Clean project preparation now removes stale
+  `ledger/experiment_ledger.jsonl` from the copied C-18 source project. This
+  keeps a fresh C-19 handoff internally consistent: no ledger rows and no
+  optimizer state before the first candidate.
+- `quantize_candidate()` now clamps continuous-step candidates by approved grid
+  offset, so off-grid upper bounds such as `0.3u..3u step 0.2u` produce `2.9u`
+  for high raw values instead of invalid `3u`.
+- Focused regression:
+  `test_quantize_candidate_clamps_off_grid_upper_to_last_approved_step`.
+- One sandboxed rerun reached 100 evaluations but failed all Spectre processes
+  with pipe/socket permission errors; this was rejected as sandbox evidence.
+- The clean non-sandbox rerun completed 100 real evaluations with
+  `33 feasible`, `46 constraint_failed`, and `21 metric_check_failed`.
+- Settings audit passed: all 100 result manifests used `preset=ax`,
+  `threads_per_run=10`, and `output_format=psfxl`; all traces kept
+  `parallel_jobs=10` and `threads_per_run=10`.
+- Best candidate: `real_041`, `FN=8`, `WN=2.3u`, `FP=9`, `WP=0.5u`,
+  objective `4.169592842385839e-14`.
 
 Forbidden in Branch B:
 

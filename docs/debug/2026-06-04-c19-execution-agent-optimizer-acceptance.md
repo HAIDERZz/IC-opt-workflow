@@ -2,7 +2,7 @@
 
 Date: 2026-06-04
 
-## Status
+## Initial Status
 
 Blocked before real Spectre/OCEAN execution.
 
@@ -82,3 +82,62 @@ C-18 history.
 
 Do not change formulas, parse PSF, replace TuRBO, or create a new optimizer
 framework.
+
+## Task 4 Closure
+
+Status: accepted after a narrow blocker fix and one clean rerun.
+
+Fixes applied:
+
+- C-19 clean project preparation now removes stale
+  `ledger/experiment_ledger.jsonl` when starting from the accepted C-18
+  project. The C-19 acceptance is a fresh handoff, not a resume of C-18
+  optimizer history.
+- Native TuRBO candidate quantization now clamps continuous-step candidates to
+  the last approved grid step when the configured upper bound is intentionally
+  off-grid. Example: `lower=0.3u`, `upper=3u`, `step=0.2u` clamps high raw
+  values to `2.9u`, not `3u`.
+
+One sandbox-only rerun attempt reached 100 evaluations but all Spectre runs
+failed with Cadence pipe/socket errors. This was not accepted as project
+evidence because Spectre was run inside the Codex sandbox.
+
+The final rerun used the same Hermes command outside the sandbox:
+
+```text
+hermes-workflow run-native-turbo PROJECT_DIR --parallel --max-evals 100 --cadence-cshrc CADENCE_CSHRC
+```
+
+Acceptance summary:
+
+- command exit status: 0;
+- optimizer evaluations: 100;
+- real result manifests: 100;
+- metric result manifests: 100;
+- result manifest status counts: `succeeded=100`;
+- metric manifest status counts: `succeeded=79`, `failed=21`;
+- optimizer status counts: `feasible=33`, `constraint_failed=46`,
+  `metric_check_failed=21`;
+- batch count: 11;
+- maximum worker metadata: 10;
+- Spectre settings audit across all result manifests:
+  `preset=ax`, `threads_per_run=10`, `output_format=psfxl`;
+- trace parallel audit: `parallel_jobs=10`, `threads_per_run=10`;
+- no Python PSF parsing, OCEAN formula rewrite, metric-formula change, or
+  native Maestro/ADE layout flattening occurred.
+
+Best accepted candidate:
+
+```text
+run_id: real_041
+parameters: FN=8, WN=2.3u, FP=9, WP=0.5u
+metrics: rise=7.272202316589962e-11, fall=6.636203994189362e-11, DC=0.0002997894042795048
+objective: 4.169592842385839e-14
+```
+
+Acceptance decision:
+
+C-19 execution-agent optimizer acceptance passes. The supervisor-to-execution
+handoff is viable when the execution agent runs the existing
+`run-native-turbo --parallel` command on a clean project that preserves the
+native Maestro/ADE netlist layout.
