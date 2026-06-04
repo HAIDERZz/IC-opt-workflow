@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "current_scope": "C-19 Execution-Agent Optimizer Practice Acceptance",
-  "current_status": "C-19 Task 1 Prepare Execution-Agent Handoff Packet is complete, verified-only. A local-only handoff packet was written under /tmp/ic_auto_opt_c19/evidence/execution_agent_optimizer_acceptance_001, and a clean C-19 practice project was copied from the C-18 accepted project while preserving native Maestro/ADE exported netlist sidecars and removing prior runs/reports/state/data outputs.",
+  "current_status": "C-19 Task 2 Real Execution-Agent Optimizer Run was attempted exactly once and is complete with blocker evidence, verified-only. The command exited before real Spectre/OCEAN execution with stdout 'optimizer state is missing', empty stderr, and no native_turbo_summary.json, native_turbo_trace.jsonl, optimizer_state.json, or real_results_ledger.jsonl outputs.",
   "review_status": "verified-only",
   "subagent_dispatch": "available",
   "active_spec": "docs/superpowers/plans/2026-06-04-execution-agent-optimizer-practice-acceptance.md",
@@ -12,11 +12,11 @@
     "docs/EXECUTION_PROGRESS_2026-05-29.md",
     "docs/COMPACT_RESUME_CHECKPOINT.md"
   ],
-  "next_allowed_action": "wait for user confirmation, then execute C-19 Task 2: Real Execution-Agent Optimizer Run; do not run the C-19 real-tool optimizer command before that confirmation",
+  "next_allowed_action": "execute C-19 Task 3: Supervisor/Hermes Acceptance Audit to classify the missing optimizer state blocker and decide the smallest corrective action; do not rerun run-native-turbo before Task 3 records the audit",
   "forbidden_actions": [
     "start broad optimizer framework work",
     "hand-pick 100 optimizer points instead of using native Turbo1.optimize()",
-    "start C-19 Task 2 real-tool execution before user confirmation",
+    "rerun C-19 Task 2 real-tool execution before Task 3 audit",
     "create daemon or service orchestration",
     "replace TuRBO",
     "run C-18 real-tool acceptance before fake/unit tasks pass and the user confirms",
@@ -44,8 +44,8 @@
     "active_spec": "docs/superpowers/plans/2026-06-04-execution-agent-optimizer-practice-acceptance.md",
     "active_plan": "docs/superpowers/plans/2026-06-04-execution-agent-optimizer-practice-acceptance.md",
     "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
-    "alignment": "Aligned. C-19 Task 1 prepared only the handoff packet and clean /tmp practice project required before the real execution-agent optimizer run. No new framework, real tool execution, formula rewrite, PSF parsing, or native layout flattening occurred.",
-    "drift": "None open. C-19 intentionally uses the implementation plan itself as the scoped active spec to avoid creating speculative overlapping design assets."
+    "alignment": "Aligned. C-19 Task 2 used the existing run-native-turbo --parallel command once and did not hand-pick points or change formulas. The run stopped before real tool launch because the clean handoff project lacked optimizer_state.json.",
+    "drift": "Open blocker evidence, not a route drift yet. Task 3 must decide whether the C-19 handoff project preparation should preserve or initialize optimizer state before rerun."
   },
   "latest_valid_commit": "d7b3cee docs: plan execution agent optimizer acceptance",
   "review_evidence": {
@@ -63,6 +63,7 @@
     "c18_task3": "Complete, verified-only. Added execute_and_check_real_candidate, make_real_candidate_batch_evaluator, sequential recording outside worker threads, non-persisted per-worker check reports, and a default-off allow_unresolved_batch_runs flag for batch preparation only. Verification passed: python3 -m pytest tests/test_native_turbo.py::test_real_batch_evaluator_caps_parallel_adapter_calls -q; python3 -m pytest tests/test_native_turbo.py tests/test_real_result_record.py tests/test_metric_results.py -q; python3 -m pytest tests/test_candidate_injection_real_run.py tests/test_real_run_recovery.py -q; python3 -m ruff check src/hermes_workflow/native_turbo.py src/hermes_workflow/real_run.py tests/test_native_turbo.py.",
     "c18_complete": "Complete, verified-only. Added run-native-turbo --parallel, report batch_summary, sanitized acceptance note docs/debug/2026-06-04-batch-native-turbo-parallel-acceptance.md, and real acceptance on /tmp/ic_auto_opt_c18_batch_native_turbo_001/bridge_test_inv. Real run completed 100 evaluations: 36 feasible, 50 constraint_failed, 14 metric_check_failed; phase counts initialization 16 and turbo_trust_region 84; batch_count 11; max worker metadata 10; Spectre audit preset ax, threads_per_run 10, parallel_jobs 10, output_format psfxl for all 100 prepared manifests. Full verification passed: python3 -m pytest -q (513 passed, 1 skipped) and python3 -m ruff check .",
     "c19_plan": "Complete, verified-only. Added docs/superpowers/plans/2026-06-04-execution-agent-optimizer-practice-acceptance.md as the next narrow practice-backed scope. C-19 validates execution-agent handoff using the existing run-native-turbo --parallel 100-evaluation path, not a new optimizer framework.",
-    "c19_task1": "Complete, verified-only. Wrote local-only execution-agent task packet at /tmp/ic_auto_opt_c19/evidence/execution_agent_optimizer_acceptance_001/EXECUTION_AGENT_TASK.md and prepared clean practice project /tmp/ic_auto_opt_c19/bridge_test_inv from the accepted C-18 project. Native netlists/exported/input.scs, ade_e.scs, and amap/ were preserved; old runs/reports/state/data outputs were removed. Verification passed: git status --short, python3 tools/check_development_cadence.py, git diff --check. No real Spectre/OCEAN/Virtuoso/SSH/bridge run occurred."
+    "c19_task1": "Complete, verified-only. Wrote local-only execution-agent task packet at /tmp/ic_auto_opt_c19/evidence/execution_agent_optimizer_acceptance_001/EXECUTION_AGENT_TASK.md and prepared clean practice project /tmp/ic_auto_opt_c19/bridge_test_inv from the accepted C-18 project. Native netlists/exported/input.scs, ade_e.scs, and amap/ were preserved; old runs/reports/state/data outputs were removed. Verification passed: git status --short, python3 tools/check_development_cadence.py, git diff --check. No real Spectre/OCEAN/Virtuoso/SSH/bridge run occurred.",
+    "c19_task2": "Complete with blocker evidence, verified-only. User confirmed real-tool execution. Ran .venv/bin/hermes-workflow run-native-turbo /tmp/ic_auto_opt_c19/bridge_test_inv --parallel --max-evals 100 --cadence-cshrc /home/zzchen/cadence_ic231_env.csh exactly once. It exited non-zero before real Spectre/OCEAN launch with stdout 'optimizer state is missing' and empty stderr. returned_artifact_hashes.sha256 is empty because no summary/trace/state/ledger files were produced. Local evidence is under /tmp/ic_auto_opt_c19/evidence/execution_agent_optimizer_acceptance_001/."
   }
 }

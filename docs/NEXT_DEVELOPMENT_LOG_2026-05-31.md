@@ -5,9 +5,9 @@
 - Repository: `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow`
 - Branch: `plan-a-hermes-file-contract-mvp`
 - Current scope: C-19 Execution-Agent Optimizer Practice Acceptance
-- Current status: verified-only; C-19 Task 1 Prepare Execution-Agent Handoff Packet is complete.
-- Next required action: wait for user confirmation, then execute C-19 Task 2: Real Execution-Agent Optimizer Run.
-- next_allowed_action: wait for user confirmation, then execute C-19 Task 2: Real Execution-Agent Optimizer Run; do not run the C-19 real-tool optimizer command before that confirmation
+- Current status: verified-only; C-19 Task 2 Real Execution-Agent Optimizer Run was attempted exactly once and is complete with blocker evidence.
+- Next required action: execute C-19 Task 3 Supervisor/Hermes Acceptance Audit to classify the missing optimizer state blocker.
+- next_allowed_action: execute C-19 Task 3: Supervisor/Hermes Acceptance Audit to classify the missing optimizer state blocker and decide the smallest corrective action; do not rerun run-native-turbo before Task 3 records the audit
 
 C-3 Task 6 final verification is complete. C-4 is confirmed as a contract-only first real-run package; it must not run Spectre, Virtuoso, subprocesses, or the optimizer loop. C-4 is now complete and reviewed. C-5 validates the execution agent's returned `result_manifest.json` and declared artifacts without running Spectre or parsing metrics. C-5.5 rehearsed the C-4/C-5 handoff with simulated execution-agent and Hermes-observer roles. After C-5.5, the project paused implementation to validate the real metric backend. Spectre + OCEAN is now confirmed as the backend route: standalone Spectre generates PSF, batch OCEAN opens the PSF and evaluates exact user/project-approved formulas, and Python only records OCEAN-produced scalar outputs and provenance. C-6 turned that route into deterministic file contracts and a Hermes validator without physical adapter wiring. C-7 added an explicit execution-side adapter and tool entry point while preserving the rule that Hermes workflow tooling still validates returned files after execution. C-8 records checked real metric results into optimizer ledger/state after `check-real-run` and `check-metric-results` pass, while preserving the contract-only boundary. C-9 prepares the next real-run package from strict ledger/state and deterministic optimizer initialization sequence, while still not running real tools or writing ledger/state. C-10 classifies failed/partial/pending real-run packages, writes explicit recovery decisions, prepares retry packages, exposes supervisor-facing recovery CLI commands, and blocks C-9 from advancing while unresolved real-run packages exist. C-10 final review fixes aligned unsafe artifact classification with the spec and hardened symlinked recovery decision reads.
 
@@ -59,6 +59,47 @@ git diff --check
 Route audit: aligned with the C-19 plan and top-level practice-first route. Drift: none. No real Spectre/OCEAN/Virtuoso/SSH/bridge execution, PSF parsing, formula rewrite, native-layout flattening, or raw artifact commit occurred.
 
 next_allowed_action: wait for user confirmation, then execute C-19 Task 2: Real Execution-Agent Optimizer Run; do not run the C-19 real-tool optimizer command before that confirmation
+
+## C-19 Task 2 Checkpoint 2026-06-04
+
+C-19 Task 2 is complete with blocker evidence, verified-only.
+
+User confirmed real-tool execution. The existing optimizer command was run
+exactly once:
+
+```text
+.venv/bin/hermes-workflow run-native-turbo /tmp/ic_auto_opt_c19/bridge_test_inv --parallel --max-evals 100 --cadence-cshrc /home/zzchen/cadence_ic231_env.csh
+```
+
+Result:
+
+- Exit status: non-zero.
+- stdout: `optimizer state is missing`.
+- stderr: empty.
+- No `reports/native_turbo_summary.json`, `reports/native_turbo_trace.jsonl`,
+  `state/optimizer_state.json`, or `data/real_results_ledger.jsonl` was
+  produced.
+- `returned_artifact_hashes.sha256` exists and is empty.
+
+Local evidence:
+
+```text
+/tmp/ic_auto_opt_c19/evidence/execution_agent_optimizer_acceptance_001/run_native_turbo_stdout.txt
+/tmp/ic_auto_opt_c19/evidence/execution_agent_optimizer_acceptance_001/run_native_turbo_stderr.txt
+/tmp/ic_auto_opt_c19/evidence/execution_agent_optimizer_acceptance_001/returned_artifact_hashes.sha256
+```
+
+Interpretation:
+
+The run did not reach real Spectre/OCEAN execution. This is an entry-state
+blocker in the C-19 clean handoff project, not evidence of a Spectre/OCEAN or
+metric-formula failure.
+
+Route audit: aligned with the C-19 plan. Drift: open blocker evidence only.
+Task 3 must decide whether the smallest correction is to preserve or initialize
+`state/optimizer_state.json` during C-19 handoff preparation before rerunning.
+
+next_allowed_action: execute C-19 Task 3: Supervisor/Hermes Acceptance Audit to classify the missing optimizer state blocker and decide the smallest corrective action; do not rerun run-native-turbo before Task 3 records the audit
 
 ## Optimizer Skill Real Flow Practice 2026-06-04
 
