@@ -20,11 +20,11 @@ ic-auto-opt-workflow/AGENTS.md
 
 Current execution state:
 
-- Current scope: C-17 Native TuRBO Optimizer Runner MVP.
-- Current status: C-17 is complete, verified-only. `run-native-turbo` now uses native `Turbo1.optimize()` with Hermes real-run package/check/record contracts and the Spectre/OCEAN adapter as the black-box evaluator.
-- Current next action: decide the next narrow productization scope after C-17.
-- C-17 real acceptance completed 100 evaluations on `/tmp/ic_auto_opt_c17_native_turbo_002/bridge_test_inv`: 8 initialization, 92 trust-region, 45 feasible, 43 constraint failed, 12 metric check failed.
-- Build future optimizer productization on the native `Turbo1.optimize()` runner path. Do not extend the older one-candidate suggestion loop or start broad optimizer framework work without user confirmation.
+- Current scope: C-18 Batch Native TuRBO Parallel Runner.
+- Current status: C-18 design spec is complete, verified-only.
+- Current next action: write C-18 implementation plan.
+- C-18 keeps native `Turbo1.optimize()` as the optimizer route, but adds a batch-aware Hermes evaluator so TuRBO batch candidates can run Spectre/OCEAN concurrently up to `spectre.parallel_jobs`.
+- Each Spectre process still uses `spectre.threads_per_run` as `+mt`. Do not confuse Spectre internal threads with parallel Spectre process count.
 - Task 1 complete and reviewed.
 - Task 2 complete and reviewed.
 - Task 3 complete and reviewed.
@@ -545,7 +545,7 @@ Status: complete, verified-only.
 
 Plan A, Plan B, Plan C C-1, Plan C C-2, Plan C C-3, Plan C C-4, Plan C C-5, and Plan C C-5.5 are complete as of 2026-06-01. C-6, C-7, C-8, and C-9 are complete and reviewed as of 2026-06-02. C-10 real-run failure/retry policy contract is complete and reviewed as of 2026-06-03. C-11 local/fake smoke is complete. C-7 real-tool closure is complete and committed as `d440c95`.
 
-Current next step: decide the next narrow productization scope after C-17. C-17 is complete, verified-only, and productized the corrected optimizer route: native `Turbo1.optimize()` drives 100 real evaluations through the proven Hermes + Spectre/OCEAN evaluator path. The previous one-candidate suggestion loop remains support tooling, not the optimizer proof path. Do not start broad optimizer framework work. Do not commit raw input decks, protected include files, PSF/raw data, full Cadence logs, `docs/OCEAN_DOC_*`, or `docs/toolchain_evidence/`. Do not parse PSF or translate OCEAN formulas in Python.
+Current next step: write C-18 implementation plan. C-18 design spec is complete and scopes batch-native TuRBO parallel evaluation: native `Turbo1.optimize()` remains the optimizer route, but Hermes must add a batch-aware evaluator because local TuRBO selects batches yet calls `self.f(x)` sequentially. Do not change code or run real tools until the C-18 plan exists and the user confirms execution. Do not start broad optimizer framework work. Do not commit raw input decks, protected include files, PSF/raw data, full Cadence logs, `docs/OCEAN_DOC_*`, or `docs/toolchain_evidence/`. Do not parse PSF or translate OCEAN formulas in Python.
 
 Read the handoff files first:
 
@@ -568,9 +568,10 @@ Use this prompt after compact:
 4. ic-auto-opt-workflow/docs/EXECUTION_PROGRESS_2026-05-29.md
 5. ic-auto-opt-workflow/docs/COMPACT_RESUME_CHECKPOINT.md
 6. ic-auto-opt-workflow/docs/debug/2026-06-04-native-turbo-runner-real-acceptance.md
-7. ic-auto-opt-workflow/docs/superpowers/specs/2026-06-04-native-turbo-optimizer-runner-mvp-design.md
-8. ic-auto-opt-workflow/docs/superpowers/plans/2026-06-04-native-turbo-optimizer-runner-mvp.md
-9. 如需背景，再读 ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md
+7. ic-auto-opt-workflow/docs/superpowers/specs/2026-06-04-batch-native-turbo-parallel-runner-design.md
+8. ic-auto-opt-workflow/docs/superpowers/specs/2026-06-04-native-turbo-optimizer-runner-mvp-design.md
+9. ic-auto-opt-workflow/docs/superpowers/plans/2026-06-04-native-turbo-optimizer-runner-mvp.md
+10. 如需背景，再读 ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。当前活动节点是 C-17 Native TuRBO Optimizer Runner MVP，状态 complete verified-only。C-17 已新增 native `Turbo1.optimize()` runner、quantized-candidate de-dup/replacement、explicit first optimizer candidate package、real evaluator bridge、`hermes-workflow run-native-turbo`、native optimizer report/JSONL trace，并完成 100-eval real acceptance：8 initialization、92 trust-region、45 feasible、43 constraint failed、12 metric check failed；Spectre 设置全程为 `preset=ax`、`threads_per_run=10`、`parallel_jobs=10`、`output_format=psfxl`。下一步是由用户确认 C-17 之后的窄 productization scope。不要写 broad optimizer framework，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。不要用 Python 解析 PSF，不要让 agent 翻译或重写 Calculator/OCEAN 公式。后续优化开发必须基于 native `Turbo1.optimize()` runner 路线，不要回到旧 C-15/C-16 one-candidate suggestion loop 作为 optimizer proof。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。当前活动节点是 C-18 Batch Native TuRBO Parallel Runner，状态 design spec complete verified-only。C-18 design spec 已写在 `docs/superpowers/specs/2026-06-04-batch-native-turbo-parallel-runner-design.md`。下一步只能写 C-18 implementation plan；不要改代码或运行真实 Virtuoso/Spectre/OCEAN/SSH/bridge，直到 C-18 plan 存在且用户确认执行。C-18 必须保持 native `Turbo1.optimize()` 路线，但要处理 local TuRBO 只 sequential 调用 `self.f(x)` 的事实：实现需要 batch-aware Hermes evaluator，使最多 `min(optimizer.batch_size, spectre.parallel_jobs)` 个 Spectre/OCEAN worker 并行；每个 Spectre process 仍使用 `spectre.threads_per_run` 作为 `+mt`。不要写 broad optimizer framework，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。不要用 Python 解析 PSF，不要让 agent 翻译或重写 Calculator/OCEAN 公式。
 ```

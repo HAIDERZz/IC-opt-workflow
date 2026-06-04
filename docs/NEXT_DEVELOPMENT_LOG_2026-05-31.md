@@ -4,10 +4,10 @@
 
 - Repository: `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow`
 - Branch: `plan-a-hermes-file-contract-mvp`
-- Current scope: C-17 Native TuRBO Optimizer Runner MVP
-- Current status: verified-only; C-17 is complete. `run-native-turbo` now uses native `Turbo1.optimize()` with Hermes real-run package/check/record contracts and the Spectre/OCEAN adapter as the black-box evaluator
-- Next required action: decide the next narrow productization scope after C-17
-- next_allowed_action: decide the next narrow productization scope after C-17; build on the native Turbo1.optimize() runner path and do not extend the older one-candidate suggestion loop or start broad optimizer framework work without user confirmation
+- Current scope: C-18 Batch Native TuRBO Parallel Runner
+- Current status: verified-only; C-18 design spec is complete. It keeps native `Turbo1.optimize()` and adds a batch-aware Hermes evaluator so TuRBO batch candidates can run Spectre/OCEAN concurrently up to `spectre.parallel_jobs`
+- Next required action: write C-18 implementation plan
+- next_allowed_action: write C-18 implementation plan for the batch-native TuRBO parallel runner; do not change code or run real tools until the C-18 plan exists and the user confirms execution
 
 C-3 Task 6 final verification is complete. C-4 is confirmed as a contract-only first real-run package; it must not run Spectre, Virtuoso, subprocesses, or the optimizer loop. C-4 is now complete and reviewed. C-5 validates the execution agent's returned `result_manifest.json` and declared artifacts without running Spectre or parsing metrics. C-5.5 rehearsed the C-4/C-5 handoff with simulated execution-agent and Hermes-observer roles. After C-5.5, the project paused implementation to validate the real metric backend. Spectre + OCEAN is now confirmed as the backend route: standalone Spectre generates PSF, batch OCEAN opens the PSF and evaluates exact user/project-approved formulas, and Python only records OCEAN-produced scalar outputs and provenance. C-6 turned that route into deterministic file contracts and a Hermes validator without physical adapter wiring. C-7 added an explicit execution-side adapter and tool entry point while preserving the rule that Hermes workflow tooling still validates returned files after execution. C-8 records checked real metric results into optimizer ledger/state after `check-real-run` and `check-metric-results` pass, while preserving the contract-only boundary. C-9 prepares the next real-run package from strict ledger/state and deterministic optimizer initialization sequence, while still not running real tools or writing ledger/state. C-10 classifies failed/partial/pending real-run packages, writes explicit recovery decisions, prepares retry packages, exposes supervisor-facing recovery CLI commands, and blocks C-9 from advancing while unresolved real-run packages exist. C-10 final review fixes aligned unsafe artifact classification with the spec and hardened symlinked recovery decision reads.
 
@@ -87,6 +87,37 @@ python3 -m ruff check .
 Route audit: aligned with the C-17 spec, implementation plan, and top-level practice-first correction. Drift: none. C-17 uses native `Turbo1.optimize()` as the optimizer driver and the proven Hermes + Spectre/OCEAN evaluator path as the objective. It does not extend the older one-candidate suggestion loop, does not parse PSF, does not rewrite OCEAN formulas, and does not replace native Maestro/ADE layout.
 
 next_allowed_action: decide the next narrow productization scope after C-17; build on the native Turbo1.optimize() runner path and do not extend the older one-candidate suggestion loop or start broad optimizer framework work without user confirmation
+
+## C-18 Batch Native TuRBO Parallel Runner Design 2026-06-04
+
+C-18 design spec is complete, verified-only.
+
+Spec:
+
+```text
+docs/superpowers/specs/2026-06-04-batch-native-turbo-parallel-runner-design.md
+```
+
+Design decision:
+
+- Native `Turbo1.optimize()` remains the optimizer route.
+- The local TuRBO source does select `batch_size` candidates, but currently
+  evaluates them sequentially with `self.f(x)`.
+- C-18 must add a batch-aware Hermes evaluation adapter rather than only
+  setting `batch_size=10`.
+- The parallelism cap is `min(optimizer.batch_size, spectre.parallel_jobs)`.
+- Each Spectre process still uses `spectre.threads_per_run` as `+mt`.
+- Package preparation and ledger/state recording stay sequential to avoid
+  shared-file races; only Spectre/OCEAN adapter calls run concurrently.
+
+Route audit: aligned with C-17 and the top-level practice-first correction.
+Drift: none. The design does not authorize broad scheduler/framework work, PSF
+parsing, OCEAN formula rewriting, native Maestro/ADE layout replacement, or
+raw Cadence artifact commits.
+
+next_allowed_action: write C-18 implementation plan for the batch-native TuRBO
+parallel runner; do not change code or run real tools until the C-18 plan exists
+and the user confirms execution
 
 ## Route Consistency Audit 2026-06-03
 

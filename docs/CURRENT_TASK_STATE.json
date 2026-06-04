@@ -1,10 +1,10 @@
 {
   "schema_version": "1.0",
-  "current_scope": "C-17 Native TuRBO Optimizer Runner MVP",
-  "current_status": "C-17 is complete, verified-only. The productized run-native-turbo command uses native Turbo1.optimize() with Hermes real-run package/check/record contracts and the Spectre/OCEAN adapter as the black-box evaluator. Real acceptance completed 100 evaluations on a clean local project: 8 initialization, 92 trust-region, 45 feasible, 43 constraint failed, 12 metric check failed.",
+  "current_scope": "C-18 Batch Native TuRBO Parallel Runner",
+  "current_status": "C-18 design spec is complete, verified-only. The design keeps native Turbo1.optimize() as the optimizer route but adds a batch-aware Hermes evaluation adapter so TuRBO batch candidates can run Spectre/OCEAN concurrently up to spectre.parallel_jobs while each Spectre process uses spectre.threads_per_run as +mt.",
   "review_status": "verified-only",
   "subagent_dispatch": "available",
-  "active_spec": "docs/superpowers/specs/2026-06-04-native-turbo-optimizer-runner-mvp-design.md",
+  "active_spec": "docs/superpowers/specs/2026-06-04-batch-native-turbo-parallel-runner-design.md",
   "active_plan": "docs/superpowers/plans/2026-06-04-native-turbo-optimizer-runner-mvp.md",
   "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
   "progress_files": [
@@ -12,12 +12,12 @@
     "docs/EXECUTION_PROGRESS_2026-05-29.md",
     "docs/COMPACT_RESUME_CHECKPOINT.md"
   ],
-  "next_allowed_action": "decide the next narrow productization scope after C-17; build on the native Turbo1.optimize() runner path and do not extend the older one-candidate suggestion loop or start broad optimizer framework work without user confirmation",
+  "next_allowed_action": "write C-18 implementation plan for the batch-native TuRBO parallel runner; do not change code or run real tools until the C-18 plan exists and the user confirms execution",
   "forbidden_actions": [
     "start broad optimizer framework work",
     "create daemon or service orchestration",
     "replace TuRBO",
-    "run another broad real-tool acceptance before C-17 Task 1-4 pass",
+    "run C-18 real-tool acceptance before fake/unit tasks pass and the user confirms",
     "run Virtuoso before explicit task confirmation",
     "run SSH before explicit task confirmation",
     "run Claude CLI as an execution agent",
@@ -39,13 +39,13 @@
     "git status --short"
   ],
   "route_audit": {
-    "active_spec": "docs/superpowers/specs/2026-06-04-native-turbo-optimizer-runner-mvp-design.md",
+    "active_spec": "docs/superpowers/specs/2026-06-04-batch-native-turbo-parallel-runner-design.md",
     "active_plan": "docs/superpowers/plans/2026-06-04-native-turbo-optimizer-runner-mvp.md",
     "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
-    "alignment": "Aligned. C-17 productizes optimizer.skill's native Turbo1.optimize() pattern with the proven Hermes + Spectre/OCEAN evaluator path, preserving approved formulas, native Maestro/ADE layout, feasibility-first objective semantics, quantized-candidate de-duplication, and Spectre threads_per_run versus parallel_jobs separation.",
-    "drift": "None in C-17. Earlier C-15/C-16 one-candidate suggestion work remains available as support tooling, but it is not the optimizer proof path."
+    "alignment": "Aligned. C-18 builds directly on the C-17 native Turbo1.optimize() runner and preserves approved formulas, native Maestro/ADE layout, feasibility-first objective semantics, quantized-candidate de-duplication, and Spectre threads_per_run versus parallel_jobs separation.",
+    "drift": "None. C-18 explicitly avoids broad scheduler/framework work and only scopes batch candidate evaluation plus bounded parallel Spectre/OCEAN workers."
   },
-  "latest_valid_commit": "b2a5087 feat: add native turbo objective core",
+  "latest_valid_commit": "e6a2346 feat: add native turbo optimizer runner",
   "review_evidence": {
     "optimizer_skill_real_practice": "Complete, verified-only. Temporary practice at /tmp/ic_auto_opt_optimizer_skill_flow_001 ran Turbo1.optimize() for 100 evaluations with 8 initialization and 92 trust-region evaluations. 73 candidates were recorded through real Spectre/OCEAN, 24 duplicate quantized candidates were skipped, and 3 metric non-scalar candidates were converted to finite penalties. Best candidate was real_011: FN=11, WN=1.9u, FP=9, WP=0.5u, rise=72.489655ps, fall=64.569947ps, DC=301.334349uW, objective=4.1300765965648685e-14.",
     "archive_doc": "docs/debug/2026-06-04-optimizer-skill-real-flow-practice.md",
@@ -53,6 +53,7 @@
     "c17_plan": "docs/superpowers/plans/2026-06-04-native-turbo-optimizer-runner-mvp.md",
     "c17_task1": "Complete, verified-only. Focused tests passed: python3 -m pytest tests/test_native_turbo.py tests/test_optimizer_suggestion.py tests/test_mock_optimizer.py -q. Focused ruff passed: python3 -m ruff check src/hermes_workflow/native_turbo.py tests/test_native_turbo.py.",
     "c17_tasks2_6": "Complete, verified-only. Added duplicate-aware NativeTurboRunner, real candidate evaluator bridge, run-native-turbo CLI, trace/report writing, real-tool acceptance, a repeated workflow-level failure stop guard, and .gitignore protection for local raw evidence paths. Verification passed: python3 -m pytest -q (508 passed), python3 -m ruff check . Real acceptance on /tmp/ic_auto_opt_c17_native_turbo_002/bridge_test_inv completed 100 evaluations: 8 initialization, 92 trust-region, 45 feasible, 43 constraint_failed, 12 metric_check_failed; Spectre settings stayed preset=ax, threads_per_run=10, parallel_jobs=10, output_format=psfxl.",
-    "c17_acceptance_archive": "docs/debug/2026-06-04-native-turbo-runner-real-acceptance.md"
+    "c17_acceptance_archive": "docs/debug/2026-06-04-native-turbo-runner-real-acceptance.md",
+    "c18_design": "docs/superpowers/specs/2026-06-04-batch-native-turbo-parallel-runner-design.md"
   }
 }
