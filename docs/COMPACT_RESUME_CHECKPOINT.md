@@ -629,17 +629,33 @@ C-29 planning result:
 - Implementation plan: `docs/superpowers/plans/2026-06-05-openbox-production-backend.md`.
 - Scope: productize OpenBox ask-and-tell candidate generation and observation updates while preserving the existing Hermes candidate package, Spectre/OCEAN adapter, backend-neutral optimizer artifacts, C-25 acceptance, and C-26 completion reports.
 - Boundaries: no TuRBO replacement, no `native_turbo` deletion, no hidden `FN=FP`, no broad optimizer framework, no PSF parsing, no OCEAN formula rewrite.
-- Task layout: Task 1 search-space effective-grid contract, Task 2 shared ask-and-tell runner core, Task 3 real evaluator integration, Task 4 CLI/dependency gate, Task 5 no-real-tool smoke, Task 6 real acceptance rerun after explicit confirmation, Task 7 closeout.
 
-Current next step: execute C-29 Task 1 OpenBox Search Space Contract. Do not run real tools, replace TuRBO, delete `native_turbo`, add hidden `FN=FP` coupling, call an execution agent, or start broad optimizer framework work.
+C-29 completion result:
+
+- Status: complete, verified-only.
+- current_scope: C-29 OpenBox Production Backend complete.
+- Productized OpenBox ask-and-tell candidate generation in `src/hermes_workflow/openbox_backend.py`.
+- Added CLI: `hermes-workflow run-openbox-real`.
+- Kept existing Hermes candidate package, Spectre/OCEAN adapter, C-25 acceptance, and C-26 completion reports.
+- TuRBO remains implemented and available; OpenBox was not made a forced replacement.
+- OpenBox stepped continuous variables use Hermes effective grid upper bounds. For `0.3u..3u step 0.2u`, OpenBox receives `2.9`.
+- OpenBox suggestions must provide all approved variables; no hidden `FN=FP` fallback remains.
+- Real acceptance on `/tmp/ic_auto_opt_c29_openbox_real/bridge_test_inv`: 100 evaluations, 43 feasible, 51 constraint_failed, 6 metric_check_failed, 0 real_check_failed, 0 duplicate replacements, 100 unique quantized parameter sets.
+- Best observed: `real_071`, `FN=12`, `WN=2.7u`, `FP=7`, `WP=0.7u`, objective `4.1325534822170306e-14`.
+- C-25 accepted the run.
+- C-26 decision: `accept_best_observed`, confidence `medium`, `global_optimum_claim=false`.
+- Sanitized evidence: `docs/debug/2026-06-05-openbox-production-backend-real-acceptance.md`.
+
+Current next step: wait for user confirmation, then choose the next narrow post-C-29 step; recommended next is C-30 OpenBox execution-agent task packet/dependency handoff, not TuRBO deletion or broad optimizer framework work.
 
 Read the handoff files first:
 
 ```text
 ic-auto-opt-workflow/AGENTS.md
-ic-auto-opt-workflow/docs/OPENCODE_HANDOFF_2026-05-29.md
+ic-auto-opt-workflow/docs/CURRENT_TASK_STATE.json
 ic-auto-opt-workflow/docs/EXECUTION_PROGRESS_2026-05-29.md
 ic-auto-opt-workflow/docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md
+ic-auto-opt-workflow/docs/COMPACT_RESUME_CHECKPOINT.md
 ```
 
 ## Resume Prompt
@@ -653,8 +669,9 @@ Use this prompt after compact:
 3. ic-auto-opt-workflow/docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md
 4. ic-auto-opt-workflow/docs/EXECUTION_PROGRESS_2026-05-29.md
 5. ic-auto-opt-workflow/docs/COMPACT_RESUME_CHECKPOINT.md
-6. ic-auto-opt-workflow/docs/OPENBOX_OPTIMIZER_BACKEND_DECISION_CHECKPOINT_2026-06-05.md
-7. 如需背景，再读 ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md
+6. ic-auto-opt-workflow/docs/superpowers/specs/2026-06-05-openbox-production-backend-design.md
+7. ic-auto-opt-workflow/docs/superpowers/plans/2026-06-05-openbox-production-backend.md
+8. ic-auto-opt-workflow/docs/debug/2026-06-05-openbox-production-backend-real-acceptance.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-28 OpenBox Real Backend Acceptance Spike 已完成，C-29 OpenBox Production Backend design spec 和 implementation plan 已完成：docs/superpowers/specs/2026-06-05-openbox-production-backend-design.md、docs/superpowers/plans/2026-06-05-openbox-production-backend.md。下一步是 execute C-29 Task 1 OpenBox Search Space Contract; do not run real tools, replace TuRBO, delete native_turbo, add hidden FN=FP coupling, or broaden the optimizer framework。不要直接替换 TuRBO，不要删除 native_turbo，不要创建 broad optimizer framework，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-29 OpenBox Production Backend 已完成并通过本地测试、真实 OpenBox 100-eval acceptance、C-25 acceptance、C-26 completion summary。下一步是 wait for user confirmation, then choose the next narrow post-C-29 step; recommended next is C-30 OpenBox execution-agent task packet/dependency handoff, not TuRBO deletion or broad optimizer framework work。不要直接替换 TuRBO，不要删除 native_turbo，不要创建 broad optimizer framework，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
 ```

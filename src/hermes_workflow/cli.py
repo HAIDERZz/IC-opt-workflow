@@ -15,7 +15,10 @@ from hermes_workflow.native_turbo import (
     run_batch_native_turbo_optimization,
     run_native_turbo_optimization,
 )
-from hermes_workflow.openbox_backend import run_openbox_fake_optimization
+from hermes_workflow.openbox_backend import (
+    run_openbox_fake_optimization,
+    run_openbox_real_optimization,
+)
 from hermes_workflow.optimizer_acceptance import check_optimizer_run
 from hermes_workflow.optimizer_completion import summarize_optimizer_run
 from hermes_workflow.optimizer_suggestion import suggest_candidate_request
@@ -626,6 +629,55 @@ def run_openbox_fake_command(
         _exit_with_error(exc)
     typer.echo(
         f"openbox fake optimizer completed: {result.evaluation_count} evaluations"
+    )
+    if result.report_path is not None:
+        typer.echo(f"report: {result.report_path.relative_to(project_dir)}")
+    if result.evaluations_path is not None:
+        typer.echo(f"evaluations: {result.evaluations_path.relative_to(project_dir)}")
+
+
+@app.command("run-openbox-real")
+def run_openbox_real_command(
+    project_dir: Annotated[
+        Path,
+        typer.Argument(help="Project directory with approved real-tool contracts."),
+    ],
+    max_evals: Annotated[
+        int | None,
+        typer.Option("--max-evals", min=1, help="OpenBox real evaluation budget."),
+    ] = None,
+    batch_size: Annotated[
+        int | None,
+        typer.Option("--batch-size", min=1, help="OpenBox suggestion batch size."),
+    ] = None,
+    parallel_jobs: Annotated[
+        int | None,
+        typer.Option(
+            "--parallel-jobs",
+            min=1,
+            help="Maximum concurrently launched Spectre runs.",
+        ),
+    ] = None,
+    cadence_cshrc: Annotated[
+        Path | None,
+        typer.Option(
+            "--cadence-cshrc",
+            help="Optional Cadence cshrc sourced before running the adapter.",
+        ),
+    ] = None,
+) -> None:
+    try:
+        result = run_openbox_real_optimization(
+            project_dir,
+            max_evals=max_evals,
+            batch_size=batch_size,
+            parallel_jobs=parallel_jobs,
+            cadence_cshrc=cadence_cshrc,
+        )
+    except (OSError, RuntimeError, ValueError) as exc:
+        _exit_with_error(exc)
+    typer.echo(
+        f"openbox real optimization completed: {result.evaluation_count} evaluations"
     )
     if result.report_path is not None:
         typer.echo(f"report: {result.report_path.relative_to(project_dir)}")

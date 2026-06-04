@@ -1,6 +1,6 @@
 # OpenBox Production Backend Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Productize the C-28 OpenBox ask-and-tell backend while preserving the existing Hermes Spectre/OCEAN execution path and TuRBO implementation.
 
@@ -39,7 +39,7 @@
 - Modify: `src/hermes_workflow/openbox_backend.py`
 - Create or modify: `tests/test_openbox_backend.py`
 
-- [ ] **Step 1: Add failing tests for effective grid upper bounds**
+- [x] **Step 1: Add failing tests for effective grid upper bounds**
 
 Add tests that build an OpenBox space through an injected fake `space` module.
 The tests must prove:
@@ -56,7 +56,7 @@ python3 -m pytest tests/test_openbox_backend.py::test_openbox_space_uses_effecti
 
 Expected: fail before implementation.
 
-- [ ] **Step 2: Implement effective grid upper helper**
+- [x] **Step 2: Implement effective grid upper helper**
 
 In `src/hermes_workflow/openbox_backend.py`, add a small helper equivalent to:
 
@@ -68,13 +68,13 @@ def _effective_continuous_upper(lower: Decimal, upper: Decimal, step: Decimal) -
 
 Use the helper only inside OpenBox space construction.
 
-- [ ] **Step 3: Update OpenBox space construction**
+- [x] **Step 3: Update OpenBox space construction**
 
 Modify the existing OpenBox space builder so stepped continuous variables use
 the effective upper. Keep the existing Hermes `quantize_candidate(...)` call as
 the final parameter authority.
 
-- [ ] **Step 4: Verify Task 1**
+- [x] **Step 4: Verify Task 1**
 
 Run:
 
@@ -86,7 +86,7 @@ python3 -m ruff check src/hermes_workflow/openbox_backend.py tests/test_openbox_
 
 Expected: all pass.
 
-- [ ] **Step 5: Record Task 1**
+- [x] **Step 5: Record Task 1**
 
 Update `docs/CURRENT_TASK_STATE.json` with Task 1 completion and route audit.
 
@@ -98,7 +98,7 @@ Update `docs/CURRENT_TASK_STATE.json` with Task 1 completion and route audit.
 - Modify: `src/hermes_workflow/openbox_backend.py`
 - Modify: `tests/test_openbox_backend.py`
 
-- [ ] **Step 1: Add failing tests for batch ask-and-tell**
+- [x] **Step 1: Add failing tests for batch ask-and-tell**
 
 Write a fake advisor that returns deterministic suggestions and records
 observations. Test that the runner core:
@@ -117,7 +117,7 @@ python3 -m pytest tests/test_openbox_backend.py::test_openbox_runner_writes_back
 
 Expected: fail before implementation.
 
-- [ ] **Step 2: Add runner result model**
+- [x] **Step 2: Add runner result model**
 
 In `openbox_backend.py`, keep the existing `NativeTurboRunResult` trace shape
 for compatibility. Add a narrow internal function:
@@ -129,13 +129,13 @@ def _run_openbox_batches(...):
 
 It must accept an evaluator callback that returns `NativeTurboObservation`.
 
-- [ ] **Step 3: Add duplicate replacement**
+- [x] **Step 3: Add duplicate replacement**
 
 Maintain a set of quantized parameter keys. If OpenBox returns a duplicate,
 request replacement suggestions up to a bounded replacement budget. If the
 budget is exhausted, raise `ValueError` before writing a false evaluation row.
 
-- [ ] **Step 4: Write backend-neutral artifacts**
+- [x] **Step 4: Write backend-neutral artifacts**
 
 Use `reports/optimizer_run_report.json` and
 `reports/optimizer_evaluations.jsonl`. The report must include:
@@ -156,7 +156,7 @@ Use `reports/optimizer_run_report.json` and
 }
 ```
 
-- [ ] **Step 5: Verify Task 2**
+- [x] **Step 5: Verify Task 2**
 
 Run:
 
@@ -167,7 +167,7 @@ python3 -m ruff check src/hermes_workflow/openbox_backend.py tests/test_openbox_
 
 Expected: all pass.
 
-- [ ] **Step 6: Record Task 2**
+- [x] **Step 6: Record Task 2**
 
 Update `docs/CURRENT_TASK_STATE.json` with Task 2 completion and route audit.
 
@@ -179,7 +179,7 @@ Update `docs/CURRENT_TASK_STATE.json` with Task 2 completion and route audit.
 - Modify: `src/hermes_workflow/openbox_backend.py`
 - Modify: `tests/test_openbox_backend.py`
 
-- [ ] **Step 1: Add failing tests for real evaluator integration**
+- [x] **Step 1: Add failing tests for real evaluator integration**
 
 Use fake adapter/evaluator functions; do not run real tools. Test that
 `run_openbox_real_optimization(...)`:
@@ -200,7 +200,7 @@ python3 -m pytest tests/test_openbox_backend.py::test_run_openbox_real_optimizat
 
 Expected: fail before implementation.
 
-- [ ] **Step 2: Implement `run_openbox_real_optimization`**
+- [x] **Step 2: Implement `run_openbox_real_optimization`**
 
 Add:
 
@@ -221,13 +221,13 @@ def run_openbox_real_optimization(
 The function prepares batch candidates sequentially, executes checks through a
 bounded thread pool, and records ledger/state sequentially.
 
-- [ ] **Step 3: Keep fake backend compatible**
+- [x] **Step 3: Keep fake backend compatible**
 
 Refactor `run_openbox_fake_optimization(...)` to use the same runner core if
 the refactor stays small. If sharing makes the file harder to read, keep the
 fake runner separate and only share the space/observation/report helpers.
 
-- [ ] **Step 4: Verify Task 3**
+- [x] **Step 4: Verify Task 3**
 
 Run:
 
@@ -239,7 +239,7 @@ python3 -m ruff check src/hermes_workflow/openbox_backend.py tests/test_openbox_
 
 Expected: all pass.
 
-- [ ] **Step 5: Record Task 3**
+- [x] **Step 5: Record Task 3**
 
 Update `docs/CURRENT_TASK_STATE.json` with Task 3 completion and route audit.
 
@@ -251,7 +251,7 @@ Update `docs/CURRENT_TASK_STATE.json` with Task 3 completion and route audit.
 - Modify: `src/hermes_workflow/cli.py`
 - Modify: `tests/test_openbox_backend.py` or CLI test file already used by the repo
 
-- [ ] **Step 1: Add failing CLI tests**
+- [x] **Step 1: Add failing CLI tests**
 
 Add tests for:
 
@@ -267,7 +267,7 @@ python3 -m pytest tests/test_openbox_backend.py::test_run_openbox_real_cli_deleg
 
 Expected: fail before implementation.
 
-- [ ] **Step 2: Add CLI command**
+- [x] **Step 2: Add CLI command**
 
 Add a Typer command:
 
@@ -279,7 +279,7 @@ def run_openbox_real_command(...):
 
 It must print the report path and use the existing project path conventions.
 
-- [ ] **Step 3: Verify Task 4**
+- [x] **Step 3: Verify Task 4**
 
 Run:
 
@@ -290,7 +290,7 @@ python3 -m ruff check src/hermes_workflow/openbox_backend.py src/hermes_workflow
 
 Expected: all pass.
 
-- [ ] **Step 4: Record Task 4**
+- [x] **Step 4: Record Task 4**
 
 Update `docs/CURRENT_TASK_STATE.json` with Task 4 completion and route audit.
 
@@ -303,7 +303,7 @@ Update `docs/CURRENT_TASK_STATE.json` with Task 4 completion and route audit.
 - Modify: `docs/CURRENT_TASK_STATE.json`
 - Modify: `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`
 
-- [ ] **Step 1: Add smoke fixture**
+- [x] **Step 1: Add smoke fixture**
 
 Use an existing lightweight project fixture. The smoke must generate OpenBox
 backend-neutral artifacts without real tools and then run:
@@ -315,7 +315,7 @@ hermes-workflow summarize-optimizer-run PROJECT_DIR
 
 through test helpers or direct Python functions.
 
-- [ ] **Step 2: Run focused smoke**
+- [x] **Step 2: Run focused smoke**
 
 Run:
 
@@ -326,7 +326,7 @@ python3 -m pytest tests/test_optimizer_acceptance.py tests/test_optimizer_comple
 
 Expected: all pass.
 
-- [ ] **Step 3: Run targeted regression**
+- [x] **Step 3: Run targeted regression**
 
 Run:
 
@@ -339,7 +339,7 @@ git diff --check
 
 Expected: all pass.
 
-- [ ] **Step 4: Record Task 5**
+- [x] **Step 4: Record Task 5**
 
 Update `docs/CURRENT_TASK_STATE.json` and
 `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`. Set next action to the real OpenBox
@@ -354,12 +354,12 @@ acceptance rerun only after user confirmation.
 - Create sanitized note only after a real run:
   `docs/debug/2026-06-05-c29-openbox-real-productization-acceptance.md`
 
-- [ ] **Step 1: Wait for explicit real-tool confirmation**
+- [x] **Step 1: Wait for explicit real-tool confirmation**
 
 Do not run this task until the user explicitly confirms real-tool execution for
 C-29.
 
-- [ ] **Step 2: Prepare clean local project**
+- [x] **Step 2: Prepare clean local project**
 
 Use the same native Maestro/ADE/Spectre layout as C-28 and C-24 retry. Ensure:
 
@@ -373,7 +373,7 @@ supervisor_instruction.json
 are present, and old generated `runs/`, `reports/`, `state/`, and ledger rows
 are absent.
 
-- [ ] **Step 3: Run productized command**
+- [x] **Step 3: Run productized command**
 
 Run:
 
@@ -388,7 +388,7 @@ Expected:
 - no hand-picked candidates.
 - no hidden `FN=FP` coupling.
 
-- [ ] **Step 4: Run C-25 and C-26**
+- [x] **Step 4: Run C-25 and C-26**
 
 Run:
 
@@ -399,7 +399,7 @@ Run:
 
 Expected: C-25 accepts and C-26 writes a decision report.
 
-- [ ] **Step 5: Write sanitized evidence**
+- [x] **Step 5: Write sanitized evidence**
 
 Write only sanitized counts, best observed candidate, settings audit, and
 issues. Do not paste raw Cadence logs.
@@ -414,7 +414,7 @@ issues. Do not paste raw Cadence logs.
 - Modify: `docs/EXECUTION_PROGRESS_2026-05-29.md`
 - Modify: `docs/COMPACT_RESUME_CHECKPOINT.md` if the context is close to compaction
 
-- [ ] **Step 1: Run final verification**
+- [x] **Step 1: Run final verification**
 
 Run:
 
@@ -428,7 +428,7 @@ git status --short
 
 Expected: all checks pass; no raw local artifacts are staged.
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 Commit only source, tests, sanitized docs, and state updates:
 
@@ -437,7 +437,7 @@ git add src/hermes_workflow/openbox_backend.py src/hermes_workflow/cli.py tests/
 git commit -m "feat: add OpenBox real optimizer backend"
 ```
 
-- [ ] **Step 3: Report**
+- [x] **Step 3: Report**
 
 Report:
 
@@ -458,3 +458,49 @@ Report:
   to Task 6 after explicit confirmation.
 - Artifact compatibility: Tasks 2, 3, 5, and 6 preserve C-25/C-26
   backend-neutral artifact compatibility.
+
+## Completion Notes
+
+Status: complete, verified-only.
+
+C-29 productized the C-28 OpenBox ask-and-tell path without replacing TuRBO.
+The implementation keeps the existing Hermes Spectre/OCEAN execution path,
+backend-neutral artifacts, C-25 acceptance, and C-26 completion reports.
+
+Implemented:
+
+- Effective OpenBox stepped-continuous upper-bound handling, matching Hermes
+  quantization. For `0.3u..3u step 0.2u`, OpenBox receives effective upper
+  `2.9`.
+- No hidden `FN=FP` fallback. OpenBox suggestions must provide every approved
+  variable in `variables.yaml`.
+- Shared OpenBox batch runner core for fake and real modes.
+- Real evaluator integration through the existing candidate package,
+  Spectre/OCEAN check, and `record_real_result` path.
+- CLI command: `hermes-workflow run-openbox-real`.
+- Real acceptance rerun against `/tmp/ic_auto_opt_c29_openbox_real/bridge_test_inv`.
+
+Real acceptance result:
+
+- `100` real evaluations.
+- `43` feasible.
+- `51` constraint_failed.
+- `6` metric_check_failed.
+- `0` real_check_failed.
+- `0` duplicate replacements.
+- `100` unique quantized parameter sets.
+- `parallel_jobs=10`, `threads_per_run=10`.
+- Best observed: `real_071`, `FN=12`, `WN=2.7u`, `FP=7`, `WP=0.7u`,
+  objective `4.1325534822170306e-14`.
+
+Supervisor checks:
+
+- C-25 `check-optimizer-run`: accepted.
+- C-26 `summarize-optimizer-run`: `accept_best_observed`, confidence `medium`,
+  `global_optimum_claim=false`.
+
+Sanitized evidence:
+
+```text
+docs/debug/2026-06-05-openbox-production-backend-real-acceptance.md
+```

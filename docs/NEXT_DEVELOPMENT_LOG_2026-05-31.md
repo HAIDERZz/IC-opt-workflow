@@ -1344,6 +1344,22 @@ C-29 OpenBox Production Backend Planning:
 - Route audit: aligned with the practice-first top-level route. OpenBox productization is based on C-28 real evidence and keeps the proven real-tool execution path.
 - next_allowed_action: execute C-29 Task 1 OpenBox Search Space Contract; do not run real tools, replace TuRBO, delete native_turbo, add hidden FN=FP coupling, or broaden the optimizer framework
 
+C-29 OpenBox Production Backend Completion:
+
+- Status: complete, verified-only.
+- Code: added productized OpenBox ask-and-tell backend in `src/hermes_workflow/openbox_backend.py` and CLI `hermes-workflow run-openbox-real`.
+- Search-space contract: stepped continuous OpenBox upper bounds now use the Hermes effective grid upper value. For `0.3u..3u step 0.2u`, OpenBox receives `2.9`.
+- Variable contract: OpenBox suggestions must provide all variables from `variables.yaml`; no hidden `FN=FP` fallback remains.
+- Execution path: real OpenBox mode reuses the existing Hermes candidate package, Spectre/OCEAN adapter, real-result checks, ledger recording, C-25 acceptance, and C-26 completion report.
+- Real acceptance: `/tmp/ic_auto_opt_c29_openbox_real/bridge_test_inv` completed `100` real evaluations with `43 feasible`, `51 constraint_failed`, `6 metric_check_failed`, `0 real_check_failed`, `0 duplicate replacements`, and `100` unique quantized parameter sets.
+- Best observed: `real_071`, `FN=12`, `WN=2.7u`, `FP=7`, `WP=0.7u`, objective `4.1325534822170306e-14`.
+- Settings audit: `parallel_jobs=10`, `threads_per_run=10`; C-25 accepted the run.
+- C-26 decision: `accept_best_observed`, confidence `medium`, `global_optimum_claim=false`.
+- Sanitized evidence: `docs/debug/2026-06-05-openbox-production-backend-real-acceptance.md`.
+- Route audit: aligned. TuRBO remains implemented and available; OpenBox is productized as an additional backend, not a forced replacement.
+- current_scope: C-29 OpenBox Production Backend complete.
+- next_allowed_action: wait for user confirmation, then choose the next narrow post-C-29 step; recommended next is C-30 OpenBox execution-agent task packet/dependency handoff, not TuRBO deletion or broad optimizer framework work
+
 ## Resume Prompt
 
 ```text

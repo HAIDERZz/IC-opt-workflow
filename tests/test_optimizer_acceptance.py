@@ -169,12 +169,12 @@ class FakeAdvisorForAcceptance:
     def __init__(self) -> None:
         self._batches = [
             [
-                {"FN": 2, "WN": 0.2, "WP": 0.4},
-                {"FN": 4, "WN": 1.0, "WP": 1.2},
+                {"FN": 2, "WN": 0.2, "FP": 3, "WP": 0.4},
+                {"FN": 4, "WN": 1.0, "FP": 5, "WP": 1.2},
             ],
             [
-                {"FN": 6, "WN": 1.4, "WP": 1.6},
-                {"FN": 8, "WN": 2.0, "WP": 2.2},
+                {"FN": 6, "WN": 1.4, "FP": 7, "WP": 1.6},
+                {"FN": 8, "WN": 2.0, "FP": 9, "WP": 2.2},
             ],
         ]
 
