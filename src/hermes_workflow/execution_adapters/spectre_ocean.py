@@ -8,7 +8,7 @@ import subprocess
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
-from typing import Protocol, TypeVar
+from typing import Protocol, Sequence, TypeVar
 
 from pydantic import BaseModel, ValidationError
 
@@ -44,6 +44,7 @@ OCEAN_STDOUT_NAME = "ocean.stdout"
 OCEAN_STDERR_NAME = "ocean.stderr"
 OCEAN_SCALARS_NAME = "ocean_scalars.tsv"
 METRIC_RESULT_MANIFEST_NAME = "metric_result_manifest.json"
+OCEAN_MAX_ATTEMPTS = 3
 
 ModelT = TypeVar("ModelT", bound=BaseModel)
 
@@ -191,16 +192,12 @@ def run_spectre_ocean_adapter(
             issues=["spectre command failed"],
         )
 
-    ocean_result = runner.run(
-        _ocean_argv(context),
-        cwd=context.project_dir,
-        stdout_path=context.metrics_dir / OCEAN_STDOUT_NAME,
-        stderr_path=context.metrics_dir / OCEAN_STDERR_NAME,
-        timeout_s=int(context.request.spectre.get("timeout_s", 3600)),
-    )
+    ocean_results = _run_ocean_with_retries(context, runner)
+    ocean_result = ocean_results[-1]
     metric_result = _write_metric_result_manifest(
         context,
         ocean_return_code=ocean_result.return_code,
+        ocean_return_codes=[result.return_code for result in ocean_results],
     )
     result_manifest_path = _write_result_manifest(
         context,
@@ -218,6 +215,25 @@ def run_spectre_ocean_adapter(
         metric_result_manifest_path=metric_result.path,
         issues=metric_result.issues,
     )
+
+
+def _run_ocean_with_retries(
+    context: SpectreOceanContext,
+    runner: CommandRunner,
+) -> list[CommandResult]:
+    results: list[CommandResult] = []
+    for _attempt in range(OCEAN_MAX_ATTEMPTS):
+        result = runner.run(
+            _ocean_argv(context),
+            cwd=context.project_dir,
+            stdout_path=context.metrics_dir / OCEAN_STDOUT_NAME,
+            stderr_path=context.metrics_dir / OCEAN_STDERR_NAME,
+            timeout_s=int(context.request.spectre.get("timeout_s", 3600)),
+        )
+        results.append(result)
+        if result.return_code == 0:
+            break
+    return results
 
 
 def load_adapter_context(
@@ -618,6 +634,7 @@ def _write_metric_result_manifest(
     context: SpectreOceanContext,
     *,
     ocean_return_code: int,
+    ocean_return_codes: Sequence[int] | None = None,
 ) -> MetricManifestWriteResult:
     scalar_path = _project_relative_path(
         context.project_dir,
@@ -630,6 +647,7 @@ def _write_metric_result_manifest(
         scalar_rows = {}
         issues.append(str(exc))
     ocean_failed = ocean_return_code != 0
+    return_codes = list(ocean_return_codes or [ocean_return_code])
     if ocean_failed:
         issues.append("ocean command failed")
 
@@ -715,6 +733,8 @@ def _write_metric_result_manifest(
         "ocean": {
             "mode": context.request.ocean.mode,
             "return_code": ocean_return_code,
+            "attempts": len(return_codes),
+            "return_codes": return_codes,
             "script_file": context.request.ocean.script_file,
             "script_sha256": sha256_file(script_path),
             "log_file": context.request.ocean.log_file,

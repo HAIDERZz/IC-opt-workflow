@@ -20,15 +20,16 @@ ic-auto-opt-workflow/AGENTS.md
 
 Current execution state:
 
-- Current scope: C-20 Execution-Agent Autonomous Handoff Acceptance.
-- Current status: C-20 is complete, verified-only. Autonomous handoff behavior is accepted; fully green real-tool acceptance is blocked by 2 OCEAN command/license failures out of 100 metric extractions.
-- Current next action: wait for user confirmation, then write a narrow C-21 OCEAN metric extraction retry/concurrency policy scope; do not start broad optimizer framework work.
+- Current scope: C-21 OCEAN Metric Extraction Retry Policy.
+- Current status: C-21 is complete, verified-only, and committed in the current HEAD. The C-7 Spectre/OCEAN adapter now retries OCEAN-only command failures without rerunning Spectre and records retry evidence in `metric_result_manifest.json`.
+- Current next action: finish final verification and commit, then wait for user confirmation before choosing the next narrow real-practice-backed optimizer or execution-agent validation step.
 - C-18 keeps native `Turbo1.optimize()` as the optimizer route and adds a batch-aware Hermes evaluator so TuRBO batch candidates run Spectre/OCEAN concurrently up to `spectre.parallel_jobs`.
 - Each Spectre process still uses `spectre.threads_per_run` as `+mt`. Do not confuse Spectre internal threads with parallel Spectre process count.
 - C-19 uses the existing C-18 `run-native-turbo --parallel` path to validate the original supervisor-agent to execution-agent handoff goal. It must not create another optimizer framework.
 - C-19 Task 3 root cause: clean project preparation removed `state/optimizer_state.json` but retained stale `ledger/experiment_ledger.jsonl` rows from C-18, causing `optimizer state is missing` before real tools launched.
 - C-19 Task 4 fixed clean project prep by removing stale optimizer ledger rows and fixed native TuRBO quantization so off-grid continuous-step upper bounds clamp to the last approved grid step. The accepted non-sandbox rerun completed 100 real evaluations through `run-native-turbo --parallel`: `33 feasible`, `46 constraint_failed`, `21 metric_check_failed`; settings audit passed with `preset=ax`, `threads_per_run=10`, `output_format=psfxl`, and trace `parallel_jobs=10`.
-- C-20 used fresh local worker subagents as execution agents. Attempt 1 exposed that command exit 0 is not sufficient because sandboxed Spectre produced 100 failed result manifests. The corrected task packet required non-sandbox execution and manifest-level audit. Attempt 2 completed 100 evaluations with 100 result manifests succeeded, 80 metric manifests succeeded, 20 metric manifests failed, and settings audit passed. Two failures, `real_057` and `real_075`, were OCEAN command/license failures and should drive the next narrow policy scope.
+- C-20 used fresh local worker subagents as execution agents. Attempt 1 exposed that command exit 0 is not sufficient because sandboxed Spectre produced 100 failed result manifests. The corrected task packet required non-sandbox execution and manifest-level audit. Attempt 2 completed 100 evaluations with 100 result manifests succeeded, 80 metric manifests succeeded, 20 metric manifests failed, and settings audit passed. Two failures, `real_057` and `real_075`, were OCEAN command/license failures.
+- C-21 added OCEAN-only retry for that residual tool/license failure class. Real rerun on `/tmp/ic_auto_opt_c21/bridge_test_inv` completed 100 evaluations with 100 result manifests succeeded, 100 metric manifests produced, 86 metric manifests succeeded, 14 candidate-level non-scalar metric failures, and 0 final OCEAN command/license failures. This rerun did not need actual retries.
 - Task 1 complete and reviewed.
 - Task 2 complete and reviewed.
 - Task 3 complete and reviewed.
@@ -549,7 +550,7 @@ Status: complete, verified-only.
 
 Plan A, Plan B, Plan C C-1, Plan C C-2, Plan C C-3, Plan C C-4, Plan C C-5, and Plan C C-5.5 are complete as of 2026-06-01. C-6, C-7, C-8, and C-9 are complete and reviewed as of 2026-06-02. C-10 real-run failure/retry policy contract is complete and reviewed as of 2026-06-03. C-11 local/fake smoke is complete. C-7 real-tool closure is complete and committed as `d440c95`.
 
-Current next step: C-18 Batch Native TuRBO Parallel Runner is complete, verified-only, with real 100-evaluation acceptance. Decide the next narrow productization or real-use validation scope after C-18. Build on `run-native-turbo --parallel`; do not start broad optimizer framework work. Do not commit raw input decks, protected include files, PSF/raw data, full Cadence logs, `docs/OCEAN_DOC_*`, or `docs/toolchain_evidence/`. Do not parse PSF or translate OCEAN formulas in Python.
+Current next step: C-21 OCEAN Metric Extraction Retry Policy is complete, verified-only, and committed in the current HEAD. Decide the next narrow real-practice-backed optimizer or execution-agent validation scope. Build on `run-native-turbo --parallel`; do not start broad optimizer framework work. Do not commit raw input decks, protected include files, PSF/raw data, full Cadence logs, `docs/OCEAN_DOC_*`, or `docs/toolchain_evidence/`. Do not parse PSF or translate OCEAN formulas in Python.
 
 Read the handoff files first:
 
@@ -571,12 +572,10 @@ Use this prompt after compact:
 3. ic-auto-opt-workflow/docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md
 4. ic-auto-opt-workflow/docs/EXECUTION_PROGRESS_2026-05-29.md
 5. ic-auto-opt-workflow/docs/COMPACT_RESUME_CHECKPOINT.md
-6. ic-auto-opt-workflow/docs/debug/2026-06-04-batch-native-turbo-parallel-acceptance.md
-7. ic-auto-opt-workflow/docs/superpowers/specs/2026-06-04-batch-native-turbo-parallel-runner-design.md
-8. ic-auto-opt-workflow/docs/superpowers/plans/2026-06-04-batch-native-turbo-parallel-runner.md
-9. ic-auto-opt-workflow/docs/superpowers/specs/2026-06-04-native-turbo-optimizer-runner-mvp-design.md
-10. ic-auto-opt-workflow/docs/superpowers/plans/2026-06-04-native-turbo-optimizer-runner-mvp.md
-11. 如需背景，再读 ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md
+6. ic-auto-opt-workflow/docs/superpowers/plans/2026-06-04-ocean-metric-extraction-retry-policy.md
+7. ic-auto-opt-workflow/docs/debug/2026-06-04-c21-ocean-metric-extraction-retry-policy.md
+8. ic-auto-opt-workflow/docs/superpowers/plans/2026-06-04-execution-agent-autonomous-handoff-acceptance.md
+9. 如需背景，再读 ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-18 Batch Native TuRBO Parallel Runner 已完成，状态 verified-only。真实 acceptance 在 `/tmp/ic_auto_opt_c18_batch_native_turbo_001/bridge_test_inv` 完成 100 evaluations：36 feasible、50 constraint_failed、14 metric_check_failed，11 batches，max worker metadata 10；所有 100 个 prepared manifests 使用 `preset=ax`、`threads_per_run=10`、`parallel_jobs=10`、`output_format=psfxl`。下一步是决定 C-18 之后的窄 scoped productization 或真实使用验证范围。必须继续基于 `run-native-turbo --parallel` 和 native `Turbo1.optimize()` 路线；不要写 broad optimizer framework，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。不要用 Python 解析 PSF，不要让 agent 翻译或重写 Calculator/OCEAN 公式。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-21 OCEAN Metric Extraction Retry Policy 已完成，状态 verified-only，等待 final commit。C-21 添加 OCEAN-only retry，不会因 OCEAN command/license failure 重跑 Spectre；`metric_result_manifest.json` 记录 `ocean.attempts` 和 `ocean.return_codes`。真实 rerun `/tmp/ic_auto_opt_c21/bridge_test_inv` 完成 100 evaluations：100 result manifests succeeded，100 metric manifests produced，86 metric manifests succeeded，14 candidate-level non-scalar metric failures，0 final OCEAN command/license failures；所有 100 个 prepared/result manifests 使用 `preset=ax`、`threads_per_run=10`、`parallel_jobs=10`、`output_format=psfxl`。下一步先完成 C-21 final verification/commit，然后等待用户确认下一个窄 scoped real-practice-backed optimizer 或 execution-agent validation 范围。必须继续基于 `run-native-turbo --parallel` 和 native `Turbo1.optimize()` 路线；不要写 broad optimizer framework，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。不要用 Python 解析 PSF，不要让 agent 翻译或重写 Calculator/OCEAN 公式。
 ```

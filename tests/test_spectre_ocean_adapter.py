@@ -597,6 +597,45 @@ class FakeOceanFailureRunner(FakeSuccessRunner):
         )
 
 
+class FakeTransientOceanFailureRunner(FakeSuccessRunner):
+    def __init__(self) -> None:
+        super().__init__()
+        self.ocean_attempts = 0
+
+    def run(
+        self,
+        argv: list[str],
+        *,
+        cwd: Path,
+        stdout_path: Path,
+        stderr_path: Path,
+        timeout_s: int,
+    ) -> CommandResult:
+        if argv[0] == "ocean":
+            self.ocean_attempts += 1
+            if self.ocean_attempts == 1:
+                self.commands.append(argv)
+                stdout_path.write_text("fake ocean stdout\n", encoding="utf-8")
+                stderr_path.write_text("fake ocean license failure\n", encoding="utf-8")
+                metrics_dir = cwd / "runs" / "real" / "real_001" / "metrics"
+                (metrics_dir / "ocean.log").write_text(
+                    "license checkout failed\n",
+                    encoding="utf-8",
+                )
+                return CommandResult(
+                    return_code=35,
+                    started_at_utc="2026-06-02T00:31:00Z",
+                    completed_at_utc="2026-06-02T00:32:00Z",
+                )
+        return super().run(
+            argv,
+            cwd=cwd,
+            stdout_path=stdout_path,
+            stderr_path=stderr_path,
+            timeout_s=timeout_s,
+        )
+
+
 class FakeOceanFailureWithoutArtifactsRunner(FakeSuccessRunner):
     def run(
         self,
@@ -825,7 +864,12 @@ def test_ocean_failure_writes_metric_failure_manifest(tmp_path: Path) -> None:
     result = run_spectre_ocean_adapter(project_dir, runner=runner)
 
     assert result.status == "failed"
-    assert [command[0] for command in runner.commands] == ["spectre", "ocean"]
+    assert [command[0] for command in runner.commands] == [
+        "spectre",
+        "ocean",
+        "ocean",
+        "ocean",
+    ]
     real_manifest = _load_json(result.result_manifest_path)
     assert real_manifest["status"] == "succeeded"
     assert real_manifest["result_data"] is not None
@@ -833,6 +877,8 @@ def test_ocean_failure_writes_metric_failure_manifest(tmp_path: Path) -> None:
     metric_manifest = _load_json(result.metric_result_manifest_path)
     assert metric_manifest["status"] == "failed"
     assert metric_manifest["ocean"]["return_code"] == 3
+    assert metric_manifest["ocean"]["attempts"] == 3
+    assert metric_manifest["ocean"]["return_codes"] == [3, 3, 3]
     requested = _load_json(
         project_dir / "runs" / "real" / "real_001" / "metric_extraction_request.json"
     )
@@ -849,6 +895,28 @@ def test_ocean_failure_writes_metric_failure_manifest(tmp_path: Path) -> None:
     assert any("ocean return_code" in issue for issue in metric_report.issues)
 
 
+def test_ocean_command_failure_retries_without_rerunning_spectre(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_real_run_project(tmp_path)
+    runner = FakeTransientOceanFailureRunner()
+
+    result = run_spectre_ocean_adapter(project_dir, runner=runner)
+
+    assert result.status == "succeeded"
+    assert [command[0] for command in runner.commands] == [
+        "spectre",
+        "ocean",
+        "ocean",
+    ]
+    assert runner.ocean_attempts == 2
+    metric_manifest = _load_json(result.metric_result_manifest_path)
+    assert metric_manifest["status"] == "succeeded"
+    assert metric_manifest["ocean"]["return_code"] == 0
+    assert metric_manifest["ocean"]["attempts"] == 2
+    assert metric_manifest["ocean"]["return_codes"] == [35, 0]
+
+
 def test_ocean_failure_without_log_or_scalars_declares_only_existing_artifacts(
     tmp_path: Path,
 ) -> None:
@@ -858,6 +926,12 @@ def test_ocean_failure_without_log_or_scalars_declares_only_existing_artifacts(
     result = run_spectre_ocean_adapter(project_dir, runner=runner)
 
     assert result.status == "failed"
+    assert [command[0] for command in runner.commands] == [
+        "spectre",
+        "ocean",
+        "ocean",
+        "ocean",
+    ]
     manifest = _load_json(result.result_manifest_path)
     assert "runs/real/real_001/metrics/ocean.log" not in manifest["artifact_files"]
     assert (
@@ -874,6 +948,16 @@ def test_ocean_failure_without_log_or_scalars_declares_only_existing_artifacts(
     assert real_report.status == RealRunCheckStatus.PASS
     assert metric_report.status == MetricResultCheckStatus.FAIL
     assert any("ocean return_code" in issue for issue in metric_report.issues)
+    metric_manifest = _load_json(
+        project_dir
+        / "runs"
+        / "real"
+        / "real_001"
+        / "metrics"
+        / "metric_result_manifest.json"
+    )
+    assert metric_manifest["ocean"]["attempts"] == 3
+    assert metric_manifest["ocean"]["return_codes"] == [3, 3, 3]
 
 
 def test_ocean_zero_exit_with_malformed_scalars_writes_failure_manifests(

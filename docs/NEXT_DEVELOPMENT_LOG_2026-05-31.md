@@ -1151,6 +1151,19 @@ C-20 Execution-Agent Autonomous Handoff Acceptance:
 - Conclusion: autonomous handoff behavior is accepted. Fully green real-tool acceptance needs a narrow OCEAN-only retry/concurrency policy.
 - next_allowed_action: wait for user confirmation, then write a narrow C-21 OCEAN metric extraction retry/concurrency policy scope; do not start broad optimizer framework work.
 
+C-21 OCEAN Metric Extraction Retry Policy:
+
+- Status: complete, verified-only, committed in the current HEAD.
+- Plan: `docs/superpowers/plans/2026-06-04-ocean-metric-extraction-retry-policy.md`.
+- Sanitized debug note: `docs/debug/2026-06-04-c21-ocean-metric-extraction-retry-policy.md`.
+- Code change: C-7 Spectre/OCEAN adapter retries OCEAN-only command failures up to three attempts without rerunning Spectre.
+- Manifest contract: `metric_result_manifest.json` now records `ocean.attempts` and `ocean.return_codes`; `check-metric-results` validates the retry evidence against the final return code.
+- Unit coverage: transient OCEAN command failure now retries and succeeds without a second Spectre run; permanent OCEAN command failures still fail closed and report retry history.
+- Real rerun: `/tmp/ic_auto_opt_c21/bridge_test_inv` completed 100 real optimizer evaluations with 100 result manifests succeeded, 100 metric manifests produced, 86 metric manifests succeeded, 14 candidate-level non-scalar metric failures, and 0 final OCEAN command/license failures. This rerun did not need actual retries.
+- Settings audit: all 100 runs used `preset=ax`, `threads_per_run=10`, `parallel_jobs=10`, and `output_format=psfxl`.
+- Route audit: aligned with the top-level practice-first route. Drift: none. C-21 did not parse PSF, rewrite OCEAN formulas, rerun Spectre for OCEAN-only failures, retry candidate-level non-scalar failures, change metric formulas, or add scheduler/framework work.
+- next_allowed_action: finish C-21 final verification and commit, then wait for user confirmation before choosing the next narrow real-practice-backed optimizer or execution-agent validation step.
+
 ## Resume Prompt
 
 ```text

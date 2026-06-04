@@ -39,6 +39,8 @@ class OceanExecution(BaseModel):
 
     mode: str
     return_code: int
+    attempts: int = Field(default=1, ge=1)
+    return_codes: list[int] = Field(default_factory=list)
     script_file: str
     script_sha256: str
     log_file: str
@@ -383,6 +385,13 @@ def _validate_manifest(
     if manifest.ocean.return_code != 0:
         identity_ok = False
         issues.append(f"ocean return_code is not zero: {manifest.ocean.return_code}")
+    ocean_return_codes = manifest.ocean.return_codes or [manifest.ocean.return_code]
+    if manifest.ocean.attempts != len(ocean_return_codes):
+        identity_ok = False
+        issues.append("ocean attempts does not match return_codes")
+    if ocean_return_codes[-1] != manifest.ocean.return_code:
+        identity_ok = False
+        issues.append("ocean final return_code does not match return_codes")
     if not _validate_prepared_input_identity(bundle, run_id, prepared, request, handoff, issues):
         identity_ok = False
 
