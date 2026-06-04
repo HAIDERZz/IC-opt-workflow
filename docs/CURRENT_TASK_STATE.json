@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "current_scope": "C-23 Optimizer Execution-Agent Task Packet MVP",
-  "current_status": "C-23 Task 1 is complete, verified-only, and committed in the current HEAD. Added the optimizer execution-agent task packet renderer and manifest writer. The implementation uses the existing run-native-turbo --parallel path and the real native_turbo artifact names.",
+  "current_status": "C-23 Task 2 is complete, verified-only, and committed in the current HEAD. Added package-optimizer-task CLI wiring for the optimizer execution-agent task packet. The command only writes the task packet and manifest; it does not run real tools.",
   "review_status": "verified-only",
   "subagent_dispatch": "available",
   "active_spec": "docs/superpowers/plans/2026-06-04-optimizer-execution-agent-task-packet.md",
@@ -12,7 +12,7 @@
     "docs/EXECUTION_PROGRESS_2026-05-29.md",
     "docs/COMPACT_RESUME_CHECKPOINT.md"
   ],
-  "next_allowed_action": "start C-23 Task 2 CLI wiring after user confirmation",
+  "next_allowed_action": "start C-23 Task 3 local fake handoff smoke after user confirmation",
   "forbidden_actions": [
     "start broad optimizer framework work",
     "hand-pick 100 optimizer points instead of using native Turbo1.optimize()",
@@ -44,8 +44,8 @@
     "active_spec": "docs/superpowers/plans/2026-06-04-optimizer-execution-agent-task-packet.md",
     "active_plan": "docs/superpowers/plans/2026-06-04-optimizer-execution-agent-task-packet.md",
     "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
-    "alignment": "Aligned. C-23 Task 1 productizes the proven C-19/C-20 optimizer execution-agent task packet without changing the optimizer runner.",
-    "drift": "Plan drift found and corrected before implementation: the initial C-23 plan inherited C-19 wording for returned artifact names, but the actual native runner writes reports/native_turbo_optimizer_report.json and reports/native_turbo_optimizer_evaluations.jsonl. The plan, tests, renderer, and manifest now use the existing runner constants."
+    "alignment": "Aligned. C-23 Task 2 exposes the Task 1 renderer through a Hermes CLI command without changing the optimizer runner.",
+    "drift": "None in Task 2. No real tools, optimizer algorithm, PSF parser, OCEAN formula rewrite, or layout replacement was added."
   },
   "latest_valid_commit": "current HEAD",
   "review_evidence": {
@@ -71,6 +71,7 @@
     "c21": "Complete, verified-only, committed in the current HEAD. Added OCEAN-only retry to the C-7 Spectre/OCEAN adapter, records ocean.attempts and ocean.return_codes in metric_result_manifest.json, and validates retry evidence in check-metric-results. Unit coverage proves a transient OCEAN command failure retries without rerunning Spectre and permanent OCEAN failures still fail closed. Real rerun on /tmp/ic_auto_opt_c21/bridge_test_inv completed 100 evaluations with 100 result manifests succeeded, 100 metric manifests produced, 86 metric manifests succeeded, 14 candidate-level non-scalar metric failures, and 0 final OCEAN command/license failures. Sanitized note: docs/debug/2026-06-04-c21-ocean-metric-extraction-retry-policy.md.",
     "c22_task1": "Complete, verified-only, committed in the current HEAD. Updated generated execution_package/EXECUTION_TASK.md wording to the generic execution-agent role and added the manifest-level audit rule from C-20. Focused red/green test passed: python3 -m pytest tests/test_package.py::test_build_execution_package_writes_execution_task -q.",
     "c23_plan": "Written, verified-only. C-23 will generate a standard optimizer execution-agent task packet for the existing run-native-turbo --parallel path, including manifest-level audit requirements and Spectre settings expectations.",
-    "c23_task1": "Complete, verified-only, committed in the current HEAD. Added src/hermes_workflow/optimizer_task_package.py and tests/test_optimizer_task_package.py. The renderer writes execution_package/OPTIMIZER_EXECUTION_TASK.md and execution_package/optimizer_execution_manifest.json with the existing run-native-turbo command, Spectre settings, manifest-level audit rule, and required returned artifacts from native_turbo constants."
+    "c23_task1": "Complete, verified-only, committed in the current HEAD. Added src/hermes_workflow/optimizer_task_package.py and tests/test_optimizer_task_package.py. The renderer writes execution_package/OPTIMIZER_EXECUTION_TASK.md and execution_package/optimizer_execution_manifest.json with the existing run-native-turbo command, Spectre settings, manifest-level audit rule, and required returned artifacts from native_turbo constants.",
+    "c23_task2": "Complete, verified-only, committed in the current HEAD. Added hermes-workflow package-optimizer-task PROJECT_DIR --max-evals N --cadence-cshrc PATH --parallel/--sequential. Focused CLI test passed and no real tools were run."
   }
 }

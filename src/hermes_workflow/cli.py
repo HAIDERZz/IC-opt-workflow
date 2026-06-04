@@ -16,6 +16,9 @@ from hermes_workflow.native_turbo import (
     run_native_turbo_optimization,
 )
 from hermes_workflow.optimizer_suggestion import suggest_candidate_request
+from hermes_workflow.optimizer_task_package import (
+    build_optimizer_execution_task_package,
+)
 from hermes_workflow.package import (
     TemplateError,
     build_execution_package,
@@ -204,6 +207,41 @@ def package_command(
     except (FileExistsError, OSError, ValueError) as exc:
         _exit_with_error(exc)
     typer.echo(str(manifest.path.relative_to(project_dir)))
+
+
+@app.command("package-optimizer-task")
+def package_optimizer_task_command(
+    project_dir: Annotated[
+        Path,
+        typer.Argument(help="Project directory with approved real-tool contracts."),
+    ],
+    max_evals: Annotated[
+        int,
+        typer.Option("--max-evals", help="Optimizer evaluation budget for the task."),
+    ],
+    cadence_cshrc: Annotated[
+        Path,
+        typer.Option("--cadence-cshrc", help="Cadence cshrc to source for execution."),
+    ],
+    parallel: Annotated[
+        bool,
+        typer.Option(
+            "--parallel/--sequential",
+            help="Whether the execution agent should use batch parallel mode.",
+        ),
+    ] = True,
+) -> None:
+    try:
+        package = build_optimizer_execution_task_package(
+            project_dir,
+            max_evals=max_evals,
+            cadence_cshrc=cadence_cshrc,
+            parallel=parallel,
+        )
+    except (OSError, ValueError) as exc:
+        _exit_with_error(exc)
+    typer.echo(str(package.task_path.relative_to(project_dir)))
+    typer.echo(str(package.manifest_path.relative_to(project_dir)))
 
 
 @app.command("approve")

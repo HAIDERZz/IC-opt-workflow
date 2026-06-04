@@ -137,12 +137,14 @@ Expected: pass.
 
 **Risk:** Medium. CLI integration, no real tools.
 
+**Status:** Complete, verified-only.
+
 **Files:**
 
 - Modify: `src/hermes_workflow/cli.py`
 - Modify: `tests/test_optimizer_task_package.py`
 
-- [ ] **Step 1: Write failing CLI test**
+- [x] **Step 1: Write failing CLI test**
 
 Add a Typer runner test for:
 
@@ -167,11 +169,11 @@ python3 -m pytest tests/test_optimizer_task_package.py -q
 
 Expected: fails because the CLI command does not exist.
 
-- [ ] **Step 2: Add CLI command**
+- [x] **Step 2: Add CLI command**
 
 Add `package-optimizer-task` to `src/hermes_workflow/cli.py`. The command must only write the package and print relative paths. It must not run real tools.
 
-- [ ] **Step 3: Verify CLI test passes**
+- [x] **Step 3: Verify CLI test passes**
 
 Run:
 

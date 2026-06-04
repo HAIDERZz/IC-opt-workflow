@@ -1,10 +1,16 @@
 import json
 from pathlib import Path
 
+from typer.testing import CliRunner
+
+from hermes_workflow.cli import app
 from hermes_workflow.optimizer_task_package import (
     build_optimizer_execution_task_package,
 )
 from hermes_workflow.package import create_project_from_template
+
+
+runner = CliRunner()
 
 
 def test_build_optimizer_execution_task_package_writes_task_and_manifest(
@@ -60,3 +66,29 @@ def test_build_optimizer_execution_task_package_writes_task_and_manifest(
         "state/optimizer_state.json",
         "ledger/experiment_ledger.jsonl",
     ]
+
+
+def test_package_optimizer_task_cli_writes_task_and_manifest(tmp_path: Path) -> None:
+    project_dir = tmp_path / "bridge_test_inv"
+    create_project_from_template(project_dir)
+
+    result = runner.invoke(
+        app,
+        [
+            "package-optimizer-task",
+            str(project_dir),
+            "--max-evals",
+            "100",
+            "--cadence-cshrc",
+            "/home/zzchen/cadence_ic231_env.csh",
+            "--parallel",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "execution_package/OPTIMIZER_EXECUTION_TASK.md" in result.stdout
+    assert "execution_package/optimizer_execution_manifest.json" in result.stdout
+    assert (project_dir / "execution_package" / "OPTIMIZER_EXECUTION_TASK.md").exists()
+    assert (
+        project_dir / "execution_package" / "optimizer_execution_manifest.json"
+    ).exists()
