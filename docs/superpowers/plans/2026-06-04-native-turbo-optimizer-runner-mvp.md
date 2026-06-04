@@ -33,6 +33,8 @@ Forbidden:
 
 **Risk:** Medium.
 
+**Status:** Complete, verified-only.
+
 Implement a small module for:
 
 - reading approved variables/metrics/optimizer settings from an existing project;

@@ -5,9 +5,9 @@
 - Repository: `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow`
 - Branch: `plan-a-hermes-file-contract-mvp`
 - Current scope: C-17 Native TuRBO Optimizer Runner MVP
-- Current status: verified-only; C-16 follow-up practice corrected the optimizer route by running local `Turbo1.optimize()` as the actual optimizer driver with Hermes + Spectre/OCEAN as the evaluator
-- Next required action: execute C-17 Task 1 Core Objective And Candidate Quantization
-- next_allowed_action: execute C-17 Task 1: Core Objective And Candidate Quantization; do not run real tools until the C-17 fake/unit tasks pass and the user confirms real-tool acceptance
+- Current status: verified-only; C-17 Task 1 added native TuRBO contract loading, approved-variable quantization, compact unit formatting, feasibility-first objective scoring, and a compact evaluation trace model
+- Next required action: execute C-17 Task 2 Duplicate-Aware Native TuRBO Runner
+- next_allowed_action: execute C-17 Task 2: Duplicate-Aware Native TuRBO Runner; do not run real tools until the C-17 fake/unit tasks pass and the user confirms real-tool acceptance
 
 C-3 Task 6 final verification is complete. C-4 is confirmed as a contract-only first real-run package; it must not run Spectre, Virtuoso, subprocesses, or the optimizer loop. C-4 is now complete and reviewed. C-5 validates the execution agent's returned `result_manifest.json` and declared artifacts without running Spectre or parsing metrics. C-5.5 rehearsed the C-4/C-5 handoff with simulated execution-agent and Hermes-observer roles. After C-5.5, the project paused implementation to validate the real metric backend. Spectre + OCEAN is now confirmed as the backend route: standalone Spectre generates PSF, batch OCEAN opens the PSF and evaluates exact user/project-approved formulas, and Python only records OCEAN-produced scalar outputs and provenance. C-6 turned that route into deterministic file contracts and a Hermes validator without physical adapter wiring. C-7 added an explicit execution-side adapter and tool entry point while preserving the rule that Hermes workflow tooling still validates returned files after execution. C-8 records checked real metric results into optimizer ledger/state after `check-real-run` and `check-metric-results` pass, while preserving the contract-only boundary. C-9 prepares the next real-run package from strict ledger/state and deterministic optimizer initialization sequence, while still not running real tools or writing ledger/state. C-10 classifies failed/partial/pending real-run packages, writes explicit recovery decisions, prepares retry packages, exposes supervisor-facing recovery CLI commands, and blocks C-9 from advancing while unresolved real-run packages exist. C-10 final review fixes aligned unsafe artifact classification with the spec and hardened symlinked recovery decision reads.
 
@@ -32,6 +32,25 @@ Local-only evidence:
 Result: `100` evaluations completed with `8` initialization points and `92` TuRBO trust-region points. `73` candidates recorded real Spectre/OCEAN scalar results, `24` quantized duplicate candidates were skipped, and `3` metric non-scalar candidates were converted to finite penalties. Best candidate was `real_011`: `FN=11`, `WN=1.9u`, `FP=9`, `WP=0.5u`, `rise=72.489655ps`, `fall=64.569947ps`, `DC=301.334349uW`, objective `4.1300765965648685e-14`.
 
 Productization decision: proceed with C-17 Native TuRBO Optimizer Runner MVP. C-17 must implement native `Turbo1.optimize()` driving, feasibility-first objective semantics, quantized-candidate de-duplication/replacement, explicit first optimizer candidate packaging, and compact optimizer traces. It must not create a broad optimizer framework or replace the proven Spectre/OCEAN evaluator path.
+
+## C-17 Task 1 Checkpoint 2026-06-04
+
+C-17 Task 1 is complete, verified-only. Added `src/hermes_workflow/native_turbo.py` and `tests/test_native_turbo.py` for:
+
+- loading approved variables, metrics, and optimizer settings from an existing project;
+- quantizing continuous TuRBO vectors to approved integer and `continuous_step` candidate strings;
+- preserving compact Spectre-safe unit suffixes;
+- returning feasibility-first objective values with finite metric-failure and constraint-violation penalties;
+- holding a compact evaluation trace model for later runner work.
+
+Verification:
+
+```text
+python3 -m pytest tests/test_native_turbo.py tests/test_optimizer_suggestion.py tests/test_mock_optimizer.py -q
+python3 -m ruff check src/hermes_workflow/native_turbo.py tests/test_native_turbo.py
+```
+
+Route audit: aligned with `docs/superpowers/specs/2026-06-04-native-turbo-optimizer-runner-mvp-design.md`, `docs/superpowers/plans/2026-06-04-native-turbo-optimizer-runner-mvp.md`, and the top-level practice-first correction. Drift: none. No real Virtuoso/Spectre/OCEAN/SSH/bridge run occurred, no PSF parsing or OCEAN formula rewrite was added, and no raw Cadence artifact was staged.
 
 ## Route Consistency Audit 2026-06-03
 

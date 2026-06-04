@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "current_scope": "C-17 Native TuRBO Optimizer Runner MVP",
-  "current_status": "C-16 follow-up practice corrected the optimizer route. A real 100-evaluation practice now uses local Turbo1.optimize() as the optimizer driver and Hermes + Spectre/OCEAN as the black-box evaluator. C-17 design spec and implementation plan are written; code implementation has not started.",
+  "current_status": "C-17 Task 1 is complete, verified-only. Added native TuRBO contract loading, approved-variable quantization, compact unit formatting, feasibility-first objective scoring, and a compact evaluation trace model. No real tools were run.",
   "review_status": "verified-only",
   "subagent_dispatch": "available",
   "active_spec": "docs/superpowers/specs/2026-06-04-native-turbo-optimizer-runner-mvp-design.md",
@@ -12,7 +12,7 @@
     "docs/EXECUTION_PROGRESS_2026-05-29.md",
     "docs/COMPACT_RESUME_CHECKPOINT.md"
   ],
-  "next_allowed_action": "execute C-17 Task 1: Core Objective And Candidate Quantization; do not run real tools until the C-17 fake/unit tasks pass and the user confirms real-tool acceptance",
+  "next_allowed_action": "execute C-17 Task 2: Duplicate-Aware Native TuRBO Runner; do not run real tools until the C-17 fake/unit tasks pass and the user confirms real-tool acceptance",
   "forbidden_actions": [
     "start broad optimizer framework work",
     "create daemon or service orchestration",
@@ -45,11 +45,12 @@
     "alignment": "Aligned after correction. The next productization step uses optimizer.skill's native Turbo1.optimize() pattern with the proven Hermes + Spectre/OCEAN evaluator path, preserving approved formulas and native Maestro/ADE layout.",
     "drift": "Previous C-15/C-16 one-candidate suggestion loop is no longer considered a valid optimizer acceptance path. C-17 must productize the native TuRBO practice path instead."
   },
-  "latest_valid_commit": "38d36e9 docs: update C16 current task pointer",
+  "latest_valid_commit": "3add5dc docs: record native turbo optimizer practice",
   "review_evidence": {
     "optimizer_skill_real_practice": "Complete, verified-only. Temporary practice at /tmp/ic_auto_opt_optimizer_skill_flow_001 ran Turbo1.optimize() for 100 evaluations with 8 initialization and 92 trust-region evaluations. 73 candidates were recorded through real Spectre/OCEAN, 24 duplicate quantized candidates were skipped, and 3 metric non-scalar candidates were converted to finite penalties. Best candidate was real_011: FN=11, WN=1.9u, FP=9, WP=0.5u, rise=72.489655ps, fall=64.569947ps, DC=301.334349uW, objective=4.1300765965648685e-14.",
     "archive_doc": "docs/debug/2026-06-04-optimizer-skill-real-flow-practice.md",
     "c17_design": "docs/superpowers/specs/2026-06-04-native-turbo-optimizer-runner-mvp-design.md",
-    "c17_plan": "docs/superpowers/plans/2026-06-04-native-turbo-optimizer-runner-mvp.md"
+    "c17_plan": "docs/superpowers/plans/2026-06-04-native-turbo-optimizer-runner-mvp.md",
+    "c17_task1": "Complete, verified-only. Focused tests passed: python3 -m pytest tests/test_native_turbo.py tests/test_optimizer_suggestion.py tests/test_mock_optimizer.py -q. Focused ruff passed: python3 -m ruff check src/hermes_workflow/native_turbo.py tests/test_native_turbo.py."
   }
 }

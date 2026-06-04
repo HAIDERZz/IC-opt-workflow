@@ -1051,8 +1051,9 @@ Next required action:
 - C-16 corrected optimizer-skill practice checkpoint: complete, verified-only. The previous one-candidate C-15/C-16 loop is not accepted as a valid optimizer proof. A corrected `/tmp` practice used native `Turbo1.optimize()` with the proven Hermes + Spectre/OCEAN evaluator path for 100 evaluations: 8 initialization evaluations, 92 TuRBO trust-region evaluations, 73 recorded real Spectre/OCEAN scalar evaluations, 24 duplicate quantized candidates skipped, and 3 metric non-scalar candidates converted to finite penalties. Best candidate was `real_011`: `FN=11`, `WN=1.9u`, `FP=9`, `WP=0.5u`, `rise=72.489655ps`, `fall=64.569947ps`, `DC=301.334349uW`, objective `4.1300765965648685e-14`. Sanitized archive: `docs/debug/2026-06-04-optimizer-skill-real-flow-practice.md`.
 - C-17 Native TuRBO Optimizer Runner MVP design spec exists: `docs/superpowers/specs/2026-06-04-native-turbo-optimizer-runner-mvp-design.md`.
 - C-17 implementation plan exists: `docs/superpowers/plans/2026-06-04-native-turbo-optimizer-runner-mvp.md`.
+- C-17 Task 1 checkpoint: complete, verified-only. Added `src/hermes_workflow/native_turbo.py` and `tests/test_native_turbo.py` for contract loading, approved-variable quantization, compact unit formatting, feasibility-first objective scoring, and compact evaluation trace modeling. Verification passed with focused native/optimizer/mock tests and focused ruff. No real tools, PSF parsing, formula rewrite, broad optimizer framework, or raw Cadence artifact commit occurred.
 - current_scope: C-17 Native TuRBO Optimizer Runner MVP.
-- next_allowed_action: execute C-17 Task 1 Core Objective And Candidate Quantization; do not run real tools until fake/unit tasks pass and the user confirms real-tool acceptance.
+- next_allowed_action: execute C-17 Task 2 Duplicate-Aware Native TuRBO Runner; do not run real tools until fake/unit tasks pass and the user confirms real-tool acceptance.
 
 ## Locked Role Model
 
