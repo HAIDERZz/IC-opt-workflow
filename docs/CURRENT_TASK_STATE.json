@@ -49,7 +49,7 @@
     "alignment": "Partially aligned. C-16 reached 100 real Spectre/OCEAN evaluations using the C-15 loop and C-7 adapter, preserving native layout and Cadence-backed metrics.",
     "drift": "Optimizer acceptance is not clean: system python3 lacked torch/gpytorch and caused pre-fix fallback, then real_092 and real_094 silently fell back after TuRBO was available. Next work must be a narrow TuRBO suggestion robustness fix, not another broad framework."
   },
-  "latest_valid_commit": "b9f10d4 fix: align Spectre settings before C16",
+  "latest_valid_commit": "34c0258 docs: record C16 optimizer acceptance results",
   "review_evidence": {
     "task_0_status": "Complete, verified-only. Tests require metric_extraction_request.spectre.threads_per_run as per-process +mt and parallel_jobs as a concurrency cap, adapter argv +preset=ax/+mt=10 with requested output_format, result manifest setting recording, request/prepared setting drift rejection, and check-real-run simulator setting drift detection. parallel_jobs is not mapped to Spectre +mt. Final verification passed with 492 tests.",
     "tasks_1_2_status": "Complete with follow-up required. 100 ledger rows recorded: 8 real_pass, 92 real_constraint_fail, 0 recorded tool failures, 0 recorded metric failures. Spectre settings were consistent for real_004 through real_100. real_057 onward mostly used TuRBO after .venv dependency fix, but real_092 and real_094 silently fell back to initialization_fallback.",
