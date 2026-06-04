@@ -152,7 +152,8 @@ def test_build_execution_package_writes_execution_task(tmp_path: Path) -> None:
     task_text = (project_dir / "execution_package" / "EXECUTION_TASK.md").read_text(
         encoding="utf-8"
     )
-    assert "# Claude Code Execution Task" in task_text
+    assert "# Execution Agent Task" in task_text
+    assert "Claude Code" not in task_text
     assert "Project: `bridge_test_inv`" in task_text
     assert "Backend: `maestro_exported_spectre_deck`" in task_text
     assert "Spectre X preset: `ax`" in task_text
@@ -174,6 +175,8 @@ def test_build_execution_package_writes_execution_task(tmp_path: Path) -> None:
     assert "Do not write `reports/netlist_preparation_report.json`" in task_text
     assert "Do not write `reports/dry_run_report.json`" in task_text
     assert "Do not write `state/health_check.json`" in task_text
+    assert "Command exit status alone is not acceptance evidence" in task_text
+    assert "Manifest-level audit is required for any real-tool run" in task_text
     assert "hermes-workflow prepare-netlist PROJECT_DIR" in task_text
     assert "hermes-workflow dry-run PROJECT_DIR" in task_text
     assert "hermes-workflow preflight-health PROJECT_DIR" in task_text

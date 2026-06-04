@@ -93,7 +93,7 @@ def _render_execution_task(bundle: ContractBundle, manifest_payload: dict) -> st
         f"- `{path}`: `{digest}`"
         for path, digest in sorted(manifest_payload["immutable_config_files"].items())
     )
-    return f"""# Claude Code Execution Task
+    return f"""# Execution Agent Task
 
 Project: `{bundle.project_config.project.name}`
 Backend: `{bundle.project_config.project.backend}`
@@ -146,6 +146,8 @@ Hermes may template only these variables in `netlists/templates/template.scs`: {
 - Do not write `reports/dry_run_report.json`.
 - Do not write `state/health_check.json`.
 - Stop after export and wait for Hermes deterministic preflight.
+- Command exit status alone is not acceptance evidence.
+- Manifest-level audit is required for any real-tool run.
 
 ## Hermes Preflight Commands
 

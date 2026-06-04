@@ -51,9 +51,10 @@ As of 2026-06-03, focused Plan A, Plan B, and Plan C C-1 through C-11 are comple
 - C-13 through C-15 productized the narrow single-candidate suggestion, candidate-injection, and fixed-budget loop path around the proven C-7 adapter. C-16 then showed that small loops are not enough for optimizer acceptance.
 - C-17 and C-18 are the current accepted optimizer runner route: use native local `Turbo1.optimize()`, batch-aware candidate evaluation, bounded parallel Spectre/OCEAN adapter workers up to `spectre.parallel_jobs`, sequential package/ledger/state recording, and per-Spectre `threads_per_run` mapped to `+mt`.
 - C-19 and C-20 validated the original supervisor-to-execution-agent boundary with fresh local worker subagents using the existing `run-native-turbo --parallel --max-evals 100` command and manifest-level audit.
-- C-21 OCEAN metric extraction retry policy is complete, verified-only, and pending commit. It addresses the residual C-20 OCEAN command/license failure class by retrying OCEAN-only failures without rerunning Spectre and recording retry evidence in the metric result manifest.
+- C-21 OCEAN metric extraction retry policy is complete and verified-only. It addresses the residual C-20 OCEAN command/license failure class by retrying OCEAN-only failures without rerunning Spectre and recording retry evidence in the metric result manifest.
+- C-22 Execution-Agent Task Package Alignment Task 1 is complete and verified-only. It updates the generated execution package task to use generic execution-agent wording and carries forward the C-20 rule that command exit status alone is not acceptance evidence.
 
-C-11 verifies the C-9 -> fake C-7-style returned artifacts -> C-5/C-6 checks -> C-8 happy path and one controlled C-10 failure/retry path without real Virtuoso/Spectre/OCEAN/SSH/agent/bridge execution. C-12 then exposed the real C-7 adapter failure path; the subsequent C-7 closure fixed the root cause by moving implementation back toward the successful Maestro/ADE evidence instead of inventing a new result layout. The current node is `C-21 OCEAN Metric Extraction Retry Policy`, complete and verified-only, pending final commit. Current resume guidance is in `docs/CURRENT_TASK_STATE.json`, `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`, `docs/EXECUTION_PROGRESS_2026-05-29.md`, `docs/COMPACT_RESUME_CHECKPOINT.md`, and `AGENTS.md`.
+C-11 verifies the C-9 -> fake C-7-style returned artifacts -> C-5/C-6 checks -> C-8 happy path and one controlled C-10 failure/retry path without real Virtuoso/Spectre/OCEAN/SSH/agent/bridge execution. C-12 then exposed the real C-7 adapter failure path; the subsequent C-7 closure fixed the root cause by moving implementation back toward the successful Maestro/ADE evidence instead of inventing a new result layout. The current node is `C-22 Execution-Agent Task Package Alignment`, Task 1 complete and verified-only, pending final verification/commit. Current resume guidance is in `docs/CURRENT_TASK_STATE.json`, `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`, `docs/EXECUTION_PROGRESS_2026-05-29.md`, `docs/COMPACT_RESUME_CHECKPOINT.md`, and `AGENTS.md`.
 
 ## Current Route Alignment
 
@@ -1336,6 +1337,7 @@ git commit -m "docs: add real integration readiness checklist"
 22. C-17/C-18: native TuRBO optimizer runner and batch parallel evaluator using `Turbo1.optimize()`, bounded by `spectre.parallel_jobs` while preserving per-process `threads_per_run`.
 23. C-19/C-20: execution-agent handoff acceptance using concise task packets, non-sandbox real-tool execution, and supervisor/Hermes manifest-level audit.
 24. C-21: OCEAN-only metric extraction retry policy for command/license failures after Spectre succeeds.
+25. C-22: execution package task wording alignment with the locked execution-agent role model and manifest-level audit rule.
 
 ## Verification Commands
 

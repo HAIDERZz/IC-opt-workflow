@@ -1164,6 +1164,16 @@ C-21 OCEAN Metric Extraction Retry Policy:
 - Route audit: aligned with the top-level practice-first route. Drift: none. C-21 did not parse PSF, rewrite OCEAN formulas, rerun Spectre for OCEAN-only failures, retry candidate-level non-scalar failures, change metric formulas, or add scheduler/framework work.
 - next_allowed_action: finish C-21 final verification and commit, then wait for user confirmation before choosing the next narrow real-practice-backed optimizer or execution-agent validation step.
 
+C-22 Execution-Agent Task Package Alignment:
+
+- Status: Task 1 complete, verified-only, committed in the current HEAD.
+- Plan: `docs/superpowers/plans/2026-06-04-execution-agent-task-package-alignment.md`.
+- Change: generated `execution_package/EXECUTION_TASK.md` now uses generic execution-agent wording instead of Claude-specific wording.
+- Added rule: `Command exit status alone is not acceptance evidence`; `Manifest-level audit is required for any real-tool run`.
+- Scope stayed narrow: no real tools, optimizer logic, new handoff framework, PSF parsing, or OCEAN formula changes.
+- Verification so far: `python3 -m pytest tests/test_package.py::test_build_execution_package_writes_execution_task -q`.
+- next_allowed_action: wait for user confirmation before choosing the next narrow real-practice-backed optimizer or execution-agent validation step.
+
 ## Resume Prompt
 
 ```text
