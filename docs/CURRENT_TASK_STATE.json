@@ -47,7 +47,7 @@
     "alignment": "Aligned. C-20 directly validated the original supervisor-to-execution-agent handoff goal using the existing run-native-turbo --parallel command and fresh local worker subagents. It did not add optimizer framework work.",
     "drift": "Residual real-tool blocker discovered: autonomous handoff is viable, but parallel OCEAN metric extraction had 2 command/license failures out of 100 metric manifests. Next work should target OCEAN-only retry/concurrency policy."
   },
-  "latest_valid_commit": "d823a40 fix: close c19 optimizer handoff acceptance",
+  "latest_valid_commit": "5051f1f docs: record c20 autonomous handoff acceptance",
   "review_evidence": {
     "optimizer_skill_real_practice": "Complete, verified-only. Temporary practice at /tmp/ic_auto_opt_optimizer_skill_flow_001 ran Turbo1.optimize() for 100 evaluations with 8 initialization and 92 trust-region evaluations. 73 candidates were recorded through real Spectre/OCEAN, 24 duplicate quantized candidates were skipped, and 3 metric non-scalar candidates were converted to finite penalties. Best candidate was real_011: FN=11, WN=1.9u, FP=9, WP=0.5u, rise=72.489655ps, fall=64.569947ps, DC=301.334349uW, objective=4.1300765965648685e-14.",
     "archive_doc": "docs/debug/2026-06-04-optimizer-skill-real-flow-practice.md",
