@@ -1077,6 +1077,12 @@ Next required action:
 - current_scope: C-24 Generated Optimizer Task Packet Handoff Acceptance complete.
 - next_allowed_action: wait for user confirmation, then choose the next narrow practice-backed productization or acceptance step; do not start a broad optimizer framework.
 
+- C-25 Optimizer Run Acceptance Audit planning: complete, verified-only. Added design spec `docs/superpowers/specs/2026-06-04-optimizer-run-acceptance-audit-design.md` and implementation plan `docs/superpowers/plans/2026-06-04-optimizer-run-acceptance-audit.md`.
+- C-25 scope: productize the C-24 manual supervisor/Hermes manifest-level audit into `hermes-workflow check-optimizer-run PROJECT_DIR`, which reads existing native TuRBO report/trace/result/metric manifests and writes `reports/optimizer_run_acceptance_report.json`.
+- C-25 boundary: no real tools, no optimizer algorithm changes, no broad framework, no PSF parsing, no OCEAN formula rewriting, and no native Maestro/ADE layout replacement.
+- current_scope: C-25 Optimizer Run Acceptance Audit.
+- next_allowed_action: execute C-25 Task 1 library acceptance report only; do not run real tools or start broad optimizer framework work.
+
 ## Locked Role Model
 
 Status: locked as of 2026-06-02.

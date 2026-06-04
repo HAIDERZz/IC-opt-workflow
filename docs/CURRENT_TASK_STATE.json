@@ -1,25 +1,25 @@
 {
   "schema_version": "1.0",
-  "current_scope": "C-24 Generated Optimizer Task Packet Handoff Acceptance",
-  "current_status": "C-24 is complete and accepted, verified-only. The generated C-23 optimizer task packet drove the proven run-native-turbo --parallel route through a non-sandbox real-tool rerun and supervisor/Hermes manifest-level audit. The first worker attempt was rejected because sandboxed Spectre failed before metric extraction; Task 2R reran the same packet semantics through the approved non-sandbox Cadence path and completed 100 evaluations.",
+  "current_scope": "C-25 Optimizer Run Acceptance Audit",
+  "current_status": "C-25 design spec and implementation plan are written, verified-only. C-25 will productize the C-24 manual supervisor/Hermes manifest-level audit into a deterministic check-optimizer-run command that reads existing native TuRBO reports, traces, result manifests, and metric manifests, then writes reports/optimizer_run_acceptance_report.json. No real tools, optimizer algorithm changes, PSF parsing, or OCEAN formula rewriting are authorized by the plan.",
   "review_status": "verified-only",
   "subagent_dispatch": "available",
-  "active_spec": "docs/superpowers/plans/2026-06-04-generated-optimizer-task-packet-handoff-acceptance.md",
-  "active_plan": "docs/superpowers/plans/2026-06-04-generated-optimizer-task-packet-handoff-acceptance.md",
+  "active_spec": "docs/superpowers/specs/2026-06-04-optimizer-run-acceptance-audit-design.md",
+  "active_plan": "docs/superpowers/plans/2026-06-04-optimizer-run-acceptance-audit.md",
   "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
   "progress_files": [
     "docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md",
     "docs/EXECUTION_PROGRESS_2026-05-29.md",
     "docs/COMPACT_RESUME_CHECKPOINT.md"
   ],
-  "next_allowed_action": "wait for user confirmation, then choose the next narrow practice-backed productization or acceptance step after C-24; do not start a broad optimizer framework",
+  "next_allowed_action": "execute C-25 Task 1 library acceptance report only; do not run real tools or start broad optimizer framework work",
   "forbidden_actions": [
     "start broad optimizer framework work",
     "hand-pick 100 optimizer points instead of using native Turbo1.optimize()",
     "start a new broad optimizer framework",
     "create daemon or service orchestration",
     "replace TuRBO",
-    "rerun C-24 without preserving the accepted non-sandbox Cadence execution requirement",
+    "run real tools during C-25 contract-only audit implementation",
     "run Virtuoso before explicit task confirmation",
     "run SSH before explicit task confirmation",
     "run Claude CLI as an execution agent",
@@ -41,11 +41,11 @@
     "git status --short"
   ],
   "route_audit": {
-    "active_spec": "docs/superpowers/plans/2026-06-04-generated-optimizer-task-packet-handoff-acceptance.md",
-    "active_plan": "docs/superpowers/plans/2026-06-04-generated-optimizer-task-packet-handoff-acceptance.md",
+    "active_spec": "docs/superpowers/specs/2026-06-04-optimizer-run-acceptance-audit-design.md",
+    "active_plan": "docs/superpowers/plans/2026-06-04-optimizer-run-acceptance-audit.md",
     "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
-    "alignment": "Aligned. C-24 completed the direct acceptance step after C-23: generated optimizer task packet, local worker-agent handoff attempt, non-sandbox real-tool rerun, and manifest-level audit. It reused run-native-turbo --parallel and did not add optimizer framework code.",
-    "drift": "None. The rejected first attempt exposed an invalid sandbox execution environment rather than optimizer, OCEAN formula, PSF, or layout drift. The accepted Task 2R route preserves the proven non-sandbox Cadence execution requirement."
+    "alignment": "Aligned. C-25 is the direct productization step after C-24: turn the proven manual manifest-level audit into deterministic Hermes workflow tooling. It reads existing run-native-turbo outputs and does not add optimizer framework code.",
+    "drift": "None. C-25 is an audit/report command only; it does not run Cadence tools, replace TuRBO, parse PSF, rewrite OCEAN formulas, or change native Maestro/ADE layout."
   },
   "latest_valid_commit": "current HEAD",
   "review_evidence": {
@@ -77,6 +77,7 @@
     "c23_task4": "Complete, verified-only, committed in the current HEAD. Final verification passed: python3 -m pytest tests/test_optimizer_task_package.py tests/test_package.py tests/test_native_turbo.py -q; python3 -m ruff check src tests tools; python3 tools/check_development_cadence.py; git diff --check.",
     "c23_post_sync_review": "Complete, verified-only. Local review found that generated optimizer task commands could preserve a relative project path and render shell commands with plain string join. Fixed by resolving project_dir/cadence_cshrc before payload generation and using shell-safe command rendering. Verification passed: python3 -m pytest tests/test_optimizer_task_package.py tests/test_package.py tests/test_native_turbo.py -q (38 passed, 1 skipped); python3 -m ruff check src tests tools; python3 tools/check_development_cadence.py; git diff --check.",
     "c24_plan": "Written, verified-only. Added docs/superpowers/plans/2026-06-04-generated-optimizer-task-packet-handoff-acceptance.md. C-24 scopes one generated task packet local worker-agent handoff and supervisor/Hermes manifest-level audit. Task 1 is workspace and packet generation only; Task 2 is the first real worker-agent execution step.",
-    "c24_complete": "Complete, verified-only. Task 1 generated the optimizer execution packet. Task 2 first worker attempt on /tmp/ic_auto_opt_c24/bridge_test_inv was rejected because sandboxed Spectre failed before metric extraction with pipe/socket permission errors. Task 2R on /tmp/ic_auto_opt_c24_retry/bridge_test_inv used the same packet semantics through the approved non-sandbox Cadence path and completed 100 evaluations. Audit passed with 100 result manifests succeeded, 100 metric manifests produced, 79 metric manifests succeeded, 21 candidate-level metric failures, 36 feasible, 43 constraint_failed, 21 metric_check_failed, preset=ax, threads_per_run=10, parallel_jobs=10, output_format=psfxl. Best candidate was real_021: FN=10, WN=1.1u, FP=9, WP=0.5u, objective=4.305718220077049e-14. Sanitized note: docs/debug/2026-06-04-c24-generated-task-packet-handoff.md."
+    "c24_complete": "Complete, verified-only. Task 1 generated the optimizer execution packet. Task 2 first worker attempt on /tmp/ic_auto_opt_c24/bridge_test_inv was rejected because sandboxed Spectre failed before metric extraction with pipe/socket permission errors. Task 2R on /tmp/ic_auto_opt_c24_retry/bridge_test_inv used the same packet semantics through the approved non-sandbox Cadence path and completed 100 evaluations. Audit passed with 100 result manifests succeeded, 100 metric manifests produced, 79 metric manifests succeeded, 21 candidate-level metric failures, 36 feasible, 43 constraint_failed, 21 metric_check_failed, preset=ax, threads_per_run=10, parallel_jobs=10, output_format=psfxl. Best candidate was real_021: FN=10, WN=1.1u, FP=9, WP=0.5u, objective=4.305718220077049e-14. Sanitized note: docs/debug/2026-06-04-c24-generated-task-packet-handoff.md.",
+    "c25_plan": "Written, verified-only. Added docs/superpowers/specs/2026-06-04-optimizer-run-acceptance-audit-design.md and docs/superpowers/plans/2026-06-04-optimizer-run-acceptance-audit.md. C-25 scopes a deterministic check-optimizer-run command that reads existing native TuRBO report/trace/result/metric manifests and writes reports/optimizer_run_acceptance_report.json. It productizes the C-24 supervisor/Hermes manifest audit and does not run real tools."
   }
 }

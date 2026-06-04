@@ -1218,8 +1218,20 @@ C-24 Generated Optimizer Task Packet Handoff Acceptance Completion:
 - Route audit: aligned with the top-level practice-first route. Drift: none. The first failed attempt was an invalid sandbox execution environment, not optimizer, OCEAN formula, PSF parser, or native-layout drift.
 - next_allowed_action: wait for user confirmation, then choose the next narrow practice-backed productization or acceptance step after C-24; do not start a broad optimizer framework.
 
+C-25 Optimizer Run Acceptance Audit Planning:
+
+- Status: design spec and implementation plan complete, verified-only.
+- Design spec: `docs/superpowers/specs/2026-06-04-optimizer-run-acceptance-audit-design.md`.
+- Implementation plan: `docs/superpowers/plans/2026-06-04-optimizer-run-acceptance-audit.md`.
+- Goal: productize the C-24 manual supervisor/Hermes manifest-level audit into deterministic Hermes workflow tooling.
+- Planned command: `hermes-workflow check-optimizer-run PROJECT_DIR`.
+- Planned output: `reports/optimizer_run_acceptance_report.json`.
+- Boundary: C-25 reads existing native TuRBO report/trace/result/metric manifests only. It does not run Virtuoso, Spectre, OCEAN, SSH, execution agents, or `virtuoso-bridge-lite`; it does not change optimizer algorithms, parse PSF, rewrite OCEAN formulas, or alter native Maestro/ADE layout.
+- Route audit: aligned with the top-level practice-first route. Drift: none. C-25 makes the already-proven C-24 acceptance audit repeatable without adding a broad optimizer framework.
+- next_allowed_action: execute C-25 Task 1 library acceptance report only; do not run real tools or start broad optimizer framework work.
+
 ## Resume Prompt
 
 ```text
-请继续 IC auto optimization workflow。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。先阅读 AGENTS.md、docs/CURRENT_TASK_STATE.json、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/plans/2026-06-04-generated-optimizer-task-packet-handoff-acceptance.md。当前活动节点是 C-24 Generated Optimizer Task Packet Handoff Acceptance，implementation plan 已完成，状态 verified-only。下一步只能执行 C-24 Task 1：准备 clean local workspace 并生成 C-23 optimizer task packet；Task 1 不运行真实工具、不派 worker-agent。不要进入 Task 2 local worker-agent real-tool execution，直到 Task 1 完成并得到用户确认。不要调用 Claude CLI 作为 execution agent，不要写 broad optimizer framework，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。不要用 Python 解析 PSF，不要让 agent 翻译或重写 Calculator/OCEAN 公式。
+请继续 IC auto optimization workflow。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。先阅读 AGENTS.md、docs/CURRENT_TASK_STATE.json、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/specs/2026-06-04-optimizer-run-acceptance-audit-design.md、docs/superpowers/plans/2026-06-04-optimizer-run-acceptance-audit.md。当前活动节点是 C-25 Optimizer Run Acceptance Audit，design spec 和 implementation plan 已完成，状态 verified-only。下一步只能执行 C-25 Task 1：library acceptance report。不要运行 Virtuoso/Spectre/OCEAN/SSH/bridge/执行 agent，不要调用 Claude CLI 作为 execution agent，不要写 broad optimizer framework，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。不要用 Python 解析 PSF，不要让 agent 翻译或重写 Calculator/OCEAN 公式。
 ```
