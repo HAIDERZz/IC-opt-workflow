@@ -5,9 +5,9 @@
 - Repository: `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow`
 - Branch: `plan-a-hermes-file-contract-mvp`
 - Current scope: C-18 Batch Native TuRBO Parallel Runner
-- Current status: verified-only; C-18 Task 3 Parallel Real Batch Evaluator is complete. It adds bounded fake-tested real batch evaluation while keeping record writes sequential.
-- Next required action: execute C-18 Task 4 CLI Option And Report Summary after user confirmation
-- next_allowed_action: wait for user confirmation, then execute C-18 Task 4 CLI Option And Report Summary; do not run real tools before fake/unit tasks pass and the user explicitly confirms C-18 real acceptance
+- Current status: verified-only; C-18 Batch Native TuRBO Parallel Runner is complete, including real 100-evaluation acceptance.
+- Next required action: decide the next narrow real-use validation or productization scope after C-18.
+- next_allowed_action: decide the next narrow productization or real-use validation scope after C-18; build on run-native-turbo --parallel and do not start broad optimizer framework work without user confirmation
 
 C-3 Task 6 final verification is complete. C-4 is confirmed as a contract-only first real-run package; it must not run Spectre, Virtuoso, subprocesses, or the optimizer loop. C-4 is now complete and reviewed. C-5 validates the execution agent's returned `result_manifest.json` and declared artifacts without running Spectre or parsing metrics. C-5.5 rehearsed the C-4/C-5 handoff with simulated execution-agent and Hermes-observer roles. After C-5.5, the project paused implementation to validate the real metric backend. Spectre + OCEAN is now confirmed as the backend route: standalone Spectre generates PSF, batch OCEAN opens the PSF and evaluates exact user/project-approved formulas, and Python only records OCEAN-produced scalar outputs and provenance. C-6 turned that route into deterministic file contracts and a Hermes validator without physical adapter wiring. C-7 added an explicit execution-side adapter and tool entry point while preserving the rule that Hermes workflow tooling still validates returned files after execution. C-8 records checked real metric results into optimizer ledger/state after `check-real-run` and `check-metric-results` pass, while preserving the contract-only boundary. C-9 prepares the next real-run package from strict ledger/state and deterministic optimizer initialization sequence, while still not running real tools or writing ledger/state. C-10 classifies failed/partial/pending real-run packages, writes explicit recovery decisions, prepares retry packages, exposes supervisor-facing recovery CLI commands, and blocks C-9 from advancing while unresolved real-run packages exist. C-10 final review fixes aligned unsafe artifact classification with the spec and hardened symlinked recovery decision reads.
 
@@ -252,6 +252,56 @@ native Maestro/ADE layout, or commit raw Cadence artifacts.
 
 next_allowed_action: wait for user confirmation, then execute C-18 Task 4 CLI
 Option And Report Summary
+
+## C-18 Completion Checkpoint 2026-06-04
+
+C-18 Batch Native TuRBO Parallel Runner is complete, verified-only.
+
+Implemented:
+
+- `hermes-workflow run-native-turbo --parallel`;
+- batch report summary fields in `reports/native_turbo_optimizer_report.json`;
+- bounded parallel real batch evaluation with sequential package preparation
+  and sequential ledger/state recording;
+- sanitized real acceptance archive:
+  `docs/debug/2026-06-04-batch-native-turbo-parallel-acceptance.md`.
+
+Real acceptance:
+
+- Workspace: `/tmp/ic_auto_opt_c18_batch_native_turbo_001/bridge_test_inv`.
+- Result: 100 evaluations completed.
+- Status counts: 36 feasible, 50 constraint failed, 14 metric check failed.
+- Phase counts: 16 initialization, 84 TuRBO trust-region.
+- Batch count: 11.
+- Max batch worker metadata: 10.
+- Best candidate: `real_018`, `FN=12`, `FP=10`, `WN=1.7u`, `WP=0.5u`,
+  `rise=6.608725022174673e-11`,
+  `fall=6.129060537337709e-11`,
+  `DC=0.0003329717286877405`.
+- Spectre setting audit: all 100 prepared manifests used `preset=ax`,
+  `threads_per_run=10`, `parallel_jobs=10`, and `output_format=psfxl`.
+
+Verification:
+
+```text
+python3 -m pytest tests/test_native_turbo.py::test_run_native_turbo_cli_parallel_uses_batch_runner -q
+python3 -m pytest tests/test_native_turbo.py::test_write_native_turbo_reports_includes_batch_summary -q
+python3 -m pytest tests/test_native_turbo.py -q
+python3 -m pytest -q  # 513 passed, 1 skipped
+python3 -m ruff check .
+```
+
+Route audit: aligned with the C-18 design spec and top-level practice-first
+route. Drift: none open. C-18 keeps native `Turbo1.optimize()` as the optimizer
+route, uses Hermes batch-aware real evaluation, caps concurrent Spectre/OCEAN
+workers by `spectre.parallel_jobs`, keeps each Spectre process on
+`spectre.threads_per_run`, records ledger/state sequentially, and preserves
+approved formulas plus native Maestro/ADE layout. It does not parse PSF, rewrite
+OCEAN formulas, replace TuRBO, or create a broad scheduler/framework.
+
+next_allowed_action: decide the next narrow productization or real-use
+validation scope after C-18; build on `run-native-turbo --parallel` and do not
+start broad optimizer framework work without user confirmation
 
 ## Route Consistency Audit 2026-06-03
 

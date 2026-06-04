@@ -11,7 +11,10 @@ from hermes_workflow.health import write_preflight_health
 from hermes_workflow.metric_results import check_metric_results
 from hermes_workflow.mock_optimizer import run_mock_optimization
 from hermes_workflow.netlists import prepare_netlist
-from hermes_workflow.native_turbo import run_native_turbo_optimization
+from hermes_workflow.native_turbo import (
+    run_batch_native_turbo_optimization,
+    run_native_turbo_optimization,
+)
 from hermes_workflow.optimizer_suggestion import suggest_candidate_request
 from hermes_workflow.package import (
     TemplateError,
@@ -578,9 +581,21 @@ def run_native_turbo_command(
             help="Optional Cadence cshrc sourced before running the adapter.",
         ),
     ] = None,
+    parallel: Annotated[
+        bool,
+        typer.Option(
+            "--parallel/--sequential",
+            help="Evaluate TuRBO batches in parallel.",
+        ),
+    ] = False,
 ) -> None:
     try:
-        result = run_native_turbo_optimization(
+        runner = (
+            run_batch_native_turbo_optimization
+            if parallel
+            else run_native_turbo_optimization
+        )
+        result = runner(
             project_dir,
             max_evals=max_evals,
             cadence_cshrc=cadence_cshrc,

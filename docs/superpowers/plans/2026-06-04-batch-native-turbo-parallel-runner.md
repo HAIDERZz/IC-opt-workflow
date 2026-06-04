@@ -601,7 +601,7 @@ Expected: all pass.
 
 **Risk:** Medium.
 
-**Status:** Not started.
+**Status:** Complete, verified-only.
 
 **Files:**
 
@@ -609,7 +609,7 @@ Expected: all pass.
 - Modify: `src/hermes_workflow/native_turbo.py`
 - Modify: `tests/test_native_turbo.py`
 
-- [ ] **Step 1: Add failing CLI test for `--parallel`**
+- [x] **Step 1: Add failing CLI test for `--parallel`**
 
 Add:
 
@@ -687,7 +687,7 @@ python3 -m pytest tests/test_native_turbo.py::test_run_native_turbo_cli_parallel
 
 Expected: fail because the CLI does not import/call batch runner.
 
-- [ ] **Step 2: Add CLI wiring**
+- [x] **Step 2: Add CLI wiring**
 
 In `src/hermes_workflow/cli.py`, import `run_batch_native_turbo_optimization`.
 
@@ -717,7 +717,7 @@ result = runner(
 
 Default remains sequential to preserve C-17 behavior.
 
-- [ ] **Step 3: Add report summary fields**
+- [x] **Step 3: Add report summary fields**
 
 Update `write_native_turbo_reports` in `native_turbo.py` to derive:
 
@@ -735,7 +735,7 @@ payload["batch_summary"] = {
 
 Import `Counter` from `collections`.
 
-- [ ] **Step 4: Run CLI and report tests**
+- [x] **Step 4: Run CLI and report tests**
 
 Run:
 
@@ -751,7 +751,7 @@ Expected: all pass.
 
 **Risk:** High; user-confirmed only.
 
-**Status:** Not started.
+**Status:** Complete, verified-only.
 
 **Files:**
 
@@ -761,7 +761,7 @@ Expected: all pass.
 - Modify: `docs/EXECUTION_PROGRESS_2026-05-29.md`
 - Modify if context compaction is needed: `docs/COMPACT_RESUME_CHECKPOINT.md`
 
-- [ ] **Step 1: Prepare clean local project**
+- [x] **Step 1: Prepare clean local project**
 
 Use the known-good C-7 exported netlist bundle:
 
@@ -783,7 +783,7 @@ Run the same Hermes preflight sequence used in C-17:
 
 Expected: prints the project path.
 
-- [ ] **Step 2: Run real batch command**
+- [x] **Step 2: Run real batch command**
 
 Run only after the user confirms real-tool execution:
 
@@ -797,7 +797,7 @@ Expected:
 native turbo optimization completed: 100 evaluations
 ```
 
-- [ ] **Step 3: Parse acceptance summary**
+- [x] **Step 3: Parse acceptance summary**
 
 Run:
 
@@ -823,7 +823,7 @@ Expected:
 - `max_workers <= 10`;
 - report has a best candidate or a clear all-failed status.
 
-- [ ] **Step 4: Audit Spectre settings**
+- [x] **Step 4: Audit Spectre settings**
 
 Run:
 
@@ -853,7 +853,7 @@ parallel_jobs {10: 100}
 output_format {'psfxl': 100}
 ```
 
-- [ ] **Step 5: Write sanitized acceptance note**
+- [x] **Step 5: Write sanitized acceptance note**
 
 Create `docs/debug/2026-06-04-batch-native-turbo-parallel-acceptance.md`.
 
@@ -874,7 +874,7 @@ Do not copy raw netlists, PSF, OCEAN scripts, or full logs into docs.
 
 **Risk:** Medium.
 
-**Status:** Not started.
+**Status:** Complete, verified-only.
 
 **Files:**
 
@@ -884,7 +884,7 @@ Do not copy raw netlists, PSF, OCEAN scripts, or full logs into docs.
 - Modify: `docs/COMPACT_RESUME_CHECKPOINT.md` if resume prompt needs update
 - Modify active implementation plan checkboxes/status
 
-- [ ] **Step 1: Run full verification**
+- [x] **Step 1: Run full verification**
 
 Run:
 
@@ -903,7 +903,7 @@ Expected:
 - cadence checker passes;
 - no raw Cadence/OCEAN/toolchain evidence appears as staged files.
 
-- [ ] **Step 2: Review gate**
+- [x] **Step 2: Review gate**
 
 Use local subagents only if available. Do not call Claude.
 
@@ -919,7 +919,12 @@ Review scope:
 
 If no callable reviewer is available, mark C-18 `verified-only`.
 
-- [ ] **Step 3: Update node files**
+Current result: C-18 is `verified-only`. No Claude reviewer was called. Local
+subagent review was not spawned in this turn because the current user request
+asked to finish C-18 directly and the multi-agent tool requires explicit
+subagent authorization.
+
+- [x] **Step 3: Update node files**
 
 Update:
 
@@ -937,7 +942,7 @@ spectre.parallel_jobs, keeps each Spectre process on spectre.threads_per_run,
 and preserves approved formulas plus native Maestro/ADE layout. Drift: none.
 ```
 
-- [ ] **Step 4: Commit with explicit pathspecs**
+- [x] **Step 4: Commit with explicit pathspecs**
 
 Stage only tracked source/tests/docs and sanitized debug note:
 

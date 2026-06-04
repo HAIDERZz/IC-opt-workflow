@@ -6,6 +6,7 @@ import random
 import shlex
 import subprocess
 import sys
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from copy import deepcopy
 from dataclasses import asdict, dataclass
@@ -786,6 +787,7 @@ def write_native_turbo_reports(
     with evaluations_path.open("w", encoding="utf-8") as handle:
         for trace in result.traces:
             handle.write(json.dumps(asdict(trace), sort_keys=True) + "\n")
+    batch_ids = [trace.batch_id for trace in result.traces if trace.batch_id]
     payload = {
         "schema_version": "1.0",
         "status": "completed",
@@ -795,6 +797,14 @@ def write_native_turbo_reports(
         ),
         "evaluations": str(EVALUATIONS_RELATIVE),
         "issues": [],
+        "batch_summary": {
+            "batch_count": len(set(batch_ids)),
+            "max_batch_worker_count": max(
+                (trace.batch_worker_count or 0 for trace in result.traces),
+                default=0,
+            ),
+            "status_counts": dict(Counter(trace.status for trace in result.traces)),
+        },
     }
     report_path.write_text(
         json.dumps(payload, indent=2, sort_keys=True) + "\n",

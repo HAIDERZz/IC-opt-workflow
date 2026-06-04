@@ -12,7 +12,9 @@ from hermes_workflow.native_turbo import (
     NativeTurboObservation,
     NativeTurboBatchCandidate,
     NativeTurboBatchRunner,
+    NativeTurboEvaluationTrace,
     NativeTurboRunner,
+    NativeTurboRunResult,
     _default_batch_turbo_factory,
     evaluate_candidate_objective,
     evaluate_real_candidate,
@@ -21,6 +23,7 @@ from hermes_workflow.native_turbo import (
     quantize_candidate,
     run_batch_native_turbo_optimization,
     run_native_turbo_optimization,
+    write_native_turbo_reports,
 )
 from hermes_workflow.package import create_project_from_template
 from hermes_workflow.real_run import prepare_explicit_candidate_real_run
@@ -801,3 +804,132 @@ def test_run_native_turbo_cli_uses_fake_runner(monkeypatch: pytest.MonkeyPatch, 
 
     assert result.exit_code == 0
     assert "native turbo optimization completed: 3 evaluations" in result.output
+
+
+def test_run_native_turbo_cli_parallel_uses_batch_runner(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    project_dir = tmp_path / "bridge_test_inv"
+    project_dir.mkdir()
+    called: dict[str, object] = {}
+
+    def fake_run_batch_native_turbo_optimization(project_dir_arg: Path, **kwargs):
+        called["project_dir"] = project_dir_arg
+        called["max_evals"] = kwargs["max_evals"]
+        called["cadence_cshrc"] = kwargs["cadence_cshrc"]
+        reports = project_dir_arg / "reports"
+        reports.mkdir()
+        report_path = reports / "native_turbo_optimizer_report.json"
+        evaluations_path = reports / "native_turbo_optimizer_evaluations.jsonl"
+        report_path.write_text(
+            json.dumps(
+                {
+                    "schema_version": "1.0",
+                    "status": "completed",
+                    "evaluation_count": 10,
+                    "best_candidate": None,
+                    "issues": [],
+                    "batch_summary": {"batch_count": 1},
+                },
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        evaluations_path.write_text("", encoding="utf-8")
+        return type(
+            "FakeResult",
+            (),
+            {
+                "evaluation_count": 10,
+                "report_path": report_path,
+                "evaluations_path": evaluations_path,
+            },
+        )()
+
+    monkeypatch.setattr(
+        "hermes_workflow.cli.run_batch_native_turbo_optimization",
+        fake_run_batch_native_turbo_optimization,
+    )
+    result = CliRunner().invoke(
+        app,
+        [
+            "run-native-turbo",
+            str(project_dir),
+            "--parallel",
+            "--max-evals",
+            "10",
+            "--cadence-cshrc",
+            "/tmp/fake.csh",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert called["project_dir"] == project_dir
+    assert called["max_evals"] == 10
+    assert called["cadence_cshrc"] == Path("/tmp/fake.csh")
+
+
+def test_write_native_turbo_reports_includes_batch_summary(tmp_path: Path) -> None:
+    trace_one = NativeTurboEvaluationTrace(
+        evaluation_index=1,
+        run_id="real_001",
+        selection_phase="initialization",
+        raw_x=[4.0, 0.5],
+        parameters={"FN": "4", "WN": "0.5u"},
+        status="feasible",
+        objective=1.0,
+        fom=1.0,
+        constraint_penalty=0.0,
+        metrics={"delay": 1.0, "gain": 20.0},
+        result_manifest="runs/real/real_001/result_manifest.json",
+        metric_result_manifest="runs/real/real_001/metrics/metric_result_manifest.json",
+        issues=[],
+        batch_id="batch_001",
+        batch_slot=1,
+        batch_size=2,
+        batch_worker_count=2,
+        max_parallel_jobs=10,
+        threads_per_run=10,
+        parallel_jobs=10,
+    )
+    trace_two = NativeTurboEvaluationTrace(
+        evaluation_index=2,
+        run_id="real_002",
+        selection_phase="initialization",
+        raw_x=[5.0, 0.6],
+        parameters={"FN": "5", "WN": "0.6u"},
+        status="constraint_failed",
+        objective=1001.0,
+        fom=1.5,
+        constraint_penalty=1.0,
+        metrics={"delay": 200.0, "gain": 20.0},
+        result_manifest="runs/real/real_002/result_manifest.json",
+        metric_result_manifest="runs/real/real_002/metrics/metric_result_manifest.json",
+        issues=["constraint delay <= 100 ps failed"],
+        batch_id="batch_001",
+        batch_slot=2,
+        batch_size=2,
+        batch_worker_count=2,
+        max_parallel_jobs=10,
+        threads_per_run=10,
+        parallel_jobs=10,
+    )
+
+    report_path, _evaluations_path = write_native_turbo_reports(
+        tmp_path,
+        NativeTurboRunResult(
+            evaluation_count=2,
+            traces=[trace_one, trace_two],
+            best_trace=trace_one,
+        ),
+    )
+
+    payload = json.loads(report_path.read_text(encoding="utf-8"))
+    assert payload["batch_summary"] == {
+        "batch_count": 1,
+        "max_batch_worker_count": 2,
+        "status_counts": {"constraint_failed": 1, "feasible": 1},
+    }
