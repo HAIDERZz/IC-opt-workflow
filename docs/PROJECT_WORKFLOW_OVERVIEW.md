@@ -33,6 +33,7 @@
 - C-23 Optimizer Execution-Agent Task Packet MVP 已完成：`hermes-workflow package-optimizer-task` 会生成 `execution_package/OPTIMIZER_EXECUTION_TASK.md` 与 `execution_package/optimizer_execution_manifest.json`，复用 `run-native-turbo --parallel`，不新增 optimizer algorithm、scheduler、daemon、PSF parser 或 OCEAN formula rewrite。
 - C-24 Generated Optimizer Task Packet Handoff Acceptance 已完成：Hermes 生成的 optimizer execution packet 已通过非沙箱真实工具 rerun 和 supervisor/Hermes manifest-level audit 验收；真实 Cadence 执行必须保留非沙箱要求。
 - C-25 Optimizer Run Acceptance Audit 已完成：C-24 的人工 manifest-level audit 已产品化为 `hermes-workflow check-optimizer-run PROJECT_DIR`，输出 `reports/optimizer_run_acceptance_report.json`。
+- C-26 Optimizer Completion And Continuation Decision Report 已完成 design spec：下一步将 accepted optimizer run 转成 supervisor 可读的 best observed / continue / refine / restart / exhaustive / stop 决策报告。
 - `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/netlist_example` 下的真实 `input.scs` 示例只作为本地参考，不能提交进仓库。
 
 ## 1. 项目概览
@@ -395,7 +396,7 @@ hermes-workflow prepare-real-run-retry projects/bridge_test_inv --failed-run-id 
 hermes-workflow resolve-real-run-failure projects/bridge_test_inv --run-id real_002 --decision abandon_candidate --reason "skip failed candidate"
 ```
 
-C-11 到 C-25 已把 fake/local smoke、真实 C-7 closure、optimizer practice-first、native TuRBO runner、batch parallel evaluator、execution-agent handoff、OCEAN retry、generated optimizer execution-agent task packet、generated packet handoff acceptance，以及 optimizer run acceptance audit command 串起来。当前 next step 是等待用户确认新的窄 scope。不要启动 broad optimizer framework；不要提交 raw input deck、protected sidecar、PSF/raw、完整 Cadence log、`docs/OCEAN_DOC_*` 或 `docs/toolchain_evidence/`；不要在 Python 中解析 PSF 或翻译 OCEAN 公式。
+C-11 到 C-26 已把 fake/local smoke、真实 C-7 closure、optimizer practice-first、native TuRBO runner、batch parallel evaluator、execution-agent handoff、OCEAN retry、generated optimizer execution-agent task packet、generated packet handoff acceptance、optimizer run acceptance audit command，以及 optimizer completion/continuation decision design 串起来。当前 next step 是 review C-26 design，然后写窄 implementation plan。不要启动 broad optimizer framework；不要提交 raw input deck、protected sidecar、PSF/raw、完整 Cadence log、`docs/OCEAN_DOC_*` 或 `docs/toolchain_evidence/`；不要在 Python 中解析 PSF 或翻译 OCEAN 公式。
 
 ## 4. 能否严格约束主管 agent 和执行 agent 的行为
 

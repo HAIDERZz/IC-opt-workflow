@@ -1091,6 +1091,13 @@ Next required action:
 - current_scope: C-25 Optimizer Run Acceptance Audit complete.
 - next_allowed_action: wait for user confirmation before choosing the next narrow practice-backed step; do not start broad optimizer framework work.
 
+- C-26 Optimizer Completion And Continuation Decision Report design: complete, verified-only.
+- Design spec: `docs/superpowers/specs/2026-06-05-optimizer-completion-continuation-decision-design.md`.
+- Scope: read an already accepted optimizer run and write `reports/optimizer_completion_report.json` with best observed candidate, status distribution, search-space estimate, improvement evidence, and a deterministic continuation decision.
+- Boundary: no real tools, optimizer algorithm change, broad framework, PSF parsing, OCEAN formula rewriting, metric/constraint changes, or native-layout replacement.
+- current_scope: C-26 Optimizer Completion And Continuation Decision Report.
+- next_allowed_action: review C-26 design spec, then write C-26 implementation plan only after user confirmation; do not implement code, run real tools, or start broad optimizer framework work.
+
 ## Locked Role Model
 
 Status: locked as of 2026-06-02.

@@ -1243,8 +1243,17 @@ C-25 Optimizer Run Acceptance Audit Completion:
 - Boundary: no Virtuoso, Spectre, OCEAN, SSH, bridge, execution agent, optimizer algorithm change, PSF parsing, OCEAN formula rewrite, or native-layout replacement.
 - next_allowed_action: wait for user confirmation before selecting the next narrow practice-backed step; do not run real tools or start broad optimizer framework work without an explicit next plan.
 
+C-26 Optimizer Completion And Continuation Decision Report Design:
+
+- Status: design spec complete, verified-only.
+- Design spec: `docs/superpowers/specs/2026-06-05-optimizer-completion-continuation-decision-design.md`.
+- Goal: after C-25 accepts a returned optimizer run structurally, generate `reports/optimizer_completion_report.json` so the supervisor can decide whether to accept the best observed candidate, continue more evaluations, locally refine, restart with a new seed, switch to exhaustive sweep, or stop for user review.
+- Boundary: C-26 is read-only and contract-only at this stage. It does not run Virtuoso, Spectre, OCEAN, SSH, bridge, execution agent, or real tools; it does not change TuRBO, optimizer algorithms, metrics, constraints, OCEAN formulas, PSF handling, or native Maestro/ADE layout.
+- Route audit: aligned with the top-level practice-first route. C-25 answers whether returned artifacts are valid; C-26 answers what the supervisor should do with an accepted optimizer result. Drift: none.
+- next_allowed_action: review C-26 design spec, then write C-26 implementation plan only after user confirmation; do not implement code, run real tools, or start broad optimizer framework work.
+
 ## Resume Prompt
 
 ```text
-请继续 IC auto optimization workflow。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。先阅读 AGENTS.md、docs/CURRENT_TASK_STATE.json、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/specs/2026-06-04-optimizer-run-acceptance-audit-design.md、docs/superpowers/plans/2026-06-04-optimizer-run-acceptance-audit.md。C-25 Optimizer Run Acceptance Audit 已完成，状态 verified-only；新增 hermes-workflow check-optimizer-run PROJECT_DIR，用于读取 existing native TuRBO report/trace/result/metric manifests 并写 reports/optimizer_run_acceptance_report.json；本地 C-24 retry workspace 形状验收通过。下一步等待用户选择新的窄 scope，不要自行进入 broad optimizer framework 或真实工具运行。不要调用 Claude CLI 作为 execution agent，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。不要用 Python 解析 PSF，不要让 agent 翻译或重写 Calculator/OCEAN 公式。
+请继续 IC auto optimization workflow。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。先阅读 AGENTS.md、docs/CURRENT_TASK_STATE.json、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/specs/2026-06-05-optimizer-completion-continuation-decision-design.md。C-26 Optimizer Completion And Continuation Decision Report design spec 已完成，状态 verified-only；implementation plan 和代码尚未开始。下一步只能 review C-26 design spec，然后在用户确认后写 C-26 implementation plan。不要自行进入 broad optimizer framework 或真实工具运行。不要调用 Claude CLI 作为 execution agent，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。不要用 Python 解析 PSF，不要让 agent 翻译或重写 Calculator/OCEAN 公式。
 ```
