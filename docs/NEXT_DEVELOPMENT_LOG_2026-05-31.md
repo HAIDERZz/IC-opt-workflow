@@ -1174,6 +1174,15 @@ C-22 Execution-Agent Task Package Alignment:
 - Verification so far: `python3 -m pytest tests/test_package.py::test_build_execution_package_writes_execution_task -q`.
 - next_allowed_action: wait for user confirmation before choosing the next narrow real-practice-backed optimizer or execution-agent validation step.
 
+C-23 Optimizer Execution-Agent Task Packet MVP:
+
+- Status: narrow implementation plan written, verified-only; implementation has not started.
+- Plan: `docs/superpowers/plans/2026-06-04-optimizer-execution-agent-task-packet.md`.
+- Goal: productize the proven C-19/C-20 hand-written optimizer execution-agent task packet into a Hermes-generated packet.
+- Boundary: reuse `run-native-turbo --parallel`; do not add optimizer algorithms, real-tool execution, daemon/scheduler framework, PSF parsing, OCEAN formula rewriting, or native-layout replacement.
+- Route audit: aligned with the top-level practice-first route. Drift: none.
+- next_allowed_action: start C-23 Task 1 renderer and manifest contract after user confirmation.
+
 ## Resume Prompt
 
 ```text

@@ -1,18 +1,18 @@
 {
   "schema_version": "1.0",
-  "current_scope": "C-22 Execution-Agent Task Package Alignment",
-  "current_status": "C-22 Task 1 is complete, verified-only, and committed in the current HEAD. The generated execution package task now uses generic execution-agent wording instead of Claude-specific wording and includes the C-20 manifest-level audit rule that command exit status alone is not acceptance evidence.",
+  "current_scope": "C-23 Optimizer Execution-Agent Task Packet MVP",
+  "current_status": "C-23 narrow implementation plan is written. Implementation has not started. The goal is to productize the proven C-19/C-20 hand-written optimizer execution-agent task packet into a Hermes-generated package while reusing run-native-turbo --parallel and manifest-level audit.",
   "review_status": "verified-only",
   "subagent_dispatch": "available",
-  "active_spec": "docs/superpowers/plans/2026-06-04-execution-agent-task-package-alignment.md",
-  "active_plan": "docs/superpowers/plans/2026-06-04-execution-agent-task-package-alignment.md",
+  "active_spec": "docs/superpowers/plans/2026-06-04-optimizer-execution-agent-task-packet.md",
+  "active_plan": "docs/superpowers/plans/2026-06-04-optimizer-execution-agent-task-packet.md",
   "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
   "progress_files": [
     "docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md",
     "docs/EXECUTION_PROGRESS_2026-05-29.md",
     "docs/COMPACT_RESUME_CHECKPOINT.md"
   ],
-  "next_allowed_action": "wait for user confirmation before choosing the next narrow real-practice-backed optimizer or execution-agent validation step",
+  "next_allowed_action": "start C-23 Task 1 renderer and manifest contract after user confirmation",
   "forbidden_actions": [
     "start broad optimizer framework work",
     "hand-pick 100 optimizer points instead of using native Turbo1.optimize()",
@@ -41,13 +41,13 @@
     "git status --short"
   ],
   "route_audit": {
-    "active_spec": "docs/superpowers/plans/2026-06-04-execution-agent-task-package-alignment.md",
-    "active_plan": "docs/superpowers/plans/2026-06-04-execution-agent-task-package-alignment.md",
+    "active_spec": "docs/superpowers/plans/2026-06-04-optimizer-execution-agent-task-packet.md",
+    "active_plan": "docs/superpowers/plans/2026-06-04-optimizer-execution-agent-task-packet.md",
     "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
-    "alignment": "Aligned. C-22 keeps the existing execution package flow and updates only the generated task wording to match the locked supervisor/Hermes/execution-agent role model and C-20 manifest-level audit evidence.",
-    "drift": "None. No real-tool command, optimizer logic, PSF parsing, OCEAN formula change, or new handoff framework was added."
+    "alignment": "Aligned. C-23 narrows the next step to productizing the proven C-19/C-20 optimizer execution-agent task packet without changing the optimizer runner.",
+    "drift": "None. The plan does not run real tools, add an optimizer algorithm, parse PSF, rewrite OCEAN formulas, or replace the native Maestro/ADE layout."
   },
-  "latest_valid_commit": "current HEAD: fix: retry ocean metric extraction failures",
+  "latest_valid_commit": "current HEAD",
   "review_evidence": {
     "optimizer_skill_real_practice": "Complete, verified-only. Temporary practice at /tmp/ic_auto_opt_optimizer_skill_flow_001 ran Turbo1.optimize() for 100 evaluations with 8 initialization and 92 trust-region evaluations. 73 candidates were recorded through real Spectre/OCEAN, 24 duplicate quantized candidates were skipped, and 3 metric non-scalar candidates were converted to finite penalties. Best candidate was real_011: FN=11, WN=1.9u, FP=9, WP=0.5u, rise=72.489655ps, fall=64.569947ps, DC=301.334349uW, objective=4.1300765965648685e-14.",
     "archive_doc": "docs/debug/2026-06-04-optimizer-skill-real-flow-practice.md",
@@ -69,6 +69,7 @@
     "c19_task4": "Complete, verified-only. Branch B fixed clean project preparation by removing stale optimizer ledger rows and fixed native TuRBO quantization so off-grid upper bounds clamp to the last approved grid step. A sandboxed rerun was rejected as invalid evidence because Spectre failed with pipe/socket permission errors. The clean non-sandbox rerun completed 100 real evaluations: 33 feasible, 46 constraint_failed, 21 metric_check_failed; 100 result manifests succeeded; 79 metric manifests succeeded and 21 failed as candidate-level metric failures; max worker metadata was 10; Spectre settings audit passed with preset=ax, threads_per_run=10, output_format=psfxl, and trace parallel_jobs=10.",
     "c20": "Complete, verified-only. Added docs/superpowers/plans/2026-06-04-execution-agent-autonomous-handoff-acceptance.md and sanitized note docs/debug/2026-06-04-c20-execution-agent-autonomous-handoff-acceptance.md. Attempt 1 showed the task packet was too weak: a sandboxed run exited 0 but all 100 result manifests failed and metric manifests were missing. After correcting the local-only task packet to require non-sandbox execution and manifest-level audit, Attempt 2 used a fresh local worker subagent and completed 100 optimizer evaluations with 100 result manifests succeeded, 80 metric manifests succeeded, 20 metric manifests failed, 31 feasible, 49 constraint_failed, 20 metric_check_failed, and settings audit passed. The worker correctly reported a blocker: real_057 and real_075 had OCEAN command/license failures. Autonomous handoff behavior is accepted; fully green real-tool acceptance needs a narrow OCEAN-only retry/concurrency policy.",
     "c21": "Complete, verified-only, committed in the current HEAD. Added OCEAN-only retry to the C-7 Spectre/OCEAN adapter, records ocean.attempts and ocean.return_codes in metric_result_manifest.json, and validates retry evidence in check-metric-results. Unit coverage proves a transient OCEAN command failure retries without rerunning Spectre and permanent OCEAN failures still fail closed. Real rerun on /tmp/ic_auto_opt_c21/bridge_test_inv completed 100 evaluations with 100 result manifests succeeded, 100 metric manifests produced, 86 metric manifests succeeded, 14 candidate-level non-scalar metric failures, and 0 final OCEAN command/license failures. Sanitized note: docs/debug/2026-06-04-c21-ocean-metric-extraction-retry-policy.md.",
-    "c22_task1": "Complete, verified-only, committed in the current HEAD. Updated generated execution_package/EXECUTION_TASK.md wording to the generic execution-agent role and added the manifest-level audit rule from C-20. Focused red/green test passed: python3 -m pytest tests/test_package.py::test_build_execution_package_writes_execution_task -q."
+    "c22_task1": "Complete, verified-only, committed in the current HEAD. Updated generated execution_package/EXECUTION_TASK.md wording to the generic execution-agent role and added the manifest-level audit rule from C-20. Focused red/green test passed: python3 -m pytest tests/test_package.py::test_build_execution_package_writes_execution_task -q.",
+    "c23_plan": "Written, verified-only. C-23 will generate a standard optimizer execution-agent task packet for the existing run-native-turbo --parallel path, including manifest-level audit requirements and Spectre settings expectations. Implementation has not started."
   }
 }

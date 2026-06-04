@@ -1067,6 +1067,10 @@ Next required action:
 - current_scope: C-22 Execution-Agent Task Package Alignment.
 - next_allowed_action: wait for user confirmation before choosing the next narrow real-practice-backed optimizer or execution-agent validation step.
 
+- C-23 Optimizer Execution-Agent Task Packet MVP checkpoint: narrow implementation plan written, verified-only; implementation has not started. The plan productizes the proven C-19/C-20 hand-written optimizer execution-agent packet into a Hermes-generated packet for the existing `run-native-turbo --parallel` path.
+- current_scope: C-23 Optimizer Execution-Agent Task Packet MVP.
+- next_allowed_action: start C-23 Task 1 renderer and manifest contract after user confirmation.
+
 ## Locked Role Model
 
 Status: locked as of 2026-06-02.
