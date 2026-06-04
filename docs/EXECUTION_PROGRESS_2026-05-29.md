@@ -1108,6 +1108,8 @@ Next required action:
 - next_allowed_action: discuss whether to write C-27 OpenBox Optimizer Backend Evidence Spike design spec; do not replace TuRBO or run real tools before that decision.
 - OpenBox Optimizer Backend Decision Checkpoint: written, verified-only. Decision document: `docs/OPENBOX_OPTIMIZER_BACKEND_DECISION_CHECKPOINT_2026-06-05.md`. Local OpenBox reference clone: `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/openbox_reference/open-box`, commit `2ab34cc`. The project is paused before C-27 to decide whether OpenBox should replace or coexist with the current TuRBO backend. No production replacement has been made.
 
+- OpenBox Backend Evidence Spike: complete, verified-only. Evidence note: `docs/debug/2026-06-05-openbox-backend-evidence-spike.md`. Local-only fake inverter probes ran in `/tmp/ic_auto_opt_openbox_spike/.venv`; no production code, real tools, execution agents, PSF parsing, or OCEAN formula rewrite occurred. Single ask-and-tell probe produced 40 candidates with 0 grid issues and 0 duplicates; batch ask-and-tell produced 10 batches of 4 with 0 grid issues and 0 duplicates. Constraints were recorded in history. Current decision: OpenBox is viable enough for a narrow C-27 backend seam MVP discussion, but TuRBO remains the implemented backend.
+
 ## Locked Role Model
 
 Status: locked as of 2026-06-02.

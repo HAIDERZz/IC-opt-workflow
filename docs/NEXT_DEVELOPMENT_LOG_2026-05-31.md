@@ -1281,8 +1281,20 @@ OpenBox Optimizer Backend Decision Checkpoint:
 - Route audit: aligned as a pause-and-evaluate checkpoint. The project goal remains a lightweight agent workflow for IC optimization; the optimizer backend is now an explicit decision point rather than an assumed TuRBO commitment. Drift: no code route change yet.
 - next_allowed_action: discuss whether to write C-27 OpenBox Optimizer Backend Evidence Spike design spec; do not replace TuRBO or run real tools before that decision.
 
+OpenBox Backend Evidence Spike:
+
+- Status: complete, verified-only.
+- Evidence note: `docs/debug/2026-06-05-openbox-backend-evidence-spike.md`.
+- Local-only probe environment: `/tmp/ic_auto_opt_openbox_spike/.venv`.
+- OpenBox reference: `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/openbox_reference/open-box`, commit `2ab34cc`.
+- Single ask-and-tell fake inverter probe: `40` candidates, `23 feasible`, `17 constraint_failed`, `0` grid issues, `0` duplicates, constraints recorded in history, and `get_importance` available.
+- Batch ask-and-tell fake inverter probe: `10` batches of `4`, `40` candidates, `24 feasible`, `16 constraint_failed`, `0` grid issues, `0` duplicates, constraints recorded in history.
+- Route audit: still aligned. OpenBox looks viable for stepped variables, constraints, ask-and-tell, and batch candidate generation, but no production replacement has been made. Spectre/OCEAN execution, candidate packaging, acceptance audit, and completion reports remain reusable.
+- Caveat: this is not a one-line TuRBO replacement. Backend-specific report schemas, CLI naming, dependency setup, history serialization, continuation semantics, and deterministic Spectre value formatting still need a narrow backend seam.
+- next_allowed_action: decide whether to write C-27 OpenBox backend seam MVP design/plan; do not replace TuRBO or run real tools before that decision.
+
 ## Resume Prompt
 
 ```text
-请继续 IC auto optimization workflow。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。先阅读 AGENTS.md、docs/CURRENT_TASK_STATE.json、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/OPENBOX_OPTIMIZER_BACKEND_DECISION_CHECKPOINT_2026-06-05.md。C-26 已完成并提交，commit: ca1c9c1。当前暂停在 optimizer backend 决策点：TuRBO 已实现但可能不如 OpenBox 适合离散/约束/并行/结果解释需求。OpenBox 已 clone 到 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/openbox_reference/open-box，参考 commit: 2ab34cc。下一步先讨论是否写 C-27 OpenBox Optimizer Backend Evidence Spike design spec。不要直接替换 TuRBO，不要删除 native_turbo，不要运行真实 Virtuoso/Spectre/OCEAN，不要调用 execution agent，不要创建 broad optimizer framework，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
+请继续 IC auto optimization workflow。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。先阅读 AGENTS.md、docs/CURRENT_TASK_STATE.json、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/OPENBOX_OPTIMIZER_BACKEND_DECISION_CHECKPOINT_2026-06-05.md、docs/debug/2026-06-05-openbox-backend-evidence-spike.md。C-26 已完成并提交，commit: ca1c9c1。当前暂停在 optimizer backend 决策点：TuRBO 已实现但可能不如 OpenBox 适合离散/约束/并行/结果解释需求。OpenBox 已 clone 到 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/openbox_reference/open-box，参考 commit: 2ab34cc。OpenBox local-only fake inverter evidence spike 已完成。下一步先决定是否写窄 scoped C-27 OpenBox backend seam MVP design/plan。不要直接替换 TuRBO，不要删除 native_turbo，不要运行真实 Virtuoso/Spectre/OCEAN，不要调用 execution agent，不要创建 broad optimizer framework，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
 ```
