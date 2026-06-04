@@ -64,7 +64,7 @@ Task 0 result:
 
 ## Task 1: 100-Point Sequential Real Optimizer Run
 
-**Status:** pending Task 0.
+**Status:** complete with blockers found.
 
 Run only after Task 0 is committed.
 
@@ -91,7 +91,22 @@ Acceptance:
 - Tool/environment failures stop the run for debugging.
 - Candidate-level metric failures become the next real blocker to productize as penalty observations; do not disguise them as OCEAN/formula bugs.
 
+Task 1 result:
+
+- The project reached `current_evaluations = 100` and `optimizer_state.status = completed`.
+- The first 55 recorded rows were produced before the TuRBO environment was fixed. Their candidate requests used `selection_mode = initialization_fallback`.
+- Root cause: system `python3` had Hermes dependencies but lacked `torch/gpytorch`; project `.venv` had `torch/gpytorch` but lacked Hermes dependencies. Installing the project into `.venv` fixed the environment split.
+- `real_056` had completed result/metric manifests when the invalid fallback run was stopped; it was checked with Hermes contracts and recorded successfully.
+- The resumed run used `.venv` and produced `real_057` through `real_100`.
+- `real_057` through `real_091`, `real_093`, and `real_095` through `real_100` used `selection_mode = turbo`.
+- `real_092` and `real_094` still used `selection_mode = initialization_fallback` after the TuRBO environment was fixed. This means TuRBO candidate generation can still silently fall back, likely after quantization/deduplication.
+- Spectre/OCEAN contracts passed for all new runs: `check-real-run` and `check-metric-results` passed for `real_004` through `real_100`.
+- Spectre settings were consistent for `real_004` through `real_100`: `preset = ax`, `threads_per_run = 10`, `output_format = psfxl`, and `parallel_jobs = 10`.
+- Ledger summary: `100` rows total, `8` `real_pass`, `92` `real_constraint_fail`, no recorded tool failures, no recorded metric failures.
+
 ## Task 2: Closeout
+
+**Status:** complete with follow-up required.
 
 Summarize:
 
@@ -101,3 +116,12 @@ Summarize:
 - best candidate id, run id, objective, and metrics;
 - whether TuRBO actually took over after initialization;
 - any blocker that must be fixed before broader use.
+
+Closeout:
+
+- Total recorded: `100`.
+- Pass/constraint/tool/metric counts: `8 real_pass`, `92 real_constraint_fail`, `0 tool failures`, `0 metric failures`.
+- Best feasible candidate remains `candidate_000003` / `real_003`, objective `4.4591643476084205e-14`, parameters `FN=6`, `FP=4`, `WN=2.4u`, `WP=1.4u`, metrics `DC=0.0003515194271758733`, `fall=6.17648525412794e-11`, `rise=6.508914194299693e-11`.
+- TuRBO did take over after the environment fix: `real_057` onward mostly used `selection_mode = turbo`.
+- C-16 is not a clean optimizer acceptance because `real_092` and `real_094` silently fell back to initialization after TuRBO was available.
+- Next required work: a narrow TuRBO suggestion robustness fix. Do not run another broad 100-point acceptance until fallback is surfaced, retried, or classified instead of silently using initialization.

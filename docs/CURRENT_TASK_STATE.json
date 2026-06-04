@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
-  "current_scope": "C-16 100-Point Real Optimizer Acceptance",
-  "current_status": "C-16 Task 0 is complete, verified-only. Spectre run settings are contract-aligned before the 100-point run: metric_extraction_request carries threads_per_run as per-Spectre-process +mt and parallel_jobs as a concurrent Spectre process cap, C-7 argv uses requested preset/threads_per_run/output_format, generated result manifests record simulator preset/threads_per_run/output_format/timeout_s, and check-real-run audits recorded simulator settings against the prepared manifest.",
+  "current_scope": "C-16 100-Point Real Optimizer Acceptance closeout",
+  "current_status": "C-16 Tasks 1-2 are complete with follow-up required. The real loop reached 100 recorded Spectre/OCEAN evaluations in /tmp/ic_auto_opt_c14/bridge_test_inv. Spectre/OCEAN contracts and settings passed, but optimizer acceptance is not clean because real_092 and real_094 silently fell back to initialization_fallback after TuRBO was available.",
   "review_status": "verified-only",
   "subagent_dispatch": "available",
   "active_spec": "docs/superpowers/plans/2026-06-04-100-point-real-optimizer-acceptance.md",
@@ -12,15 +12,14 @@
     "docs/EXECUTION_PROGRESS_2026-05-29.md",
     "docs/COMPACT_RESUME_CHECKPOINT.md"
   ],
-  "next_allowed_action": "wait for user confirmation, then start C-16 Task 1 100-point sequential real optimizer run",
+  "next_allowed_action": "write or implement a narrow TuRBO suggestion robustness fix; do not run another broad 100-point acceptance until silent fallback is surfaced, retried, or classified",
   "forbidden_actions": [
     "start broad optimizer framework work",
     "create new optimizer algorithms",
     "create batch candidate orchestration without a narrow plan",
     "create daemon or service orchestration",
     "run Virtuoso before explicit task confirmation",
-    "run Spectre before C-16 Task 0 is committed and the 100-point run is explicitly started",
-    "run OCEAN before C-16 Task 0 is committed and the 100-point run is explicitly started",
+    "run another broad 100-point acceptance before TuRBO silent fallback is fixed or classified",
     "run SSH before explicit task confirmation",
     "run Claude CLI as an execution agent before explicit task confirmation",
     "run virtuoso-bridge-lite before explicit task confirmation",
@@ -47,12 +46,13 @@
     "active_spec": "docs/superpowers/plans/2026-06-04-100-point-real-optimizer-acceptance.md",
     "active_plan": "docs/superpowers/plans/2026-06-04-100-point-real-optimizer-acceptance.md",
     "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
-    "alignment": "Aligned. C-16 moves from small-point acceptance to a meaningful 100-point real optimizer acceptance using the existing C-15 loop and C-7 adapter.",
-    "drift": "None. Task 0 only aligns Spectre run settings with existing contracts before the 100-point run; it does not add a broad optimizer framework, new optimizer algorithm, PSF parser, formula rewrite, or native-layout replacement."
+    "alignment": "Partially aligned. C-16 reached 100 real Spectre/OCEAN evaluations using the C-15 loop and C-7 adapter, preserving native layout and Cadence-backed metrics.",
+    "drift": "Optimizer acceptance is not clean: system python3 lacked torch/gpytorch and caused pre-fix fallback, then real_092 and real_094 silently fell back after TuRBO was available. Next work must be a narrow TuRBO suggestion robustness fix, not another broad framework."
   },
   "latest_valid_commit": "b9f10d4 fix: align Spectre settings before C16",
   "review_evidence": {
     "task_0_status": "Complete, verified-only. Tests require metric_extraction_request.spectre.threads_per_run as per-process +mt and parallel_jobs as a concurrency cap, adapter argv +preset=ax/+mt=10 with requested output_format, result manifest setting recording, request/prepared setting drift rejection, and check-real-run simulator setting drift detection. parallel_jobs is not mapped to Spectre +mt. Final verification passed with 492 tests.",
+    "tasks_1_2_status": "Complete with follow-up required. 100 ledger rows recorded: 8 real_pass, 92 real_constraint_fail, 0 recorded tool failures, 0 recorded metric failures. Spectre settings were consistent for real_004 through real_100. real_057 onward mostly used TuRBO after .venv dependency fix, but real_092 and real_094 silently fell back to initialization_fallback.",
     "sandbox_note": "Real Spectre/OCEAN adapter runs should use the approved external Cadence csh path. A sandboxed Spectre attempt failed before OCEAN with pipe/socket permission errors, while the same command shape succeeded outside the sandbox."
   }
 }

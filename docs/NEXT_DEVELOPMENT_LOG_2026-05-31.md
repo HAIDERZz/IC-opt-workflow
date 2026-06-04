@@ -671,9 +671,28 @@ C-16 100-Point Real Optimizer Acceptance Task 0:
 - Plan: `docs/superpowers/plans/2026-06-04-100-point-real-optimizer-acceptance.md`.
 - User clarified an important settings distinction: Spectre `+mt` is per-Spectre process thread count; `spectre.parallel_jobs` is the maximum number of simultaneous Spectre processes. C-16 must not map `parallel_jobs` to `+mt`.
 - Task 0 patch aligns run settings before the 100-point run: `metric_extraction_request.json` carries `spectre.threads_per_run` as per-process `+mt` and `spectre.parallel_jobs` as the concurrency cap, C-7 adapter rejects request/prepared setting drift, Spectre argv now uses requested `preset`, `threads_per_run`, and `output_format`, result manifests record simulator `preset/threads_per_run/output_format/timeout_s`, and `check-real-run` detects recorded simulator setting drift. Current project setting is `+preset=ax`, `+mt=10`, `output_format=psfxl`, and `parallel_jobs=10`.
-- Final verification passed: `python3 -m pytest -q` (490 passed), `python3 -m ruff check src tests tools`, `python3 tools/check_development_cadence.py`, and `git diff --check`.
+- Final verification passed: `python3 -m pytest -q` (492 passed), `python3 -m ruff check src tests tools`, `python3 tools/check_development_cadence.py`, and `git diff --check`.
 - Route audit: aligned with the top-level practice-first route. Drift: none. This is a blocker fix before C-16 100-point execution, not broad optimizer framework work.
 - next_allowed_action: wait for user confirmation, then start C-16 Task 1 100-point sequential real optimizer run
+
+C-16 100-Point Real Optimizer Acceptance Tasks 1-2:
+
+- Status: complete with follow-up required.
+- current_scope: C-16 100-Point Real Optimizer Acceptance closeout.
+- Local project: `/tmp/ic_auto_opt_c14/bridge_test_inv`.
+- The real loop reached `100` recorded evaluations and `optimizer_state.status = completed`.
+- First attempt used system `python3`; it ran real Spectre/OCEAN correctly but did not use TuRBO because that interpreter lacked `torch/gpytorch`. The run was stopped at 55 recorded rows after this was discovered.
+- Environment fix: installed the project into the existing `.venv`, which already had `torch/gpytorch`; `.venv` can now import Hermes, TuRBO, `torch`, and `gpytorch`.
+- `real_056` had completed result/metric manifests when the invalid fallback run was stopped; Hermes `check-real-run`, `check-metric-results`, and `record-real-result` passed for `real_056`.
+- Resumed run used `.venv` and recorded `real_057` through `real_100`.
+- TuRBO handoff: `real_057` through `real_091`, `real_093`, and `real_095` through `real_100` used `selection_mode = turbo`.
+- Remaining optimizer blocker: `real_092` and `real_094` silently fell back to `selection_mode = initialization_fallback` even after TuRBO was available. The next fix must surface/retry/classify TuRBO duplicate or quantization fallback instead of silently using initialization.
+- Spectre/OCEAN contract result: all `check-real-run` and `check-metric-results` reports passed for `real_004` through `real_100`.
+- Spectre settings audit: all new result manifests from `real_004` through `real_100` recorded `preset = ax`, `threads_per_run = 10`, `output_format = psfxl`; request/prepared manifests kept `threads_per_run = 10` and `parallel_jobs = 10`.
+- Ledger summary: `100` rows total, `8 real_pass`, `92 real_constraint_fail`, `0` recorded tool failures, `0` recorded metric failures.
+- Best feasible candidate remains `candidate_000003` / `real_003`, objective `4.4591643476084205e-14`, parameters `FN=6`, `FP=4`, `WN=2.4u`, `WP=1.4u`.
+- Route audit: aligned with the practice-first top-level route. Drift found: C-16 is not a clean optimizer acceptance because silent post-TuRBO fallback occurred at `real_092` and `real_094`.
+- next_allowed_action: write or implement a narrow TuRBO suggestion robustness fix; do not run another broad 100-point acceptance until silent fallback is surfaced, retried, or classified
 
 ## Resume Prompt
 
