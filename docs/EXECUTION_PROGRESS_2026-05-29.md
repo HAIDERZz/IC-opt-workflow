@@ -1116,6 +1116,8 @@ Next required action:
 
 - C-28 OpenBox Real Backend Acceptance Spike completion: complete, verified-only. Sanitized evidence note: `docs/debug/2026-06-05-openbox-real-backend-acceptance-spike.md`. Local-only runner `/tmp/ic_auto_opt_c28_openbox_real/run_openbox_real_spike.py` used OpenBox ask-and-tell to generate 100 candidates, then evaluated them through the existing Hermes Spectre/OCEAN path under `/tmp/ic_auto_opt_c28_openbox_real/bridge_test_inv`. Results: 43 feasible, 51 constraint_failed, 6 metric_check_failed, 0 real_check_failed, 0 duplicate replacements. C-25 accepted all 100 result manifests and 100 metric manifests with stable `preset=ax`, `threads_per_run=10`, `parallel_jobs=10`, `output_format=psfxl`. C-26 decision: `accept_best_observed`, confidence `medium`, `global_optimum_claim=false`. Best observed: `real_071`, `FN=12`, `WN=2.7u`, `FP=7`, `WP=0.7u`, objective `4.1325534822170306e-14`. Productization blockers discovered and worked around locally: OpenBox stepped continuous variables need Hermes effective grid upper bounds, and the local real project bundle must include `netlists/templates/template.scs`. next_allowed_action: write C-29 OpenBox productization plan; do not replace TuRBO or broaden optimizer framework work without a narrow approved plan.
 
+- C-29 OpenBox Production Backend planning: design spec and implementation plan written, verified-only. Design spec: `docs/superpowers/specs/2026-06-05-openbox-production-backend-design.md`. Implementation plan: `docs/superpowers/plans/2026-06-05-openbox-production-backend.md`. Scope: productize OpenBox candidate generation and ask-and-tell observation updates while preserving the existing Hermes candidate package, Spectre/OCEAN execution adapter, backend-neutral optimizer artifacts, C-25 acceptance, and C-26 completion decision. Boundaries: no TuRBO replacement, no hidden `FN=FP`, no broad optimizer framework, no PSF parsing, no OCEAN formula rewrite. next_allowed_action: execute C-29 Task 1 OpenBox Search Space Contract; do not run real tools, replace TuRBO, delete native_turbo, add hidden FN=FP coupling, or broaden the optimizer framework.
+
 ## Locked Role Model
 
 Status: locked as of 2026-06-02.
@@ -1141,9 +1143,9 @@ Do not use "Hermes agent" as a role name in future specs or plans. If older docu
 3. ic-auto-opt-workflow/docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md
 4. ic-auto-opt-workflow/docs/EXECUTION_PROGRESS_2026-05-29.md
 5. ic-auto-opt-workflow/docs/COMPACT_RESUME_CHECKPOINT.md
-6. ic-auto-opt-workflow/docs/superpowers/specs/2026-06-05-openbox-real-backend-acceptance-spike-design.md
-7. ic-auto-opt-workflow/docs/superpowers/plans/2026-06-05-openbox-real-backend-acceptance-spike.md
+6. ic-auto-opt-workflow/docs/superpowers/specs/2026-06-05-openbox-production-backend-design.md
+7. ic-auto-opt-workflow/docs/superpowers/plans/2026-06-05-openbox-production-backend.md
 8. ic-auto-opt-workflow/docs/debug/2026-06-05-openbox-real-backend-acceptance-spike.md
 
-当前活动节点是 C-28 OpenBox Real Backend Acceptance Spike complete/verified-only。C-28 已完成 100 real evaluations：43 feasible，51 constraint_failed，6 metric_check_failed，0 real_check_failed，0 duplicate replacements；C-25 accepted；C-26 decision 是 `accept_best_observed` 且 `global_optimum_claim=false`。下一步是写 C-29 OpenBox productization plan。不要直接替换 TuRBO，不要删除 native_turbo，不要启动 broad optimizer framework，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。不要解析 PSF，不要重写 OCEAN 公式。
+当前活动节点是 C-29 OpenBox Production Backend。C-29 design spec 和 implementation plan 已完成。下一步是 execute C-29 Task 1 OpenBox Search Space Contract; do not run real tools, replace TuRBO, delete native_turbo, add hidden FN=FP coupling, or broaden the optimizer framework。不要直接替换 TuRBO，不要删除 native_turbo，不要启动 broad optimizer framework，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。不要解析 PSF，不要重写 OCEAN 公式。
 ```
