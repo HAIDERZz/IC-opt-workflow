@@ -296,6 +296,56 @@ def test_check_real_run_reports_prepared_input_hash_drift(tmp_path: Path) -> Non
     assert report.checks.prepared_input_hash_ok is False
 
 
+def test_check_real_run_reports_simulator_setting_drift(tmp_path: Path) -> None:
+    project_dir, _package = _prepare_real_run_project(tmp_path)
+    _write_result_handoff(
+        project_dir,
+        overrides={
+            "simulator": {
+                "engine": "spectre_x",
+                "preset": "ax",
+                "output_format": "psfascii",
+                "threads_per_run": 10,
+                "timeout_s": 3600,
+                "command_label": "external_spectre_run",
+            }
+        },
+    )
+
+    report = check_real_run(project_dir)
+
+    assert report.status == RealRunCheckStatus.FAIL
+    assert "result simulator output_format does not match prepared manifest" in (
+        report.issues
+    )
+
+
+def test_check_real_run_reports_simulator_threads_per_run_drift(
+    tmp_path: Path,
+) -> None:
+    project_dir, _package = _prepare_real_run_project(tmp_path)
+    _write_result_handoff(
+        project_dir,
+        overrides={
+            "simulator": {
+                "engine": "spectre_x",
+                "preset": "ax",
+                "output_format": "psfxl",
+                "threads_per_run": 16,
+                "timeout_s": 3600,
+                "command_label": "external_spectre_run",
+            }
+        },
+    )
+
+    report = check_real_run(project_dir)
+
+    assert report.status == RealRunCheckStatus.FAIL
+    assert "result simulator threads_per_run does not match prepared manifest" in (
+        report.issues
+    )
+
+
 @pytest.mark.parametrize(
     ("artifact_value", "expected_issue"),
     [

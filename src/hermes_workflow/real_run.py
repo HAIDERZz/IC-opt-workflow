@@ -856,6 +856,7 @@ def _build_manifest(
             "engine": spectre.engine,
             "preset": spectre.preset.value,
             "output_format": spectre.output_format,
+            "threads_per_run": spectre.threads_per_run,
             "parallel_jobs": spectre.parallel_jobs,
             "timeout_s": spectre.timeout_s,
         },

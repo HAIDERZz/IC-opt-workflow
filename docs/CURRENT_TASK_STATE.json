@@ -1,26 +1,26 @@
 {
   "schema_version": "1.0",
-  "current_scope": "C-15 Narrow Optimizer Loop Productization",
-  "current_status": "C-15 Tasks 1-4 are complete and reviewed. A narrow loop library and repo tool were added, fake-adapter tests passed, one real optimizer loop cycle ran on /tmp/ic_auto_opt_c14/bridge_test_inv, and final local review/verification passed. The loop recorded candidate_000003 as real_003 through the existing C-7 Spectre/OCEAN adapter, Hermes checks, and record-real-result. Ledger now has 3 rows; candidate_000003 is real_pass and current best.",
-  "review_status": "reviewed",
+  "current_scope": "C-16 100-Point Real Optimizer Acceptance",
+  "current_status": "C-16 Task 0 is complete, verified-only. Spectre run settings are contract-aligned before the 100-point run: metric_extraction_request carries threads_per_run as per-Spectre-process +mt and parallel_jobs as a concurrent Spectre process cap, C-7 argv uses requested preset/threads_per_run/output_format, generated result manifests record simulator preset/threads_per_run/output_format/timeout_s, and check-real-run audits recorded simulator settings against the prepared manifest.",
+  "review_status": "verified-only",
   "subagent_dispatch": "available",
-  "active_spec": "docs/superpowers/specs/2026-06-04-narrow-optimizer-loop-productization-design.md",
-  "active_plan": "docs/superpowers/plans/2026-06-04-narrow-optimizer-loop-productization.md",
+  "active_spec": "docs/superpowers/plans/2026-06-04-100-point-real-optimizer-acceptance.md",
+  "active_plan": "docs/superpowers/plans/2026-06-04-100-point-real-optimizer-acceptance.md",
   "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
   "progress_files": [
     "docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md",
     "docs/EXECUTION_PROGRESS_2026-05-29.md",
     "docs/COMPACT_RESUME_CHECKPOINT.md"
   ],
-  "next_allowed_action": "wait for user confirmation, then choose the next narrow real-practice-backed optimizer productization step; do not start a broad optimizer framework",
+  "next_allowed_action": "wait for user confirmation, then start C-16 Task 1 100-point sequential real optimizer run",
   "forbidden_actions": [
     "start broad optimizer framework work",
     "create new optimizer algorithms",
     "create batch candidate orchestration without a narrow plan",
     "create daemon or service orchestration",
     "run Virtuoso before explicit task confirmation",
-    "run Spectre before the next real-tool task explicitly requires it",
-    "run OCEAN before the next real-tool task explicitly requires it",
+    "run Spectre before C-16 Task 0 is committed and the 100-point run is explicitly started",
+    "run OCEAN before C-16 Task 0 is committed and the 100-point run is explicitly started",
     "run SSH before explicit task confirmation",
     "run Claude CLI as an execution agent before explicit task confirmation",
     "run virtuoso-bridge-lite before explicit task confirmation",
@@ -36,28 +36,23 @@
     "stage docs/toolchain_evidence/"
   ],
   "required_pre_commit_checks": [
-    "python3 -m pytest tests/test_optimizer_loop.py -q",
-    "python3 -m pytest tests/test_optimizer_suggestion.py tests/test_candidate_injection_real_run.py tests/test_real_result_record.py tests/test_metric_results.py -q",
+    "python3 -m pytest tests/test_spectre_ocean_adapter.py tests/test_result_handoff.py tests/test_metric_results.py -q",
+    "python3 -m pytest tests/test_candidate_injection_real_run.py tests/test_real_run.py tests/test_next_real_run.py tests/test_real_result_record.py -q",
     "python3 -m ruff check src tests tools",
     "python3 tools/check_development_cadence.py",
     "git diff --check",
     "git status --short"
   ],
   "route_audit": {
-    "active_spec": "docs/superpowers/specs/2026-06-04-narrow-optimizer-loop-productization-design.md",
-    "active_plan": "docs/superpowers/plans/2026-06-04-narrow-optimizer-loop-productization.md",
+    "active_spec": "docs/superpowers/plans/2026-06-04-100-point-real-optimizer-acceptance.md",
+    "active_plan": "docs/superpowers/plans/2026-06-04-100-point-real-optimizer-acceptance.md",
     "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
-    "alignment": "Aligned. C-15 productizes only the proven C-14 route: suggest one candidate, prepare one candidate run, execute the existing C-7 adapter, check, and record.",
-    "drift": "None. No new optimizer algorithm, daemon, scheduler, PSF parser, formula rewrite, or native-layout replacement was added. The loop is fixed-budget and single-candidate per cycle."
+    "alignment": "Aligned. C-16 moves from small-point acceptance to a meaningful 100-point real optimizer acceptance using the existing C-15 loop and C-7 adapter.",
+    "drift": "None. Task 0 only aligns Spectre run settings with existing contracts before the 100-point run; it does not add a broad optimizer framework, new optimizer algorithm, PSF parser, formula rewrite, or native-layout replacement."
   },
-  "latest_valid_commit": "674800a fix: close C15 optimizer loop gate",
+  "latest_valid_commit": "f0157cf docs: record C15 closeout commit",
   "review_evidence": {
-    "spec_review": "Local subagent Ohm reviewed C-15 and returned PASS. Important findings were addressed by adding result_check_failed and record_failed coverage, bounding adapter issues, and using RECORDED consistently. Narrow re-review returned PASS with no remaining blockers.",
-    "code_quality_review": "Local subagent Jason reviewed C-15 and returned PASS. Important findings were addressed by adding result_check_failed and record_failed coverage and bounding adapter failure output. Narrow re-review returned PASS with no remaining blockers.",
-    "task_1_status": "Added src/hermes_workflow/optimizer_loop.py with one-cycle orchestration and fake adapter tests.",
-    "task_2_status": "Added tools/run_real_optimizer_loop.py with fake subprocess tests and a sanitized loop report.",
-    "task_3_status": "Ran one real C-15 cycle outside the sandbox. real_003/candidate_000003 recorded as real_pass with rise=6.508914194299693e-11 s, fall=6.17648525412794e-11 s, DC=0.0003515194271758733 W.",
-    "task_4_status": "Final verification/review gate passed. Focused C-15 tests now cover adapter_failed, result_check_failed, metric_check_failed, record_failed, success, CLI success/failure, and invalid budget. Adapter failure issues in optimizer_loop_report are bounded.",
+    "task_0_status": "Complete, verified-only. Tests require metric_extraction_request.spectre.threads_per_run as per-process +mt and parallel_jobs as a concurrency cap, adapter argv +preset=ax/+mt=10 with requested output_format, result manifest setting recording, request/prepared setting drift rejection, and check-real-run simulator setting drift detection. parallel_jobs is not mapped to Spectre +mt. Final verification passed with 492 tests.",
     "sandbox_note": "Real Spectre/OCEAN adapter runs should use the approved external Cadence csh path. A sandboxed Spectre attempt failed before OCEAN with pipe/socket permission errors, while the same command shape succeeded outside the sandbox."
   }
 }

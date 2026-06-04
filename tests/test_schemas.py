@@ -88,6 +88,7 @@ def test_spectre_rejects_non_spectre_x_engine() -> None:
     ("field", "value"),
     [
         ("parallel_jobs", "10"),
+        ("threads_per_run", "10"),
         ("timeout_s", "3600"),
         ("keep_successful_runs", "false"),
     ],

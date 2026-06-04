@@ -252,6 +252,7 @@ def test_prepare_real_run_writes_first_real_run_package(tmp_path: Path) -> None:
         "engine": "spectre_x",
         "preset": "ax",
         "output_format": "psfxl",
+        "threads_per_run": 10,
         "parallel_jobs": 10,
         "timeout_s": 3600,
     }
@@ -347,6 +348,8 @@ def test_prepare_real_run_writes_metric_extraction_request(tmp_path: Path) -> No
         "engine": "spectre_x",
         "preset": "ax",
         "output_format": "psfxl",
+        "threads_per_run": 10,
+        "parallel_jobs": 10,
         "timeout_s": 3600,
     }
     assert request["ocean"] == {

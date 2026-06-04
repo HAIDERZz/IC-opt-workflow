@@ -66,6 +66,10 @@ def _write_project(
             "run subprocess-backed C-7 adapter",
             "parse PSF",
             "rewrite OCEAN formulas",
+            "commit raw input.scs",
+            "commit protected include sidecars",
+            "commit PSF/raw data",
+            "commit full Cadence logs",
         ],
         "required_pre_commit_checks": ["python3 tools/check_development_cadence.py"],
         "review_evidence": review_evidence

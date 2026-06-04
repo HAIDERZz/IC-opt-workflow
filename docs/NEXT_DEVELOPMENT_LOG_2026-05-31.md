@@ -665,6 +665,16 @@ C-15 Narrow Optimizer Loop Productization Task 4:
 - Route audit: aligned with `docs/superpowers/specs/2026-06-04-narrow-optimizer-loop-productization-design.md` and the top-level practice-first route. Drift: none. C-15 remains a narrow fixed-budget loop around existing contracts and the proven C-7 adapter path; no broad optimizer framework, daemon, scheduler, PSF parser, formula rewrite, or native-layout replacement was added.
 - next_allowed_action: wait for user confirmation, then choose the next narrow real-practice-backed optimizer productization step; do not start a broad optimizer framework
 
+C-16 100-Point Real Optimizer Acceptance Task 0:
+
+- Status: complete, verified-only.
+- Plan: `docs/superpowers/plans/2026-06-04-100-point-real-optimizer-acceptance.md`.
+- User clarified an important settings distinction: Spectre `+mt` is per-Spectre process thread count; `spectre.parallel_jobs` is the maximum number of simultaneous Spectre processes. C-16 must not map `parallel_jobs` to `+mt`.
+- Task 0 patch aligns run settings before the 100-point run: `metric_extraction_request.json` carries `spectre.threads_per_run` as per-process `+mt` and `spectre.parallel_jobs` as the concurrency cap, C-7 adapter rejects request/prepared setting drift, Spectre argv now uses requested `preset`, `threads_per_run`, and `output_format`, result manifests record simulator `preset/threads_per_run/output_format/timeout_s`, and `check-real-run` detects recorded simulator setting drift. Current project setting is `+preset=ax`, `+mt=10`, `output_format=psfxl`, and `parallel_jobs=10`.
+- Final verification passed: `python3 -m pytest -q` (490 passed), `python3 -m ruff check src tests tools`, `python3 tools/check_development_cadence.py`, and `git diff --check`.
+- Route audit: aligned with the top-level practice-first route. Drift: none. This is a blocker fix before C-16 100-point execution, not broad optimizer framework work.
+- next_allowed_action: wait for user confirmation, then start C-16 Task 1 100-point sequential real optimizer run
+
 ## Resume Prompt
 
 ```text

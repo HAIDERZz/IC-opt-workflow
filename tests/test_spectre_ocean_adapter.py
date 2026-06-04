@@ -82,6 +82,8 @@ def test_load_adapter_context_accepts_prepared_real_run(tmp_path: Path) -> None:
     assert context.metrics_dir == context.run_dir / "metrics"
     assert context.request.backend == "spectre_ocean_batch"
     assert context.request.spectre["output_format"] == "psfxl"
+    assert context.request.spectre["threads_per_run"] == 10
+    assert context.request.spectre["parallel_jobs"] == 10
     assert context.request.metrics
 
 
@@ -683,6 +685,9 @@ def test_run_spectre_ocean_adapter_uses_project_root_for_ocean_paths(
     run_spectre_ocean_adapter(project_dir, runner=runner)
 
     assert "+escchars" in runner.commands[0]
+    assert "+preset=ax" in runner.commands[0]
+    assert "+mt=10" in runner.commands[0]
+    assert runner.commands[0][runner.commands[0].index("-format") + 1] == "psfxl"
     assert runner.commands[0][runner.commands[0].index("+log") + 1] == (
         "../psf/spectre.out"
     )
@@ -711,6 +716,38 @@ def test_run_spectre_ocean_adapter_uses_project_root_for_ocean_paths(
     ).read_text(encoding="utf-8")
     assert '"runs/real/real_001/psf"' in script
     assert '"runs/real/real_001/metrics/ocean_scalars.tsv"' in script
+
+
+def test_run_spectre_ocean_adapter_records_actual_spectre_settings(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_real_run_project(tmp_path)
+    runner = FakeSuccessRunner()
+
+    run_spectre_ocean_adapter(project_dir, runner=runner)
+
+    manifest = _load_json(
+        project_dir / "runs" / "real" / "real_001" / "result_manifest.json"
+    )
+    assert manifest["simulator"]["preset"] == "ax"
+    assert manifest["simulator"]["output_format"] == "psfxl"
+    assert manifest["simulator"]["threads_per_run"] == 10
+    assert manifest["simulator"]["timeout_s"] == 3600
+
+
+def test_load_adapter_context_rejects_spectre_setting_drift(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_real_run_project(tmp_path)
+    run_dir = project_dir / "runs" / "real" / "real_001"
+    request_path = run_dir / "metric_extraction_request.json"
+    request = _load_json(request_path)
+    request["spectre"]["parallel_jobs"] = 16
+    _write_json(request_path, request)
+    _refresh_metric_request_hash(run_dir)
+
+    with pytest.raises(AdapterPreconditionError, match="parallel_jobs"):
+        load_adapter_context(project_dir)
 
 
 def test_tool_entrypoint_reports_success_without_real_tools(

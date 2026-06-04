@@ -289,6 +289,7 @@ def test_spectre_config_accepts_psfxl_for_ocean_backend() -> None:
                 "engine": "spectre_x",
                 "preset": "ax",
                 "output_format": "psfxl",
+                "threads_per_run": 10,
                 "parallel_jobs": 10,
                 "timeout_s": 3600,
                 "require_license_check": True,

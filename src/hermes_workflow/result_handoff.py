@@ -28,6 +28,9 @@ class ResultSimulator(BaseModel):
 
     engine: str
     preset: str
+    output_format: str | None = None
+    threads_per_run: int | None = None
+    timeout_s: int | None = None
     command_label: str
 
 
@@ -163,6 +166,30 @@ def _validate_cross_references(
         issues.append("result candidate_id does not match candidate file")
     if result.prepared_input_scs != prepared.get("rendered_input_scs"):
         issues.append("result prepared_input_scs does not match prepared manifest")
+    prepared_spectre = prepared.get("spectre")
+    if isinstance(prepared_spectre, dict):
+        if result.simulator.preset != prepared_spectre.get("preset"):
+            issues.append("result simulator preset does not match prepared manifest")
+        if (
+            result.simulator.output_format is not None
+            and result.simulator.output_format != prepared_spectre.get("output_format")
+        ):
+            issues.append(
+                "result simulator output_format does not match prepared manifest"
+            )
+        if (
+            result.simulator.threads_per_run is not None
+            and result.simulator.threads_per_run
+            != prepared_spectre.get("threads_per_run")
+        ):
+            issues.append(
+                "result simulator threads_per_run does not match prepared manifest"
+            )
+        if (
+            result.simulator.timeout_s is not None
+            and result.simulator.timeout_s != prepared_spectre.get("timeout_s")
+        ):
+            issues.append("result simulator timeout_s does not match prepared manifest")
 
     hash_matches_manifest = result.prepared_input_sha256 == prepared.get(
         "rendered_input_sha256"

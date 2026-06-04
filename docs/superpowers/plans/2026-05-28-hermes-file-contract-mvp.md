@@ -2025,7 +2025,7 @@ Only template these variables in the exported Spectre deck: {variable_names}
 - Engine: `spectre_x`
 - Spectre X preset: `{bundle.spectre.spectre.preset.value}`
 - Output format: `{bundle.spectre.spectre.output_format}`
-- Candidate-level parallel jobs: `{bundle.spectre.spectre.parallel_jobs}`
+- Max simultaneous Spectre processes: `{bundle.spectre.spectre.parallel_jobs}`
 - Per-candidate timeout seconds: `{bundle.spectre.spectre.timeout_s}`
 
 ## Safety Rules

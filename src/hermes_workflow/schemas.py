@@ -245,6 +245,7 @@ class SpectreSettings(StrictModel):
     engine: Literal["spectre_x"]
     preset: SpectrePreset
     output_format: Literal["psfascii", "psfxl"]
+    threads_per_run: StrictInt = Field(default=10, ge=1)
     parallel_jobs: StrictInt = Field(ge=1)
     timeout_s: StrictInt = Field(gt=0)
     require_license_check: StrictBool

@@ -273,8 +273,8 @@ def load_adapter_context(
         raise AdapterPreconditionError("metric request path mismatch")
     if prepared.metric_extraction_request_sha256 != sha256_file(request_path):
         raise AdapterPreconditionError("metric request file hash mismatch")
-
     _validate_spectre_request(request.spectre)
+    _validate_spectre_settings_match(prepared, request)
 
     input_scs = _exact_project_path(
         project_dir,
@@ -508,13 +508,16 @@ def parse_ocean_scalars(path: Path) -> dict[str, OceanScalarRow]:
 
 
 def _spectre_argv(context: SpectreOceanContext) -> list[str]:
+    preset = str(context.request.spectre["preset"])
+    output_format = str(context.request.spectre["output_format"])
+    threads_per_run = int(context.request.spectre["threads_per_run"])
     return [
         "spectre",
         "-64",
         context.input_scs.name,
         "+escchars",
-        "+preset=cx",
-        "+mt=16",
+        f"+preset={preset}",
+        f"+mt={threads_per_run}",
         "+lqtimeout",
         "900",
         "-maxw",
@@ -525,7 +528,7 @@ def _spectre_argv(context: SpectreOceanContext) -> list[str]:
         "ade",
         "+logstatus",
         "-format",
-        SPECTRE_OUTPUT_FORMAT,
+        output_format,
         "-raw",
         f"../{PSF_DIR_NAME}",
         "+log",
@@ -567,6 +570,9 @@ def _write_result_manifest(
         "simulator": {
             "engine": SPECTRE_ENGINE,
             "preset": str(context.request.spectre["preset"]),
+            "output_format": str(context.request.spectre["output_format"]),
+            "threads_per_run": int(context.request.spectre["threads_per_run"]),
+            "timeout_s": int(context.request.spectre["timeout_s"]),
             "command_label": "external_spectre_run",
         },
         "prepared_input_scs": context.prepared.rendered_input_scs,
@@ -830,9 +836,45 @@ def _validate_spectre_request(spectre: dict) -> None:
         raise AdapterPreconditionError("spectre.output_format is required")
     if output_format != SPECTRE_OUTPUT_FORMAT:
         raise AdapterPreconditionError("output_format must be psfxl")
+    threads_per_run = spectre.get("threads_per_run")
+    if (
+        not isinstance(threads_per_run, int)
+        or isinstance(threads_per_run, bool)
+        or threads_per_run <= 0
+    ):
+        raise AdapterPreconditionError(
+            "spectre.threads_per_run must be a positive integer"
+        )
+    parallel_jobs = spectre.get("parallel_jobs")
+    if (
+        not isinstance(parallel_jobs, int)
+        or isinstance(parallel_jobs, bool)
+        or parallel_jobs <= 0
+    ):
+        raise AdapterPreconditionError(
+            "spectre.parallel_jobs must be a positive integer"
+        )
     timeout_s = spectre.get("timeout_s")
     if not isinstance(timeout_s, int) or isinstance(timeout_s, bool) or timeout_s <= 0:
         raise AdapterPreconditionError("spectre.timeout_s must be a positive integer")
+
+
+def _validate_spectre_settings_match(
+    prepared: PreparedRealRunManifest,
+    request: MetricExtractionRequest,
+) -> None:
+    for key in (
+        "engine",
+        "preset",
+        "output_format",
+        "threads_per_run",
+        "parallel_jobs",
+        "timeout_s",
+    ):
+        if prepared.spectre.get(key) != request.spectre.get(key):
+            raise AdapterPreconditionError(
+                f"spectre.{key} does not match prepared manifest"
+            )
 
 
 def _validate_run_id(run_id: str) -> str:

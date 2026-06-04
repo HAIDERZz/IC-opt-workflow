@@ -4,6 +4,7 @@ spectre:
   engine: spectre_x
   preset: ax
   output_format: psfxl
+  threads_per_run: 10
   parallel_jobs: 10
   timeout_s: 3600
   require_license_check: true

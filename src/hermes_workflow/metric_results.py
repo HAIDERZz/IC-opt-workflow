@@ -87,6 +87,7 @@ class PreparedRealRunManifest(BaseModel):
     rendered_input_sha256: str
     metric_extraction_request: str
     metric_extraction_request_sha256: str
+    spectre: dict
 
 
 class MetricRequestOcean(BaseModel):
