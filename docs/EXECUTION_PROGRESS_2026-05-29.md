@@ -1112,6 +1112,8 @@ Next required action:
 
 - C-27 OpenBox Backend Seam MVP: implementation complete, verified-only. Added backend-neutral optimizer artifact loading, fake OpenBox artifact generation, C-25/C-26 compatibility, and `hermes-workflow run-openbox-fake`. Full local regression passed with `544 passed, 1 skipped`; targeted C-27 `ruff` passed. OpenBox import smoke was skipped because `openbox` is not installed. No real tools, execution agents, TuRBO replacement, PSF parsing, or OCEAN formula rewrite occurred. next_allowed_action: wait for user decision on the next narrow OpenBox step.
 
+- C-28 OpenBox Real Backend Acceptance Spike: design spec and implementation plan written, verified-only. Scope is one narrow local-only real-tool evidence spike to decide whether OpenBox should be productized. It preserves the current Spectre/OCEAN execution path and C-25/C-26 audit flow. next_allowed_action: execute C-28 Task 1 Environment And Known-Good Project Gate; real OpenBox/Spectre/OCEAN execution is not allowed until Task 2 is explicitly confirmed.
+
 ## Locked Role Model
 
 Status: locked as of 2026-06-02.

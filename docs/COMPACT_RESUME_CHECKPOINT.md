@@ -553,9 +553,9 @@ Status: complete, verified-only.
 
 Plan A, Plan B, and Plan C C-1 through C-26 are complete. C-26 is committed at `ca1c9c1`.
 
-current_scope: C-27 OpenBox Backend Seam MVP complete
+current_scope: C-28 OpenBox Real Backend Acceptance Spike
 
-Current state is after C-27 implementation. The current TuRBO-backed optimizer route remains the implemented real backend. OpenBox has a fake-only backend seam and backend-neutral artifact path, but no production real-tool OpenBox route is approved yet.
+Current state is after C-28 planning. The current TuRBO-backed optimizer route remains the implemented real backend. OpenBox has a fake-only backend seam and backend-neutral artifact path from C-27. C-28 will run one narrow real-tool evidence spike only after Task 2 is explicitly confirmed.
 
 OpenBox local reference:
 
@@ -605,7 +605,14 @@ C-27 implementation result:
 - Verification passed: `python3 -m pytest -q` (`544 passed, 1 skipped`) and targeted C-27 `ruff`.
 - Optional OpenBox import smoke skipped because `openbox` is not installed in the active environment.
 
-Current next step: wait for user decision on the next narrow OpenBox step. Do not replace TuRBO, delete `native_turbo`, run real tools, call an execution agent, or start broad optimizer framework work without explicit approval. Do not commit raw input decks, protected include files, PSF/raw data, full Cadence logs, `docs/OCEAN_DOC_*`, or `docs/toolchain_evidence/`. Do not parse PSF or translate OCEAN formulas in Python.
+C-28 planning result:
+
+- Design spec: `docs/superpowers/specs/2026-06-05-openbox-real-backend-acceptance-spike-design.md`.
+- Implementation plan: `docs/superpowers/plans/2026-06-05-openbox-real-backend-acceptance-spike.md`.
+- Scope: one local-only OpenBox ask-and-tell real-tool spike using the existing Spectre/OCEAN execution path and backend-neutral artifacts.
+- Boundary: no TuRBO replacement, no `native_turbo` deletion, no production OpenBox runner, no broad optimizer framework, no PSF parsing, no OCEAN formula rewrite.
+
+Current next step: execute C-28 Task 1 Environment And Known-Good Project Gate. Do not run real OpenBox/Spectre/OCEAN, replace TuRBO, delete `native_turbo`, call an execution agent, or start broad optimizer framework work before Task 1 is complete and Task 2 is explicitly confirmed. Do not commit raw input decks, protected include files, PSF/raw data, full Cadence logs, `docs/OCEAN_DOC_*`, or `docs/toolchain_evidence/`. Do not parse PSF or translate OCEAN formulas in Python.
 
 Read the handoff files first:
 
@@ -630,5 +637,5 @@ Use this prompt after compact:
 6. ic-auto-opt-workflow/docs/OPENBOX_OPTIMIZER_BACKEND_DECISION_CHECKPOINT_2026-06-05.md
 7. 如需背景，再读 ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-27 OpenBox Backend Seam MVP 已完成：backend-neutral optimizer artifacts、fake OpenBox backend seam、C-25/C-26 compatibility、run-openbox-fake CLI。OpenBox local-only fake inverter evidence spike 已完成，证据在 docs/debug/2026-06-05-openbox-backend-evidence-spike.md。下一步等待用户决定是否继续 OpenBox 依赖/真实工具 acceptance。不要直接替换 TuRBO，不要删除 native_turbo，不要运行真实 Virtuoso/Spectre/OCEAN，不要调用 execution agent，不要创建 broad optimizer framework，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-28 OpenBox Real Backend Acceptance Spike design spec 和 implementation plan 已完成：docs/superpowers/specs/2026-06-05-openbox-real-backend-acceptance-spike-design.md、docs/superpowers/plans/2026-06-05-openbox-real-backend-acceptance-spike.md。下一步是 execute C-28 Task 1 Environment And Known-Good Project Gate。不要在 Task 1 跑真实 OpenBox/Spectre/OCEAN；不要替换 TuRBO，不要删除 native_turbo，不要创建 broad optimizer framework，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
 ```
