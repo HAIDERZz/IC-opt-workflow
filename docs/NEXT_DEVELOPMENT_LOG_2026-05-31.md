@@ -1134,7 +1134,7 @@ C-19 Execution-Agent Optimizer Practice Acceptance:
 - Real-tool audit: 100 result manifests succeeded; 79 metric manifests succeeded and 21 failed as candidate-level metric failures; max worker metadata was 10; all result manifests used `preset=ax`, `threads_per_run=10`, `output_format=psfxl`; traces kept `parallel_jobs=10`.
 - Best accepted candidate: `real_041`, `FN=8`, `WN=2.3u`, `FP=9`, `WP=0.5u`, objective `4.169592842385839e-14`.
 - Route audit: aligned with the top-level practice-first route. Drift resolved. No broad optimizer framework, formula change, PSF parsing, or native Maestro/ADE layout replacement occurred.
-- next_allowed_action: commit C-19 Task 4 fix and sanitized evidence, then wait for user confirmation before choosing the next narrow practice-backed productization or execution-agent validation scope.
+- next_allowed_action: wait for user confirmation before choosing the next narrow practice-backed productization or execution-agent validation scope.
 
 ## Resume Prompt
 

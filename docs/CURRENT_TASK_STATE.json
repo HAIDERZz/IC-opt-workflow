@@ -12,7 +12,7 @@
     "docs/EXECUTION_PROGRESS_2026-05-29.md",
     "docs/COMPACT_RESUME_CHECKPOINT.md"
   ],
-  "next_allowed_action": "commit C-19 Task 4 fix and sanitized evidence, then wait for user confirmation before choosing the next narrow practice-backed productization or execution-agent validation scope",
+  "next_allowed_action": "wait for user confirmation before choosing the next narrow practice-backed productization or execution-agent validation scope",
   "forbidden_actions": [
     "start broad optimizer framework work",
     "hand-pick 100 optimizer points instead of using native Turbo1.optimize()",
@@ -47,7 +47,7 @@
     "alignment": "Aligned. C-19 Task 4 kept the route practice-first: no new framework, no formula change, no PSF parsing, native Maestro/ADE layout preserved, and real acceptance used the existing run-native-turbo --parallel command.",
     "drift": "Resolved. The clean project preparation now removes stale optimizer ledger rows, and candidate quantization now respects the approved grid when upper bounds are off-grid."
   },
-  "latest_valid_commit": "e378f79 docs: audit c19 execution blocker",
+  "latest_valid_commit": "d823a40 fix: close c19 optimizer handoff acceptance",
   "review_evidence": {
     "optimizer_skill_real_practice": "Complete, verified-only. Temporary practice at /tmp/ic_auto_opt_optimizer_skill_flow_001 ran Turbo1.optimize() for 100 evaluations with 8 initialization and 92 trust-region evaluations. 73 candidates were recorded through real Spectre/OCEAN, 24 duplicate quantized candidates were skipped, and 3 metric non-scalar candidates were converted to finite penalties. Best candidate was real_011: FN=11, WN=1.9u, FP=9, WP=0.5u, rise=72.489655ps, fall=64.569947ps, DC=301.334349uW, objective=4.1300765965648685e-14.",
     "archive_doc": "docs/debug/2026-06-04-optimizer-skill-real-flow-practice.md",
