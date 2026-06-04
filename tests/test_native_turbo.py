@@ -10,6 +10,7 @@ from typer.testing import CliRunner
 from hermes_workflow.cli import app
 from hermes_workflow.native_turbo import (
     NativeTurboObservation,
+    NativeTurboBatchRunner,
     NativeTurboRunner,
     evaluate_candidate_objective,
     evaluate_real_candidate,
@@ -91,6 +92,49 @@ class _DuplicateFakeTurbo(_FakeTurbo):
             self.fX.append([self.f(raw)])
 
 
+class _FakeBatchTurbo:
+    instances: list["_FakeBatchTurbo"] = []
+
+    def __init__(
+        self,
+        *,
+        f_batch,
+        lb,
+        ub,
+        n_init,
+        max_evals,
+        batch_size,
+        verbose,
+    ) -> None:
+        self.f_batch = f_batch
+        self.lb = lb
+        self.ub = ub
+        self.n_init = n_init
+        self.max_evals = max_evals
+        self.batch_size = batch_size
+        self.verbose = verbose
+        self.optimize_called = False
+        _FakeBatchTurbo.instances.append(self)
+
+    def optimize(self) -> None:
+        self.optimize_called = True
+        self.f_batch(
+            [
+                [2.0, 0.3],
+                [2.1, 0.31],
+                [2.0, 0.3],
+            ],
+            selection_phase="initialization",
+        )
+        self.f_batch(
+            [
+                [4.0, 0.7],
+                [5.0, 0.8],
+            ],
+            selection_phase="turbo_trust_region",
+        )
+
+
 def _variables_config() -> VariablesConfig:
     return VariablesConfig(
         schema_version="1.0",
@@ -113,14 +157,14 @@ def _variables_config() -> VariablesConfig:
     )
 
 
-def _optimizer_config() -> OptimizerConfig:
+def _optimizer_config(*, batch_size: int = 1) -> OptimizerConfig:
     return OptimizerConfig(
         schema_version="1.0",
         optimizer=OptimizerSettings(
             algorithm=OptimizerAlgorithm.TURBO,
             initialization=InitializationMethod.SOBOL,
             max_evaluations=100,
-            batch_size=1,
+            batch_size=batch_size,
             random_seed=20260528,
             failure_penalty=1000.0,
             deduplicate_candidates=True,
@@ -383,6 +427,49 @@ def test_runner_stops_after_repeated_workflow_level_failures() -> None:
         "real_check_failed",
         "real_check_failed",
     ]
+
+
+def test_batch_runner_records_batch_metadata_and_order() -> None:
+    _FakeBatchTurbo.instances.clear()
+    seen_batches: list[list[dict[str, str]]] = []
+
+    def batch_evaluator(candidates) -> list[NativeTurboObservation]:
+        seen_batches.append([candidate.parameters for candidate in candidates])
+        return [
+            NativeTurboObservation(metrics={"delay": 50.0, "gain": 20.0})
+            for _candidate in candidates
+        ]
+
+    runner = NativeTurboBatchRunner(
+        variables=_variables_config(),
+        metrics=_metrics_config(),
+        optimizer=_optimizer_config(batch_size=3),
+        batch_evaluator=batch_evaluator,
+        batch_turbo_factory=_FakeBatchTurbo,
+        max_evals=5,
+        replacement_attempts=1,
+        parallel_jobs=2,
+        threads_per_run=10,
+    )
+
+    result = runner.run()
+
+    assert _FakeBatchTurbo.instances[0].optimize_called is True
+    assert _FakeBatchTurbo.instances[0].batch_size == 3
+    assert result.evaluation_count == 5
+    assert seen_batches == [
+        [{"FN": "2", "WN": "0.3u"}, {"FN": "3", "WN": "0.3u"}],
+        [{"FN": "4", "WN": "0.7u"}, {"FN": "5", "WN": "0.8u"}],
+    ]
+    assert result.traces[0].batch_id == "batch_001"
+    assert result.traces[0].batch_slot == 1
+    assert result.traces[0].batch_size == 3
+    assert result.traces[0].batch_worker_count == 2
+    assert result.traces[0].parallel_jobs == 2
+    assert result.traces[0].threads_per_run == 10
+    assert result.traces[1].issues == ["duplicate candidate replaced"]
+    assert result.traces[2].status == "duplicate_candidate_skipped"
+    assert result.traces[3].selection_phase == "turbo_trust_region"
 
 
 def test_run_native_turbo_optimization_writes_compact_trace_files(tmp_path: Path) -> None:

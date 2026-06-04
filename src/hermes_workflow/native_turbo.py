@@ -69,6 +69,20 @@ class NativeTurboObservation:
 
 
 @dataclass(frozen=True)
+class NativeTurboBatchCandidate:
+    evaluation_index: int
+    run_id: str
+    candidate_id: str
+    batch_id: str
+    batch_slot: int
+    batch_size: int
+    selection_phase: str
+    raw_x: list[float]
+    parameters: dict[str, str]
+    replacement_issues: list[str]
+
+
+@dataclass(frozen=True)
 class NativeTurboEvaluationTrace:
     evaluation_index: int
     run_id: str
@@ -83,6 +97,13 @@ class NativeTurboEvaluationTrace:
     result_manifest: str | None
     metric_result_manifest: str | None
     issues: list[str]
+    batch_id: str | None = None
+    batch_slot: int | None = None
+    batch_size: int | None = None
+    batch_worker_count: int | None = None
+    max_parallel_jobs: int | None = None
+    threads_per_run: int | None = None
+    parallel_jobs: int | None = None
 
 
 @dataclass(frozen=True)
@@ -95,6 +116,10 @@ class NativeTurboRunResult:
 
 
 Evaluator = Callable[[dict[str, str]], NativeTurboObservation]
+BatchEvaluator = Callable[
+    [list[NativeTurboBatchCandidate]],
+    list[NativeTurboObservation],
+]
 Adapter = Callable[[Path], None]
 
 
@@ -217,21 +242,11 @@ class NativeTurboRunner:
 
         actual_raw, parameters, replacement_issues = resolved
         observation = self.evaluator(parameters)
-        if observation.metrics is None:
-            objective_eval = ObjectiveEvaluation(
-                status=observation.status,
-                objective=self.optimizer.optimizer.failure_penalty,
-                fom=None,
-                constraints_passed=False,
-                constraint_penalty=0.0,
-                issues=observation.issues or [observation.status],
-            )
-        else:
-            objective_eval = evaluate_candidate_objective(
-                self.metrics,
-                self.optimizer,
-                observation.metrics,
-            )
+        objective_eval = _objective_evaluation_for_observation(
+            self.metrics,
+            self.optimizer,
+            observation,
+        )
         issues = [*replacement_issues, *objective_eval.issues, *(observation.issues or [])]
         trace = NativeTurboEvaluationTrace(
             evaluation_index=evaluation_index,
@@ -308,6 +323,178 @@ class NativeTurboRunner:
             )
         return replacements
 
+
+class NativeTurboBatchRunner(NativeTurboRunner):
+    def __init__(
+        self,
+        *,
+        variables: VariablesConfig,
+        metrics: MetricsConfig,
+        optimizer: OptimizerConfig,
+        batch_evaluator: BatchEvaluator,
+        batch_turbo_factory: Callable[..., object],
+        max_evals: int | None = None,
+        replacement_attempts: int = 32,
+        workflow_failure_limit: int = DEFAULT_WORKFLOW_FAILURE_LIMIT,
+        parallel_jobs: int = 1,
+        threads_per_run: int | None = None,
+    ) -> None:
+        def unused_scalar_evaluator(
+            _parameters: dict[str, str],
+        ) -> NativeTurboObservation:
+            raise RuntimeError("batch runner does not use scalar evaluator")
+
+        super().__init__(
+            variables=variables,
+            metrics=metrics,
+            optimizer=optimizer,
+            evaluator=unused_scalar_evaluator,
+            turbo_factory=batch_turbo_factory,
+            max_evals=max_evals,
+            replacement_attempts=replacement_attempts,
+            workflow_failure_limit=workflow_failure_limit,
+        )
+        self.batch_evaluator = batch_evaluator
+        self.parallel_jobs = parallel_jobs
+        self.threads_per_run = threads_per_run
+        self._batch_count = 0
+
+    def run(self) -> NativeTurboRunResult:
+        lb, ub = _raw_bounds(self.variables)
+        n_params = len(self.variables.variables)
+        n_init = 2 * n_params
+        turbo = self.turbo_factory(
+            f_batch=self._objective_batch,
+            lb=lb,
+            ub=ub,
+            n_init=n_init,
+            max_evals=self.max_evals,
+            batch_size=self.optimizer.optimizer.batch_size,
+            verbose=False,
+        )
+        turbo.optimize()
+        return NativeTurboRunResult(
+            evaluation_count=len(self.traces),
+            traces=list(self.traces),
+            best_trace=_best_trace(self.traces),
+        )
+
+    def _objective_batch(
+        self,
+        raw_batch: Sequence[Sequence[float]],
+        *,
+        selection_phase: str,
+    ) -> list[float]:
+        remaining = self.max_evals - len(self.traces)
+        if remaining <= 0:
+            return []
+        selected_raw_batch = list(raw_batch[:remaining])
+        self._batch_count += 1
+        batch_id = f"batch_{self._batch_count:03d}"
+        batch_size = len(selected_raw_batch)
+        batch_worker_count = min(self.optimizer.optimizer.batch_size, self.parallel_jobs)
+        slots: list[NativeTurboBatchCandidate | NativeTurboEvaluationTrace] = []
+        candidates: list[NativeTurboBatchCandidate] = []
+
+        for slot_index, raw_values in enumerate(selected_raw_batch, start=1):
+            evaluation_index = len(self.traces) + slot_index
+            raw_x = [float(value) for value in raw_values]
+            resolved = self._resolve_unique_candidate(raw_x)
+            if resolved is None:
+                slots.append(
+                    NativeTurboEvaluationTrace(
+                        evaluation_index=evaluation_index,
+                        run_id=f"real_{evaluation_index:03d}",
+                        selection_phase=selection_phase,
+                        raw_x=raw_x,
+                        parameters=quantize_candidate(self.variables, raw_x),
+                        status=DUPLICATE_SKIPPED,
+                        objective=self.optimizer.optimizer.failure_penalty,
+                        fom=None,
+                        constraint_penalty=0.0,
+                        metrics=None,
+                        result_manifest=None,
+                        metric_result_manifest=None,
+                        issues=["duplicate candidate skipped"],
+                        batch_id=batch_id,
+                        batch_slot=slot_index,
+                        batch_size=batch_size,
+                        batch_worker_count=batch_worker_count,
+                        max_parallel_jobs=self.parallel_jobs,
+                        threads_per_run=self.threads_per_run,
+                        parallel_jobs=self.parallel_jobs,
+                    )
+                )
+                continue
+
+            actual_raw, parameters, replacement_issues = resolved
+            candidate = NativeTurboBatchCandidate(
+                evaluation_index=evaluation_index,
+                run_id=f"real_{evaluation_index:03d}",
+                candidate_id=f"candidate_{evaluation_index:06d}",
+                batch_id=batch_id,
+                batch_slot=slot_index,
+                batch_size=batch_size,
+                selection_phase=selection_phase,
+                raw_x=actual_raw,
+                parameters=parameters,
+                replacement_issues=replacement_issues,
+            )
+            candidates.append(candidate)
+            slots.append(candidate)
+
+        observations = self.batch_evaluator(candidates) if candidates else []
+        if len(observations) != len(candidates):
+            raise RuntimeError("batch evaluator returned an unexpected observation count")
+        observation_by_index = {
+            candidate.evaluation_index: observation
+            for candidate, observation in zip(candidates, observations, strict=True)
+        }
+        objectives: list[float] = []
+        for slot in slots:
+            if isinstance(slot, NativeTurboEvaluationTrace):
+                trace = slot
+            else:
+                observation = observation_by_index[slot.evaluation_index]
+                objective_eval = _objective_evaluation_for_observation(
+                    self.metrics,
+                    self.optimizer,
+                    observation,
+                )
+                trace = NativeTurboEvaluationTrace(
+                    evaluation_index=slot.evaluation_index,
+                    run_id=slot.run_id,
+                    selection_phase=slot.selection_phase,
+                    raw_x=slot.raw_x,
+                    parameters=slot.parameters,
+                    status=(
+                        observation.status
+                        if observation.metrics is None and observation.status != "recorded"
+                        else objective_eval.status
+                    ),
+                    objective=objective_eval.objective,
+                    fom=objective_eval.fom,
+                    constraint_penalty=objective_eval.constraint_penalty,
+                    metrics=observation.metrics,
+                    result_manifest=observation.result_manifest,
+                    metric_result_manifest=observation.metric_result_manifest,
+                    issues=[
+                        *slot.replacement_issues,
+                        *objective_eval.issues,
+                        *(observation.issues or []),
+                    ],
+                    batch_id=slot.batch_id,
+                    batch_slot=slot.batch_slot,
+                    batch_size=slot.batch_size,
+                    batch_worker_count=batch_worker_count,
+                    max_parallel_jobs=self.parallel_jobs,
+                    threads_per_run=self.threads_per_run,
+                    parallel_jobs=self.parallel_jobs,
+                )
+            self.traces.append(trace)
+            self._raise_after_repeated_workflow_failure(trace)
+            objectives.append(trace.objective)
+        return objectives
 
 def run_native_turbo_optimization(
     project_dir: Path,
@@ -460,6 +647,27 @@ def write_native_turbo_reports(
         encoding="utf-8",
     )
     return report_path, evaluations_path
+
+
+def _objective_evaluation_for_observation(
+    metrics_config: MetricsConfig,
+    optimizer_config: OptimizerConfig,
+    observation: NativeTurboObservation,
+) -> ObjectiveEvaluation:
+    if observation.metrics is None:
+        return ObjectiveEvaluation(
+            status=observation.status,
+            objective=optimizer_config.optimizer.failure_penalty,
+            fom=None,
+            constraints_passed=False,
+            constraint_penalty=0.0,
+            issues=observation.issues or [observation.status],
+        )
+    return evaluate_candidate_objective(
+        metrics_config,
+        optimizer_config,
+        observation.metrics,
+    )
 
 
 def evaluate_candidate_objective(

@@ -51,14 +51,14 @@ Forbidden:
 
 **Risk:** Medium.
 
-**Status:** Not started.
+**Status:** Complete, verified-only.
 
 **Files:**
 
 - Modify: `src/hermes_workflow/native_turbo.py`
 - Modify: `tests/test_native_turbo.py`
 
-- [ ] **Step 1: Add failing batch runner test**
+- [x] **Step 1: Add failing batch runner test**
 
 Add this test to `tests/test_native_turbo.py`:
 
@@ -91,7 +91,7 @@ class _FakeBatchTurbo:
             [
                 [2.0, 0.3],
                 [2.1, 0.31],
-                [3.0, 0.5],
+                [2.0, 0.3],
             ],
             selection_phase="initialization",
         )
@@ -117,10 +117,11 @@ def test_batch_runner_records_batch_metadata_and_order() -> None:
     runner = NativeTurboBatchRunner(
         variables=_variables_config(),
         metrics=_metrics_config(),
-        optimizer=_optimizer_config(),
+        optimizer=_optimizer_config(batch_size=3),
         batch_evaluator=batch_evaluator,
         batch_turbo_factory=_FakeBatchTurbo,
         max_evals=5,
+        replacement_attempts=1,
         parallel_jobs=2,
         threads_per_run=10,
     )
@@ -138,6 +139,7 @@ def test_batch_runner_records_batch_metadata_and_order() -> None:
     assert result.traces[0].batch_worker_count == 2
     assert result.traces[0].parallel_jobs == 2
     assert result.traces[0].threads_per_run == 10
+    assert result.traces[1].issues == ["duplicate candidate replaced"]
     assert result.traces[2].status == "duplicate_candidate_skipped"
     assert result.traces[3].selection_phase == "turbo_trust_region"
 ```
@@ -150,7 +152,7 @@ python3 -m pytest tests/test_native_turbo.py::test_batch_runner_records_batch_me
 
 Expected: fail because `NativeTurboBatchRunner` does not exist.
 
-- [ ] **Step 2: Implement minimal batch dataclasses and runner**
+- [x] **Step 2: Implement minimal batch dataclasses and runner**
 
 In `src/hermes_workflow/native_turbo.py`, add:
 
@@ -194,12 +196,13 @@ Add `NativeTurboBatchRunner` that:
 - uses `optimizer.optimizer.batch_size` as TuRBO batch size;
 - uses `min(optimizer.optimizer.batch_size, parallel_jobs)` as worker count metadata;
 - resolves duplicates before calling `batch_evaluator`;
-- records duplicate-skipped traces immediately with finite penalty;
+- records duplicate-skipped traces with finite penalty without calling
+  `batch_evaluator`;
 - records evaluated traces in original batch order.
 
 Do not change `NativeTurboRunner` behavior in this task.
 
-- [ ] **Step 3: Run focused test**
+- [x] **Step 3: Run focused test**
 
 Run:
 
@@ -209,7 +212,7 @@ python3 -m pytest tests/test_native_turbo.py::test_batch_runner_records_batch_me
 
 Expected: pass.
 
-- [ ] **Step 4: Run adjacent native tests**
+- [x] **Step 4: Run adjacent native tests**
 
 Run:
 
