@@ -5,9 +5,9 @@
 - Repository: `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow`
 - Branch: `plan-a-hermes-file-contract-mvp`
 - Current scope: C-18 Batch Native TuRBO Parallel Runner
-- Current status: verified-only; C-18 design spec is complete. It keeps native `Turbo1.optimize()` and adds a batch-aware Hermes evaluator so TuRBO batch candidates can run Spectre/OCEAN concurrently up to `spectre.parallel_jobs`
-- Next required action: write C-18 implementation plan
-- next_allowed_action: write C-18 implementation plan for the batch-native TuRBO parallel runner; do not change code or run real tools until the C-18 plan exists and the user confirms execution
+- Current status: verified-only; C-18 design spec and implementation plan are complete. The plan keeps native `Turbo1.optimize()`, adds a batch-aware Hermes evaluator, and runs Spectre/OCEAN workers concurrently up to `spectre.parallel_jobs` while each Spectre process uses `spectre.threads_per_run` as `+mt`
+- Next required action: execute C-18 Task 1 Batch Runner Seam And Trace Metadata after user confirmation
+- next_allowed_action: wait for user confirmation, then execute C-18 Task 1 Batch Runner Seam And Trace Metadata; do not run real tools before fake/unit tasks pass and the user explicitly confirms C-18 real acceptance
 
 C-3 Task 6 final verification is complete. C-4 is confirmed as a contract-only first real-run package; it must not run Spectre, Virtuoso, subprocesses, or the optimizer loop. C-4 is now complete and reviewed. C-5 validates the execution agent's returned `result_manifest.json` and declared artifacts without running Spectre or parsing metrics. C-5.5 rehearsed the C-4/C-5 handoff with simulated execution-agent and Hermes-observer roles. After C-5.5, the project paused implementation to validate the real metric backend. Spectre + OCEAN is now confirmed as the backend route: standalone Spectre generates PSF, batch OCEAN opens the PSF and evaluates exact user/project-approved formulas, and Python only records OCEAN-produced scalar outputs and provenance. C-6 turned that route into deterministic file contracts and a Hermes validator without physical adapter wiring. C-7 added an explicit execution-side adapter and tool entry point while preserving the rule that Hermes workflow tooling still validates returned files after execution. C-8 records checked real metric results into optimizer ledger/state after `check-real-run` and `check-metric-results` pass, while preserving the contract-only boundary. C-9 prepares the next real-run package from strict ledger/state and deterministic optimizer initialization sequence, while still not running real tools or writing ledger/state. C-10 classifies failed/partial/pending real-run packages, writes explicit recovery decisions, prepares retry packages, exposes supervisor-facing recovery CLI commands, and blocks C-9 from advancing while unresolved real-run packages exist. C-10 final review fixes aligned unsafe artifact classification with the spec and hardened symlinked recovery decision reads.
 
@@ -118,6 +118,40 @@ raw Cadence artifact commits.
 next_allowed_action: write C-18 implementation plan for the batch-native TuRBO
 parallel runner; do not change code or run real tools until the C-18 plan exists
 and the user confirms execution
+
+## C-18 Batch Native TuRBO Parallel Runner Plan 2026-06-04
+
+C-18 implementation plan is complete, verified-only.
+
+Plan:
+
+```text
+docs/superpowers/plans/2026-06-04-batch-native-turbo-parallel-runner.md
+```
+
+Plan shape:
+
+- Task 1: add the batch runner seam and trace metadata using fake batch tests.
+- Task 2: add a narrow local `Turbo1` batch wrapper while preserving native TuRBO
+  candidate generation.
+- Task 3: add a bounded parallel real batch evaluator; package preparation and
+  ledger/state recording remain sequential.
+- Task 4: wire `hermes-workflow run-native-turbo --parallel` and report summary
+  fields.
+- Task 5: run one user-confirmed real C-18 acceptance on a clean `/tmp` project
+  with `max_evals=100`, `batch_size=10`, `parallel_jobs=10`, and
+  `threads_per_run=10`.
+- Task 6: final verification, local review if available, node updates, and
+  commit.
+
+Route audit: aligned with the C-18 design spec and top-level practice-first
+route. Drift: none. The plan does not authorize broad scheduler/framework work,
+PSF parsing, OCEAN formula rewriting, native Maestro/ADE layout replacement, or
+raw Cadence artifact commits.
+
+next_allowed_action: wait for user confirmation, then execute C-18 Task 1 Batch
+Runner Seam And Trace Metadata; do not run real tools before fake/unit tasks pass
+and the user explicitly confirms C-18 real acceptance
 
 ## Route Consistency Audit 2026-06-03
 
