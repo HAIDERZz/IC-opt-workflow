@@ -551,15 +551,31 @@ Status: complete, verified-only.
 
 ## Next Step
 
-Plan A, Plan B, and Plan C C-1 through C-25 are complete. C-26 design spec is written. The current accepted optimizer route uses native `Turbo1.optimize()`, the existing `run-native-turbo --parallel` runner, bounded Spectre/OCEAN workers, OCEAN-only retry for command/license failures, Hermes-generated execution task packets, and manifest-level supervisor/Hermes audit.
+Plan A, Plan B, and Plan C C-1 through C-26 are complete. C-26 is committed at `ca1c9c1`.
 
-C-24 validated the C-23 generated optimizer task packet handoff. The first worker attempt was rejected because sandboxed Spectre failed before metric extraction with pipe/socket permission errors. Task 2R reran the same packet semantics through the approved non-sandbox Cadence path on `/tmp/ic_auto_opt_c24_retry/bridge_test_inv` and completed `100` evaluations: `36 feasible`, `43 constraint_failed`, `21 metric_check_failed`; `100` result manifests succeeded; `100` metric manifests were produced; settings audit passed with `preset=ax`, `threads_per_run=10`, `parallel_jobs=10`, and `output_format=psfxl`. Sanitized audit: `docs/debug/2026-06-04-c24-generated-task-packet-handoff.md`.
+current_scope: OpenBox Optimizer Backend Decision Checkpoint
 
-C-25 productized the manual supervisor/Hermes audit as `hermes-workflow check-optimizer-run PROJECT_DIR`, a deterministic command that reads existing native TuRBO report/trace/result/metric manifests and writes `reports/optimizer_run_acceptance_report.json`. It passed focused fake-artifact tests and local C-24 retry shape smoke on `/tmp/ic_auto_opt_c24_retry/bridge_test_inv` with `optimizer run accepted`.
+Current state is an optimizer backend decision checkpoint, not an implementation task. The current TuRBO-backed optimizer route works, but the project is paused because OpenBox may better match the actual IC optimization requirements: discrete/stepped variables, black-box constraints, parallel evaluation, ask-and-tell workflow, and post-run visualization/parameter-importance reporting.
 
-C-26 design spec is `docs/superpowers/specs/2026-06-05-optimizer-completion-continuation-decision-design.md`. It scopes a read-only `optimizer_completion_report.json` that tells the supervisor whether to accept the best observed candidate, continue, locally refine, restart, switch to exhaustive sweep, or stop for user review.
+OpenBox local reference:
 
-Current next step: review C-26 design spec, then write C-26 implementation plan only after user confirmation. Build on `run-native-turbo --parallel`; do not start broad optimizer framework work. Do not commit raw input decks, protected include files, PSF/raw data, full Cadence logs, `docs/OCEAN_DOC_*`, or `docs/toolchain_evidence/`. Do not parse PSF or translate OCEAN formulas in Python.
+```text
+/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/openbox_reference/open-box
+```
+
+Reference commit:
+
+```text
+2ab34cc chore: release v0.9.0
+```
+
+Decision document:
+
+```text
+ic-auto-opt-workflow/docs/OPENBOX_OPTIMIZER_BACKEND_DECISION_CHECKPOINT_2026-06-05.md
+```
+
+Current next step: discuss whether to write `C-27 OpenBox Optimizer Backend Evidence Spike` design spec. Do not replace TuRBO, delete `native_turbo`, run real tools, call an execution agent, or start broad optimizer framework work before that decision. Do not commit raw input decks, protected include files, PSF/raw data, full Cadence logs, `docs/OCEAN_DOC_*`, or `docs/toolchain_evidence/`. Do not parse PSF or translate OCEAN formulas in Python.
 
 Read the handoff files first:
 
@@ -581,11 +597,8 @@ Use this prompt after compact:
 3. ic-auto-opt-workflow/docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md
 4. ic-auto-opt-workflow/docs/EXECUTION_PROGRESS_2026-05-29.md
 5. ic-auto-opt-workflow/docs/COMPACT_RESUME_CHECKPOINT.md
-6. ic-auto-opt-workflow/docs/superpowers/specs/2026-06-04-optimizer-run-acceptance-audit-design.md
-7. ic-auto-opt-workflow/docs/superpowers/plans/2026-06-04-optimizer-run-acceptance-audit.md
-8. ic-auto-opt-workflow/docs/superpowers/plans/2026-06-04-generated-optimizer-task-packet-handoff-acceptance.md
-9. ic-auto-opt-workflow/docs/superpowers/plans/2026-06-04-optimizer-execution-agent-task-packet.md
-10. 如需背景，再读 ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md
+6. ic-auto-opt-workflow/docs/OPENBOX_OPTIMIZER_BACKEND_DECISION_CHECKPOINT_2026-06-05.md
+7. 如需背景，再读 ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-26 Optimizer Completion And Continuation Decision Report design spec 已完成，状态 verified-only；implementation plan 和代码尚未开始。下一步只能 review C-26 design spec，然后在用户确认后写 C-26 implementation plan。不要自行进入 broad optimizer framework 或真实工具运行。不要调用 Claude CLI 作为 execution agent，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。不要用 Python 解析 PSF，不要让 agent 翻译或重写 Calculator/OCEAN 公式。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-26 已完成并提交，commit: ca1c9c1。当前暂停在 optimizer backend 决策点：TuRBO 已实现但可能不如 OpenBox 适合离散/约束/并行/结果解释需求。OpenBox 已 clone 到 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/openbox_reference/open-box，参考 commit: 2ab34cc。下一步先讨论是否写 C-27 OpenBox Optimizer Backend Evidence Spike design spec。不要直接替换 TuRBO，不要删除 native_turbo，不要运行真实 Virtuoso/Spectre/OCEAN，不要调用 execution agent，不要创建 broad optimizer framework，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
 ```

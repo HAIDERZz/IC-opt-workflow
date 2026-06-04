@@ -1097,14 +1097,16 @@ Next required action:
 - Boundary: no real tools, optimizer algorithm change, broad framework, PSF parsing, OCEAN formula rewriting, metric/constraint changes, or native-layout replacement.
 - current_scope: C-26 Optimizer Completion And Continuation Decision Report.
 - next_allowed_action: review C-26 design spec, then write C-26 implementation plan only after user confirmation; do not implement code, run real tools, or start broad optimizer framework work.
-- C-26 Optimizer Completion And Continuation Decision Report implementation: complete locally, verified-only, pending final commit.
+- C-26 Optimizer Completion And Continuation Decision Report implementation: complete, verified-only, committed at `ca1c9c1`.
 - Added `src/hermes_workflow/optimizer_completion.py`, `tests/test_optimizer_completion.py`, and CLI `hermes-workflow summarize-optimizer-run PROJECT_DIR`.
 - The command reads existing accepted optimizer artifacts and writes `reports/optimizer_completion_report.json`.
 - Report output includes best observed candidate, optimizer status counts, finite search-space estimate, evaluated fraction, full-coverage/global-optimum claim flag, best-so-far improvement evidence, and deterministic supervisor decision.
 - First-version decisions are intentionally narrow: `accept_best_observed`, `continue_more_evals`, `switch_to_exhaustive_sweep`, and `stop_for_user_review`.
 - Focused verification passed: `python3 -m pytest tests/test_optimizer_completion.py -q`; `python3 -m ruff check src/hermes_workflow/optimizer_completion.py src/hermes_workflow/cli.py tests/test_optimizer_completion.py`.
-- current_scope: C-26 Optimizer Completion And Continuation Decision Report.
-- next_allowed_action: run C-26 final verification and commit; do not start C-27, real-tool work, or broad optimizer framework work before C-26 is committed.
+- Final verification passed before commit: `python3 -m pytest tests/test_optimizer_completion.py tests/test_optimizer_acceptance.py tests/test_optimizer_task_package.py tests/test_native_turbo.py -q`; `python3 -m ruff check src tests tools`; `python3 tools/check_development_cadence.py`; `git diff --check`.
+- current_scope: OpenBox Optimizer Backend Decision Checkpoint.
+- next_allowed_action: discuss whether to write C-27 OpenBox Optimizer Backend Evidence Spike design spec; do not replace TuRBO or run real tools before that decision.
+- OpenBox Optimizer Backend Decision Checkpoint: written, verified-only. Decision document: `docs/OPENBOX_OPTIMIZER_BACKEND_DECISION_CHECKPOINT_2026-06-05.md`. Local OpenBox reference clone: `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/openbox_reference/open-box`, commit `2ab34cc`. The project is paused before C-27 to decide whether OpenBox should replace or coexist with the current TuRBO backend. No production replacement has been made.
 
 ## Locked Role Model
 
