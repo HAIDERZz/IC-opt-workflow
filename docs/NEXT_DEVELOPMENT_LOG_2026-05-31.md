@@ -1295,17 +1295,19 @@ OpenBox Backend Evidence Spike:
 
 C-27 OpenBox Backend Seam MVP:
 
-- Status: design spec and implementation plan written, verified-only.
+- Status: implementation complete, verified-only.
 - Design spec: `docs/superpowers/specs/2026-06-05-openbox-backend-seam-mvp-design.md`.
 - Implementation plan: `docs/superpowers/plans/2026-06-05-openbox-backend-seam-mvp.md`.
-- Scope: add only a fake OpenBox backend seam and backend-neutral optimizer artifact shape so OpenBox can be evaluated without replacing the working native TuRBO route.
+- Scope: added only a fake OpenBox backend seam and backend-neutral optimizer artifact shape so OpenBox can be evaluated without replacing the working native TuRBO route.
 - Design choice: existing Spectre/OCEAN execution, candidate package, C-25 acceptance, and C-26 completion contracts remain the foundation. New OpenBox work must produce artifacts those contracts can read.
 - Boundary: no production OpenBox real-tool runner, no TuRBO deletion, no real tools, no execution agent, no broad optimizer framework, no PSF parsing, and no OCEAN formula rewriting.
+- Code: `src/hermes_workflow/optimizer_artifacts.py`, `src/hermes_workflow/openbox_backend.py`, `hermes-workflow run-openbox-fake`, and C-25/C-26 backend-neutral artifact loading.
+- Verification: `python3 -m pytest -q` passed with `544 passed, 1 skipped`; targeted C-27 `ruff` passed. Optional OpenBox import smoke was skipped because `openbox` is not installed in the active environment.
 - Route audit: aligned with the top-level lightweight workflow goal. Drift: none; TuRBO remains the implemented real backend.
-- next_allowed_action: execute C-27 Task 1 Backend-Neutral Optimizer Artifact Loader; do not start Task 2, replace TuRBO, or run real tools before Task 1 is complete.
+- next_allowed_action: wait for user decision on the next narrow OpenBox step: either keep OpenBox fake-only for now, run a scoped OpenBox dependency acceptance in an approved environment, or plan a real-tool OpenBox backend acceptance. Do not replace TuRBO, delete native_turbo, run real tools, or broaden the optimizer framework without explicit approval.
 
 ## Resume Prompt
 
 ```text
-请继续 IC auto optimization workflow。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。先阅读 AGENTS.md、docs/CURRENT_TASK_STATE.json、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/specs/2026-06-05-openbox-backend-seam-mvp-design.md、docs/superpowers/plans/2026-06-05-openbox-backend-seam-mvp.md、docs/debug/2026-06-05-openbox-backend-evidence-spike.md。C-27 OpenBox Backend Seam MVP design spec 和 implementation plan 已写好。下一步是 execute C-27 Task 1 Backend-Neutral Optimizer Artifact Loader; do not start Task 2, replace TuRBO, or run real tools before Task 1 is complete。不要直接替换 TuRBO，不要删除 native_turbo，不要运行真实 Virtuoso/Spectre/OCEAN，不要调用 execution agent，不要创建 broad optimizer framework，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
+请继续 IC auto optimization workflow。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。先阅读 AGENTS.md、docs/CURRENT_TASK_STATE.json、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/specs/2026-06-05-openbox-backend-seam-mvp-design.md、docs/superpowers/plans/2026-06-05-openbox-backend-seam-mvp.md、docs/debug/2026-06-05-openbox-backend-evidence-spike.md。C-27 OpenBox Backend Seam MVP 已完成：backend-neutral optimizer artifacts、fake OpenBox backend seam、C-25/C-26 compatibility、run-openbox-fake CLI。下一步等待用户决定是否继续 OpenBox 依赖/真实工具 acceptance。不要直接替换 TuRBO，不要删除 native_turbo，不要运行真实 Virtuoso/Spectre/OCEAN，不要调用 execution agent，不要创建 broad optimizer framework，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
 ```

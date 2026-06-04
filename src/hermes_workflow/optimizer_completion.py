@@ -10,11 +10,11 @@ from typing import Any
 
 import yaml
 
+from hermes_workflow.optimizer_artifacts import load_optimizer_artifacts
+
 
 REPORT_RELATIVE = Path("reports/optimizer_completion_report.json")
 ACCEPTANCE_REPORT_RELATIVE = Path("reports/optimizer_run_acceptance_report.json")
-NATIVE_REPORT_RELATIVE = Path("reports/native_turbo_optimizer_report.json")
-NATIVE_EVALUATIONS_RELATIVE = Path("reports/native_turbo_optimizer_evaluations.jsonl")
 
 
 @dataclass(frozen=True)
@@ -40,8 +40,9 @@ def summarize_optimizer_run(project_dir: str | Path) -> OptimizerCompletionRepor
     warnings: list[str] = []
 
     acceptance_report = _load_json(project_root / ACCEPTANCE_REPORT_RELATIVE, issues)
-    native_report = _load_json(project_root / NATIVE_REPORT_RELATIVE, issues)
-    traces = _load_jsonl(project_root / NATIVE_EVALUATIONS_RELATIVE, issues)
+    artifacts = load_optimizer_artifacts(project_root, issues)
+    native_report = artifacts.report
+    traces = artifacts.traces
 
     if acceptance_report.get("status") != "accepted":
         issues.append("optimizer acceptance report status is not accepted")
@@ -106,28 +107,6 @@ def _load_json(path: Path, issues: list[str]) -> dict[str, Any]:
         issues.append(f"JSON file must contain an object: {path}")
         return {}
     return payload
-
-
-def _load_jsonl(path: Path, issues: list[str]) -> list[dict[str, Any]]:
-    try:
-        text = path.read_text(encoding="utf-8")
-    except FileNotFoundError:
-        issues.append(f"missing file: {path}")
-        return []
-    rows: list[dict[str, Any]] = []
-    for line_number, line in enumerate(text.splitlines(), start=1):
-        if not line.strip():
-            continue
-        try:
-            payload = json.loads(line)
-        except json.JSONDecodeError as exc:
-            issues.append(f"invalid JSONL row: {path}:{line_number}: {exc}")
-            continue
-        if not isinstance(payload, dict):
-            issues.append(f"JSONL row must contain an object: {path}:{line_number}")
-            continue
-        rows.append(payload)
-    return rows
 
 
 def _summarize_search_space(

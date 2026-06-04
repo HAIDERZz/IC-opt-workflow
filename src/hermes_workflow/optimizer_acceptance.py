@@ -6,10 +6,10 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
+from hermes_workflow.optimizer_artifacts import load_optimizer_artifacts
+
 
 REPORT_RELATIVE = Path("reports/optimizer_run_acceptance_report.json")
-NATIVE_REPORT_RELATIVE = Path("reports/native_turbo_optimizer_report.json")
-NATIVE_EVALUATIONS_RELATIVE = Path("reports/native_turbo_optimizer_evaluations.jsonl")
 
 
 @dataclass(frozen=True)
@@ -31,11 +31,16 @@ def check_optimizer_run(project_dir: str | Path) -> OptimizerRunAcceptanceReport
     issues: list[str] = []
     warnings: list[str] = []
 
-    native_report = _load_json(project_root / NATIVE_REPORT_RELATIVE, issues)
-    traces = _load_jsonl(project_root / NATIVE_EVALUATIONS_RELATIVE, issues)
+    artifacts = load_optimizer_artifacts(project_root, issues)
+    native_report = artifacts.report
+    traces = artifacts.traces
+    backend = _string_value(native_report.get("backend"))
+    is_fake = _string_value(native_report.get("execution_mode")) == "fake"
 
     if native_report.get("status") != "completed":
-        issues.append("native turbo report status is not completed")
+        issues.append("optimizer report status is not completed")
+    if is_fake and backend != "openbox":
+        issues.append("fake optimizer artifacts are only accepted for backend=openbox")
 
     evaluation_count = _int_value(native_report.get("evaluation_count"))
     if evaluation_count != len(traces):
@@ -58,6 +63,10 @@ def check_optimizer_run(project_dir: str | Path) -> OptimizerRunAcceptanceReport
             issues.append("trace row is missing run_id")
         if isinstance(row.get("parallel_jobs"), int):
             parallel_jobs.add(row["parallel_jobs"])
+        if is_fake:
+            if result_relative or metric_relative:
+                warnings.append(f"{run_id} fake row includes manifest paths")
+            continue
 
         result_manifest = _load_optional_json(project_root, result_relative, issues)
         if not result_manifest:
@@ -99,10 +108,14 @@ def check_optimizer_run(project_dir: str | Path) -> OptimizerRunAcceptanceReport
             )
 
     settings = _summarize_settings(simulator_settings, parallel_jobs, issues)
-    if result_manifest_count == 0 and native_report.get("status") == "completed":
-        issues.append("native turbo report completed but no result manifests exist")
-    elif result_success_count == 0 and native_report.get("status") == "completed":
-        issues.append("native turbo report completed but no result manifests succeeded")
+    if not is_fake and result_manifest_count == 0 and native_report.get("status") == "completed":
+        issues.append("optimizer report completed but no result manifests exist")
+    elif (
+        not is_fake
+        and result_success_count == 0
+        and native_report.get("status") == "completed"
+    ):
+        issues.append("optimizer report completed but no result manifests succeeded")
 
     status = "rejected" if issues else "accepted"
     report_path = project_root / REPORT_RELATIVE
@@ -142,28 +155,6 @@ def _load_json(path: Path, issues: list[str]) -> dict[str, Any]:
         issues.append(f"JSON file must contain an object: {path}")
         return {}
     return payload
-
-
-def _load_jsonl(path: Path, issues: list[str]) -> list[dict[str, Any]]:
-    try:
-        text = path.read_text(encoding="utf-8")
-    except FileNotFoundError:
-        issues.append(f"missing file: {path}")
-        return []
-    rows: list[dict[str, Any]] = []
-    for line_number, line in enumerate(text.splitlines(), start=1):
-        if not line.strip():
-            continue
-        try:
-            payload = json.loads(line)
-        except json.JSONDecodeError as exc:
-            issues.append(f"invalid JSONL row: {path}:{line_number}: {exc}")
-            continue
-        if not isinstance(payload, dict):
-            issues.append(f"JSONL row must contain an object: {path}:{line_number}")
-            continue
-        rows.append(payload)
-    return rows
 
 
 def _load_optional_json(

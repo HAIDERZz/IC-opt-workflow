@@ -15,6 +15,7 @@ from hermes_workflow.native_turbo import (
     run_batch_native_turbo_optimization,
     run_native_turbo_optimization,
 )
+from hermes_workflow.openbox_backend import run_openbox_fake_optimization
 from hermes_workflow.optimizer_acceptance import check_optimizer_run
 from hermes_workflow.optimizer_completion import summarize_optimizer_run
 from hermes_workflow.optimizer_suggestion import suggest_candidate_request
@@ -598,6 +599,38 @@ def summarize_optimizer_run_command(
         typer.echo(issue)
     typer.echo("report: reports/optimizer_completion_report.json")
     raise typer.Exit(code=1)
+
+
+@app.command("run-openbox-fake")
+def run_openbox_fake_command(
+    project_dir: Annotated[
+        Path,
+        typer.Argument(help="Project directory with optimizer config artifacts."),
+    ],
+    max_evals: Annotated[
+        int,
+        typer.Option("--max-evals", min=1, help="Fake OpenBox evaluation budget."),
+    ] = 40,
+    batch_size: Annotated[
+        int,
+        typer.Option("--batch-size", min=1, help="Fake OpenBox suggestion batch size."),
+    ] = 4,
+) -> None:
+    try:
+        result = run_openbox_fake_optimization(
+            project_dir,
+            max_evals=max_evals,
+            batch_size=batch_size,
+        )
+    except (OSError, RuntimeError, ValueError) as exc:
+        _exit_with_error(exc)
+    typer.echo(
+        f"openbox fake optimizer completed: {result.evaluation_count} evaluations"
+    )
+    if result.report_path is not None:
+        typer.echo(f"report: {result.report_path.relative_to(project_dir)}")
+    if result.evaluations_path is not None:
+        typer.echo(f"evaluations: {result.evaluations_path.relative_to(project_dir)}")
 
 
 @app.command("record-real-result")

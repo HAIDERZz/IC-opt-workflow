@@ -6,6 +6,7 @@ from typer.testing import CliRunner
 
 from hermes_workflow.cli import app
 from hermes_workflow.optimizer_completion import summarize_optimizer_run
+from tests.real_run_smoke_helpers import create_approved_real_project
 
 
 def _write_json(path: Path, payload: dict) -> None:
@@ -198,6 +199,48 @@ def _write_accepted_optimizer_project(
         },
     )
     return project_dir
+
+
+class FakeAdvisorForCompletion:
+    def __init__(self) -> None:
+        self._batches = [
+            [
+                {"FN": 2, "WN": 0.2, "WP": 0.4},
+                {"FN": 4, "WN": 1.0, "WP": 1.2},
+            ],
+            [
+                {"FN": 6, "WN": 1.4, "WP": 1.6},
+                {"FN": 8, "WN": 2.0, "WP": 2.2},
+            ],
+        ]
+
+    def get_suggestions(self, batch_size: int) -> list[dict[str, float]]:
+        return self._batches.pop(0)[:batch_size]
+
+    def update_observations(self, observations: list[object]) -> None:
+        assert observations
+
+
+def test_summarize_optimizer_run_reads_backend_neutral_report(
+    tmp_path: Path,
+) -> None:
+    from hermes_workflow.openbox_backend import run_openbox_fake_optimization
+    from hermes_workflow.optimizer_acceptance import check_optimizer_run
+
+    project_dir = create_approved_real_project(tmp_path)
+    run_openbox_fake_optimization(
+        project_dir,
+        max_evals=4,
+        batch_size=2,
+        advisor_factory=lambda _space, _seed: FakeAdvisorForCompletion(),
+    )
+    check_optimizer_run(project_dir)
+
+    report = summarize_optimizer_run(project_dir)
+
+    assert report.status == "pass"
+    assert report.evaluation_count == 4
+    assert report.best_observed is not None
 
 
 def test_summarize_optimizer_run_loads_accepted_run(tmp_path: Path) -> None:

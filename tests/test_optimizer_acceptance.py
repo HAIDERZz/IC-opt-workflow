@@ -5,6 +5,7 @@ from typer.testing import CliRunner
 
 from hermes_workflow.cli import app
 from hermes_workflow.optimizer_acceptance import check_optimizer_run
+from tests.real_run_smoke_helpers import create_approved_real_project
 
 
 runner = CliRunner()
@@ -162,6 +163,91 @@ def _write_minimal_optimizer_run(tmp_path: Path) -> Path:
         encoding="utf-8",
     )
     return project_dir
+
+
+class FakeAdvisorForAcceptance:
+    def __init__(self) -> None:
+        self._batches = [
+            [
+                {"FN": 2, "WN": 0.2, "WP": 0.4},
+                {"FN": 4, "WN": 1.0, "WP": 1.2},
+            ],
+            [
+                {"FN": 6, "WN": 1.4, "WP": 1.6},
+                {"FN": 8, "WN": 2.0, "WP": 2.2},
+            ],
+        ]
+
+    def get_suggestions(self, batch_size: int) -> list[dict[str, float]]:
+        return self._batches.pop(0)[:batch_size]
+
+    def update_observations(self, observations: list[object]) -> None:
+        assert observations
+
+
+def _write_backend_neutral_optimizer_report(
+    project_dir: Path,
+    *,
+    backend: str,
+    execution_mode: str,
+    rows: list[dict],
+) -> None:
+    _write_json(
+        project_dir / "reports" / "optimizer_run_report.json",
+        {
+            "batch_summary": {
+                "batch_count": 1,
+                "max_batch_worker_count": 1,
+                "status_counts": {"feasible": len(rows)},
+            },
+            "backend": backend,
+            "best_candidate": rows[0] if rows else None,
+            "evaluation_count": len(rows),
+            "evaluations": "reports/optimizer_evaluations.jsonl",
+            "execution_mode": execution_mode,
+            "issues": [],
+            "schema_version": "1.0",
+            "status": "completed",
+        },
+    )
+    _append_jsonl(project_dir / "reports" / "optimizer_evaluations.jsonl", rows)
+
+
+def test_check_optimizer_run_accepts_fake_openbox_without_manifests(
+    tmp_path: Path,
+) -> None:
+    from hermes_workflow.openbox_backend import run_openbox_fake_optimization
+
+    project_dir = create_approved_real_project(tmp_path)
+    run_openbox_fake_optimization(
+        project_dir,
+        max_evals=4,
+        batch_size=2,
+        advisor_factory=lambda _space, _seed: FakeAdvisorForAcceptance(),
+    )
+
+    report = check_optimizer_run(project_dir)
+
+    assert report.status == "accepted"
+    assert report.result_manifest_count == 0
+    assert report.metric_manifest_count == 0
+    assert report.status_counts
+
+
+def test_check_optimizer_run_rejects_real_backend_rows_without_manifests(
+    tmp_path: Path,
+) -> None:
+    _write_backend_neutral_optimizer_report(
+        tmp_path,
+        backend="openbox",
+        execution_mode="real",
+        rows=[{"evaluation_index": 1, "run_id": "real_001", "status": "feasible"}],
+    )
+
+    report = check_optimizer_run(tmp_path)
+
+    assert report.status == "rejected"
+    assert any("manifest" in issue for issue in report.issues)
 
 
 def test_check_optimizer_run_accepts_completed_manifest_audit(

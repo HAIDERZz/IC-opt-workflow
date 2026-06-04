@@ -553,9 +553,9 @@ Status: complete, verified-only.
 
 Plan A, Plan B, and Plan C C-1 through C-26 are complete. C-26 is committed at `ca1c9c1`.
 
-current_scope: OpenBox Optimizer Backend Decision Checkpoint
+current_scope: C-27 OpenBox Backend Seam MVP complete
 
-Current state is an optimizer backend decision checkpoint, not an implementation task. The current TuRBO-backed optimizer route works, but the project is paused because OpenBox may better match the actual IC optimization requirements: discrete/stepped variables, black-box constraints, parallel evaluation, ask-and-tell workflow, and post-run visualization/parameter-importance reporting.
+Current state is after C-27 implementation. The current TuRBO-backed optimizer route remains the implemented real backend. OpenBox has a fake-only backend seam and backend-neutral artifact path, but no production real-tool OpenBox route is approved yet.
 
 OpenBox local reference:
 
@@ -595,7 +595,17 @@ C-27 implementation plan:
 ic-auto-opt-workflow/docs/superpowers/plans/2026-06-05-openbox-backend-seam-mvp.md
 ```
 
-Current next step: execute C-27 Task 1 Backend-Neutral Optimizer Artifact Loader. Do not start Task 2, replace TuRBO, delete `native_turbo`, run real tools, call an execution agent, or start broad optimizer framework work before Task 1 is complete. Do not commit raw input decks, protected include files, PSF/raw data, full Cadence logs, `docs/OCEAN_DOC_*`, or `docs/toolchain_evidence/`. Do not parse PSF or translate OCEAN formulas in Python.
+C-27 implementation result:
+
+- Added backend-neutral optimizer artifact loading: `reports/optimizer_run_report.json` and `reports/optimizer_evaluations.jsonl`.
+- Added fake OpenBox backend seam: `src/hermes_workflow/openbox_backend.py`.
+- Added CLI: `hermes-workflow run-openbox-fake`.
+- C-25 acceptance and C-26 completion read backend-neutral artifacts first and fall back to legacy native TuRBO artifacts.
+- Fake OpenBox artifacts are accepted only for `backend=openbox` and `execution_mode=fake`; real artifacts still require manifest-level audit.
+- Verification passed: `python3 -m pytest -q` (`544 passed, 1 skipped`) and targeted C-27 `ruff`.
+- Optional OpenBox import smoke skipped because `openbox` is not installed in the active environment.
+
+Current next step: wait for user decision on the next narrow OpenBox step. Do not replace TuRBO, delete `native_turbo`, run real tools, call an execution agent, or start broad optimizer framework work without explicit approval. Do not commit raw input decks, protected include files, PSF/raw data, full Cadence logs, `docs/OCEAN_DOC_*`, or `docs/toolchain_evidence/`. Do not parse PSF or translate OCEAN formulas in Python.
 
 Read the handoff files first:
 
@@ -620,5 +630,5 @@ Use this prompt after compact:
 6. ic-auto-opt-workflow/docs/OPENBOX_OPTIMIZER_BACKEND_DECISION_CHECKPOINT_2026-06-05.md
 7. 如需背景，再读 ic-auto-opt-workflow/docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-27 OpenBox Backend Seam MVP design spec 和 implementation plan 已完成：docs/superpowers/specs/2026-06-05-openbox-backend-seam-mvp-design.md、docs/superpowers/plans/2026-06-05-openbox-backend-seam-mvp.md。OpenBox local-only fake inverter evidence spike 已完成，证据在 docs/debug/2026-06-05-openbox-backend-evidence-spike.md。下一步是 execute C-27 Task 1 Backend-Neutral Optimizer Artifact Loader; do not start Task 2, replace TuRBO, or run real tools before Task 1 is complete。不要直接替换 TuRBO，不要删除 native_turbo，不要运行真实 Virtuoso/Spectre/OCEAN，不要调用 execution agent，不要创建 broad optimizer framework，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-27 OpenBox Backend Seam MVP 已完成：backend-neutral optimizer artifacts、fake OpenBox backend seam、C-25/C-26 compatibility、run-openbox-fake CLI。OpenBox local-only fake inverter evidence spike 已完成，证据在 docs/debug/2026-06-05-openbox-backend-evidence-spike.md。下一步等待用户决定是否继续 OpenBox 依赖/真实工具 acceptance。不要直接替换 TuRBO，不要删除 native_turbo，不要运行真实 Virtuoso/Spectre/OCEAN，不要调用 execution agent，不要创建 broad optimizer framework，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
 ```

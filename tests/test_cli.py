@@ -528,6 +528,63 @@ def test_cli_record_real_result_reports_failure_without_traceback(
     assert "Traceback" not in result.output
 
 
+def test_run_openbox_fake_cli_writes_artifacts(monkeypatch, tmp_path: Path) -> None:
+    import hermes_workflow.cli as cli_module
+
+    project_dir = tmp_path / "bridge_test_inv"
+
+    class FakeResult:
+        evaluation_count = 4
+        report_path = project_dir / "reports" / "optimizer_run_report.json"
+        evaluations_path = project_dir / "reports" / "optimizer_evaluations.jsonl"
+
+    def fake_run(project_dir: Path, *, max_evals: int, batch_size: int) -> FakeResult:
+        reports_dir = project_dir / "reports"
+        reports_dir.mkdir(parents=True, exist_ok=True)
+        (reports_dir / "optimizer_run_report.json").write_text(
+            json.dumps(
+                {
+                    "backend": "openbox",
+                    "best_candidate": None,
+                    "batch_summary": {
+                        "batch_count": 0,
+                        "max_batch_worker_count": batch_size,
+                        "status_counts": {},
+                    },
+                    "evaluation_count": max_evals,
+                    "evaluations": "reports/optimizer_evaluations.jsonl",
+                    "execution_mode": "fake",
+                    "issues": [],
+                    "schema_version": "1.0",
+                    "status": "completed",
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        (reports_dir / "optimizer_evaluations.jsonl").write_text("", encoding="utf-8")
+        return FakeResult()
+
+    monkeypatch.setattr(cli_module, "run_openbox_fake_optimization", fake_run)
+
+    result = runner.invoke(
+        cli_module.app,
+        [
+            "run-openbox-fake",
+            str(project_dir),
+            "--max-evals",
+            "4",
+            "--batch-size",
+            "2",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "openbox fake optimizer completed: 4 evaluations" in result.output
+    assert "report: reports/optimizer_run_report.json" in result.output
+    assert "evaluations: reports/optimizer_evaluations.jsonl" in result.output
+
+
 def test_cli_assess_real_run_recovery_reports_pending(tmp_path: Path) -> None:
     from tests.test_real_run_recovery import _create_ready_project
 

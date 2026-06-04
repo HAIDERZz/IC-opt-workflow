@@ -60,7 +60,7 @@
 - Modify: `src/hermes_workflow/optimizer_acceptance.py`
 - Modify: `src/hermes_workflow/optimizer_completion.py`
 
-- [ ] **Step 1: Write tests for neutral-first and legacy fallback loading**
+- [x] **Step 1: Write tests for neutral-first and legacy fallback loading**
 
 Add `tests/test_optimizer_artifacts.py`:
 
@@ -134,7 +134,7 @@ def test_loader_falls_back_to_legacy_native_turbo_artifacts(tmp_path: Path) -> N
     assert artifacts.traces[0]["status"] == "feasible"
 ```
 
-- [ ] **Step 2: Run tests to confirm the loader module is missing**
+- [x] **Step 2: Run tests to confirm the loader module is missing**
 
 Run:
 
@@ -144,7 +144,7 @@ python3 -m pytest tests/test_optimizer_artifacts.py -q
 
 Expected: fails with `ModuleNotFoundError: No module named 'hermes_workflow.optimizer_artifacts'`.
 
-- [ ] **Step 3: Implement `optimizer_artifacts.py`**
+- [x] **Step 3: Implement `optimizer_artifacts.py`**
 
 Create `src/hermes_workflow/optimizer_artifacts.py`:
 
@@ -231,7 +231,7 @@ def _load_jsonl(path: Path, issues: list[str]) -> list[dict[str, Any]]:
     return rows
 ```
 
-- [ ] **Step 4: Refactor C-25/C-26 readers to use the loader without changing behavior**
+- [x] **Step 4: Refactor C-25/C-26 readers to use the loader without changing behavior**
 
 In `src/hermes_workflow/optimizer_acceptance.py`, replace direct native report loading:
 
@@ -261,7 +261,7 @@ traces = artifacts.traces
 
 Keep existing constant names in those modules only if tests still import them; otherwise remove unused native report constants.
 
-- [ ] **Step 5: Verify Task 1**
+- [x] **Step 5: Verify Task 1**
 
 Run:
 
@@ -282,7 +282,7 @@ Expected: all selected tests pass and ruff reports no issues.
 - Reuse: `src/hermes_workflow/native_turbo.py`
 - Reuse: `src/hermes_workflow/optimizer_artifacts.py`
 
-- [ ] **Step 1: Write tests with an injected advisor**
+- [x] **Step 1: Write tests with an injected advisor**
 
 Add `tests/test_openbox_backend.py`:
 
@@ -364,7 +364,7 @@ def test_openbox_fake_runner_requires_openbox_when_no_advisor_is_injected(
         raise AssertionError("expected missing OpenBox dependency error")
 ```
 
-- [ ] **Step 2: Run tests to confirm the module is missing**
+- [x] **Step 2: Run tests to confirm the module is missing**
 
 Run:
 
@@ -374,7 +374,7 @@ python3 -m pytest tests/test_openbox_backend.py -q
 
 Expected: fails with `ModuleNotFoundError: No module named 'hermes_workflow.openbox_backend'`.
 
-- [ ] **Step 3: Implement fake runner and report writer**
+- [x] **Step 3: Implement fake runner and report writer**
 
 Create `src/hermes_workflow/openbox_backend.py`:
 
@@ -501,7 +501,7 @@ Then add helper functions in the same file:
 
 Keep the helper functions local to this file. Do not move shared quantization out of `native_turbo.py` during C-27.
 
-- [ ] **Step 4: Verify Task 2**
+- [x] **Step 4: Verify Task 2**
 
 Run:
 
@@ -523,7 +523,7 @@ Expected: tests pass without requiring OpenBox to be installed.
 - Test: `tests/test_optimizer_completion.py`
 - Test: `tests/test_openbox_backend.py`
 
-- [ ] **Step 1: Add acceptance tests for fake OpenBox and missing-manifest real rows**
+- [x] **Step 1: Add acceptance tests for fake OpenBox and missing-manifest real rows**
 
 In `tests/test_optimizer_acceptance.py`, add:
 
@@ -627,7 +627,7 @@ def test_check_optimizer_run_rejects_real_backend_rows_without_manifests(
     assert any("manifest" in issue for issue in report.issues)
 ```
 
-- [ ] **Step 2: Add completion test for accepted backend-neutral artifacts**
+- [x] **Step 2: Add completion test for accepted backend-neutral artifacts**
 
 In `tests/test_optimizer_completion.py`, add:
 
@@ -679,7 +679,7 @@ def test_summarize_optimizer_run_reads_backend_neutral_report(
     assert report.best_observed is not None
 ```
 
-- [ ] **Step 3: Run tests to verify current acceptance rejects fake rows**
+- [x] **Step 3: Run tests to verify current acceptance rejects fake rows**
 
 Run:
 
@@ -689,7 +689,7 @@ python3 -m pytest tests/test_optimizer_acceptance.py::test_check_optimizer_run_a
 
 Expected: fails because `check_optimizer_run` currently requires real manifests for completed optimizer reports.
 
-- [ ] **Step 4: Implement fake-mode acceptance**
+- [x] **Step 4: Implement fake-mode acceptance**
 
 In `src/hermes_workflow/optimizer_acceptance.py`:
 
@@ -714,11 +714,11 @@ continue
 
 Keep real-mode logic unchanged.
 
-- [ ] **Step 5: Update C-26 to use backend-neutral artifacts**
+- [x] **Step 5: Update C-26 to use backend-neutral artifacts**
 
 In `src/hermes_workflow/optimizer_completion.py`, after Task 1 loader refactor, no special fake-mode logic should be needed. Confirm the completion report reads the backend-neutral report and JSONL rows through `load_optimizer_artifacts`.
 
-- [ ] **Step 6: Verify Task 3**
+- [x] **Step 6: Verify Task 3**
 
 Run:
 
@@ -738,7 +738,7 @@ Expected: tests pass and ruff reports no issues.
 - Test: `tests/test_cli.py` or `tests/test_openbox_backend.py`
 - Verify: existing C-25/C-26 tests
 
-- [ ] **Step 1: Add CLI tests**
+- [x] **Step 1: Add CLI tests**
 
 Add focused CLI coverage using `CliRunner`:
 
@@ -785,7 +785,7 @@ def test_run_openbox_fake_cli_writes_artifacts(monkeypatch, tmp_path: Path) -> N
     assert "optimizer_run_report.json" in result.output
 ```
 
-- [ ] **Step 2: Run CLI test to verify command is missing**
+- [x] **Step 2: Run CLI test to verify command is missing**
 
 Run:
 
@@ -795,7 +795,7 @@ python3 -m pytest tests/test_cli.py::test_run_openbox_fake_cli_writes_artifacts 
 
 Expected: fails because `run-openbox-fake` is not registered.
 
-- [ ] **Step 3: Add CLI command**
+- [x] **Step 3: Add CLI command**
 
 In `src/hermes_workflow/cli.py`, import:
 
@@ -828,7 +828,7 @@ def run_openbox_fake(
 
 Use existing CLI error helper patterns in `cli.py`; if the helper name differs, match the local pattern rather than introducing a second error style.
 
-- [ ] **Step 4: Run fake end-to-end smoke without real tools**
+- [x] **Step 4: Run fake end-to-end smoke without real tools**
 
 Run:
 
@@ -838,7 +838,12 @@ python3 -m pytest tests/test_openbox_backend.py tests/test_optimizer_acceptance.
 
 Expected: fake OpenBox runner can write artifacts, C-25 can accept them, and C-26 can summarize them without real manifests.
 
-- [ ] **Step 5: Optional local OpenBox smoke**
+Implementation note: the missing-command red check was not kept as a separate
+artifact because the focused CLI test and command registration were applied in
+one small step. Final verification covers command registration, path output, and
+fake artifact wiring.
+
+- [x] **Step 5: Optional local OpenBox smoke**
 
 Only if OpenBox is installed in the active environment, run:
 
@@ -867,7 +872,7 @@ If OpenBox is not installed, record that the optional smoke was skipped. Do not 
 - Modify: `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`
 - Optional milestone update: `docs/COMPACT_RESUME_CHECKPOINT.md`
 
-- [ ] **Step 1: Run focused verification**
+- [x] **Step 1: Run focused verification**
 
 Run:
 
@@ -881,7 +886,7 @@ git diff --check
 
 Expected: all commands pass.
 
-- [ ] **Step 2: Update docs and plan status**
+- [x] **Step 2: Update docs and plan status**
 
 Update:
 
@@ -897,7 +902,7 @@ Update:
 
 Update `docs/COMPACT_RESUME_CHECKPOINT.md` only if the user is about to compact context or if the next action changes materially after C-27.
 
-- [ ] **Step 3: Review gate**
+- [x] **Step 3: Review gate**
 
 Because C-27 touches report-loading and acceptance behavior, request review if subagent tooling is available:
 
@@ -906,7 +911,7 @@ Because C-27 touches report-loading and acceptance behavior, request review if s
 
 If no review tooling is available, mark `review_status = verified-only` and record that no real-tool or production backend replacement happened.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 Run:
 
