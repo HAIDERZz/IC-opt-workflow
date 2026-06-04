@@ -50,7 +50,7 @@
     "alignment": "Aligned. C-16 moves from small-point acceptance to a meaningful 100-point real optimizer acceptance using the existing C-15 loop and C-7 adapter.",
     "drift": "None. Task 0 only aligns Spectre run settings with existing contracts before the 100-point run; it does not add a broad optimizer framework, new optimizer algorithm, PSF parser, formula rewrite, or native-layout replacement."
   },
-  "latest_valid_commit": "f0157cf docs: record C15 closeout commit",
+  "latest_valid_commit": "b9f10d4 fix: align Spectre settings before C16",
   "review_evidence": {
     "task_0_status": "Complete, verified-only. Tests require metric_extraction_request.spectre.threads_per_run as per-process +mt and parallel_jobs as a concurrency cap, adapter argv +preset=ax/+mt=10 with requested output_format, result manifest setting recording, request/prepared setting drift rejection, and check-real-run simulator setting drift detection. parallel_jobs is not mapped to Spectre +mt. Final verification passed with 492 tests.",
     "sandbox_note": "Real Spectre/OCEAN adapter runs should use the approved external Cadence csh path. A sandboxed Spectre attempt failed before OCEAN with pipe/socket permission errors, while the same command shape succeeded outside the sandbox."
