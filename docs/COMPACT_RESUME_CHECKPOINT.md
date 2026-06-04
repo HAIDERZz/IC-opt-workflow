@@ -21,11 +21,12 @@ ic-auto-opt-workflow/AGENTS.md
 Current execution state:
 
 - Current scope: C-19 Execution-Agent Optimizer Practice Acceptance.
-- Current status: C-19 Task 1 Prepare Execution-Agent Handoff Packet is complete, verified-only.
-- Current next action: wait for user confirmation, then execute C-19 Task 2: Real Execution-Agent Optimizer Run; do not run the C-19 real-tool optimizer command before that confirmation.
+- Current status: C-19 Task 3 Supervisor/Hermes Acceptance Audit is complete, verified-only.
+- Current next action: execute C-19 Task 4 Branch B: surgical fix for clean project preparation by removing stale optimizer ledger rows or initializing matching empty state before rerunning run-native-turbo once.
 - C-18 keeps native `Turbo1.optimize()` as the optimizer route and adds a batch-aware Hermes evaluator so TuRBO batch candidates run Spectre/OCEAN concurrently up to `spectre.parallel_jobs`.
 - Each Spectre process still uses `spectre.threads_per_run` as `+mt`. Do not confuse Spectre internal threads with parallel Spectre process count.
 - C-19 uses the existing C-18 `run-native-turbo --parallel` path to validate the original supervisor-agent to execution-agent handoff goal. It must not create another optimizer framework.
+- C-19 Task 3 root cause: clean project preparation removed `state/optimizer_state.json` but retained stale `ledger/experiment_ledger.jsonl` rows from C-18, causing `optimizer state is missing` before real tools launched.
 - Task 1 complete and reviewed.
 - Task 2 complete and reviewed.
 - Task 3 complete and reviewed.

@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "current_scope": "C-19 Execution-Agent Optimizer Practice Acceptance",
-  "current_status": "C-19 Task 2 Real Execution-Agent Optimizer Run was attempted exactly once and is complete with blocker evidence, verified-only. The command exited before real Spectre/OCEAN execution with stdout 'optimizer state is missing', empty stderr, and no native_turbo_summary.json, native_turbo_trace.jsonl, optimizer_state.json, or real_results_ledger.jsonl outputs.",
+  "current_status": "C-19 Task 3 Supervisor/Hermes Acceptance Audit is complete, verified-only. Acceptance is blocked before real tools because C-19 Task 1 copied a C-18 project, removed state/optimizer_state.json, but left stale ledger/experiment_ledger.jsonl rows. This made the clean handoff project internally inconsistent and caused prepare_explicit_candidate_real_run to fail with 'optimizer state is missing'.",
   "review_status": "verified-only",
   "subagent_dispatch": "available",
   "active_spec": "docs/superpowers/plans/2026-06-04-execution-agent-optimizer-practice-acceptance.md",
@@ -12,11 +12,11 @@
     "docs/EXECUTION_PROGRESS_2026-05-29.md",
     "docs/COMPACT_RESUME_CHECKPOINT.md"
   ],
-  "next_allowed_action": "execute C-19 Task 3: Supervisor/Hermes Acceptance Audit to classify the missing optimizer state blocker and decide the smallest corrective action; do not rerun run-native-turbo before Task 3 records the audit",
+  "next_allowed_action": "execute C-19 Task 4 Branch B: surgical fix for clean project preparation by removing stale optimizer ledger rows or initializing matching empty state before rerunning run-native-turbo once",
   "forbidden_actions": [
     "start broad optimizer framework work",
     "hand-pick 100 optimizer points instead of using native Turbo1.optimize()",
-    "rerun C-19 Task 2 real-tool execution before Task 3 audit",
+    "rerun C-19 real-tool execution before Task 4 applies the clean-project fix",
     "create daemon or service orchestration",
     "replace TuRBO",
     "run C-18 real-tool acceptance before fake/unit tasks pass and the user confirms",
@@ -44,8 +44,8 @@
     "active_spec": "docs/superpowers/plans/2026-06-04-execution-agent-optimizer-practice-acceptance.md",
     "active_plan": "docs/superpowers/plans/2026-06-04-execution-agent-optimizer-practice-acceptance.md",
     "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
-    "alignment": "Aligned. C-19 Task 2 used the existing run-native-turbo --parallel command once and did not hand-pick points or change formulas. The run stopped before real tool launch because the clean handoff project lacked optimizer_state.json.",
-    "drift": "Open blocker evidence, not a route drift yet. Task 3 must decide whether the C-19 handoff project preparation should preserve or initialize optimizer state before rerun."
+    "alignment": "Aligned. C-19 Task 3 classified an entry-state blocker and kept the route practice-first: no new framework, no formula change, no PSF parsing, and no physical tool blame without evidence.",
+    "drift": "Open implementation blocker. The C-19 clean project preparation was too broad: it deleted state but retained stale ledger rows. Task 4 Branch B must make the handoff project state internally consistent before one rerun."
   },
   "latest_valid_commit": "d7b3cee docs: plan execution agent optimizer acceptance",
   "review_evidence": {
@@ -64,6 +64,7 @@
     "c18_complete": "Complete, verified-only. Added run-native-turbo --parallel, report batch_summary, sanitized acceptance note docs/debug/2026-06-04-batch-native-turbo-parallel-acceptance.md, and real acceptance on /tmp/ic_auto_opt_c18_batch_native_turbo_001/bridge_test_inv. Real run completed 100 evaluations: 36 feasible, 50 constraint_failed, 14 metric_check_failed; phase counts initialization 16 and turbo_trust_region 84; batch_count 11; max worker metadata 10; Spectre audit preset ax, threads_per_run 10, parallel_jobs 10, output_format psfxl for all 100 prepared manifests. Full verification passed: python3 -m pytest -q (513 passed, 1 skipped) and python3 -m ruff check .",
     "c19_plan": "Complete, verified-only. Added docs/superpowers/plans/2026-06-04-execution-agent-optimizer-practice-acceptance.md as the next narrow practice-backed scope. C-19 validates execution-agent handoff using the existing run-native-turbo --parallel 100-evaluation path, not a new optimizer framework.",
     "c19_task1": "Complete, verified-only. Wrote local-only execution-agent task packet at /tmp/ic_auto_opt_c19/evidence/execution_agent_optimizer_acceptance_001/EXECUTION_AGENT_TASK.md and prepared clean practice project /tmp/ic_auto_opt_c19/bridge_test_inv from the accepted C-18 project. Native netlists/exported/input.scs, ade_e.scs, and amap/ were preserved; old runs/reports/state/data outputs were removed. Verification passed: git status --short, python3 tools/check_development_cadence.py, git diff --check. No real Spectre/OCEAN/Virtuoso/SSH/bridge run occurred.",
-    "c19_task2": "Complete with blocker evidence, verified-only. User confirmed real-tool execution. Ran .venv/bin/hermes-workflow run-native-turbo /tmp/ic_auto_opt_c19/bridge_test_inv --parallel --max-evals 100 --cadence-cshrc /home/zzchen/cadence_ic231_env.csh exactly once. It exited non-zero before real Spectre/OCEAN launch with stdout 'optimizer state is missing' and empty stderr. returned_artifact_hashes.sha256 is empty because no summary/trace/state/ledger files were produced. Local evidence is under /tmp/ic_auto_opt_c19/evidence/execution_agent_optimizer_acceptance_001/."
+    "c19_task2": "Complete with blocker evidence, verified-only. User confirmed real-tool execution. Ran .venv/bin/hermes-workflow run-native-turbo /tmp/ic_auto_opt_c19/bridge_test_inv --parallel --max-evals 100 --cadence-cshrc /home/zzchen/cadence_ic231_env.csh exactly once. It exited non-zero before real Spectre/OCEAN launch with stdout 'optimizer state is missing' and empty stderr. returned_artifact_hashes.sha256 is empty because no summary/trace/state/ledger files were produced. Local evidence is under /tmp/ic_auto_opt_c19/evidence/execution_agent_optimizer_acceptance_001/.",
+    "c19_task3": "Complete, verified-only. Wrote sanitized audit note docs/debug/2026-06-04-c19-execution-agent-optimizer-acceptance.md. Root cause: C-19 clean copy retained stale ledger/experiment_ledger.jsonl with 86 old C-18 rows while deleting state/optimizer_state.json. prepare_explicit_candidate_real_run requires state when ledger rows exist, so the run failed before real tool launch. Smallest next corrective action is Task 4 Branch B: remove stale optimizer ledger rows or initialize matching empty state before rerunning run-native-turbo once."
   }
 }

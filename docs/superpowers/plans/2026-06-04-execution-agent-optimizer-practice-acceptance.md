@@ -282,6 +282,8 @@ Update only the active plan, current state, and next log. Do not write a sanitiz
 
 **Risk:** Medium. This task reads generated reports and writes one sanitized acceptance note.
 
+**Status:** Complete, verified-only. Acceptance is blocked before real tools because the C-19 clean project kept stale C-18 `ledger/experiment_ledger.jsonl` while deleting `state/optimizer_state.json`.
+
 **Files:**
 
 - Create: `docs/debug/2026-06-04-c19-execution-agent-optimizer-acceptance.md`
@@ -289,7 +291,7 @@ Update only the active plan, current state, and next log. Do not write a sanitiz
 - Modify: `docs/CURRENT_TASK_STATE.json`
 - Modify: `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`
 
-- [ ] **Step 1: Audit optimizer report shape and settings**
+- [x] **Step 1: Audit optimizer report shape and settings**
 
 Run:
 
@@ -333,7 +335,14 @@ Expected:
 - no `threads_per_run` or `parallel_jobs` drift;
 - best candidate is reported when at least one feasible candidate exists.
 
-- [ ] **Step 2: Write sanitized acceptance note**
+Actual:
+
+- audit could not read `reports/native_turbo_summary.json` because Task 2 exited before report generation;
+- `ledger/experiment_ledger.jsonl` still contained old C-18 rows;
+- `state/optimizer_state.json` was missing;
+- this inconsistent clean-copy state is the blocker.
+
+- [x] **Step 2: Write sanitized acceptance note**
 
 Create `docs/debug/2026-06-04-c19-execution-agent-optimizer-acceptance.md` with:
 
@@ -345,7 +354,7 @@ Create `docs/debug/2026-06-04-c19-execution-agent-optimizer-acceptance.md` with:
 - whether execution-agent handoff was accepted or blocked;
 - blocking bug list if any.
 
-- [ ] **Step 3: Run repo verification**
+- [x] **Step 3: Run repo verification**
 
 Run:
 
