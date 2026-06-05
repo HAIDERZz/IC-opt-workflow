@@ -88,7 +88,7 @@ Required import check:
 Advanced visualization dependency check after C-47:
 
 ```bash
-/tmp/ic_auto_opt_openbox_spike/.venv/bin/python -c "import openbox, shap, lightgbm; print('openbox advanced visualization deps ok')"
+/tmp/ic_auto_opt_openbox_spike/.venv/bin/python -c "import openbox, shap, lightgbm, pyrfr; import pyrfr.regression; print('openbox advanced visualization deps ok')"
 ```
 
 Do not install unpinned latest `shap` into this venv. OpenBox 0.9 requires the
@@ -103,11 +103,21 @@ scikit-learn==1.3.2
 pandas==2.1.4
 shap==0.44.1
 lightgbm==4.6.0
+swig==4.4.1
+pyrfr==0.9.0
 ```
 
-OpenBox 0.9's feature-importance import path also references `pyrfr`. Installing
-`pyrfr` currently requires system `swig`. If `swig`/`pyrfr` are absent, C-47
-still generates OpenBox official HTML/JSON and surrogate verification, but the
+OpenBox 0.9's feature-importance import path also references `pyrfr`.
+`pyrfr` can be built without system package changes by installing PyPI `swig`
+inside the OpenBox venv first, then installing `pyrfr` without build isolation:
+
+```bash
+/tmp/ic_auto_opt_openbox_spike/.venv/bin/python -m pip install swig
+PATH=/tmp/ic_auto_opt_openbox_spike/.venv/bin:$PATH /tmp/ic_auto_opt_openbox_spike/.venv/bin/python -m pip install --no-build-isolation pyrfr
+```
+
+This is the accepted C-47 environment. If `pyrfr` is absent, C-47 still
+generates OpenBox official HTML/JSON and surrogate verification, but the
 manifest reports `generated_partial` with `parameter importance data was not
 generated`.
 

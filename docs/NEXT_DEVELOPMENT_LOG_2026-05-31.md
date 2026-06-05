@@ -1633,10 +1633,11 @@ C-47 OpenBox Advanced Visualization Artifact Completion:
 - Artifacts: writes `reports/openbox_advanced_visualization_manifest.json` plus OpenBox official HTML/JSON under `reports/openbox_advanced_visualization/`.
 - Reporting: `reports/optimizer_run_report.json` records `openbox.advanced_visualization`; `optimizer_insight_report.{json,md}` links the official OpenBox advanced visualization artifact.
 - Status model: distinguishes `generated`, `generated_partial`, `failed`, and `not_available`; it inspects OpenBox visualization JSON rather than trusting HTML existence alone.
-- Toolchain evidence: OpenBox-only fake workflow probe generated official HTML/JSON and correctly reported `generated_partial` because OpenBox 0.9 feature importance requires `pyrfr`, and `pyrfr` installation failed without system `swig`.
-- Dependency note: `/tmp/ic_auto_opt_openbox_spike/.venv` was restored to OpenBox-compatible numeric pins and uses `shap==0.44.1` plus `lightgbm==4.6.0`; do not install unpinned latest `shap`.
+- Toolchain evidence: OpenBox-only fake workflow probe generated official HTML/JSON and correctly reported `generated`, including parameter importance.
+- Dependency note: `/tmp/ic_auto_opt_openbox_spike/.venv` was restored to OpenBox-compatible numeric pins and uses `shap==0.44.1`, `lightgbm==4.6.0`, `swig==4.4.1`, and `pyrfr==0.9.0`; do not install unpinned latest `shap`.
+- Dependency resolution: `pyrfr` was built without system package changes by installing PyPI `swig` inside the OpenBox venv and then running `pip install --no-build-isolation pyrfr`.
 - Verification: targeted tests passed (`20 passed`), full suite passed (`574 passed, 1 skipped`), targeted ruff passed.
 - Boundary: no real Spectre/OCEAN rerun, no formula changes, no hand-picked candidates, no PSF parsing, no OCEAN formula rewrite, and no backend replacement.
 - current_scope: C-47 OpenBox Advanced Visualization Artifact complete.
-- next_allowed_action: decide whether to install system `swig`/`pyrfr` for full parameter-importance visualization, or proceed with production runs using `generated_partial` official OpenBox reports plus Hermes insight plots.
-- next_allowed_action exact: wait for user decision: either install system swig/pyrfr to unlock full OpenBox parameter-importance visualization, or proceed with production optimizer use accepting generated_partial official OpenBox reports plus Hermes insight plots
+- next_allowed_action: proceed with production optimizer use with full OpenBox advanced visualization available in the OpenBox venv; for the next real run, verify the advanced dependency check in TOOLCHAIN_EXECUTION_REFERENCE before execution.
+- next_allowed_action exact: proceed with production optimizer use with full OpenBox advanced visualization available in the OpenBox venv; for the next real run, verify the advanced dependency check in TOOLCHAIN_EXECUTION_REFERENCE before execution.

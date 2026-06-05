@@ -52,7 +52,7 @@ selection, or optimizer acceptance rules.
   - optimizer insight report links to OpenBox advanced visualization.
 - Full test suite passed after implementation.
 - OpenBox-only fake workflow probe generated official HTML/JSON and correctly
-  reported `generated_partial` because `pyrfr` is unavailable.
+  reported `generated`.
 
 ## Known Toolchain Note
 
@@ -68,11 +68,14 @@ Current compatible OpenBox visualization dependency state:
 - `pandas==2.1.4`
 - `shap==0.44.1`
 - `lightgbm==4.6.0`
+- `swig==4.4.1`
+- `pyrfr==0.9.0`
 
 OpenBox 0.9 still imports `pyrfr` through its feature-importance package.
-Installing `pyrfr` currently requires system `swig`; without it, C-47 produces
-official OpenBox HTML/JSON and surrogate verification, but records parameter
-importance as missing.
+This was resolved without system package changes by installing PyPI `swig`
+inside the OpenBox venv, then installing `pyrfr` with
+`--no-build-isolation`. With `pyrfr` present, the C-47 OpenBox-only probe
+records full `generated` status including parameter importance.
 
 ## Verification
 

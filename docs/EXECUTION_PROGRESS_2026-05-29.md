@@ -1278,8 +1278,9 @@ C-47 OpenBox Advanced Visualization Artifact Completion:
 - Manifest: `reports/openbox_advanced_visualization_manifest.json`.
 - Report linkage: `optimizer_run_report.json` records `openbox.advanced_visualization`; `optimizer_insight_report.{json,md}` links the artifact and warnings.
 - Status model: `generated`, `generated_partial`, `failed`, `not_available`.
-- Real OpenBox-only probe produced `generated_partial`: surrogate verification was present, parameter importance was missing because OpenBox 0.9 imports `pyrfr` for feature importance and `pyrfr` requires system `swig`.
-- OpenBox venv dependency correction: latest unpinned SHAP briefly upgraded OpenBox-incompatible numeric packages; venv was restored to `numpy==1.26.4`, `scipy==1.12.0`, `scikit-learn==1.3.2`, `pandas==2.1.4`, `shap==0.44.1`, `lightgbm==4.6.0`.
+- Real OpenBox-only probe now produced `generated`: surrogate verification and parameter importance are present.
+- OpenBox venv dependency correction: latest unpinned SHAP briefly upgraded OpenBox-incompatible numeric packages; venv was restored to `numpy==1.26.4`, `scipy==1.12.0`, `scikit-learn==1.3.2`, `pandas==2.1.4`, `shap==0.44.1`, `lightgbm==4.6.0`, `swig==4.4.1`, and `pyrfr==0.9.0`.
+- `pyrfr` was built without system package changes by installing PyPI `swig` inside the OpenBox venv and then running `pip install --no-build-isolation pyrfr`.
 - Verification: full suite passed (`574 passed, 1 skipped`) and targeted ruff passed.
 - Boundary: no real Spectre/OCEAN rerun, no metric formula changes, no PSF parsing, no backend replacement.
 - current_scope: C-47 OpenBox Advanced Visualization Artifact complete.
