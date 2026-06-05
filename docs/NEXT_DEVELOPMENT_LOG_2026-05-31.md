@@ -1460,6 +1460,7 @@ C-35 Toolchain Execution Reference Completion:
 - `AGENTS.md` updated so future real Virtuoso/Spectre/OCEAN/OpenBox/native-TuRBO/bridge work must read this reference first and compare failures against it before inventing new debug paths.
 - Fake-run policy tightened: at most one focused fake/local smoke per new command path, then smallest meaningful real practice flow when the feature depends on real tool behavior.
 - Boundary: no code changes, no real tools, no optimizer backend behavior changes, no PSF parsing, no OCEAN formula handling changes.
+- Commit: `18e899f`.
 - current_scope: C-35 Toolchain Execution Reference complete.
 - next_allowed_action: wait for user confirmation; recommended next is either productizing a stable OpenBox/Hermes execution environment requirement or planning continuation/multi-run optimizer workflow using the reference first.
 - State next_allowed_action: wait for user confirmation before the next narrow production step; recommended next is productizing the stable OpenBox/Hermes execution environment requirement or planning continuation/multi-run optimizer workflow using docs/TOOLCHAIN_EXECUTION_REFERENCE.md first

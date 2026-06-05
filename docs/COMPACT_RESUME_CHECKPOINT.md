@@ -745,6 +745,7 @@ C-35 Toolchain Execution Reference result:
 - The reference records the known-good C-34 setup: project `.venv` for normal Hermes/test/contract commands, `/tmp/ic_auto_opt_openbox_spike/.venv` for OpenBox real execution, `/home/zzchen/cadence_ic231_env.csh`, non-sandbox/escalated real-tool execution, clean workspace package sequence, matching `supervisor_instruction.json`, and `finalize-optimizer-run` closeout.
 - `AGENTS.md` now requires reading this reference before real tool work and limits fake/local smoke to one focused pass per new command path before moving to meaningful real practice.
 - Boundary: no code changes, no real tools, no optimizer backend behavior changes, no PSF parsing, no OCEAN formula handling changes.
+- Commit: `18e899f`.
 - Current next step: wait for user confirmation; recommended next is productizing a stable OpenBox/Hermes execution environment requirement or planning continuation/multi-run optimizer workflow using this reference first.
 
 Read the handoff files first:
