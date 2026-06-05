@@ -227,6 +227,7 @@ def prepare_explicit_candidate_real_run(
     metadata: dict[str, object] | None = None,
     created_at_utc: str | None = None,
     allow_unresolved_batch_runs: bool = False,
+    allow_optimizer_continuation: bool = False,
 ) -> RealRunPackage:
     project_dir = Path(project_dir)
     if run_id is not None:
@@ -256,7 +257,12 @@ def prepare_explicit_candidate_real_run(
     state_path = project_dir / OPTIMIZER_STATE_PATH
     if ledger_rows or state_path.exists():
         state = _load_optimizer_state_or_raise(project_dir)
-        _assert_optimizer_state_matches_bundle(bundle, state, ledger_rows)
+        _assert_optimizer_state_matches_bundle(
+            bundle,
+            state,
+            ledger_rows,
+            allow_optimizer_continuation=allow_optimizer_continuation,
+        )
     _assert_candidate_is_unique(project_dir, request, ledger_rows)
     request_relative = f"{REAL_RUN_ROOT}/{selected_run_id}/candidate_request.json"
     request_sha256 = _sha256_text(request_text)
@@ -388,6 +394,8 @@ def _assert_optimizer_state_matches_bundle(
     bundle: ContractBundle,
     state: OptimizerState,
     ledger_rows: list[LedgerRow],
+    *,
+    allow_optimizer_continuation: bool = False,
 ) -> None:
     optimizer = bundle.optimizer.optimizer
     checks = {
@@ -403,13 +411,18 @@ def _assert_optimizer_state_matches_bundle(
             raise ValueError(
                 f"optimizer state {field_name} disagrees with optimizer.yaml"
             )
-    if state.status in {"completed", "stopped"}:
+    if state.status == "stopped":
+        raise ValueError(f"optimizer state is {state.status}")
+    if state.status == "completed" and not allow_optimizer_continuation:
         raise ValueError(f"optimizer state is {state.status}")
     if state.current_evaluations != len(ledger_rows):
         raise ValueError(
             "optimizer state current_evaluations disagrees with ledger row count"
         )
-    if state.current_evaluations >= optimizer.max_evaluations:
+    if (
+        state.current_evaluations >= optimizer.max_evaluations
+        and not allow_optimizer_continuation
+    ):
         raise ValueError("optimizer maximum evaluations have already been reached")
 
 

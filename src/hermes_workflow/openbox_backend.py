@@ -194,6 +194,7 @@ def run_openbox_real_optimization(
         cadence_cshrc=cadence_cshrc,
         max_workers=min(selected_parallel_jobs, selected_batch_size),
         adapter=adapter,
+        allow_optimizer_continuation=continue_from_existing,
     )
     return _run_openbox_batches(
         project_root,
@@ -750,6 +751,7 @@ def make_openbox_real_candidate_batch_evaluator(
     cadence_cshrc: Path | None,
     max_workers: int,
     adapter: Callable[..., object] | None = None,
+    allow_optimizer_continuation: bool = False,
 ) -> BatchEvaluator:
     project_dir = Path(project_dir)
     selected_max_workers = max(1, max_workers)
@@ -772,6 +774,7 @@ def make_openbox_real_candidate_batch_evaluator(
                     "ask_tell": True,
                 },
                 allow_unresolved_batch_runs=True,
+                allow_optimizer_continuation=allow_optimizer_continuation,
             )
 
         observations: list[NativeTurboObservation | None] = [None] * len(candidates)

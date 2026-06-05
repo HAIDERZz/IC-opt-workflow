@@ -63,6 +63,10 @@ robust across OpenBox versions.
 - Seed duplicate detection with prior candidate parameter tuples.
 - Continue candidate ids and evaluation indexes after the prior trace count.
 - Continue real run ids after existing `runs/real/real_NNN` directories.
+- Allow explicit OpenBox continuation candidate packaging to proceed from a
+  prior `completed` optimizer state only when continuation mode is active,
+  while preserving normal completed/stopped-state guards for non-continuation
+  real-run preparation.
 - Write cumulative optimizer artifacts containing prior and new traces.
 - Record continuation metadata in `reports/optimizer_run_report.json`.
 - Add CLI support for:

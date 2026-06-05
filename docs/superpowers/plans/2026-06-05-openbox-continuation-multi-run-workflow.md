@@ -24,6 +24,8 @@ docs/superpowers/specs/2026-06-05-openbox-continuation-multi-run-workflow-design
   - prior traces are converted to advisor observations before new suggestions;
   - prior parameter tuples seed duplicate detection;
   - cumulative reports keep prior plus new traces.
+- [x] Add regression coverage for continuing from a prior `completed`
+  optimizer state, limited to explicit OpenBox continuation packaging.
 - [x] Implement the smallest helper layer needed inside `openbox_backend.py`.
 - [x] Keep existing non-continuation behavior unchanged.
 

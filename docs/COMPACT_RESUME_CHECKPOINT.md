@@ -772,6 +772,26 @@ C-38 OpenBox Continuation / Multi-Run Optimizer Workflow result:
 - Boundary: no real optimizer run, Spectre, OCEAN, Virtuoso, bridge, PSF parsing, or OCEAN formula rewrite occurred.
 - Current next step: wait for user confirmation; recommended next is a real continuation acceptance run using `docs/TOOLCHAIN_EXECUTION_REFERENCE.md`, `check-toolchain-env`, and `continue-openbox-real` against a known-good OpenBox project copy.
 
+C-39 OpenBox Real Continuation Acceptance result:
+
+- Status: complete, verified-only.
+- current_scope: C-39 OpenBox Real Continuation Acceptance complete.
+- Active acceptance plan: `docs/superpowers/plans/2026-06-05-openbox-real-continuation-acceptance.md`.
+- Sanitized evidence: `docs/debug/2026-06-05-c39-openbox-real-continuation-acceptance.md`.
+- First attempt failed before real tool launch with `optimizer state is completed`; this exposed a C-38 continuation package guard gap.
+- Fix: explicit OpenBox continuation packaging may continue from a prior `completed` optimizer state only when continuation mode is active. Normal non-continuation completed/stopped-state guards stay intact.
+- Successful workspace: `/tmp/ic_auto_opt_c39_continuation_002/bridge_test_inv`.
+- Toolchain gate passed with `/tmp/ic_auto_opt_c39_toolchain_probe_002.json`.
+- Real continuation completed `120` cumulative evaluations from prior `100` plus additional `20`.
+- New run ids: `real_101` through `real_120`.
+- New continuation statuses: `15 feasible`, `5 constraint_failed`, `0 metric_check_failed`, `0 real_check_failed`.
+- Cumulative statuses: `58 feasible`, `56 constraint_failed`, `6 metric_check_failed`.
+- `check-optimizer-run`: accepted.
+- `summarize-optimizer-run`: `accept_best_observed`, confidence `medium`, `global_optimum_claim=false`.
+- `finalize-optimizer-run`: passed.
+- Best observed remained `real_071`.
+- Current next step: wait for user confirmation before the next narrow production step; recommended next is productionizing continuation handoff/usage guidance or addressing the next real optimizer usability gap.
+
 Read the handoff files first:
 
 ```text
@@ -801,5 +821,5 @@ Use this prompt after compact:
 6. ic-auto-opt-workflow/docs/COMPACT_RESUME_CHECKPOINT.md
 7. ic-auto-opt-workflow/docs/OPTIMIZER_PRODUCTION_HANDOFF_GUIDE.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-38 OpenBox Continuation / Multi-Run Optimizer Workflow 已完成：新增 hermes-workflow continue-openbox-real、OpenBox continuation warm-start/cumulative artifacts、以及 package-optimizer-task --backend openbox --continuation --additional-evals N。下一步等待用户确认后做真实 continuation acceptance run；真实 OpenBox 前必须先读 TOOLCHAIN_EXECUTION_REFERENCE 并跑 check-toolchain-env。减少无意义 fake run；不要 silent fallback，不要直接替换 TuRBO，不要删除 native_turbo，不要创建 broad optimizer framework，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-39 OpenBox Real Continuation Acceptance 已完成：C-38 continuation 在真实 OpenBox/Spectre/OCEAN 路径上从 C34 的 100 eval 追加到 120 eval，check/summarize/finalize 全部通过。C-39 修复了 continuation-only completed-state package guard；普通非 continuation completed/stopped guard 不放宽。下一步等待用户确认后选择下一个窄生产步骤；推荐先 productionize continuation handoff/usage guidance 或处理下一项真实 optimizer usability gap。真实 OpenBox 前必须先读 TOOLCHAIN_EXECUTION_REFERENCE 并跑 check-toolchain-env。减少无意义 fake run；不要 silent fallback，不要直接替换 TuRBO，不要删除 native_turbo，不要创建 broad optimizer framework，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
 ```

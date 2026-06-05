@@ -1147,6 +1147,9 @@ Next required action:
 - C-38 OpenBox Continuation / Multi-Run Optimizer Workflow: complete, verified-only. Added `hermes-workflow continue-openbox-real`, OpenBox continuation warm-start from prior backend-neutral traces, cumulative optimizer artifact writing, duplicate seeding from prior candidates, continued evaluation/run/batch numbering, and `package-optimizer-task --backend openbox --continuation --additional-evals N`. Verification passed with full tests (`566 passed, 1 skipped`) and full ruff. No real optimizer run, Spectre, OCEAN, Virtuoso, bridge, PSF parsing, or formula rewrite occurred.
 - current_scope: C-38 OpenBox Continuation / Multi-Run Optimizer Workflow complete.
 
+- C-39 OpenBox Real Continuation Acceptance: complete, verified-only. Acceptance plan: `docs/superpowers/plans/2026-06-05-openbox-real-continuation-acceptance.md`; sanitized evidence: `docs/debug/2026-06-05-c39-openbox-real-continuation-acceptance.md`. First attempt exposed a C-38 package guard issue: explicit continuation candidate packaging rejected a prior `completed` optimizer state. Fixed with a continuation-only allowance while keeping normal completed/stopped guards intact. Real rerun on `/tmp/ic_auto_opt_c39_continuation_002/bridge_test_inv` passed toolchain gate, continued C34 from `100` to `120` cumulative evaluations, added `real_101` through `real_120`, and closed out with `check-optimizer-run` accepted, `summarize-optimizer-run` `accept_best_observed` confidence `medium` `global_optimum_claim=false`, and `finalize-optimizer-run` passed. New continuation statuses: `15 feasible`, `5 constraint_failed`; cumulative statuses: `58 feasible`, `56 constraint_failed`, `6 metric_check_failed`; best observed remained `real_071`.
+- current_scope: C-39 OpenBox Real Continuation Acceptance complete.
+
 ## Locked Role Model
 
 Status: locked as of 2026-06-02.

@@ -5,6 +5,7 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
+from hermes_workflow.approvals import decide_first_real_run
 from hermes_workflow.cli import app
 from hermes_workflow.openbox_backend import (
     _build_openbox_space,
@@ -12,8 +13,14 @@ from hermes_workflow.openbox_backend import (
     run_openbox_real_optimization,
 )
 from hermes_workflow.optimizer_artifacts import EVALUATIONS_RELATIVE, REPORT_RELATIVE
+from hermes_workflow.package import build_execution_package, create_project_from_template
+from hermes_workflow.real_run import prepare_real_run
 from hermes_workflow.validate import assert_valid_project
-from tests.real_run_smoke_helpers import create_approved_real_project
+from tests.real_run_smoke_helpers import (
+    TEMPLATE_TEXT,
+    create_approved_real_project,
+)
+from tests.report_helpers import write_pass_reports
 
 
 class FakeAdvisor:
@@ -67,6 +74,31 @@ class ContinuationAdvisor:
         assert observations
 
 
+class SequentialAdvisor:
+    def __init__(self, *, start: int = 0) -> None:
+        self.index = start
+        self.updated_observations: list[object] = []
+
+    def get_suggestions(self, batch_size: int) -> list[dict[str, float]]:
+        suggestions: list[dict[str, float]] = []
+        for _slot in range(batch_size):
+            value = self.index
+            self.index += 1
+            suggestions.append(
+                {
+                    "FN": 2 + (value % 10),
+                    "WN": 0.3 + 0.2 * (value % 10),
+                    "FP": 3 + (value % 9),
+                    "WP": 0.5 + 0.2 * (value % 9),
+                }
+            )
+        return suggestions
+
+    def update_observations(self, observations: list[object]) -> None:
+        self.updated_observations.extend(observations)
+        assert observations
+
+
 class FakeVariable:
     def __init__(self, name: str, lower: object, upper: object, **kwargs) -> None:
         self.name = name
@@ -87,6 +119,32 @@ class FakeSpaceModule:
     Space = FakeSpace
     Int = FakeVariable
     Real = FakeVariable
+
+
+def create_approved_real_project_with_optimizer_max(
+    tmp_path: Path,
+    max_evaluations: int,
+) -> Path:
+    project_dir = tmp_path / "bridge_test_inv"
+    create_project_from_template(project_dir)
+    optimizer_path = project_dir / "config" / "optimizer.yaml"
+    optimizer_text = optimizer_path.read_text(encoding="utf-8").replace(
+        "max_evaluations: 100",
+        f"max_evaluations: {max_evaluations}",
+    )
+    optimizer_path.write_text(optimizer_text, encoding="utf-8")
+    build_execution_package(project_dir, created_at_utc="2026-06-03T00:00:00Z")
+    write_pass_reports(project_dir)
+    instruction = decide_first_real_run(
+        project_dir,
+        created_at_utc="2026-06-03T00:10:00Z",
+    )
+    assert instruction["decision"] == "approve_first_real_run"
+    template_path = project_dir / "netlists" / "templates" / "template.scs"
+    template_path.parent.mkdir(parents=True, exist_ok=True)
+    template_path.write_text(TEMPLATE_TEXT, encoding="utf-8")
+    prepare_real_run(project_dir, created_at_utc="2026-06-03T00:20:00Z")
+    return project_dir
 
 
 def test_openbox_space_uses_effective_grid_upper(tmp_path: Path) -> None:
@@ -279,6 +337,59 @@ def test_run_openbox_real_optimization_uses_existing_real_candidate_path(
     assert rows[0]["metric_result_manifest"]
     assert first_candidate["requested_source"] == "openbox_optimizer"
     assert first_candidate["metadata"]["optimizer"] == "openbox"
+
+
+def test_run_openbox_real_continuation_allows_completed_prior_state(
+    tmp_path: Path,
+) -> None:
+    project_dir = create_approved_real_project_with_optimizer_max(
+        tmp_path,
+        max_evaluations=8,
+    )
+
+    def adapter(project_dir: Path, *, run_id: str, cadence_cshrc: Path | None) -> None:
+        from tests.real_run_smoke_helpers import (
+            write_fake_metric_result_manifest,
+            write_fake_result_manifest,
+        )
+
+        write_fake_result_manifest(project_dir, run_id=run_id)
+        write_fake_metric_result_manifest(project_dir, run_id=run_id)
+
+    run_openbox_real_optimization(
+        project_dir,
+        max_evals=8,
+        batch_size=4,
+        parallel_jobs=4,
+        advisor_factory=lambda _space, _seed: SequentialAdvisor(),
+        adapter=adapter,
+    )
+    state = json.loads(
+        (project_dir / "state" / "optimizer_state.json").read_text(encoding="utf-8")
+    )
+    assert state["status"] == "completed"
+    advisor = SequentialAdvisor(start=8)
+
+    result = run_openbox_real_optimization(
+        project_dir,
+        additional_evals=1,
+        continue_from_existing=True,
+        batch_size=1,
+        parallel_jobs=1,
+        advisor_factory=lambda _space, _seed: advisor,
+        adapter=adapter,
+    )
+
+    report = json.loads((project_dir / REPORT_RELATIVE).read_text())
+    rows = [
+        json.loads(line)
+        for line in (project_dir / EVALUATIONS_RELATIVE).read_text().splitlines()
+    ]
+
+    assert result.evaluation_count == 9
+    assert report["openbox"]["continuation"]["prior_evaluation_count"] == 8
+    assert rows[-1]["evaluation_index"] == 9
+    assert rows[-1]["run_id"] == "real_010"
 
 
 def test_run_openbox_real_cli_uses_dependency_gate(tmp_path: Path, monkeypatch) -> None:
