@@ -25,6 +25,7 @@ from hermes_workflow.optimizer_completion import summarize_optimizer_run
 from hermes_workflow.optimizer_finalize import finalize_optimizer_run
 from hermes_workflow.optimizer_insights import generate_optimizer_insight_report
 from hermes_workflow.optimizer_suggestion import suggest_candidate_request
+from hermes_workflow.optimizer_status import summarize_optimizer_status
 from hermes_workflow.optimizer_task_package import (
     build_optimizer_execution_task_package,
 )
@@ -724,6 +725,55 @@ def finalize_optimizer_run_command(
     for issue in report.issues:
         typer.echo(issue)
     typer.echo("report: reports/optimizer_finalize_report.json")
+    raise typer.Exit(code=1)
+
+
+@app.command("optimizer-status")
+def optimizer_status_command(
+    project_dir: Annotated[
+        Path,
+        typer.Argument(help="Project directory with optimizer artifacts."),
+    ],
+) -> None:
+    try:
+        summary = summarize_optimizer_status(project_dir)
+    except (OSError, ValueError) as exc:
+        _exit_with_error(exc)
+
+    typer.echo(f"optimizer status: {summary.status}")
+    if summary.decision is not None:
+        typer.echo(f"decision: {summary.decision}")
+    if summary.confidence is not None:
+        typer.echo(f"confidence: {summary.confidence}")
+    if summary.global_optimum_claim is not None:
+        typer.echo(
+            f"global optimum claim: {str(summary.global_optimum_claim).lower()}"
+        )
+    if summary.best_observed_run_id is not None:
+        typer.echo(f"best observed: {summary.best_observed_run_id}")
+    if summary.evaluation_count is not None:
+        typer.echo(f"evaluations: {summary.evaluation_count}")
+    if summary.status_counts:
+        counts = ", ".join(
+            f"{name}={count}" for name, count in sorted(summary.status_counts.items())
+        )
+        typer.echo(f"status counts: {counts}")
+    if summary.continuation_recommended is not None:
+        typer.echo(
+            "continuation recommended: "
+            f"{str(summary.continuation_recommended).lower()}"
+        )
+    if summary.plateau_detected is not None:
+        typer.echo(f"plateau detected: {str(summary.plateau_detected).lower()}")
+    if summary.continuation_reason is not None:
+        typer.echo(f"continuation reason: {summary.continuation_reason}")
+    for name, path in sorted(summary.reports.items()):
+        typer.echo(f"{name}: {path}")
+    if summary.status == "pass":
+        return
+
+    for issue in summary.issues:
+        typer.echo(issue)
     raise typer.Exit(code=1)
 
 

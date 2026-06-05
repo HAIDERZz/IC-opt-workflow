@@ -1205,3 +1205,17 @@ C-42 OpenBox Continuation Packet Handoff Drill Completion:
 - Boundary: no formula changes, no hand-picked candidates, no PSF parsing, no OCEAN formula rewrite, no raw Cadence artifacts committed.
 - current_scope: C-42 OpenBox Continuation Packet Handoff Drill complete.
 - next_allowed_action: wait for user confirmation before the next narrow production step; recommended next is a small supervisor-facing optimizer run-status command or user-guided production adoption of the C-40/C-42 packet handoff path.
+
+
+C-43 Optimizer Status Command Completion:
+
+- Status: complete, verified-only.
+- Design spec: `docs/superpowers/specs/2026-06-05-optimizer-status-command-design.md`.
+- Implementation plan: `docs/superpowers/plans/2026-06-05-optimizer-status-command.md`.
+- Code: added `src/hermes_workflow/optimizer_status.py` and CLI `hermes-workflow optimizer-status PROJECT_DIR`.
+- Behavior: reuses `finalize_optimizer_run`, reads existing completion/finalize data, and prints a compact supervisor-facing summary: status, decision, confidence, `global_optimum_claim`, best observed run id, evaluation count, status counts, continuation recommendation, plateau flag, reason, and report paths.
+- Real-workspace smoke on `/tmp/ic_auto_opt_c42_packet_handoff_001/bridge_test_inv`: status `pass`, decision `accept_best_observed`, confidence `medium`, `global_optimum_claim=false`, best observed `real_071`, `130` evaluations, counts `constraint_failed=62`, `feasible=62`, `metric_check_failed=6`, continuation recommended `false`.
+- Verification: `python3 -m pytest tests/test_optimizer_status.py -q` passed; `python3 -m pytest tests/test_optimizer_status.py tests/test_optimizer_finalize.py tests/test_optimizer_completion.py tests/test_optimizer_acceptance.py -q` passed; targeted ruff passed.
+- Boundary: no real optimizer execution, Spectre, OCEAN, Virtuoso, bridge, objective change, new report contract, PSF parsing, or OCEAN formula rewrite occurred.
+- current_scope: C-43 Optimizer Status Command complete.
+- next_allowed_action: wait for user confirmation before the next narrow production step; recommended next is production use of optimizer-status on a fresh execution-agent handoff, or a small user-facing optimizer adoption guide update if needed.
