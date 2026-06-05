@@ -5,7 +5,7 @@ from typer.testing import CliRunner
 
 from hermes_workflow.cli import app
 from hermes_workflow.optimizer_insights import generate_optimizer_insight_report
-from tests.test_optimizer_completion import _write_accepted_optimizer_project
+from tests.test_optimizer_completion import _trace_row, _write_accepted_optimizer_project
 
 
 runner = CliRunner()
@@ -32,7 +32,9 @@ def test_generate_optimizer_insight_report_writes_json_markdown_and_svgs(
     assert "FN" in payload["observed_relationships"]
     assert "objective" in payload["observed_relationships"]["FN"]
     assert payload["plots"] == {
+        "constraint_margins": "reports/optimizer_visuals/constraint_margins.svg",
         "convergence": "reports/optimizer_visuals/convergence.svg",
+        "feasible_convergence": "reports/optimizer_visuals/feasible_convergence.svg",
         "parameter_objective_scatter": (
             "reports/optimizer_visuals/parameter_objective_scatter.svg"
         ),
@@ -102,6 +104,86 @@ def test_generate_optimizer_insight_report_links_openbox_advanced_visualization(
     markdown = report.markdown_path.read_text(encoding="utf-8")
     assert "reports/openbox_advanced_visualization/history/run/run.html" in markdown
     assert "parameter_importance" in markdown
+
+
+def test_generate_optimizer_insight_report_writes_ic_native_sections(
+    tmp_path: Path,
+) -> None:
+    rows = [
+        _trace_row(
+            evaluation_index=1,
+            run_id="real_001",
+            status="constraint_failed",
+            objective=1_000_000.1,
+        ),
+        _trace_row(
+            evaluation_index=2,
+            run_id="real_002",
+            status="feasible",
+            objective=4.5e-14,
+        ),
+        _trace_row(
+            evaluation_index=3,
+            run_id="real_003",
+            status="feasible",
+            objective=4.0e-14,
+        ),
+    ]
+    rows[0]["metrics"] = {"rise": 100e-12, "fall": 75e-12, "DC": 350e-6}
+    rows[1]["metrics"] = {"rise": 72e-12, "fall": 70e-12, "DC": 340e-6}
+    rows[2]["metrics"] = {"rise": 68e-12, "fall": 66e-12, "DC": 320e-6}
+    rows[2]["parameters"] = {"FN": "12", "WN": "2.7u", "FP": "7", "WP": "0.7u"}
+    project_dir = _write_accepted_optimizer_project(tmp_path, rows=rows)
+    (project_dir / "config" / "metrics.yaml").write_text(
+        """
+schema_version: "1.0"
+metrics:
+  - name: rise
+    unit: s
+  - name: fall
+    unit: s
+  - name: DC
+    unit: W
+constraints:
+  - metric: rise
+    op: lt
+    value: "80e-12 s"
+  - metric: fall
+    op: lt
+    value: "80e-12 s"
+  - metric: DC
+    op: lt
+    value: "4e-4 W"
+objective:
+  direction: minimize
+  expression: "(rise + fall) * DC"
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    report = generate_optimizer_insight_report(project_dir)
+
+    payload = json.loads(report.report_path.read_text(encoding="utf-8"))
+    assert payload["ic_metric_summary"]["objective"]["best_feasible_run_id"] == "real_003"
+    assert payload["top_feasible_candidates"][0]["run_id"] == "real_003"
+    assert payload["top_feasible_candidates"][0]["metrics_display"] == {
+        "DC": "320 uW",
+        "fall": "66 ps",
+        "rise": "68 ps",
+    }
+    assert payload["constraint_margin_summary"]["rise"]["best_margin_display"] == "12 ps"
+    assert payload["constraint_margin_summary"]["DC"]["best_margin_display"] == "80 uW"
+    assert payload["plots"]["feasible_convergence"] == (
+        "reports/optimizer_visuals/feasible_convergence.svg"
+    )
+    assert payload["plots"]["constraint_margins"] == (
+        "reports/optimizer_visuals/constraint_margins.svg"
+    )
+    markdown = report.markdown_path.read_text(encoding="utf-8")
+    assert "IC-native Summary" in markdown
+    assert "Top feasible candidates" in markdown
+    assert "Constraint margins" in markdown
+    assert "real_003" in markdown
 
 
 def test_visualize_optimizer_run_cli_writes_report(tmp_path: Path) -> None:

@@ -1296,3 +1296,12 @@ C-47 Real OpenBox Advanced Visualization Flow Completion:
 - OpenBox advanced visualization: manifest status `generated`, including objective/constraint history, surrogate verification, and parameter importance.
 - Boundary: no hand-picked candidates, formula changes, PSF parsing, OCEAN formula rewrite, or raw Cadence artifact commit.
 - current_scope: C-47 Real OpenBox Advanced Visualization Flow complete.
+
+C-48 IC-native Offline Optimizer Insight Report Completion:
+
+- Status: complete, verified-only.
+- `optimizer_insight_report` now adds IC-native report sections from existing evaluated samples: best feasible summary, top feasible candidates, constraint margin summary, feasible-only convergence, constraint margin plot, and OpenBox SHAP importance summary with constraint metric labels.
+- Real sample probe: `/tmp/ic_auto_opt_real_flow_t77ky7/bridge_test_inv` regenerated successfully without Spectre/OCEAN rerun.
+- Verification: `tests/test_optimizer_insights.py` passed, adjacent optimizer report/closeout tests passed (`22 passed`), targeted ruff passed.
+- Boundary: reporting-only change; no candidate selection, formula, adapter, acceptance, continuation, or PSF parsing change.
+- current_scope: C-48 IC-native Offline Optimizer Insight Report complete.

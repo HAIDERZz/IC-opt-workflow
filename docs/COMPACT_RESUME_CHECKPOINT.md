@@ -991,8 +991,25 @@ C-47 Real OpenBox Advanced Visualization Flow Completion:
 - Advanced visualization: `reports/openbox_advanced_visualization_manifest.json` status `generated`, with objective/constraint history, surrogate verification, and parameter importance.
 - Next: inspect the C-47 real visualization quality and improve offline insight reporting only if the existing 100 real samples show a concrete reporting gap.
 
+C-48 IC-native Offline Optimizer Insight Report Completion:
+
+- Status: complete, verified-only.
+- Code: `src/hermes_workflow/optimizer_insights.py`; tests: `tests/test_optimizer_insights.py`.
+- Report now adds best feasible objective summary, top feasible candidates with IC display units, constraint margin summary, feasible-only convergence SVG, constraint margin SVG, and OpenBox SHAP parameter importance with metric constraint labels.
+- Real sample probe: regenerated `/tmp/ic_auto_opt_real_flow_t77ky7/bridge_test_inv/reports/optimizer_insight_report.{json,md}` without rerunning Spectre/OCEAN; status `pass`.
+- Verification: targeted TDD test passed, `tests/test_optimizer_insights.py` passed, adjacent optimizer report/closeout tests passed (`22 passed`), targeted ruff passed.
+- Boundary: no optimizer candidate selection change, no Spectre/OCEAN rerun, no formula change, no PSF parsing, no acceptance/continuation decision change.
+- current_scope: C-48 IC-native Offline Optimizer Insight Report complete.
+- next_allowed_action: review the improved IC-native optimizer_insight_report from /tmp/ic_auto_opt_real_flow_t77ky7/bridge_test_inv and decide whether the report quality is sufficient for production adoption; do not rerun Spectre/OCEAN solely for report formatting.
+
 ## Resume Prompt
 
 ```text
 请继续 IC auto optimization workflow。先阅读 AGENTS.md、docs/CURRENT_TASK_STATE.json、docs/TOOLCHAIN_EXECUTION_REFERENCE.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/OPTIMIZER_PRODUCTION_HANDOFF_GUIDE.md。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-47 OpenBox Advanced Visualization Artifact 已完成并已通过一次完整真实 OpenBox/Spectre/OCEAN 100 eval flow 验证：workspace /tmp/ic_auto_opt_real_flow_t77ky7/bridge_test_inv，结果 43 feasible / 51 constraint_failed / 6 metric_check_failed / 0 real_check_failed，best observed real_071，decision accept_best_observed，global_optimum_claim=false。OpenBox advanced visualization manifest 是 generated，包含 objective/constraint history、surrogate verification、parameter importance。下一步建议先检查这份真实 HTML/JSON 的可视化质量，如果需要，基于现有 100 个真实样本改进离线 optimizer insight report，不要为了报告质量重跑 Spectre/OCEAN。真实 OpenBox/Spectre/OCEAN 前必须先读 TOOLCHAIN_EXECUTION_REFERENCE 并跑 check-toolchain-env 及 advanced visualization dependency check。不要创建 broad framework，不要 hand-pick optimizer points，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
+```
+
+## Latest Resume Prompt
+
+```text
+请继续 IC auto optimization workflow。先阅读 AGENTS.md、docs/CURRENT_TASK_STATE.json、docs/TOOLCHAIN_EXECUTION_REFERENCE.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/OPTIMIZER_PRODUCTION_HANDOFF_GUIDE.md。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-48 IC-native Offline Optimizer Insight Report 已完成：optimizer_insight_report.{json,md} 现在包含 best feasible summary、top feasible candidates with IC display units、constraint margin summary、feasible-only convergence SVG、constraint margin SVG、OpenBox SHAP parameter importance with metric labels。真实样本 /tmp/ic_auto_opt_real_flow_t77ky7/bridge_test_inv 已在不重跑 Spectre/OCEAN 的情况下重新生成 report，status pass。下一步请 review 这份改进后的 IC-native optimizer_insight_report，判断报告质量是否足够进入生产采用；不要为了报告格式重跑 Spectre/OCEAN。真实 OpenBox/Spectre/OCEAN 前必须先读 TOOLCHAIN_EXECUTION_REFERENCE 并跑 check-toolchain-env 及 advanced visualization dependency check。不要创建 broad framework，不要 hand-pick optimizer points，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
 ```

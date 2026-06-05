@@ -72,6 +72,10 @@ Completed optimizer milestones since C-26:
   The generated manifest status was `generated`, including
   objective/constraint history, surrogate verification, and parameter
   importance.
+- C-48 improved the offline supervisor-facing optimizer insight report using
+  existing evaluated samples. The report now includes IC-native top feasible
+  candidates, constraint margins, feasible-only convergence, and OpenBox SHAP
+  importance summaries with metric labels.
 
 Current code-level entry points:
 
@@ -86,10 +90,10 @@ Current code-level entry points:
 - `hermes-workflow optimizer-status PROJECT_DIR`
 
 The next work should stay narrow and practice-first. Do not start a broad
-optimizer framework rewrite. The likely next production step is to inspect the
-real C-47 OpenBox advanced visualization output quality and, if needed, improve
-the offline insight report using existing real samples without rerunning
-Spectre/OCEAN.
+optimizer framework rewrite. The likely next production step is to review the
+C-48 IC-native report quality on the C-47 real 100-evaluation sample and then
+move to production adoption or only the smallest reporting usability fix that
+the real report shows is still needed.
 
 ## Current Route Alignment
 

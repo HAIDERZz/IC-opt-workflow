@@ -1654,3 +1654,15 @@ C-47 Real OpenBox Advanced Visualization Flow Completion:
 - Boundary: no hand-picked candidates, no formula changes, no PSF parsing, no OCEAN formula rewrite, and no raw Cadence artifacts committed.
 - current_scope: C-47 Real OpenBox Advanced Visualization Flow complete.
 - next_allowed_action: inspect the C-47 real OpenBox advanced visualization quality and, if needed, improve offline optimizer insight reporting using the existing 100 real samples without rerunning Spectre/OCEAN.
+
+C-48 IC-native Offline Optimizer Insight Report Completion:
+
+- Status: complete, verified-only.
+- Code: `src/hermes_workflow/optimizer_insights.py`.
+- Tests: `tests/test_optimizer_insights.py`.
+- Behavior: `optimizer_insight_report.{json,md}` now includes IC-native post-run sections: best feasible objective summary, top feasible candidates with display units, constraint margin summary, OpenBox SHAP parameter-importance summary with constraint metric names, feasible-only convergence plot, and constraint margin plot.
+- Real sample validation: regenerated the report for `/tmp/ic_auto_opt_real_flow_t77ky7/bridge_test_inv` without rerunning Spectre/OCEAN; report status `pass`, OpenBox importance `available`, and new SVG paths were written.
+- Verification: targeted TDD test passed, full `tests/test_optimizer_insights.py` passed, adjacent optimizer report/closeout tests passed (`22 passed`), targeted ruff passed.
+- Boundary: no optimizer candidate selection change, no Spectre/OCEAN rerun, no formula change, no PSF parsing, no acceptance/continuation decision change.
+- current_scope: C-48 IC-native Offline Optimizer Insight Report complete.
+- next_allowed_action: review the improved IC-native optimizer_insight_report from /tmp/ic_auto_opt_real_flow_t77ky7/bridge_test_inv and decide whether the report quality is sufficient for production adoption; do not rerun Spectre/OCEAN solely for report formatting.
