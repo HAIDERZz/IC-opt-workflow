@@ -61,15 +61,16 @@ def test_build_optimizer_execution_task_package_writes_task_and_manifest(
     ]
     assert manifest_payload["spectre_settings"]["threads_per_run"] == 10
     assert manifest_payload["spectre_settings"]["parallel_jobs"] == 10
-    assert manifest_payload["required_returned_artifacts"] == [
-        "reports/native_turbo_optimizer_report.json",
-        "reports/native_turbo_optimizer_evaluations.jsonl",
-        "state/optimizer_state.json",
-        "ledger/experiment_ledger.jsonl",
-    ]
+    required_artifacts = manifest_payload["required_returned_artifacts"]
+    assert "reports/native_turbo_optimizer_report.json" in required_artifacts
+    assert "reports/native_turbo_optimizer_evaluations.jsonl" in required_artifacts
+    assert "state/optimizer_state.json" in required_artifacts
+    assert "ledger/experiment_ledger.jsonl" in required_artifacts
+    assert "reports/optimizer_finalize_report.json" in required_artifacts
     assert manifest_payload["audit_commands"] == [
         ["hermes-workflow", "check-optimizer-run", str(project_dir)],
         ["hermes-workflow", "summarize-optimizer-run", str(project_dir)],
+        ["hermes-workflow", "finalize-optimizer-run", str(project_dir)],
     ]
 
 
@@ -119,12 +120,12 @@ def test_build_optimizer_execution_task_package_writes_openbox_backend(
         "--cadence-cshrc",
         "/home/zzchen/cadence_ic231_env.csh",
     ]
-    assert manifest_payload["required_returned_artifacts"] == [
-        "reports/optimizer_run_report.json",
-        "reports/optimizer_evaluations.jsonl",
-        "state/optimizer_state.json",
-        "ledger/experiment_ledger.jsonl",
-    ]
+    required_artifacts = manifest_payload["required_returned_artifacts"]
+    assert "reports/optimizer_run_report.json" in required_artifacts
+    assert "reports/optimizer_evaluations.jsonl" in required_artifacts
+    assert "state/optimizer_state.json" in required_artifacts
+    assert "ledger/experiment_ledger.jsonl" in required_artifacts
+    assert "reports/optimizer_finalize_report.json" in required_artifacts
 
 
 def test_build_optimizer_execution_task_package_writes_openbox_continuation(
@@ -150,10 +151,26 @@ def test_build_optimizer_execution_task_package_writes_openbox_continuation(
     assert "run-openbox-real" not in task_text
     assert "--additional-evals 50" in task_text
     assert "existing accepted optimizer traces" in task_text
+    assert "check-toolchain-env" in task_text
+    assert "/tmp/ic_auto_opt_openbox_spike/.venv" in task_text
+    assert "finalize-optimizer-run" in task_text
+    assert "non-sandbox" in task_text
+    assert "reports/optimizer_run_acceptance_report.json" in task_text
+    assert "reports/optimizer_completion_report.json" in task_text
+    assert "reports/optimizer_finalize_report.json" in task_text
+    assert "reports/optimizer_insight_report.md" in task_text
     assert manifest_payload["backend"] == "openbox"
     assert manifest_payload["continuation"] is True
     assert manifest_payload["additional_evals"] == 50
     assert manifest_payload["max_evals"] is None
+    assert manifest_payload["toolchain_check_command"] == [
+        "hermes-workflow",
+        "check-toolchain-env",
+        "--openbox-venv",
+        "/tmp/ic_auto_opt_openbox_spike/.venv",
+        "--cadence-cshrc",
+        "/home/zzchen/cadence_ic231_env.csh",
+    ]
     assert manifest_payload["command"] == [
         "hermes-workflow",
         "continue-openbox-real",
@@ -166,6 +183,14 @@ def test_build_optimizer_execution_task_package_writes_openbox_continuation(
         "10",
         "--cadence-cshrc",
         "/home/zzchen/cadence_ic231_env.csh",
+    ]
+    assert [
+        "hermes-workflow",
+        "finalize-optimizer-run",
+        str(project_dir),
+    ] in manifest_payload["audit_commands"]
+    assert "reports/optimizer_finalize_report.json" in manifest_payload[
+        "required_returned_artifacts"
     ]
 
 

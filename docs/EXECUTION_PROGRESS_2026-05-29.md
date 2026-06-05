@@ -1150,6 +1150,9 @@ Next required action:
 - C-39 OpenBox Real Continuation Acceptance: complete, verified-only. Acceptance plan: `docs/superpowers/plans/2026-06-05-openbox-real-continuation-acceptance.md`; sanitized evidence: `docs/debug/2026-06-05-c39-openbox-real-continuation-acceptance.md`. First attempt exposed a C-38 package guard issue: explicit continuation candidate packaging rejected a prior `completed` optimizer state. Fixed with a continuation-only allowance while keeping normal completed/stopped guards intact. Real rerun on `/tmp/ic_auto_opt_c39_continuation_002/bridge_test_inv` passed toolchain gate, continued C34 from `100` to `120` cumulative evaluations, added `real_101` through `real_120`, and closed out with `check-optimizer-run` accepted, `summarize-optimizer-run` `accept_best_observed` confidence `medium` `global_optimum_claim=false`, and `finalize-optimizer-run` passed. New continuation statuses: `15 feasible`, `5 constraint_failed`; cumulative statuses: `58 feasible`, `56 constraint_failed`, `6 metric_check_failed`; best observed remained `real_071`.
 - current_scope: C-39 OpenBox Real Continuation Acceptance complete.
 
+- C-40 OpenBox Continuation Production Handoff: complete, verified-only. Added design spec `docs/superpowers/specs/2026-06-05-openbox-continuation-production-handoff-design.md` and plan `docs/superpowers/plans/2026-06-05-openbox-continuation-production-handoff.md`. Strengthened generated OpenBox task packets so continuation handoff includes the toolchain gate, known-good OpenBox venv, non-sandbox/escalated execution note, `finalize-optimizer-run`, and supervisor closeout artifacts. Updated `docs/OPTIMIZER_PRODUCTION_HANDOFF_GUIDE.md` with first-run and continuation packet flows. No real tools were run.
+- current_scope: C-40 OpenBox Continuation Production Handoff complete.
+
 ## Locked Role Model
 
 Status: locked as of 2026-06-02.

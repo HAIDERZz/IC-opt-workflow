@@ -792,6 +792,17 @@ C-39 OpenBox Real Continuation Acceptance result:
 - Best observed remained `real_071`.
 - Current next step: wait for user confirmation before the next narrow production step; recommended next is productionizing continuation handoff/usage guidance or addressing the next real optimizer usability gap.
 
+C-40 OpenBox Continuation Production Handoff result:
+
+- Status: complete, verified-only.
+- current_scope: C-40 OpenBox Continuation Production Handoff complete.
+- Design spec: `docs/superpowers/specs/2026-06-05-openbox-continuation-production-handoff-design.md`.
+- Implementation plan: `docs/superpowers/plans/2026-06-05-openbox-continuation-production-handoff.md`.
+- Code: OpenBox execution-agent packets now include `check-toolchain-env`, known-good OpenBox venv `/tmp/ic_auto_opt_openbox_spike/.venv`, non-sandbox/escalated execution wording, `finalize-optimizer-run`, and supervisor closeout artifacts.
+- Guide: `docs/OPTIMIZER_PRODUCTION_HANDOFF_GUIDE.md` now documents OpenBox first-run and continuation package flows.
+- Boundary: no real optimizer run, Spectre, OCEAN, Virtuoso, bridge, PSF parsing, or OCEAN formula rewrite occurred.
+- Current next step: wait for user confirmation before the next narrow production step; recommended next is either a one-command supervisor closeout wrapper or a focused optimizer continuation decision improvement.
+
 Read the handoff files first:
 
 ```text
@@ -821,5 +832,5 @@ Use this prompt after compact:
 6. ic-auto-opt-workflow/docs/COMPACT_RESUME_CHECKPOINT.md
 7. ic-auto-opt-workflow/docs/OPTIMIZER_PRODUCTION_HANDOFF_GUIDE.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-39 OpenBox Real Continuation Acceptance 已完成：C-38 continuation 在真实 OpenBox/Spectre/OCEAN 路径上从 C34 的 100 eval 追加到 120 eval，check/summarize/finalize 全部通过。C-39 修复了 continuation-only completed-state package guard；普通非 continuation completed/stopped guard 不放宽。下一步等待用户确认后选择下一个窄生产步骤；推荐先 productionize continuation handoff/usage guidance 或处理下一项真实 optimizer usability gap。真实 OpenBox 前必须先读 TOOLCHAIN_EXECUTION_REFERENCE 并跑 check-toolchain-env。减少无意义 fake run；不要 silent fallback，不要直接替换 TuRBO，不要删除 native_turbo，不要创建 broad optimizer framework，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-40 OpenBox Continuation Production Handoff 已完成：OpenBox execution-agent packets now include check-toolchain-env, known-good OpenBox venv /tmp/ic_auto_opt_openbox_spike/.venv, non-sandbox/escalated execution wording, finalize-optimizer-run, and supervisor closeout artifacts. C-39 已证明真实 continuation 从 100 eval 追加到 120 eval 可行。下一步等待用户确认后选择下一个窄生产步骤；推荐 one-command supervisor closeout wrapper 或 focused optimizer continuation decision improvement。真实 OpenBox 前必须先读 TOOLCHAIN_EXECUTION_REFERENCE 并跑 check-toolchain-env。减少无意义 fake run；不要 silent fallback，不要直接替换 TuRBO，不要删除 native_turbo，不要创建 broad optimizer framework，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
 ```

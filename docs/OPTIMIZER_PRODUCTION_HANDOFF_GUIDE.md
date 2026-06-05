@@ -70,6 +70,13 @@ Use OpenBox only when explicitly selected:
 .venv/bin/hermes-workflow package-optimizer-task PROJECT_DIR --backend openbox --max-evals 100 --cadence-cshrc CADENCE_CSHRC --parallel
 ```
 
+Continue an accepted OpenBox run only when the supervisor decides to add more
+evaluations:
+
+```bash
+.venv/bin/hermes-workflow package-optimizer-task PROJECT_DIR --backend openbox --continuation --additional-evals 20 --cadence-cshrc CADENCE_CSHRC --parallel
+```
+
 Both backends must use the same approved variables, bounds, quantization, metric
 formulas, Spectre settings, and manifest-level audit rules. Do not add hidden
 coupling such as `FP=FN` unless it is present in the approved project contract.
@@ -86,10 +93,16 @@ If `supervisor_instruction.json` is copied from a known-good approved project,
 the `approved_config_hashes` must exactly match
 `execution_package/execution_manifest.json`.
 
-2. Generate the optimizer execution task packet:
+2. Generate the optimizer execution task packet for a first optimizer run:
 
 ```bash
 .venv/bin/hermes-workflow package-optimizer-task PROJECT_DIR --backend BACKEND --max-evals 100 --cadence-cshrc CADENCE_CSHRC --parallel
+```
+
+For an OpenBox continuation, use:
+
+```bash
+.venv/bin/hermes-workflow package-optimizer-task PROJECT_DIR --backend openbox --continuation --additional-evals N --cadence-cshrc CADENCE_CSHRC --parallel
 ```
 
 3. Give the execution agent these files:
@@ -133,6 +146,23 @@ OpenBox task packets call:
 hermes-workflow run-openbox-real PROJECT_DIR --max-evals N --batch-size B --parallel-jobs P --cadence-cshrc CADENCE_CSHRC
 ```
 
+OpenBox continuation task packets call:
+
+```bash
+hermes-workflow continue-openbox-real PROJECT_DIR --additional-evals N --batch-size B --parallel-jobs P --cadence-cshrc CADENCE_CSHRC
+```
+
+Before OpenBox real execution, the execution agent must run the toolchain gate
+printed in the packet. The current known-good OpenBox execution environment is:
+
+```text
+/tmp/ic_auto_opt_openbox_spike/.venv
+```
+
+The real optimizer command must run with the OpenBox venv first in `PATH`,
+Cadence cshrc sourced, writable `MPLCONFIGDIR`, and a non-sandbox/escalated
+execution path.
+
 After execution, the execution agent should run the audit commands printed in
 the task packet, then report the paths and status. Chat text is not acceptance
 evidence; the files are the evidence.
@@ -152,6 +182,12 @@ OpenBox:
 - `reports/optimizer_evaluations.jsonl`
 - `state/optimizer_state.json`
 - `ledger/experiment_ledger.jsonl`
+- `reports/optimizer_run_acceptance_report.json`
+- `reports/optimizer_completion_report.json`
+- `reports/optimizer_finalize_report.json`
+- `reports/optimizer_insight_report.json`
+- `reports/optimizer_insight_report.md`
+- `reports/optimizer_visuals/*.svg`
 
 Real-tool runs also produce per-run manifests under `runs/real/<run_id>/`.
 Supervisor acceptance depends on those manifests, not on command exit status.
@@ -199,6 +235,8 @@ environment, package, or search-space issue instead.
 
 - Confirm backend: `native-turbo` or `openbox`.
 - Generate task packet with `package-optimizer-task`.
+- For OpenBox continuation, use `--continuation --additional-evals N`.
+- For OpenBox real execution, run the task packet's toolchain gate first.
 - Execution agent runs the rendered command outside restrictive sandboxing.
 - Execution agent preserves returned artifacts.
 - Supervisor runs `finalize-optimizer-run`.

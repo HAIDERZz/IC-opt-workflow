@@ -24,6 +24,7 @@ TASK_FILE_NAME = "OPTIMIZER_EXECUTION_TASK.md"
 MANIFEST_FILE_NAME = "optimizer_execution_manifest.json"
 NATIVE_TURBO_BACKEND = "native_turbo"
 OPENBOX_BACKEND = "openbox"
+DEFAULT_OPENBOX_EXECUTION_VENV = "/tmp/ic_auto_opt_openbox_spike/.venv"
 NATIVE_TURBO_REQUIRED_RETURNED_ARTIFACTS = [
     str(NATIVE_TURBO_REPORT_RELATIVE),
     str(NATIVE_TURBO_EVALUATIONS_RELATIVE),
@@ -35,6 +36,14 @@ OPENBOX_REQUIRED_RETURNED_ARTIFACTS = [
     str(OPTIMIZER_EVALUATIONS_RELATIVE),
     OPTIMIZER_STATE_PATH,
     LEDGER_PATH,
+]
+SUPERVISOR_CLOSEOUT_ARTIFACTS = [
+    "reports/optimizer_run_acceptance_report.json",
+    "reports/optimizer_completion_report.json",
+    "reports/optimizer_finalize_report.json",
+    "reports/optimizer_insight_report.json",
+    "reports/optimizer_insight_report.md",
+    "reports/optimizer_visuals/*.svg",
 ]
 
 
@@ -93,6 +102,7 @@ def build_optimizer_execution_task_package(
     audit_commands = [
         ["hermes-workflow", "check-optimizer-run", str(project_dir)],
         ["hermes-workflow", "summarize-optimizer-run", str(project_dir)],
+        ["hermes-workflow", "finalize-optimizer-run", str(project_dir)],
     ]
     payload = {
         "schema_version": "1.0",
@@ -111,6 +121,7 @@ def build_optimizer_execution_task_package(
         "cadence_cshrc": str(cadence_cshrc),
         "spectre_settings": spectre_settings,
         "required_returned_artifacts": _required_returned_artifacts(backend),
+        "toolchain_check_command": _toolchain_check_command(backend, cadence_cshrc),
     }
 
     task_path = execution_dir / TASK_FILE_NAME
@@ -162,9 +173,25 @@ def _validate_budget(
 
 
 def _required_returned_artifacts(backend: str) -> list[str]:
+    base: list[str]
     if backend == OPENBOX_BACKEND:
-        return list(OPENBOX_REQUIRED_RETURNED_ARTIFACTS)
-    return list(NATIVE_TURBO_REQUIRED_RETURNED_ARTIFACTS)
+        base = list(OPENBOX_REQUIRED_RETURNED_ARTIFACTS)
+    else:
+        base = list(NATIVE_TURBO_REQUIRED_RETURNED_ARTIFACTS)
+    return base + list(SUPERVISOR_CLOSEOUT_ARTIFACTS)
+
+
+def _toolchain_check_command(backend: str, cadence_cshrc: Path) -> list[str] | None:
+    if backend != OPENBOX_BACKEND:
+        return None
+    return [
+        "hermes-workflow",
+        "check-toolchain-env",
+        "--openbox-venv",
+        DEFAULT_OPENBOX_EXECUTION_VENV,
+        "--cadence-cshrc",
+        str(cadence_cshrc),
+    ]
 
 
 def _command(
@@ -210,11 +237,15 @@ def _render_task(payload: dict) -> str:
     )
     required_behavior = _required_behavior(payload)
     continuation_note = _continuation_note(payload)
+    toolchain_gate = _toolchain_gate(payload)
+    execution_environment = _execution_environment(payload)
     return f"""# Optimizer Execution Agent Task
 
 Project: `{payload["project_name"]}`
 Project directory: `{payload["project_dir"]}`
 Created at UTC: `{payload["created_at_utc"]}`
+{toolchain_gate}
+{execution_environment}
 
 ## Command
 
@@ -283,3 +314,34 @@ def _continuation_note(payload: dict) -> str:
         "- This is a continuation task: load existing accepted optimizer traces "
         "and evaluate only the requested additional candidates.\n"
     )
+
+
+def _toolchain_gate(payload: dict) -> str:
+    command = payload.get("toolchain_check_command")
+    if not command:
+        return ""
+    return f"""
+## Toolchain Gate
+
+Run this before OpenBox real execution:
+
+```bash
+{shlex.join(command)}
+```
+"""
+
+
+def _execution_environment(payload: dict) -> str:
+    if payload["backend"] != OPENBOX_BACKEND:
+        return ""
+    return f"""
+## Execution Environment
+
+- Source Cadence cshrc before the optimizer command:
+  `{payload["cadence_cshrc"]}`.
+- Put the OpenBox execution venv first in `PATH`:
+  `{DEFAULT_OPENBOX_EXECUTION_VENV}`.
+- Set `MPLCONFIGDIR` to a writable `/tmp` directory.
+- Run real OpenBox/Spectre/OCEAN execution through a non-sandbox or escalated
+  command path.
+"""
