@@ -28,12 +28,13 @@ Do not use "Hermes agent" as a role name. In this project, Hermes means workflow
   - Append a short entry to `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md` when the task changes project state.
   - Update `docs/COMPACT_RESUME_CHECKPOINT.md` only before context compaction, at milestone boundaries, or when the next resume prompt would otherwise be wrong.
   - Update `docs/EXECUTION_PROGRESS_2026-05-29.md` only for phase/milestone completion, route changes, or user-requested summaries.
-  - Update active plan checkboxes/status when executing a plan task.
+  - Update active implementation plan checkboxes/status at the end of a small flow or checkpoint. Do not spend a separate documentation cycle after every tiny subtask unless the user asks for per-task stop-and-report.
+  - Update the top-level plan current node only when a milestone, route, or production-readiness state changes, especially after real-tool acceptance, production handoff, or optimizer route changes.
   - Update this `Current Development Cadence` section only when cadence, next-task rules, role model, or handoff expectations change.
 - After each task, audit the current implementation against the top-level plan and the active spec. Record the audit in `CURRENT_TASK_STATE.json`; duplicate it into other progress files only when the Lean Evidence Gate says those files are due.
 - If development reveals a plan/spec problem and the implementation must differ from the written plan, synchronize the active design spec, active implementation plan, and any affected top-level plan before claiming the task is complete. Do not leave code and planning documents divergent.
 - Run verification by risk. Low-risk docs/environment tasks normally need only JSON validation when applicable, `python3 tools/check_development_cadence.py`, and `git diff --check`. Code tasks need targeted tests; high-risk code also needs broader regression checks and review evidence.
-- Do not start the next task until the user confirms. Do not jump to C-11 local smoke or real tool/agent integration until C-10 passes review/final gate.
+- Do not start the next task until the user confirms, unless the user explicitly asks to complete the next task or next step without interruption.
 - Keep progress files aligned with implementation before context compaction.
 - When the user explicitly authorizes a fast real-tool debug lane, label the work `verified-only`, keep changes surgical, record a concise debug note under `docs/debug/`, keep raw tool artifacts local-only, and return to the normal task/review cadence before claiming a reviewed implementation task is complete.
 - Before running real Virtuoso/Spectre/OCEAN/OpenBox/native-TuRBO/bridge commands, read `docs/TOOLCHAIN_EXECUTION_REFERENCE.md` and use its known-good environment, sandbox, workspace-preparation, and closeout commands. If a real-tool run fails, compare it against that reference before inventing a new debug path.

@@ -212,9 +212,19 @@ Successful closeout:
 .venv/bin/hermes-workflow check-optimizer-run /tmp/ic_auto_opt_c34_clean2/bridge_test_inv
 .venv/bin/hermes-workflow summarize-optimizer-run /tmp/ic_auto_opt_c34_clean2/bridge_test_inv
 .venv/bin/hermes-workflow finalize-optimizer-run /tmp/ic_auto_opt_c34_clean2/bridge_test_inv
+.venv/bin/hermes-workflow optimizer-status /tmp/ic_auto_opt_c34_clean2/bridge_test_inv
 ```
 
 All passed. `global_optimum_claim=false`.
+
+Latest fresh packet/status handoff smoke:
+
+```text
+docs/debug/2026-06-05-c45-fresh-optimizer-status-handoff-drill.md
+```
+
+This C-45 smoke used a fresh workspace and the updated task packet with
+`optimizer-status` in `audit_commands`.
 
 ## Fresh Workspace Preparation
 

@@ -23,42 +23,63 @@
 
 ## Current Implementation Node
 
-As of 2026-06-05, focused Plan A, Plan B, and Plan C C-1 through C-25 are complete, and C-26 design is written. The current accepted optimizer route is practice-first and execution-agent-facing: native local `Turbo1.optimize()`, bounded batch Spectre/OCEAN execution through the existing adapter, manifest-level supervisor/Hermes audit, and a generated optimizer execution-agent task packet for the proven `run-native-turbo --parallel` path.
+As of 2026-06-05, Plan A, Plan B, and Plan C through C-45 are complete. The
+accepted route is no longer an abstract contract-only optimizer plan; it is a
+practice-first production handoff flow that has been exercised with real
+OpenBox, Spectre, and OCEAN runs.
 
-- C-10 Task 1 recovery report schemas are complete and reviewed.
-- C-10 Task 2 deterministic recovery classifier is complete and reviewed.
-- C-10 Task 3 explicit supervisor recovery decisions and same-candidate retry package preparation are complete and reviewed.
-- C-10 Task 4 C-9 unresolved real-run guard is complete and reviewed.
-- C-10 Task 5 CLI Integration is complete and reviewed.
-- C-10 Task 6 docs/progress/final verification is complete and reviewed.
-- C-11 Task 1 test-only smoke helpers are complete and reviewed.
-- C-11 Task 2 library happy-path smoke is complete and reviewed.
-- C-11 Task 3 controlled failure/retry smoke is complete and reviewed.
-- C-11 Task 4 CLI smoke, docs, and final gate is complete and reviewed.
-- C-12 Task 2 Hermes preflight and approved real-run package is complete and reviewed.
-- C-12 Task 3 execution-agent/C-7 adapter invocation is complete and reviewed; it reached the real Spectre boundary and returned a structured failed `result_manifest.json`.
-- C-12 Task 4 Hermes check/recovery handling is complete and reviewed; Hermes accepted the failed handoff manifest structure, rejected metric-result recording, skipped `record-real-result`, and classified `real_001` as `tool_result_failed`.
-- C-7 real-tool closure fixes are complete and committed as `d440c95 fix: preserve ADE netlist layout for real runs`; the fixed adapter preserves the Maestro/ADE `netlist/` working-directory shape with sibling `psf/`, and the real inverter closure passed through Spectre, OCEAN, `check-real-run`, `check-metric-results`, and `record-real-result`.
-- Optimizer practice-first plan is written at `docs/superpowers/plans/2026-06-03-optimizer-practice-first.md`. This plan requires a real optimizer loop using `virtuoso-bridge-lite/skills/optimizer/SKILL.md` and local TuRBO before Hermes optimizer development; a few hand-picked candidate points are not enough.
-- Optimizer Practice-First Task 1 baseline package shape check is complete and verified-only. The clean practice package exists under `/tmp/ic_auto_opt_optimizer_practice/bridge_test_inv/runs/real/real_001`; no Spectre/OCEAN adapter, TuRBO, or optimizer loop was run.
-- Optimizer Practice-First Task 2 single-point replay sanity check is complete and verified-only. Successful replay used `/tmp/ic_auto_opt_optimizer_practice/bridge_test_inv_baseline_001` with the C-7 closure candidate values and passed C-7 adapter, Spectre, OCEAN, `check-real-run`, `check-metric-results`, and `record-real-result`. The first full-range lower-bound replay returned `rise/fall non_scalar`; because other parameter points can produce scalars through the same flow, this is optimizer candidate performance failure to penalize, not formula/layout/tool failure.
-- Optimizer Practice-First Task 3 optimizer skill and TuRBO environment gate is complete and verified-only. A project-local Linux `.venv` now imports local `Turbo1` with CPU-only `torch=2.12.0+cpu` and `gpytorch=1.15.2`; `.venv/` is ignored and must not be committed.
-- Optimizer Practice-First Task 4 native optimizer full-loop practice is complete and verified-only. The temporary `/tmp` runner used local `Turbo1`, Hermes package/check/record contracts, and the C-7 Spectre/OCEAN adapter for 9 evaluations, including 1 post-initial TuRBO suggestion. All 9 evaluations produced OCEAN scalar metrics and finite objectives; best candidate was `FN=12`, `WN=1.3u`, `FP=2`, `WP=2.5u`, objective `4.183168953894332e-14`.
-- Optimizer Practice-First Task 5 productization decision is complete and verified-only. The decision is B: native optimizer practice passed, but Hermes lacks an explicit candidate-injection package contract, so add that narrow contract before Hermes optimizer productization.
-- Candidate-injection package contract design spec is complete and verified-only at `docs/superpowers/specs/2026-06-04-candidate-injection-package-contract-design.md`. It defines the narrow `prepare-candidate-real-run` contract for explicit optimizer-selected parameters without replacing C-4, replacing C-9, running real tools, parsing PSF, or rewriting OCEAN formulas.
-- Candidate-injection package contract implementation plan is complete and verified-only at `docs/superpowers/plans/2026-06-04-candidate-injection-package-contract.md`. It splits implementation into candidate request validation, package writer reuse, CLI plus fake C-7 handoff smoke, and final verification/review gate.
-- Candidate-injection package contract is complete and reviewed. Hermes validates explicit candidate request files, prepares deterministic explicit-candidate real-run packages through the existing real-run package writer, and exposes CLI/fake handoff smoke coverage without mutating `config/variables.yaml`.
-- C-13 through C-15 productized the narrow single-candidate suggestion, candidate-injection, and fixed-budget loop path around the proven C-7 adapter. C-16 then showed that small loops are not enough for optimizer acceptance.
-- C-17 and C-18 are the current accepted optimizer runner route: use native local `Turbo1.optimize()`, batch-aware candidate evaluation, bounded parallel Spectre/OCEAN adapter workers up to `spectre.parallel_jobs`, sequential package/ledger/state recording, and per-Spectre `threads_per_run` mapped to `+mt`.
-- C-19 and C-20 validated the original supervisor-to-execution-agent boundary with fresh local worker subagents using the existing `run-native-turbo --parallel --max-evals 100` command and manifest-level audit.
-- C-21 OCEAN metric extraction retry policy is complete and verified-only. It addresses the residual C-20 OCEAN command/license failure class by retrying OCEAN-only failures without rerunning Spectre and recording retry evidence in the metric result manifest.
-- C-22 Execution-Agent Task Package Alignment Task 1 is complete and verified-only. It updates the generated execution package task to use generic execution-agent wording and carries forward the C-20 rule that command exit status alone is not acceptance evidence.
-- C-23 Optimizer Execution-Agent Task Packet MVP is complete and verified-only. Hermes now writes `execution_package/OPTIMIZER_EXECUTION_TASK.md` and `execution_package/optimizer_execution_manifest.json` for the existing `run-native-turbo --parallel` route, including manifest-level audit requirements, Spectre settings expectations, shell-safe absolute commands, and forbidden actions learned from C-19/C-20.
-- C-24 Generated Optimizer Task Packet Handoff Acceptance is complete and verified-only. The C-23 generated task packet was validated through one local worker-agent handoff attempt, one accepted non-sandbox real-tool rerun, and supervisor/Hermes manifest-level audit.
-- C-25 Optimizer Run Acceptance Audit is complete and verified-only. It productizes the C-24 manual supervisor/Hermes audit into `hermes-workflow check-optimizer-run PROJECT_DIR`, which reads existing native TuRBO report/trace/result/metric manifests and writes `reports/optimizer_run_acceptance_report.json`.
-- C-26 Optimizer Completion And Continuation Decision Report design spec is complete and verified-only. It scopes a read-only report that turns an accepted optimizer run into a supervisor decision: accept best observed, continue, locally refine, restart, switch to exhaustive sweep, or stop for user review.
+Current production route:
 
-C-11 verified the local/fake handoff path. C-12 exposed the real C-7 adapter failure path; the subsequent C-7 closure fixed the root cause by moving implementation back toward the successful Maestro/ADE evidence instead of inventing a new result layout. C-17/C-18 established the native TuRBO batch optimizer runner, C-19/C-20 validated execution-agent handoff behavior, C-21 closed the residual OCEAN command/license retry gap, C-22 aligned generic execution-agent wording, C-23 productized the optimizer execution-agent task packet, C-24 validated that generated packet in the real workflow, C-25 productized the deterministic supervisor/Hermes acceptance audit for completed optimizer runs, and C-26 now scopes the optimizer-quality continuation decision report. The current node is C-26 design review; the next allowed action is writing a narrow C-26 implementation plan after user confirmation. Current resume guidance is in `docs/CURRENT_TASK_STATE.json`, `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`, `docs/EXECUTION_PROGRESS_2026-05-29.md`, `docs/COMPACT_RESUME_CHECKPOINT.md`, and `AGENTS.md`.
+```text
+supervisor agent
+-> Hermes workflow tooling validates/package contracts
+-> Hermes writes optimizer execution task packet
+-> execution agent follows the packet command exactly
+-> OpenBox/native TuRBO generates candidates, not hand-picked points
+-> Spectre runs with approved precision/thread settings
+-> OCEAN computes approved metrics
+-> Hermes audits manifests/reports
+-> supervisor reads finalize + optimizer-status
+```
+
+Completed optimizer milestones since C-26:
+
+- C-27 through C-29 introduced and productized the OpenBox backend while
+  preserving native TuRBO and the existing Spectre/OCEAN adapter boundary.
+- C-30 through C-34 created and validated production optimizer task packet
+  handoff for OpenBox, including the known-good OpenBox/Hermes execution venv.
+- C-35 and C-36 locked the real-tool execution reference and added
+  `check-toolchain-env` so future runs do not repeat venv/Cadence setup errors.
+- C-38 through C-42 added OpenBox continuation, proved real continuation from
+  100 to 120 and then 120 to 130 cumulative evaluations, and validated the
+  generated continuation packet path.
+- C-43 added `hermes-workflow optimizer-status PROJECT_DIR`, a concise
+  supervisor-facing closeout summary.
+- C-44 integrated `optimizer-status` into generated optimizer task packet audit
+  commands and the production handoff guide.
+- C-45 validated a fresh production-style OpenBox handoff from a clean
+  workspace for 10 real evaluations using the updated packet. The run closed out
+  through `check-optimizer-run`, `summarize-optimizer-run`,
+  `finalize-optimizer-run`, and `optimizer-status`. The 10-eval smoke produced
+  `9 constraint_failed` and `1 metric_check_failed`, no feasible point, and the
+  correct supervisor decision `stop_for_user_review` with confidence `low`.
+
+Current code-level entry points:
+
+- `hermes-workflow package-optimizer-task PROJECT_DIR --backend openbox --max-evals N --cadence-cshrc CADENCE_CSHRC --parallel`
+- `hermes-workflow package-optimizer-task PROJECT_DIR --backend openbox --continuation --additional-evals N --cadence-cshrc CADENCE_CSHRC --parallel`
+- `hermes-workflow run-openbox-real PROJECT_DIR --max-evals N --batch-size B --parallel-jobs P --cadence-cshrc CADENCE_CSHRC`
+- `hermes-workflow continue-openbox-real PROJECT_DIR --additional-evals N --batch-size B --parallel-jobs P --cadence-cshrc CADENCE_CSHRC`
+- `hermes-workflow check-toolchain-env --openbox-venv /tmp/ic_auto_opt_openbox_spike/.venv --cadence-cshrc /home/zzchen/cadence_ic231_env.csh`
+- `hermes-workflow check-optimizer-run PROJECT_DIR`
+- `hermes-workflow summarize-optimizer-run PROJECT_DIR`
+- `hermes-workflow finalize-optimizer-run PROJECT_DIR`
+- `hermes-workflow optimizer-status PROJECT_DIR`
+
+The next work should stay narrow and practice-first. Do not start a broad
+optimizer framework rewrite. The likely next production step is user/workflow
+adoption: run the current handoff on the user-selected real project scale, then
+fix only bugs or usability gaps that appear from that real flow.
 
 ## Current Route Alignment
 

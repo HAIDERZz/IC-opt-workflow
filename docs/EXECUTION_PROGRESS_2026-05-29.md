@@ -1232,3 +1232,21 @@ C-44 Optimizer Status Handoff Integration Completion:
 - Boundary: no real optimizer execution, Spectre, OCEAN, Virtuoso, bridge, optimizer behavior change, new report contract, PSF parsing, or OCEAN formula rewrite occurred.
 - current_scope: C-44 Optimizer Status Handoff Integration complete.
 - next_allowed_action: wait for user confirmation before the next narrow production step; recommended next is a fresh production-style optimizer handoff using the updated packet and optimizer-status closeout, or a small adoption guide/example if the user wants documentation first.
+
+
+C-45 Fresh Optimizer Status Handoff Drill Completion:
+
+- Status: complete, verified-only.
+- Active spec: `docs/superpowers/specs/2026-06-05-optimizer-status-handoff-integration-design.md`.
+- Active plan: `docs/superpowers/plans/2026-06-05-fresh-optimizer-status-handoff-drill.md`.
+- Sanitized evidence: `docs/debug/2026-06-05-c45-fresh-optimizer-status-handoff-drill.md`.
+- Workspace: `/tmp/ic_auto_opt_c45_fresh_status_handoff_001/bridge_test_inv`.
+- Fresh workspace preparation copied only `config/`, `netlists/`, and matching `supervisor_instruction.json` from `/tmp/ic_auto_opt_c34_clean2/bridge_test_inv`; old `ledger/`, `state/`, `reports/`, and `runs/` were not copied.
+- Generated updated OpenBox task packet with `--max-evals 10`; packet task text and manifest audit commands include `optimizer-status`.
+- Real execution passed `check-toolchain-env` and completed 10 OpenBox-generated Spectre/OCEAN evaluations with `parallel_jobs=10`, `threads_per_run=10`, and approved Cadence cshrc.
+- Closeout passed through `check-optimizer-run`, `summarize-optimizer-run`, `finalize-optimizer-run`, and `optimizer-status`.
+- Result summary: `9 constraint_failed`, `1 metric_check_failed`, `0 feasible`, best observed `real_009`, decision `stop_for_user_review`, confidence `low`, `global_optimum_claim=false`, continuation recommended `false`.
+- Route sync: updated `AGENTS.md` stale cadence wording, top-level plan current node, and `docs/TOOLCHAIN_EXECUTION_REFERENCE.md` closeout reference.
+- Boundary: no hand-picked candidates, no variable/formula changes, no PSF parsing, no OCEAN formula rewrite, and no raw Cadence artifacts committed.
+- current_scope: C-45 Fresh Optimizer Status Handoff Drill complete.
+- next_allowed_action: wait for user confirmation before the next production step; recommended next is user-selected real project scale adoption using the current packet/status handoff, or a narrow usability fix only if the user wants one before adoption.
