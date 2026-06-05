@@ -112,13 +112,19 @@ For an OpenBox continuation, use:
 
 4. Wait for the execution agent to finish and return file artifacts.
 
-5. Run the closeout command:
+5. Run the machine acceptance closeout command:
 
 ```bash
 .venv/bin/hermes-workflow finalize-optimizer-run PROJECT_DIR
 ```
 
-6. Read:
+6. Run the supervisor-facing one-screen status command:
+
+```bash
+.venv/bin/hermes-workflow optimizer-status PROJECT_DIR
+```
+
+7. Read:
 
 - `reports/optimizer_finalize_report.json`
 - `reports/optimizer_run_acceptance_report.json`
@@ -164,8 +170,8 @@ Cadence cshrc sourced, writable `MPLCONFIGDIR`, and a non-sandbox/escalated
 execution path.
 
 After execution, the execution agent should run the audit commands printed in
-the task packet, then report the paths and status. Chat text is not acceptance
-evidence; the files are the evidence.
+the task packet, including `optimizer-status`, then report the paths and status.
+Chat text is not acceptance evidence; the files are the evidence.
 
 ## Required Returned Artifacts
 
@@ -242,5 +248,6 @@ environment, package, or search-space issue instead.
 - Execution agent runs the rendered command outside restrictive sandboxing.
 - Execution agent preserves returned artifacts.
 - Supervisor runs `finalize-optimizer-run`.
+- Supervisor runs `optimizer-status` for the concise decision summary.
 - Supervisor reads the finalize, completion, and insight reports.
 - Supervisor records the next decision before launching another optimizer run.

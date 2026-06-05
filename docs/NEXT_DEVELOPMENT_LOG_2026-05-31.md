@@ -1574,3 +1574,16 @@ C-43 Optimizer Status Command Completion:
 - Boundary: no real optimizer execution, Spectre, OCEAN, Virtuoso, bridge, objective change, new report contract, PSF parsing, or OCEAN formula rewrite occurred.
 - current_scope: C-43 Optimizer Status Command complete.
 - next_allowed_action: wait for user confirmation before the next narrow production step; recommended next is production use of optimizer-status on a fresh execution-agent handoff, or a small user-facing optimizer adoption guide update if needed.
+
+
+C-44 Optimizer Status Handoff Integration Completion:
+
+- Status: complete, verified-only.
+- Design spec: `docs/superpowers/specs/2026-06-05-optimizer-status-handoff-integration-design.md`.
+- Implementation plan: `docs/superpowers/plans/2026-06-05-optimizer-status-handoff-integration.md`.
+- Code: updated `src/hermes_workflow/optimizer_task_package.py` so generated native TuRBO and OpenBox optimizer task packets include `hermes-workflow optimizer-status PROJECT_DIR` in `audit_commands` and task text.
+- Guide: updated `docs/OPTIMIZER_PRODUCTION_HANDOFF_GUIDE.md` so supervisor closeout runs `finalize-optimizer-run` for machine acceptance and then `optimizer-status` for the concise decision summary.
+- Verification: RED packet tests failed before implementation; GREEN packet tests passed (`9 passed`); adjacent status/finalize/package tests passed (`15 passed`); targeted ruff passed.
+- Boundary: no real optimizer execution, Spectre, OCEAN, Virtuoso, bridge, optimizer behavior change, new report contract, PSF parsing, or OCEAN formula rewrite occurred.
+- current_scope: C-44 Optimizer Status Handoff Integration complete.
+- next_allowed_action: wait for user confirmation before the next narrow production step; recommended next is a fresh production-style optimizer handoff using the updated packet and optimizer-status closeout, or a small adoption guide/example if the user wants documentation first.

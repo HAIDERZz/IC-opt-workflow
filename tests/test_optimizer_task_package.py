@@ -40,6 +40,7 @@ def test_build_optimizer_execution_task_package_writes_task_and_manifest(
     assert "--max-evals 100" in task_text
     assert "Command exit status alone is not acceptance evidence" in task_text
     assert "Manifest-level audit is required" in task_text
+    assert "hermes-workflow optimizer-status" in task_text
     assert "threads_per_run" in task_text
     assert "parallel_jobs" in task_text
     assert "ledger/experiment_ledger.jsonl" in task_text
@@ -71,6 +72,7 @@ def test_build_optimizer_execution_task_package_writes_task_and_manifest(
         ["hermes-workflow", "check-optimizer-run", str(project_dir)],
         ["hermes-workflow", "summarize-optimizer-run", str(project_dir)],
         ["hermes-workflow", "finalize-optimizer-run", str(project_dir)],
+        ["hermes-workflow", "optimizer-status", str(project_dir)],
     ]
 
 
@@ -101,6 +103,7 @@ def test_build_optimizer_execution_task_package_writes_openbox_backend(
     assert "Do not silently fall back to TuRBO" in task_text
     assert "hermes-workflow check-optimizer-run" in task_text
     assert "hermes-workflow summarize-optimizer-run" in task_text
+    assert "hermes-workflow optimizer-status" in task_text
     assert "reports/optimizer_run_report.json" in task_text
     assert "reports/optimizer_evaluations.jsonl" in task_text
 
@@ -187,6 +190,11 @@ def test_build_optimizer_execution_task_package_writes_openbox_continuation(
     assert [
         "hermes-workflow",
         "finalize-optimizer-run",
+        str(project_dir),
+    ] in manifest_payload["audit_commands"]
+    assert [
+        "hermes-workflow",
+        "optimizer-status",
         str(project_dir),
     ] in manifest_payload["audit_commands"]
     assert "reports/optimizer_finalize_report.json" in manifest_payload[

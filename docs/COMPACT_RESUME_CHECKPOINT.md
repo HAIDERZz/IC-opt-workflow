@@ -890,3 +890,22 @@ C-43 Optimizer Status Command Completion:
 ```text
 请继续 IC auto optimization workflow。先阅读 AGENTS.md、docs/CURRENT_TASK_STATE.json、docs/TOOLCHAIN_EXECUTION_REFERENCE.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/OPTIMIZER_PRODUCTION_HANDOFF_GUIDE.md。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-43 Optimizer Status Command 已完成：新增 hermes-workflow optimizer-status PROJECT_DIR，可读取/刷新现有 finalize/completion closeout 并输出主管 agent 可读摘要：status、decision、confidence、global_optimum_claim、best observed、evaluation count、status counts、continuation recommendation、plateau、reason、report paths。C-42 packet handoff drill 已证明 continuation packet 从 120 到 130 evals 可跑通。下一步等待用户确认；推荐把 optimizer-status 用在新鲜 execution-agent handoff 的生产演练，或做一个小的用户 adoption guide 更新。真实 OpenBox 前必须先读 TOOLCHAIN_EXECUTION_REFERENCE 并跑 check-toolchain-env。不要创建 broad framework，不要 hand-pick optimizer points，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
 ```
+
+
+C-44 Optimizer Status Handoff Integration Completion:
+
+- Status: complete, verified-only.
+- Design spec: `docs/superpowers/specs/2026-06-05-optimizer-status-handoff-integration-design.md`.
+- Implementation plan: `docs/superpowers/plans/2026-06-05-optimizer-status-handoff-integration.md`.
+- Code: updated `src/hermes_workflow/optimizer_task_package.py` so generated native TuRBO and OpenBox optimizer task packets include `hermes-workflow optimizer-status PROJECT_DIR` in `audit_commands` and task text.
+- Guide: updated `docs/OPTIMIZER_PRODUCTION_HANDOFF_GUIDE.md` so supervisor closeout runs `finalize-optimizer-run` for machine acceptance and then `optimizer-status` for the concise decision summary.
+- Verification: RED packet tests failed before implementation; GREEN packet tests passed (`9 passed`); adjacent status/finalize/package tests passed (`15 passed`); targeted ruff passed.
+- Boundary: no real optimizer execution, Spectre, OCEAN, Virtuoso, bridge, optimizer behavior change, new report contract, PSF parsing, or OCEAN formula rewrite occurred.
+- current_scope: C-44 Optimizer Status Handoff Integration complete.
+- next_allowed_action: wait for user confirmation before the next narrow production step; recommended next is a fresh production-style optimizer handoff using the updated packet and optimizer-status closeout, or a small adoption guide/example if the user wants documentation first.
+
+## Resume Prompt
+
+```text
+请继续 IC auto optimization workflow。先阅读 AGENTS.md、docs/CURRENT_TASK_STATE.json、docs/TOOLCHAIN_EXECUTION_REFERENCE.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/OPTIMIZER_PRODUCTION_HANDOFF_GUIDE.md。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-44 Optimizer Status Handoff Integration 已完成：generated optimizer task packet 的 audit_commands 现在包含 optimizer-status，production guide 规定 supervisor closeout 先 finalize-optimizer-run，再 optimizer-status 获取一屏摘要。C-42 已证明 continuation packet handoff 可真实跑通到 130 evals。下一步等待用户确认；推荐使用更新后的 packet 做一次 fresh production-style optimizer handoff，或者先补一份小的实际操作示例。真实 OpenBox 前必须先读 TOOLCHAIN_EXECUTION_REFERENCE 并跑 check-toolchain-env。不要创建 broad framework，不要 hand-pick optimizer points，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
+```

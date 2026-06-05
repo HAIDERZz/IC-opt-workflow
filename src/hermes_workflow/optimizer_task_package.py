@@ -103,6 +103,7 @@ def build_optimizer_execution_task_package(
         ["hermes-workflow", "check-optimizer-run", str(project_dir)],
         ["hermes-workflow", "summarize-optimizer-run", str(project_dir)],
         ["hermes-workflow", "finalize-optimizer-run", str(project_dir)],
+        ["hermes-workflow", "optimizer-status", str(project_dir)],
     ]
     payload = {
         "schema_version": "1.0",

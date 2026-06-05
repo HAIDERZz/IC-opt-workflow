@@ -1,18 +1,18 @@
 {
   "schema_version": "1.0",
-  "current_scope": "C-43 Optimizer Status Command complete",
-  "current_status": "C-43 is complete, verified-only. Added hermes-workflow optimizer-status PROJECT_DIR as a supervisor-facing closeout summary command. It reuses finalize_optimizer_run, reads the existing completion/finalize reports, and prints finalization status, decision, confidence, global_optimum_claim, best observed run id, evaluation count, status counts, continuation recommendation, plateau flag, reason, and report paths. It does not run real tools, alter optimizer behavior, create a new report contract, parse PSF, or rewrite OCEAN formulas.",
+  "current_scope": "C-44 Optimizer Status Handoff Integration complete",
+  "current_status": "C-44 is complete, verified-only. Integrated hermes-workflow optimizer-status into generated optimizer task packet audit_commands for native TuRBO and OpenBox packets, and updated the production handoff guide so supervisor closeout runs finalize-optimizer-run followed by optimizer-status. This changes handoff/readability only; it does not run real tools, alter optimizer behavior, create a new report contract, parse PSF, or rewrite OCEAN formulas.",
   "review_status": "verified-only",
   "subagent_dispatch": "available",
-  "active_spec": "docs/superpowers/specs/2026-06-05-optimizer-status-command-design.md",
-  "active_plan": "docs/superpowers/plans/2026-06-05-optimizer-status-command.md",
+  "active_spec": "docs/superpowers/specs/2026-06-05-optimizer-status-handoff-integration-design.md",
+  "active_plan": "docs/superpowers/plans/2026-06-05-optimizer-status-handoff-integration.md",
   "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
   "progress_files": [
     "docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md",
     "docs/EXECUTION_PROGRESS_2026-05-29.md",
     "docs/COMPACT_RESUME_CHECKPOINT.md"
   ],
-  "next_allowed_action": "wait for user confirmation before the next narrow production step; recommended next is production use of optimizer-status on a fresh execution-agent handoff, or a small user-facing optimizer adoption guide update if needed",
+  "next_allowed_action": "wait for user confirmation before the next narrow production step; recommended next is a fresh production-style optimizer handoff using the updated packet and optimizer-status closeout, or a small adoption guide/example if the user wants documentation first",
   "forbidden_actions": [
     "run real tool commands without first checking docs/TOOLCHAIN_EXECUTION_REFERENCE.md",
     "run long fake-run ladders before a meaningful real practice flow",
@@ -44,13 +44,13 @@
     "git status --short"
   ],
   "route_audit": {
-    "active_spec": "docs/superpowers/specs/2026-06-05-optimizer-status-command-design.md",
-    "active_plan": "docs/superpowers/plans/2026-06-05-optimizer-status-command.md",
+    "active_spec": "docs/superpowers/specs/2026-06-05-optimizer-status-handoff-integration-design.md",
+    "active_plan": "docs/superpowers/plans/2026-06-05-optimizer-status-handoff-integration.md",
     "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
-    "alignment": "Aligned. C-43 improves supervisor readability on top of existing acceptance, completion, finalize, insight, and C-40/C-42 handoff evidence without changing optimizer execution.",
-    "drift": "No route drift. C-43 does not run real tools, change optimizer behavior, add a new report contract, parse PSF, rewrite OCEAN formulas, replace TuRBO, or add broad framework assets."
+    "alignment": "Aligned. C-44 puts the C-43 supervisor status command into the C-40/C-42 production handoff path while preserving existing acceptance and finalization semantics.",
+    "drift": "No route drift. C-44 does not run real tools, change optimizer execution, add a new report contract, parse PSF, rewrite OCEAN formulas, replace TuRBO, or add broad framework assets."
   },
-  "latest_valid_commit": "9f40407",
+  "latest_valid_commit": "27430f2",
   "review_evidence": {
     "optimizer_skill_real_practice": "Complete, verified-only. Temporary practice at /tmp/ic_auto_opt_optimizer_skill_flow_001 ran Turbo1.optimize() for 100 evaluations with 8 initialization and 92 trust-region evaluations. 73 candidates were recorded through real Spectre/OCEAN, 24 duplicate quantized candidates were skipped, and 3 metric non-scalar candidates were converted to finite penalties. Best candidate was real_011: FN=11, WN=1.9u, FP=9, WP=0.5u, rise=72.489655ps, fall=64.569947ps, DC=301.334349uW, objective=4.1300765965648685e-14.",
     "archive_doc": "docs/debug/2026-06-04-optimizer-skill-real-flow-practice.md",
@@ -111,6 +111,7 @@
     "c40_complete": "Complete, verified-only. Added design spec docs/superpowers/specs/2026-06-05-openbox-continuation-production-handoff-design.md and plan docs/superpowers/plans/2026-06-05-openbox-continuation-production-handoff.md. Productized the OpenBox continuation handoff packet: OpenBox packets now render check-toolchain-env, known-good OpenBox venv /tmp/ic_auto_opt_openbox_spike/.venv, non-sandbox/escalated execution wording, finalize-optimizer-run audit command, and supervisor closeout artifacts. Updated docs/OPTIMIZER_PRODUCTION_HANDOFF_GUIDE.md with first-run and continuation flows. No real tools were run.",
     "c41_complete": "Complete, verified-only. Added design spec docs/superpowers/specs/2026-06-05-optimizer-continuation-decision-detail-design.md and plan docs/superpowers/plans/2026-06-05-optimizer-continuation-decision-detail.md. Extended optimizer_completion_report.json with continuation detail: recommended, suggested_additional_evals, recent_window, recent_best_improved, plateau_detected, feasible_count, feasible_ratio, low_feasible_ratio, estimated_remaining_combinations, and reason. Existing top-level decisions remain unchanged. No real tools were run.",
     "c42_packet_handoff_drill": "Complete, verified-only. Sanitized evidence: docs/debug/2026-06-05-c42-openbox-continuation-packet-handoff-drill.md. Workspace /tmp/ic_auto_opt_c42_packet_handoff_001/bridge_test_inv copied accepted C39 result, generated OpenBox continuation packet, passed check-toolchain-env, ran continue-openbox-real for 10 additional evaluations, and closed out at 130 cumulative evaluations with accepted/finalized reports.",
-    "c43_optimizer_status_command": "Complete, verified-only. Added src/hermes_workflow/optimizer_status.py and CLI hermes-workflow optimizer-status PROJECT_DIR. Focused tests and adjacent optimizer closeout tests passed. Smoke on /tmp/ic_auto_opt_c42_packet_handoff_001/bridge_test_inv printed pass, accept_best_observed, best observed real_071, 130 evaluations, status distribution, continuation recommended false, and report paths."
+    "c43_optimizer_status_command": "Complete, verified-only. Added src/hermes_workflow/optimizer_status.py and CLI hermes-workflow optimizer-status PROJECT_DIR. Focused tests and adjacent optimizer closeout tests passed. Smoke on /tmp/ic_auto_opt_c42_packet_handoff_001/bridge_test_inv printed pass, accept_best_observed, best observed real_071, 130 evaluations, status distribution, continuation recommended false, and report paths.",
+    "c44_optimizer_status_handoff_integration": "Complete, verified-only. Added optimizer-status to optimizer task packet audit_commands and production handoff guide closeout. Verification passed: packet tests, optimizer-status/finalize adjacent tests, targeted ruff, cadence, and diff checks."
   }
 }
