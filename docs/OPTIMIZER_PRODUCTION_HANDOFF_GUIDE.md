@@ -39,6 +39,8 @@ Execution agent:
   Virtuoso/Spectre/OCEAN/OpenBox/native-TuRBO/bridge execution. That file is the
   authoritative reference for known-good venvs, Cadence cshrc, non-sandbox
   execution, fresh workspace preparation, and closeout commands.
+- Run `hermes-workflow check-toolchain-env` before OpenBox real execution when
+  the execution venv has changed or after context compaction.
 - `config/*.yaml` is already reviewed and valid.
 - `metrics.yaml` contains approved OCEAN formulas.
 - `netlists/exported/input.scs` and native Maestro/ADE sidecars are present.

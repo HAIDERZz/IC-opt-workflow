@@ -1141,6 +1141,9 @@ Next required action:
 - C-35 Toolchain Execution Reference: complete, verified-only. Added `docs/TOOLCHAIN_EXECUTION_REFERENCE.md` and updated `AGENTS.md` so future real-tool work starts from the proven C-34 environment and execution path: project `.venv` for normal Hermes/test commands, `/tmp/ic_auto_opt_openbox_spike/.venv` for OpenBox real execution, Cadence cshrc `/home/zzchen/cadence_ic231_env.csh`, non-sandbox/escalated real-tool command rule, clean workspace package sequence, and `finalize-optimizer-run` closeout. Fake-run guidance is now stricter: at most one focused fake/local smoke per new command path before the smallest meaningful real practice flow.
 - current_scope: C-35 Toolchain Execution Reference complete.
 
+- C-36 Stable OpenBox/Hermes Execution Environment Gate: complete, verified-only. Added `hermes-workflow check-toolchain-env`, backed by `src/hermes_workflow/toolchain_env.py` and `tests/test_toolchain_env.py`. The gate checks OpenBox execution venv existence, venv Python, venv `hermes-workflow`, Cadence cshrc, and same-Python imports of `openbox` plus `hermes_workflow.openbox_backend`. Current C-34 venv `/tmp/ic_auto_opt_openbox_spike/.venv` passed and wrote `/tmp/toolchain_environment_report_c36.json`. No real optimizer run, Spectre, OCEAN, Virtuoso, bridge, PSF parsing, or formula rewrite occurred.
+- current_scope: C-36 Stable OpenBox/Hermes Execution Environment Gate complete.
+
 ## Locked Role Model
 
 Status: locked as of 2026-06-02.

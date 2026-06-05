@@ -5,6 +5,7 @@ from typing import Annotated, NoReturn
 import typer
 
 from hermes_workflow import __version__
+import hermes_workflow.toolchain_env as toolchain_env
 from hermes_workflow.approvals import decide_first_real_run
 from hermes_workflow.dry_run import run_dry_run
 from hermes_workflow.health import write_preflight_health
@@ -103,6 +104,47 @@ def _exit_with_recovery_report(
             for issue in issues:
                 if isinstance(issue, str):
                     typer.echo(issue)
+    raise typer.Exit(code=1)
+
+
+@app.command("check-toolchain-env")
+def check_toolchain_env_command(
+    openbox_venv: Annotated[
+        Path,
+        typer.Option(
+            "--openbox-venv",
+            help="OpenBox/Hermes execution venv to check.",
+        ),
+    ] = toolchain_env.DEFAULT_OPENBOX_EXECUTION_VENV,
+    cadence_cshrc: Annotated[
+        Path,
+        typer.Option("--cadence-cshrc", help="Cadence cshrc required by real runs."),
+    ] = toolchain_env.DEFAULT_CADENCE_CSHRC,
+    report: Annotated[
+        Path | None,
+        typer.Option("--report", help="Optional JSON report path."),
+    ] = None,
+) -> None:
+    try:
+        payload = toolchain_env.check_toolchain_environment(
+            openbox_venv=openbox_venv,
+            cadence_cshrc=cadence_cshrc,
+            report_path=report,
+        )
+    except OSError as exc:
+        _exit_with_error(exc)
+
+    if payload["status"] == "pass":
+        typer.echo("toolchain environment check passed")
+        if report is not None:
+            typer.echo(f"report: {report}")
+        return
+
+    typer.echo("toolchain environment check failed")
+    for issue in payload["issues"]:
+        typer.echo(issue)
+    if report is not None:
+        typer.echo(f"report: {report}")
     raise typer.Exit(code=1)
 
 

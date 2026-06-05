@@ -85,6 +85,16 @@ Required import check:
 /tmp/ic_auto_opt_openbox_spike/.venv/bin/python -c "import openbox, hermes_workflow.openbox_backend; print('openbox hermes env ok')"
 ```
 
+Preferred project gate after C-36:
+
+```bash
+.venv/bin/hermes-workflow check-toolchain-env --openbox-venv /tmp/ic_auto_opt_openbox_spike/.venv --cadence-cshrc /home/zzchen/cadence_ic231_env.csh --report /tmp/toolchain_environment_report.json
+```
+
+This checks the OpenBox venv, OpenBox/Hermes imports in the same Python
+environment, the `hermes-workflow` script in that venv, and the Cadence cshrc.
+It does not run Spectre, OCEAN, Virtuoso, or an optimizer loop.
+
 Use this venv by putting it first in `PATH`:
 
 ```bash
@@ -107,6 +117,10 @@ Spectre/OCEAN/OpenBox real execution command shape:
 ```bash
 csh -fc 'source /home/zzchen/cadence_ic231_env.csh; setenv PATH /tmp/ic_auto_opt_openbox_spike/.venv/bin:$PATH; setenv MPLCONFIGDIR /tmp/ic_auto_opt_c34/mpl_cache; cd /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow; hermes-workflow run-openbox-real PROJECT_DIR --max-evals 100 --batch-size 10 --parallel-jobs 10 --cadence-cshrc /home/zzchen/cadence_ic231_env.csh'
 ```
+
+Keep `MPLCONFIGDIR` set to a writable `/tmp` directory for real OpenBox runs.
+Without it, OpenBox/Matplotlib may still import but can emit cache-directory
+warnings and slow down process startup.
 
 `+mt` / `threads_per_run` and run-level parallelism are different:
 

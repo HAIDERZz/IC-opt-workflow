@@ -1,18 +1,18 @@
 {
   "schema_version": "1.0",
-  "current_scope": "C-35 Toolchain Execution Reference complete",
-  "current_status": "C-35 is complete, verified-only. Added a mandatory toolchain execution reference so future real Virtuoso/Spectre/OCEAN/OpenBox/native-TuRBO/bridge work starts from the known-good environment, sandbox, workspace-preparation, and closeout commands from C-34 instead of rediscovering venv or sandbox failures.",
+  "current_scope": "C-36 Stable OpenBox/Hermes Execution Environment Gate complete",
+  "current_status": "C-36 is complete, verified-only. Added hermes-workflow check-toolchain-env to verify the OpenBox/Hermes execution venv, OpenBox and Hermes imports in the same Python, the venv hermes-workflow script, and the Cadence cshrc before real OpenBox execution. The current C-34 OpenBox/Hermes venv passed the gate.",
   "review_status": "verified-only",
   "subagent_dispatch": "available",
-  "active_spec": "docs/TOOLCHAIN_EXECUTION_REFERENCE.md",
-  "active_plan": "docs/TOOLCHAIN_EXECUTION_REFERENCE.md",
+  "active_spec": "docs/superpowers/specs/2026-06-05-stable-openbox-hermes-execution-environment-gate-design.md",
+  "active_plan": "docs/superpowers/plans/2026-06-05-stable-openbox-hermes-execution-environment-gate.md",
   "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
   "progress_files": [
     "docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md",
     "docs/EXECUTION_PROGRESS_2026-05-29.md",
     "docs/COMPACT_RESUME_CHECKPOINT.md"
   ],
-  "next_allowed_action": "wait for user confirmation before the next narrow production step; recommended next is productizing the stable OpenBox/Hermes execution environment requirement or planning continuation/multi-run optimizer workflow using docs/TOOLCHAIN_EXECUTION_REFERENCE.md first",
+  "next_allowed_action": "wait for user confirmation before the next narrow production step; recommended next is continuation/multi-run optimizer workflow or OpenBox advanced visualization, with check-toolchain-env run first before any real OpenBox execution",
   "forbidden_actions": [
     "run real tool commands without first checking docs/TOOLCHAIN_EXECUTION_REFERENCE.md",
     "run long fake-run ladders before a meaningful real practice flow",
@@ -44,11 +44,11 @@
     "git status --short"
   ],
   "route_audit": {
-    "active_spec": "docs/TOOLCHAIN_EXECUTION_REFERENCE.md",
-    "active_plan": "docs/TOOLCHAIN_EXECUTION_REFERENCE.md",
+    "active_spec": "docs/superpowers/specs/2026-06-05-stable-openbox-hermes-execution-environment-gate-design.md",
+    "active_plan": "docs/superpowers/plans/2026-06-05-stable-openbox-hermes-execution-environment-gate.md",
     "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
-    "alignment": "Aligned. C-35 records the proven C-34 real-tool path as a mandatory reference and tightens AGENTS.md so future tool work starts from observed evidence instead of speculative or repeated setup/debug loops.",
-    "drift": "No route drift. This is a documentation/process correction only; it does not change optimizer backends, real-tool adapters, formulas, or schemas."
+    "alignment": "Aligned. C-36 turns the C-34 proven OpenBox/Hermes execution environment into a deterministic pre-real-run gate, reducing repeated venv/import/cshrc mistakes before real optimizer execution.",
+    "drift": "No route drift. This adds an environment checker only; it does not run real tools, change optimizer backends, alter Spectre/OCEAN execution, parse PSF, or rewrite formulas."
   },
   "latest_valid_commit": "18e899f",
   "review_evidence": {
@@ -104,6 +104,7 @@
     "c34_task1": "Complete, verified-only. Added docs/superpowers/plans/2026-06-05-production-optimizer-handoff-acceptance.md and generated the OpenBox task packet for /tmp/ic_auto_opt_c29_openbox_real/bridge_test_inv using package-optimizer-task --backend openbox --max-evals 100 --parallel. Local-only evidence copied to /tmp/ic_auto_opt_c34: EXECUTION_TASK.md, optimizer_execution_manifest.json, task_packet_sha256.txt. Verified the packet contains run-openbox-real, check-optimizer-run, summarize-optimizer-run, and Do not hand-pick wording. No real tools were run.",
     "c34_task2_blocker": "Resolved, verified-only. After user said continue, the generated OpenBox command was attempted. It first exited before Spectre/OCEAN with: OpenBox is not installed; install it in the active environment to run the OpenBox backend. Sanitized blocker note: docs/debug/2026-06-05-c34-production-openbox-handoff-dependency-blocker.md. No fallback to TuRBO was performed.",
     "c34_complete": "Complete, verified-only. OpenBox/Hermes execution environment fixed by installing Hermes workflow editable into /tmp/ic_auto_opt_openbox_spike/.venv. Clean approved workspace rebuilt at /tmp/ic_auto_opt_c34_clean2/bridge_test_inv with config, netlists, standard execution_manifest.json, optimizer task packet, and matching supervisor_instruction.json. Real OpenBox production handoff completed 100 evaluations: 43 feasible, 51 constraint_failed, 6 metric_check_failed, 0 real_check_failed. check-optimizer-run accepted, summarize-optimizer-run decision accept_best_observed confidence medium global_optimum_claim=false, finalize-optimizer-run passed with best observed real_071. Sanitized success note: docs/debug/2026-06-05-c34-production-openbox-handoff-success.md.",
-    "c35_complete": "Complete, verified-only. Added docs/TOOLCHAIN_EXECUTION_REFERENCE.md and updated AGENTS.md so future real-tool work must use the known-good C-34 OpenBox/Hermes venv, Cadence cshrc, non-sandbox execution rule, fresh workspace package sequence, closeout commands, and fake-run limit. No code, real tools, optimizer backend behavior, PSF parsing, or OCEAN formula handling changed."
+    "c35_complete": "Complete, verified-only. Added docs/TOOLCHAIN_EXECUTION_REFERENCE.md and updated AGENTS.md so future real-tool work must use the known-good C-34 OpenBox/Hermes venv, Cadence cshrc, non-sandbox execution rule, fresh workspace package sequence, closeout commands, and fake-run limit. No code, real tools, optimizer backend behavior, PSF parsing, or OCEAN formula handling changed.",
+    "c36_complete": "Complete, verified-only. Added src/hermes_workflow/toolchain_env.py, tests/test_toolchain_env.py, and CLI hermes-workflow check-toolchain-env. The gate checks the OpenBox execution venv, venv Python, venv hermes-workflow script, Cadence cshrc, and same-Python imports of openbox plus hermes_workflow.openbox_backend. Current C-34 venv passed with report /tmp/toolchain_environment_report_c36.json. No real optimizer run, Spectre, OCEAN, Virtuoso, bridge, PSF parsing, or OCEAN formula rewrite occurred."
   }
 }

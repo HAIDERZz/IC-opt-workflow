@@ -1465,8 +1465,21 @@ C-35 Toolchain Execution Reference Completion:
 - next_allowed_action: wait for user confirmation; recommended next is either productizing a stable OpenBox/Hermes execution environment requirement or planning continuation/multi-run optimizer workflow using the reference first.
 - State next_allowed_action: wait for user confirmation before the next narrow production step; recommended next is productizing the stable OpenBox/Hermes execution environment requirement or planning continuation/multi-run optimizer workflow using docs/TOOLCHAIN_EXECUTION_REFERENCE.md first
 
+C-36 Stable OpenBox/Hermes Execution Environment Gate Completion:
+
+- Status: complete, verified-only.
+- Design spec: `docs/superpowers/specs/2026-06-05-stable-openbox-hermes-execution-environment-gate-design.md`.
+- Implementation plan: `docs/superpowers/plans/2026-06-05-stable-openbox-hermes-execution-environment-gate.md`.
+- Code: added `src/hermes_workflow/toolchain_env.py` and CLI `hermes-workflow check-toolchain-env`.
+- Behavior: checks the OpenBox execution venv, venv Python, venv `hermes-workflow` script, Cadence cshrc, and same-Python imports of `openbox` plus `hermes_workflow.openbox_backend`; optionally writes a JSON report.
+- Current C-34 OpenBox/Hermes venv passed:
+  `.venv/bin/hermes-workflow check-toolchain-env --openbox-venv /tmp/ic_auto_opt_openbox_spike/.venv --cadence-cshrc /home/zzchen/cadence_ic231_env.csh --report /tmp/toolchain_environment_report_c36.json`.
+- Boundary: no real optimizer run, Spectre, OCEAN, Virtuoso, bridge, PSF parsing, or OCEAN formula rewrite occurred.
+- current_scope: C-36 Stable OpenBox/Hermes Execution Environment Gate complete.
+- next_allowed_action: wait for user confirmation before the next narrow production step; recommended next is continuation/multi-run optimizer workflow or OpenBox advanced visualization, with check-toolchain-env run first before any real OpenBox execution
+
 ## Resume Prompt
 
 ```text
-请继续 IC auto optimization workflow。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。先阅读 AGENTS.md、docs/CURRENT_TASK_STATE.json、docs/TOOLCHAIN_EXECUTION_REFERENCE.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/OPTIMIZER_PRODUCTION_HANDOFF_GUIDE.md、docs/debug/2026-06-05-c34-production-openbox-handoff-success.md。C-35 Toolchain Execution Reference 已完成：真实 Virtuoso/Spectre/OCEAN/OpenBox/native-TuRBO/bridge 工作必须先对照 docs/TOOLCHAIN_EXECUTION_REFERENCE.md，使用已验证的 venv/Cadence/non-sandbox/clean-workspace/closeout 路径，避免重复 OpenBox venv 和 sandbox 失败。下一步等待用户确认后选择一个窄的生产步骤：productize stable OpenBox/Hermes execution environment requirement，或规划 continuation/multi-run optimizer workflow。减少无意义 fake run；不要 silent fallback，不要替换 TuRBO，不要删除 native_turbo，不要创建 broad optimizer framework，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
+请继续 IC auto optimization workflow。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。先阅读 AGENTS.md、docs/CURRENT_TASK_STATE.json、docs/TOOLCHAIN_EXECUTION_REFERENCE.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/OPTIMIZER_PRODUCTION_HANDOFF_GUIDE.md。C-36 Stable OpenBox/Hermes Execution Environment Gate 已完成：新增 hermes-workflow check-toolchain-env，可在真实 OpenBox execution 前检查 OpenBox/Hermes venv、同一 Python import、venv hermes-workflow 脚本和 Cadence cshrc。当前 /tmp/ic_auto_opt_openbox_spike/.venv 已通过该 gate。下一步等待用户确认后选择一个窄的生产步骤：continuation/multi-run optimizer workflow 或 OpenBox advanced visualization；任何真实 OpenBox 运行前先跑 check-toolchain-env。减少无意义 fake run；不要 silent fallback，不要替换 TuRBO，不要删除 native_turbo，不要创建 broad optimizer framework，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
 ```
