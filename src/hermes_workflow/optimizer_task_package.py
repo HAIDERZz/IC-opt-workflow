@@ -48,18 +48,23 @@ class OptimizerExecutionTaskPackage:
 def build_optimizer_execution_task_package(
     project_dir: Path,
     *,
-    max_evals: int,
+    max_evals: int | None,
+    additional_evals: int | None = None,
     cadence_cshrc: Path,
     parallel: bool = True,
     optimizer_backend: str = NATIVE_TURBO_BACKEND,
+    continuation: bool = False,
     created_at_utc: str | None = None,
 ) -> OptimizerExecutionTaskPackage:
-    if max_evals < 1:
-        raise ValueError("max_evals must be >= 1")
-
     project_dir = Path(project_dir).resolve()
     cadence_cshrc = Path(cadence_cshrc).expanduser().resolve()
     backend = _normalize_backend(optimizer_backend)
+    _validate_budget(
+        backend=backend,
+        max_evals=max_evals,
+        additional_evals=additional_evals,
+        continuation=continuation,
+    )
     bundle = assert_valid_project(project_dir)
     execution_dir = project_dir / "execution_package"
     execution_dir.mkdir(parents=True, exist_ok=True)
@@ -70,11 +75,13 @@ def build_optimizer_execution_task_package(
     command = _command(
         project_dir,
         max_evals,
+        additional_evals,
         cadence_cshrc,
         parallel,
         backend=backend,
         batch_size=batch_size,
         parallel_jobs=parallel_jobs,
+        continuation=continuation,
     )
     spectre_settings = {
         "preset": spectre.preset.value,
@@ -96,6 +103,8 @@ def build_optimizer_execution_task_package(
         "command": command,
         "audit_commands": audit_commands,
         "max_evals": max_evals,
+        "additional_evals": additional_evals,
+        "continuation": continuation,
         "parallel": parallel,
         "batch_size": batch_size,
         "parallel_jobs": parallel_jobs,
@@ -129,6 +138,29 @@ def _normalize_backend(backend: str) -> str:
     return normalized
 
 
+def _validate_budget(
+    *,
+    backend: str,
+    max_evals: int | None,
+    additional_evals: int | None,
+    continuation: bool,
+) -> None:
+    if continuation and backend != OPENBOX_BACKEND:
+        raise ValueError("continuation is only supported for the openbox backend")
+    if continuation:
+        if additional_evals is None:
+            raise ValueError("additional_evals is required for continuation")
+        if additional_evals < 1:
+            raise ValueError("additional_evals must be >= 1")
+        return
+    if max_evals is None:
+        raise ValueError("max_evals is required")
+    if max_evals < 1:
+        raise ValueError("max_evals must be >= 1")
+    if additional_evals is not None:
+        raise ValueError("additional_evals is only valid for continuation")
+
+
 def _required_returned_artifacts(backend: str) -> list[str]:
     if backend == OPENBOX_BACKEND:
         return list(OPENBOX_REQUIRED_RETURNED_ARTIFACTS)
@@ -137,17 +169,23 @@ def _required_returned_artifacts(backend: str) -> list[str]:
 
 def _command(
     project_dir: Path,
-    max_evals: int,
+    max_evals: int | None,
+    additional_evals: int | None,
     cadence_cshrc: Path,
     parallel: bool,
     *,
     backend: str,
     batch_size: int,
     parallel_jobs: int,
+    continuation: bool,
 ) -> list[str]:
     if backend == OPENBOX_BACKEND:
-        command = ["hermes-workflow", "run-openbox-real", str(project_dir)]
-        command.extend(["--max-evals", str(max_evals)])
+        if continuation:
+            command = ["hermes-workflow", "continue-openbox-real", str(project_dir)]
+            command.extend(["--additional-evals", str(additional_evals)])
+        else:
+            command = ["hermes-workflow", "run-openbox-real", str(project_dir)]
+            command.extend(["--max-evals", str(max_evals)])
         command.extend(["--batch-size", str(batch_size)])
         command.extend(["--parallel-jobs", str(parallel_jobs)])
         command.extend(["--cadence-cshrc", str(cadence_cshrc)])
@@ -170,7 +208,8 @@ def _render_task(payload: dict) -> str:
     artifacts = "\n".join(
         f"- `{artifact}`" for artifact in payload["required_returned_artifacts"]
     )
-    required_behavior = _required_behavior(payload["backend"])
+    required_behavior = _required_behavior(payload)
+    continuation_note = _continuation_note(payload)
     return f"""# Optimizer Execution Agent Task
 
 Project: `{payload["project_name"]}`
@@ -192,6 +231,7 @@ Run these after optimizer execution:
 ## Required Behavior
 
 {required_behavior}
+{continuation_note}
 - Preserve native Maestro/ADE exported netlist structure.
 - Command exit status alone is not acceptance evidence.
 - Manifest-level audit is required for any real-tool run.
@@ -219,14 +259,27 @@ Run these after optimizer execution:
 """
 
 
-def _required_behavior(backend: str) -> str:
+def _required_behavior(payload: dict) -> str:
+    backend = payload["backend"]
     if backend == OPENBOX_BACKEND:
+        command_name = (
+            "continue-openbox-real" if payload.get("continuation") else "run-openbox-real"
+        )
         return "\n".join(
             [
-                "- Use OpenBox ask-and-tell through `run-openbox-real`.",
+                f"- Use OpenBox ask-and-tell through `{command_name}`.",
                 "- OpenBox must be installed and importable in the execution environment.",
                 "- If OpenBox is unavailable, report a dependency blocker.",
                 "- Do not silently fall back to TuRBO or manually choose candidates.",
             ]
         )
     return "- Use native `Turbo1.optimize()` through `run-native-turbo`."
+
+
+def _continuation_note(payload: dict) -> str:
+    if not payload.get("continuation"):
+        return ""
+    return (
+        "- This is a continuation task: load existing accepted optimizer traces "
+        "and evaluate only the requested additional candidates.\n"
+    )

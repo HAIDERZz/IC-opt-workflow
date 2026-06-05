@@ -127,6 +127,48 @@ def test_build_optimizer_execution_task_package_writes_openbox_backend(
     ]
 
 
+def test_build_optimizer_execution_task_package_writes_openbox_continuation(
+    tmp_path: Path,
+) -> None:
+    project_dir = tmp_path / "bridge_test_inv"
+    create_project_from_template(project_dir)
+
+    package = build_optimizer_execution_task_package(
+        project_dir,
+        max_evals=None,
+        additional_evals=50,
+        cadence_cshrc=Path("/home/zzchen/cadence_ic231_env.csh"),
+        optimizer_backend="openbox",
+        continuation=True,
+        created_at_utc="2026-06-05T00:00:00Z",
+    )
+
+    task_text = package.task_path.read_text(encoding="utf-8")
+    manifest_payload = package.payload
+
+    assert "continue-openbox-real" in task_text
+    assert "run-openbox-real" not in task_text
+    assert "--additional-evals 50" in task_text
+    assert "existing accepted optimizer traces" in task_text
+    assert manifest_payload["backend"] == "openbox"
+    assert manifest_payload["continuation"] is True
+    assert manifest_payload["additional_evals"] == 50
+    assert manifest_payload["max_evals"] is None
+    assert manifest_payload["command"] == [
+        "hermes-workflow",
+        "continue-openbox-real",
+        str(project_dir),
+        "--additional-evals",
+        "50",
+        "--batch-size",
+        "10",
+        "--parallel-jobs",
+        "10",
+        "--cadence-cshrc",
+        "/home/zzchen/cadence_ic231_env.csh",
+    ]
+
+
 def test_package_optimizer_task_cli_writes_task_and_manifest(tmp_path: Path) -> None:
     project_dir = tmp_path / "bridge_test_inv"
     create_project_from_template(project_dir)
@@ -176,6 +218,35 @@ def test_package_optimizer_task_cli_writes_openbox_manifest(tmp_path: Path) -> N
     manifest_payload = json.loads(manifest_path.read_text(encoding="utf-8"))
     assert manifest_payload["backend"] == "openbox"
     assert manifest_payload["command"][1] == "run-openbox-real"
+
+
+def test_package_optimizer_task_cli_writes_openbox_continuation_manifest(
+    tmp_path: Path,
+) -> None:
+    project_dir = tmp_path / "bridge_test_inv"
+    create_project_from_template(project_dir)
+
+    result = runner.invoke(
+        app,
+        [
+            "package-optimizer-task",
+            str(project_dir),
+            "--backend",
+            "openbox",
+            "--continuation",
+            "--additional-evals",
+            "50",
+            "--cadence-cshrc",
+            "/home/zzchen/cadence_ic231_env.csh",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    manifest_path = project_dir / "execution_package" / "optimizer_execution_manifest.json"
+    manifest_payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert manifest_payload["continuation"] is True
+    assert manifest_payload["additional_evals"] == 50
+    assert manifest_payload["command"][1] == "continue-openbox-real"
 
 
 def test_optimizer_task_package_uses_absolute_shell_safe_command(

@@ -4,7 +4,7 @@ import json
 import math
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, fields
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, Callable
@@ -19,7 +19,11 @@ from hermes_workflow.native_turbo import (
     load_native_turbo_contract,
     quantize_candidate,
 )
-from hermes_workflow.optimizer_artifacts import EVALUATIONS_RELATIVE, REPORT_RELATIVE
+from hermes_workflow.optimizer_artifacts import (
+    EVALUATIONS_RELATIVE,
+    REPORT_RELATIVE,
+    load_optimizer_artifacts,
+)
 from hermes_workflow.real_result_record import record_real_result
 from hermes_workflow.real_run import prepare_explicit_candidate_real_run
 from hermes_workflow.schemas import (
@@ -72,6 +76,9 @@ class OpenBoxBatchRunSettings:
     random_seed: int
     parallel_jobs: int
     threads_per_run: int | None
+    continuation_enabled: bool = False
+    prior_evaluation_count: int = 0
+    additional_evals: int | None = None
 
 
 @dataclass(frozen=True)
@@ -97,13 +104,13 @@ class OpenBoxBatchResult:
 def run_openbox_fake_optimization(
     project_dir: str | Path,
     *,
-    max_evals: int,
+    max_evals: int | None = None,
+    additional_evals: int | None = None,
+    continue_from_existing: bool = False,
     batch_size: int,
     advisor_factory: AdvisorFactory | None = None,
     random_seed: int | None = None,
 ) -> NativeTurboRunResult:
-    if max_evals < 1:
-        raise ValueError("max_evals must be >= 1")
     if batch_size < 1:
         raise ValueError("batch_size must be >= 1")
 
@@ -114,9 +121,21 @@ def run_openbox_fake_optimization(
         if random_seed is not None
         else contract.optimizer.optimizer.random_seed
     )
+    prior_traces = _load_continuation_traces(
+        project_root,
+        execution_mode=FAKE_EXECUTION_MODE,
+        enabled=continue_from_existing,
+    )
+    selected_max_evals = _select_target_evaluation_count(
+        max_evals=max_evals,
+        additional_evals=additional_evals,
+        continue_from_existing=continue_from_existing,
+        prior_count=len(prior_traces),
+        default_max_evals=None,
+    )
     result = _run_openbox_batches(
         project_root,
-        max_evals=max_evals,
+        max_evals=selected_max_evals,
         batch_size=batch_size,
         advisor_factory=advisor_factory,
         evaluator=_fake_batch_evaluator,
@@ -124,6 +143,8 @@ def run_openbox_fake_optimization(
         random_seed=seed,
         parallel_jobs=batch_size,
         threads_per_run=None,
+        prior_traces=prior_traces,
+        continuation_additional_evals=additional_evals,
     )
     return result
 
@@ -132,6 +153,8 @@ def run_openbox_real_optimization(
     project_dir: str | Path,
     *,
     max_evals: int | None = None,
+    additional_evals: int | None = None,
+    continue_from_existing: bool = False,
     batch_size: int | None = None,
     parallel_jobs: int | None = None,
     cadence_cshrc: Path | None = None,
@@ -141,11 +164,8 @@ def run_openbox_real_optimization(
 ) -> NativeTurboRunResult:
     project_root = Path(project_dir)
     bundle = assert_valid_project(project_root)
-    selected_max_evals = max_evals or bundle.optimizer.optimizer.max_evaluations
     selected_batch_size = batch_size or bundle.optimizer.optimizer.batch_size
     selected_parallel_jobs = parallel_jobs or bundle.spectre.spectre.parallel_jobs
-    if selected_max_evals < 1:
-        raise ValueError("max_evals must be >= 1")
     if selected_batch_size < 1:
         raise ValueError("batch_size must be >= 1")
     if selected_parallel_jobs < 1:
@@ -156,6 +176,18 @@ def run_openbox_real_optimization(
         random_seed
         if random_seed is not None
         else contract.optimizer.optimizer.random_seed
+    )
+    prior_traces = _load_continuation_traces(
+        project_root,
+        execution_mode=REAL_EXECUTION_MODE,
+        enabled=continue_from_existing,
+    )
+    selected_max_evals = _select_target_evaluation_count(
+        max_evals=max_evals,
+        additional_evals=additional_evals,
+        continue_from_existing=continue_from_existing,
+        prior_count=len(prior_traces),
+        default_max_evals=bundle.optimizer.optimizer.max_evaluations,
     )
     evaluator = make_openbox_real_candidate_batch_evaluator(
         project_root,
@@ -173,6 +205,8 @@ def run_openbox_real_optimization(
         random_seed=seed,
         parallel_jobs=selected_parallel_jobs,
         threads_per_run=bundle.spectre.spectre.threads_per_run,
+        prior_traces=prior_traces,
+        continuation_additional_evals=additional_evals,
     )
 
 
@@ -242,6 +276,12 @@ def write_openbox_reports(
             "parallel_jobs": settings.parallel_jobs,
             "threads_per_run": settings.threads_per_run,
             "duplicate_replacements": duplicate_replacements,
+            "continuation": {
+                "enabled": settings.continuation_enabled,
+                "prior_evaluation_count": settings.prior_evaluation_count,
+                "additional_evals": settings.additional_evals,
+                "target_total_evals": settings.max_evals,
+            },
         },
     }
     report_path.write_text(
@@ -262,6 +302,67 @@ def _load_openbox() -> tuple[Any, Any, Any]:
     return Advisor, Observation, sp
 
 
+def _load_continuation_traces(
+    project_dir: Path,
+    *,
+    execution_mode: str,
+    enabled: bool,
+) -> list[NativeTurboEvaluationTrace]:
+    if not enabled:
+        return []
+    issues: list[str] = []
+    artifacts = load_optimizer_artifacts(project_dir, issues)
+    if issues:
+        raise ValueError(
+            "cannot load OpenBox continuation artifacts: " + "; ".join(issues)
+        )
+    if artifacts.report.get("backend") != OPENBOX_BACKEND:
+        raise ValueError("OpenBox continuation requires prior OpenBox artifacts")
+    if artifacts.report.get("execution_mode") != execution_mode:
+        raise ValueError(
+            "OpenBox continuation execution mode mismatch: "
+            f"expected {execution_mode}"
+        )
+    traces = [_trace_from_payload(row) for row in artifacts.traces]
+    if not traces:
+        raise ValueError("OpenBox continuation requires at least one prior trace")
+    return traces
+
+
+def _trace_from_payload(payload: dict[str, Any]) -> NativeTurboEvaluationTrace:
+    field_names = {field.name for field in fields(NativeTurboEvaluationTrace)}
+    values = {name: payload[name] for name in field_names if name in payload}
+    try:
+        return NativeTurboEvaluationTrace(**values)
+    except TypeError as exc:
+        raise ValueError("invalid OpenBox continuation trace payload") from exc
+
+
+def _select_target_evaluation_count(
+    *,
+    max_evals: int | None,
+    additional_evals: int | None,
+    continue_from_existing: bool,
+    prior_count: int,
+    default_max_evals: int | None,
+) -> int:
+    if continue_from_existing:
+        if additional_evals is None:
+            raise ValueError("additional_evals is required for OpenBox continuation")
+        if additional_evals < 1:
+            raise ValueError("additional_evals must be >= 1")
+        return prior_count + additional_evals
+
+    if additional_evals is not None:
+        raise ValueError("additional_evals is only valid for OpenBox continuation")
+    selected = max_evals if max_evals is not None else default_max_evals
+    if selected is None:
+        raise ValueError("max_evals is required")
+    if selected < 1:
+        raise ValueError("max_evals must be >= 1")
+    return selected
+
+
 def _run_openbox_batches(
     project_dir: Path,
     *,
@@ -273,23 +374,26 @@ def _run_openbox_batches(
     random_seed: int,
     parallel_jobs: int,
     threads_per_run: int | None,
+    prior_traces: list[NativeTurboEvaluationTrace] | None = None,
+    continuation_additional_evals: int | None = None,
 ) -> NativeTurboRunResult:
     contract = load_native_turbo_contract(project_dir)
-    advisor, observation_factory = _create_advisor(
+    advisor, observation_factory, config_builder = _create_advisor(
         project_dir,
         contract.variables,
         random_seed,
         advisor_factory=advisor_factory,
         num_constraints=len(contract.metrics.constraints),
     )
-    traces: list[NativeTurboEvaluationTrace] = []
-    seen_keys: set[tuple[tuple[str, str], ...]] = set()
+    traces: list[NativeTurboEvaluationTrace] = list(prior_traces or [])
+    prior_count = len(traces)
+    seen_keys: set[tuple[tuple[str, str], ...]] = _seen_keys_from_traces(traces)
     duplicate_replacements = 0
-    batch_index = 0
+    batch_index = _max_batch_index(traces)
     run_offset = (
         _next_run_offset(project_dir, "real")
         if execution_mode == REAL_EXECUTION_MODE
-        else 0
+        else prior_count
     )
     settings = OpenBoxBatchRunSettings(
         execution_mode=execution_mode,
@@ -298,7 +402,23 @@ def _run_openbox_batches(
         random_seed=random_seed,
         parallel_jobs=parallel_jobs,
         threads_per_run=threads_per_run,
+        continuation_enabled=prior_count > 0,
+        prior_evaluation_count=prior_count,
+        additional_evals=continuation_additional_evals,
     )
+    if traces:
+        _update_observations(
+            advisor,
+            [
+                _make_openbox_observation(
+                    metrics_config=contract.metrics,
+                    trace=trace,
+                    config=config_builder(trace.parameters),
+                    observation_factory=observation_factory,
+                )
+                for trace in traces
+            ],
+        )
 
     while len(traces) < max_evals:
         batch_index += 1
@@ -310,6 +430,7 @@ def _run_openbox_batches(
             batch_id=f"batch_{batch_index:03d}",
             batch_size=selected_batch_size,
             evaluation_offset=len(traces),
+            run_evaluation_offset=len(traces) - prior_count,
             run_offset=run_offset,
             run_prefix=("fake" if execution_mode == FAKE_EXECUTION_MODE else "real"),
         )
@@ -388,6 +509,24 @@ def _run_openbox_batches(
     )
 
 
+def _seen_keys_from_traces(
+    traces: list[NativeTurboEvaluationTrace],
+) -> set[tuple[tuple[str, str], ...]]:
+    return {tuple(sorted(trace.parameters.items())) for trace in traces}
+
+
+def _max_batch_index(traces: list[NativeTurboEvaluationTrace]) -> int:
+    indexes: list[int] = []
+    for trace in traces:
+        if trace.batch_id is None or not trace.batch_id.startswith("batch_"):
+            continue
+        try:
+            indexes.append(int(trace.batch_id.rsplit("_", 1)[1]))
+        except ValueError:
+            continue
+    return max(indexes, default=0)
+
+
 def _build_openbox_space(
     variables: VariablesConfig,
     space_module: object | None = None,
@@ -444,6 +583,21 @@ def _build_openbox_space(
     return space
 
 
+def _values_from_parameters(
+    variables: VariablesConfig,
+    parameters: dict[str, str],
+) -> dict[str, int | float]:
+    values: dict[str, int | float] = {}
+    for variable in variables.variables:
+        if variable.name not in parameters:
+            raise ValueError(f"continuation trace missing parameter {variable.name}")
+        if variable.kind == VariableKind.INTEGER:
+            values[variable.name] = int(_numeric_value(parameters[variable.name]))
+        else:
+            values[variable.name] = _numeric_value(parameters[variable.name])
+    return values
+
+
 def _build_openbox_advisor(
     variables: VariablesConfig,
     seed: int,
@@ -467,9 +621,13 @@ def _create_advisor(
     *,
     advisor_factory: AdvisorFactory | None,
     num_constraints: int,
-) -> tuple[object, Callable[..., object]]:
+) -> tuple[object, Callable[..., object], Callable[[dict[str, str]], object]]:
     if advisor_factory is not None:
-        return advisor_factory(_build_openbox_space(variables), seed), FakeOpenBoxObservation
+        return (
+            advisor_factory(_build_openbox_space(variables), seed),
+            FakeOpenBoxObservation,
+            lambda parameters: _values_from_parameters(variables, parameters),
+        )
 
     Advisor, Observation, sp = _load_openbox()
     space = _build_openbox_space(variables, sp)
@@ -487,6 +645,10 @@ def _create_advisor(
             random_state=seed,
         ),
         Observation,
+        lambda parameters: sp.Configuration(
+            space,
+            values=_values_from_parameters(variables, parameters),
+        ),
     )
 
 
@@ -507,6 +669,7 @@ def _prepare_unique_batch(
     batch_id: str,
     batch_size: int,
     evaluation_offset: int,
+    run_evaluation_offset: int,
     run_offset: int,
     run_prefix: str,
 ) -> OpenBoxBatchResult:
@@ -529,6 +692,7 @@ def _prepare_unique_batch(
             )
             seen_keys.add(key)
             evaluation_index = evaluation_offset + len(candidates) + 1
+            run_index = run_offset + run_evaluation_offset + len(candidates) + 1
             candidates.append(
                 OpenBoxPreparedSuggestion(
                     config=suggestion,
@@ -536,7 +700,7 @@ def _prepare_unique_batch(
                     raw_x=raw_x,
                     parameters=parameters,
                     candidate_id=f"candidate_{evaluation_index:06d}",
-                    run_id=f"{run_prefix}_{run_offset + evaluation_index:03d}",
+                    run_id=f"{run_prefix}_{run_index:03d}",
                     batch_id=batch_id,
                     batch_slot=len(candidates) + 1,
                     batch_size=batch_size,

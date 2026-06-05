@@ -1479,8 +1479,21 @@ C-36 Stable OpenBox/Hermes Execution Environment Gate Completion:
 - current_scope: C-36 Stable OpenBox/Hermes Execution Environment Gate complete.
 - next_allowed_action: wait for user confirmation before the next narrow production step; recommended next is continuation/multi-run optimizer workflow or OpenBox advanced visualization, with check-toolchain-env run first before any real OpenBox execution
 
+C-38 OpenBox Continuation / Multi-Run Optimizer Workflow Completion:
+
+- Status: complete, verified-only.
+- Design spec: `docs/superpowers/specs/2026-06-05-openbox-continuation-multi-run-workflow-design.md`.
+- Implementation plan: `docs/superpowers/plans/2026-06-05-openbox-continuation-multi-run-workflow.md`.
+- Code: added OpenBox continuation support in `src/hermes_workflow/openbox_backend.py`, CLI `hermes-workflow continue-openbox-real`, and OpenBox continuation task packet rendering in `package-optimizer-task`.
+- Behavior: continuation loads prior backend-neutral OpenBox traces, converts them into OpenBox observations, tells them to the advisor before new suggestions, seeds duplicate detection, continues evaluation/run/batch numbering, and writes cumulative `reports/optimizer_run_report.json` plus `reports/optimizer_evaluations.jsonl`.
+- Execution-agent packet behavior: `package-optimizer-task --backend openbox --continuation --additional-evals N` renders `continue-openbox-real ... --additional-evals N`.
+- Verification passed: `python3 -m pytest -q` (`566 passed, 1 skipped`) and `python3 -m ruff check src tests tools`.
+- Boundary: no real optimizer run, Spectre, OCEAN, Virtuoso, bridge, PSF parsing, or OCEAN formula rewrite occurred.
+- current_scope: C-38 OpenBox Continuation / Multi-Run Optimizer Workflow complete.
+- next_allowed_action: wait for user confirmation before the next narrow production step; recommended next is a real continuation acceptance run using docs/TOOLCHAIN_EXECUTION_REFERENCE.md, check-toolchain-env, and continue-openbox-real against a known-good OpenBox project copy.
+
 ## Resume Prompt
 
 ```text
-请继续 IC auto optimization workflow。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。先阅读 AGENTS.md、docs/CURRENT_TASK_STATE.json、docs/TOOLCHAIN_EXECUTION_REFERENCE.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/OPTIMIZER_PRODUCTION_HANDOFF_GUIDE.md。C-36 Stable OpenBox/Hermes Execution Environment Gate 已完成：新增 hermes-workflow check-toolchain-env，可在真实 OpenBox execution 前检查 OpenBox/Hermes venv、同一 Python import、venv hermes-workflow 脚本和 Cadence cshrc。当前 /tmp/ic_auto_opt_openbox_spike/.venv 已通过该 gate。下一步等待用户确认后选择一个窄的生产步骤：continuation/multi-run optimizer workflow 或 OpenBox advanced visualization；任何真实 OpenBox 运行前先跑 check-toolchain-env。减少无意义 fake run；不要 silent fallback，不要替换 TuRBO，不要删除 native_turbo，不要创建 broad optimizer framework，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
+请继续 IC auto optimization workflow。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。先阅读 AGENTS.md、docs/CURRENT_TASK_STATE.json、docs/TOOLCHAIN_EXECUTION_REFERENCE.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/OPTIMIZER_PRODUCTION_HANDOFF_GUIDE.md。C-38 OpenBox Continuation / Multi-Run Optimizer Workflow 已完成：新增 hermes-workflow continue-openbox-real、OpenBox continuation warm-start/cumulative artifacts、以及 package-optimizer-task --backend openbox --continuation --additional-evals N。下一步等待用户确认后做一个真实 continuation acceptance run；真实 OpenBox 前必须先读 TOOLCHAIN_EXECUTION_REFERENCE 并跑 check-toolchain-env。减少无意义 fake run；不要 silent fallback，不要替换 TuRBO，不要删除 native_turbo，不要创建 broad optimizer framework，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
 ```

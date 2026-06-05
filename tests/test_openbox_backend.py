@@ -41,6 +41,32 @@ class FakeAdvisor:
         assert observations
 
 
+class ContinuationAdvisor:
+    def __init__(self) -> None:
+        self.updated_batches = 0
+        self.updated_observations: list[object] = []
+        self.seen_prior_before_suggest = False
+        self._batches = [
+            [
+                {"FN": 2, "WN": 0.2, "FP": 3, "WP": 0.4},
+                {"FN": 10, "WN": 2.4, "FP": 11, "WP": 2.6},
+            ],
+            [
+                {"FN": 12, "WN": 2.8, "FP": 12, "WP": 2.8},
+            ],
+        ]
+
+    def get_suggestions(self, batch_size: int) -> list[dict[str, float]]:
+        self.seen_prior_before_suggest = len(self.updated_observations) == 2
+        batch = self._batches.pop(0)
+        return batch[:batch_size]
+
+    def update_observations(self, observations: list[object]) -> None:
+        self.updated_batches += 1
+        self.updated_observations.extend(observations)
+        assert observations
+
+
 class FakeVariable:
     def __init__(self, name: str, lower: object, upper: object, **kwargs) -> None:
         self.name = name
@@ -105,6 +131,56 @@ def test_openbox_fake_runner_writes_backend_neutral_artifacts(
     assert rows[0]["result_manifest"] is None
     assert rows[0]["metric_result_manifest"] is None
     assert rows[0]["batch_id"] == "batch_001"
+
+
+def test_openbox_fake_continuation_warm_starts_and_writes_cumulative_artifacts(
+    tmp_path: Path,
+) -> None:
+    project_dir = create_approved_real_project(tmp_path)
+    run_openbox_fake_optimization(
+        project_dir,
+        max_evals=2,
+        batch_size=2,
+        advisor_factory=lambda _space, _seed: FakeAdvisor(),
+    )
+    advisor = ContinuationAdvisor()
+
+    result = run_openbox_fake_optimization(
+        project_dir,
+        additional_evals=2,
+        batch_size=2,
+        continue_from_existing=True,
+        advisor_factory=lambda _space, _seed: advisor,
+    )
+
+    report = json.loads((project_dir / REPORT_RELATIVE).read_text())
+    rows = [
+        json.loads(line)
+        for line in (project_dir / EVALUATIONS_RELATIVE).read_text().splitlines()
+    ]
+
+    assert advisor.seen_prior_before_suggest is True
+    assert advisor.updated_batches == 2
+    assert result.evaluation_count == 4
+    assert report["evaluation_count"] == 4
+    assert report["openbox"]["duplicate_replacements"] == 1
+    assert report["openbox"]["continuation"] == {
+        "enabled": True,
+        "prior_evaluation_count": 2,
+        "additional_evals": 2,
+        "target_total_evals": 4,
+    }
+    assert len(rows) == 4
+    assert rows[0]["evaluation_index"] == 1
+    assert rows[2]["evaluation_index"] == 3
+    assert rows[2]["run_id"] == "fake_003"
+    assert rows[2]["batch_id"] == "batch_002"
+    assert rows[2]["parameters"] == {
+        "FN": "10",
+        "WN": "2.3u",
+        "FP": "11",
+        "WP": "2.7u",
+    }
 
 
 def test_openbox_fake_runner_requires_openbox_when_no_advisor_is_injected(
@@ -249,3 +325,56 @@ def test_run_openbox_real_cli_uses_dependency_gate(tmp_path: Path, monkeypatch) 
 
     assert result.exit_code == 0, result.output
     assert "openbox real optimization completed: 3 evaluations" in result.output
+
+
+def test_continue_openbox_real_cli_uses_additional_evals(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    import hermes_workflow.cli as cli_module
+
+    project_dir = create_approved_real_project(tmp_path)
+
+    def fake_runner(
+        project_dir: Path,
+        *,
+        max_evals: int | None,
+        additional_evals: int | None,
+        continue_from_existing: bool,
+        batch_size: int | None,
+        parallel_jobs: int | None,
+        cadence_cshrc: Path | None,
+    ) -> object:
+        assert max_evals is None
+        assert additional_evals == 5
+        assert continue_from_existing is True
+        assert batch_size == 2
+        assert parallel_jobs == 2
+        assert cadence_cshrc is None
+        return type(
+            "Result",
+            (),
+            {
+                "evaluation_count": 7,
+                "report_path": project_dir / REPORT_RELATIVE,
+                "evaluations_path": project_dir / EVALUATIONS_RELATIVE,
+            },
+        )()
+
+    monkeypatch.setattr(cli_module, "run_openbox_real_optimization", fake_runner)
+    result = CliRunner().invoke(
+        app,
+        [
+            "continue-openbox-real",
+            str(project_dir),
+            "--additional-evals",
+            "5",
+            "--batch-size",
+            "2",
+            "--parallel-jobs",
+            "2",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "openbox real continuation completed: 7 cumulative evaluations" in result.output

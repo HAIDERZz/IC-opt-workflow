@@ -266,13 +266,27 @@ def package_optimizer_task_command(
         typer.Argument(help="Project directory with approved real-tool contracts."),
     ],
     max_evals: Annotated[
-        int,
+        int | None,
         typer.Option("--max-evals", help="Optimizer evaluation budget for the task."),
-    ],
+    ] = None,
+    additional_evals: Annotated[
+        int | None,
+        typer.Option(
+            "--additional-evals",
+            help="Additional OpenBox evaluations for a continuation task.",
+        ),
+    ] = None,
+    continuation: Annotated[
+        bool,
+        typer.Option(
+            "--continuation",
+            help="Generate an OpenBox continuation task instead of a first-run task.",
+        ),
+    ] = False,
     cadence_cshrc: Annotated[
         Path,
         typer.Option("--cadence-cshrc", help="Cadence cshrc to source for execution."),
-    ],
+    ] = ...,
     parallel: Annotated[
         bool,
         typer.Option(
@@ -292,9 +306,11 @@ def package_optimizer_task_command(
         package = build_optimizer_execution_task_package(
             project_dir,
             max_evals=max_evals,
+            additional_evals=additional_evals,
             cadence_cshrc=cadence_cshrc,
             parallel=parallel,
             optimizer_backend=backend,
+            continuation=continuation,
         )
     except (OSError, ValueError) as exc:
         _exit_with_error(exc)
@@ -785,6 +801,62 @@ def run_openbox_real_command(
         _exit_with_error(exc)
     typer.echo(
         f"openbox real optimization completed: {result.evaluation_count} evaluations"
+    )
+    if result.report_path is not None:
+        typer.echo(f"report: {result.report_path.relative_to(project_dir)}")
+    if result.evaluations_path is not None:
+        typer.echo(f"evaluations: {result.evaluations_path.relative_to(project_dir)}")
+
+
+@app.command("continue-openbox-real")
+def continue_openbox_real_command(
+    project_dir: Annotated[
+        Path,
+        typer.Argument(help="Project directory with prior OpenBox optimizer artifacts."),
+    ],
+    additional_evals: Annotated[
+        int,
+        typer.Option(
+            "--additional-evals",
+            min=1,
+            help="Number of new OpenBox real evaluations to add.",
+        ),
+    ],
+    batch_size: Annotated[
+        int | None,
+        typer.Option("--batch-size", min=1, help="OpenBox suggestion batch size."),
+    ] = None,
+    parallel_jobs: Annotated[
+        int | None,
+        typer.Option(
+            "--parallel-jobs",
+            min=1,
+            help="Maximum concurrently launched Spectre runs.",
+        ),
+    ] = None,
+    cadence_cshrc: Annotated[
+        Path | None,
+        typer.Option(
+            "--cadence-cshrc",
+            help="Optional Cadence cshrc sourced before running the adapter.",
+        ),
+    ] = None,
+) -> None:
+    try:
+        result = run_openbox_real_optimization(
+            project_dir,
+            max_evals=None,
+            additional_evals=additional_evals,
+            continue_from_existing=True,
+            batch_size=batch_size,
+            parallel_jobs=parallel_jobs,
+            cadence_cshrc=cadence_cshrc,
+        )
+    except (OSError, RuntimeError, ValueError) as exc:
+        _exit_with_error(exc)
+    typer.echo(
+        "openbox real continuation completed: "
+        f"{result.evaluation_count} cumulative evaluations"
     )
     if result.report_path is not None:
         typer.echo(f"report: {result.report_path.relative_to(project_dir)}")

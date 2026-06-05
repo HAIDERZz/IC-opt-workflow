@@ -1144,6 +1144,9 @@ Next required action:
 - C-36 Stable OpenBox/Hermes Execution Environment Gate: complete, verified-only. Added `hermes-workflow check-toolchain-env`, backed by `src/hermes_workflow/toolchain_env.py` and `tests/test_toolchain_env.py`. The gate checks OpenBox execution venv existence, venv Python, venv `hermes-workflow`, Cadence cshrc, and same-Python imports of `openbox` plus `hermes_workflow.openbox_backend`. Current C-34 venv `/tmp/ic_auto_opt_openbox_spike/.venv` passed and wrote `/tmp/toolchain_environment_report_c36.json`. No real optimizer run, Spectre, OCEAN, Virtuoso, bridge, PSF parsing, or formula rewrite occurred.
 - current_scope: C-36 Stable OpenBox/Hermes Execution Environment Gate complete.
 
+- C-38 OpenBox Continuation / Multi-Run Optimizer Workflow: complete, verified-only. Added `hermes-workflow continue-openbox-real`, OpenBox continuation warm-start from prior backend-neutral traces, cumulative optimizer artifact writing, duplicate seeding from prior candidates, continued evaluation/run/batch numbering, and `package-optimizer-task --backend openbox --continuation --additional-evals N`. Verification passed with full tests (`566 passed, 1 skipped`) and full ruff. No real optimizer run, Spectre, OCEAN, Virtuoso, bridge, PSF parsing, or formula rewrite occurred.
+- current_scope: C-38 OpenBox Continuation / Multi-Run Optimizer Workflow complete.
+
 ## Locked Role Model
 
 Status: locked as of 2026-06-02.
