@@ -1641,3 +1641,16 @@ C-47 OpenBox Advanced Visualization Artifact Completion:
 - current_scope: C-47 OpenBox Advanced Visualization Artifact complete.
 - next_allowed_action: proceed with production optimizer use with full OpenBox advanced visualization available in the OpenBox venv; for the next real run, verify the advanced dependency check in TOOLCHAIN_EXECUTION_REFERENCE before execution.
 - next_allowed_action exact: proceed with production optimizer use with full OpenBox advanced visualization available in the OpenBox venv; for the next real run, verify the advanced dependency check in TOOLCHAIN_EXECUTION_REFERENCE before execution.
+
+C-47 Real OpenBox Advanced Visualization Flow Completion:
+
+- Status: complete, verified-only.
+- Evidence note: `docs/debug/2026-06-05-c47-real-openbox-advanced-visualization-flow.md`.
+- Workspace: `/tmp/ic_auto_opt_real_flow_t77ky7/bridge_test_inv`.
+- Real execution completed 100 OpenBox-generated Spectre/OCEAN evaluations with `batch_size=10`, `parallel_jobs=10`, and `threads_per_run=10`.
+- Closeout passed through `check-optimizer-run`, `summarize-optimizer-run`, `finalize-optimizer-run`, and `optimizer-status`.
+- Result summary: `43 feasible`, `51 constraint_failed`, `6 metric_check_failed`, `0 real_check_failed`; best observed `real_071`; decision `accept_best_observed`, confidence `medium`, `global_optimum_claim=false`.
+- OpenBox advanced visualization manifest status: `generated`; includes objective/constraint history, surrogate verification, and parameter importance.
+- Boundary: no hand-picked candidates, no formula changes, no PSF parsing, no OCEAN formula rewrite, and no raw Cadence artifacts committed.
+- current_scope: C-47 Real OpenBox Advanced Visualization Flow complete.
+- next_allowed_action: inspect the C-47 real OpenBox advanced visualization quality and, if needed, improve offline optimizer insight reporting using the existing 100 real samples without rerunning Spectre/OCEAN.

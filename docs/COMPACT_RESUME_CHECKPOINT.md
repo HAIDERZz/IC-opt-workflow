@@ -978,3 +978,21 @@ C-47 OpenBox Advanced Visualization Artifact Completion:
 ```text
 请继续 IC auto optimization workflow。先阅读 AGENTS.md、docs/CURRENT_TASK_STATE.json、docs/TOOLCHAIN_EXECUTION_REFERENCE.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/OPTIMIZER_PRODUCTION_HANDOFF_GUIDE.md。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-47 OpenBox Advanced Visualization Artifact 已完成：OpenBox backend 在 final closeout 后调用 advisor.get_history().visualize_html(open_html=false, show_importance=true, verify_surrogate=true)，写 reports/openbox_advanced_visualization_manifest.json 和 OpenBox 官方 HTML/JSON，并在 optimizer_run_report 与 optimizer_insight_report 中链接。状态会区分 generated/generated_partial/failed/not_available。当前真实 OpenBox-only probe 是 generated：surrogate verification 和 parameter importance 都存在。OpenBox venv 已恢复到兼容 pins：numpy 1.26.4、scipy 1.12.0、sklearn 1.3.2、pandas 2.1.4、shap 0.44.1、lightgbm 4.6.0、swig 4.4.1、pyrfr 0.9.0；不要 unpinned install latest shap。pyrfr 是通过 venv 内 PyPI swig + pip install --no-build-isolation pyrfr 构建成功的，没有改系统包。下一步可以继续生产 optimizer 使用；真实 OpenBox/Spectre/OCEAN 前必须先读 TOOLCHAIN_EXECUTION_REFERENCE 并跑 check-toolchain-env 及 advanced visualization dependency check。不要创建 broad framework，不要 hand-pick optimizer points，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
 ```
+
+C-47 Real OpenBox Advanced Visualization Flow Completion:
+
+- Status: complete, verified-only.
+- current_scope: C-47 Real OpenBox Advanced Visualization Flow complete.
+- Evidence: `docs/debug/2026-06-05-c47-real-openbox-advanced-visualization-flow.md`.
+- Workspace: `/tmp/ic_auto_opt_real_flow_t77ky7/bridge_test_inv`.
+- Real OpenBox/Spectre/OCEAN completed 100 evaluations with `batch_size=10`, `parallel_jobs=10`, `threads_per_run=10`.
+- Closeout passed: `check-optimizer-run`, `summarize-optimizer-run`, `finalize-optimizer-run`, and `optimizer-status`.
+- Result: `43 feasible`, `51 constraint_failed`, `6 metric_check_failed`, `0 real_check_failed`; best observed `real_071`; decision `accept_best_observed`; `global_optimum_claim=false`.
+- Advanced visualization: `reports/openbox_advanced_visualization_manifest.json` status `generated`, with objective/constraint history, surrogate verification, and parameter importance.
+- Next: inspect the C-47 real visualization quality and improve offline insight reporting only if the existing 100 real samples show a concrete reporting gap.
+
+## Resume Prompt
+
+```text
+请继续 IC auto optimization workflow。先阅读 AGENTS.md、docs/CURRENT_TASK_STATE.json、docs/TOOLCHAIN_EXECUTION_REFERENCE.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/OPTIMIZER_PRODUCTION_HANDOFF_GUIDE.md。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-47 OpenBox Advanced Visualization Artifact 已完成并已通过一次完整真实 OpenBox/Spectre/OCEAN 100 eval flow 验证：workspace /tmp/ic_auto_opt_real_flow_t77ky7/bridge_test_inv，结果 43 feasible / 51 constraint_failed / 6 metric_check_failed / 0 real_check_failed，best observed real_071，decision accept_best_observed，global_optimum_claim=false。OpenBox advanced visualization manifest 是 generated，包含 objective/constraint history、surrogate verification、parameter importance。下一步建议先检查这份真实 HTML/JSON 的可视化质量，如果需要，基于现有 100 个真实样本改进离线 optimizer insight report，不要为了报告质量重跑 Spectre/OCEAN。真实 OpenBox/Spectre/OCEAN 前必须先读 TOOLCHAIN_EXECUTION_REFERENCE 并跑 check-toolchain-env 及 advanced visualization dependency check。不要创建 broad framework，不要 hand-pick optimizer points，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
+```

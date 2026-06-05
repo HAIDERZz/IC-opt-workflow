@@ -53,6 +53,18 @@ selection, or optimizer acceptance rules.
 - Full test suite passed after implementation.
 - OpenBox-only fake workflow probe generated official HTML/JSON and correctly
   reported `generated`.
+- Full real OpenBox/Spectre/OCEAN flow:
+  - Evidence note:
+    `docs/debug/2026-06-05-c47-real-openbox-advanced-visualization-flow.md`.
+  - Workspace:
+    `/tmp/ic_auto_opt_real_flow_t77ky7/bridge_test_inv`.
+  - Result: 100 real evaluations, `43 feasible`, `51 constraint_failed`,
+    `6 metric_check_failed`, `0 real_check_failed`.
+  - Closeout: `check-optimizer-run`, `summarize-optimizer-run`,
+    `finalize-optimizer-run`, and `optimizer-status` all passed.
+  - OpenBox advanced visualization manifest status: `generated`, including
+    objective/constraint history, surrogate verification, and parameter
+    importance.
 
 ## Known Toolchain Note
 

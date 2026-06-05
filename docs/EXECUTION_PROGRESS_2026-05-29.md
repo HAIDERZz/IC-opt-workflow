@@ -1284,3 +1284,15 @@ C-47 OpenBox Advanced Visualization Artifact Completion:
 - Verification: full suite passed (`574 passed, 1 skipped`) and targeted ruff passed.
 - Boundary: no real Spectre/OCEAN rerun, no metric formula changes, no PSF parsing, no backend replacement.
 - current_scope: C-47 OpenBox Advanced Visualization Artifact complete.
+
+C-47 Real OpenBox Advanced Visualization Flow Completion:
+
+- Status: complete, verified-only.
+- Evidence: `docs/debug/2026-06-05-c47-real-openbox-advanced-visualization-flow.md`.
+- Workspace: `/tmp/ic_auto_opt_real_flow_t77ky7/bridge_test_inv`.
+- Full real OpenBox/Spectre/OCEAN flow completed 100 evaluations and passed `check-optimizer-run`, `summarize-optimizer-run`, `finalize-optimizer-run`, and `optimizer-status`.
+- Counts: `43 feasible`, `51 constraint_failed`, `6 metric_check_failed`, `0 real_check_failed`.
+- Best observed: `real_071`, `FN=12`, `WN=2.7u`, `FP=7`, `WP=0.7u`; `rise=69.604322ps`, `fall=56.781892ps`, `DC=326.978183uW`; objective `4.1325534822170306e-14`.
+- OpenBox advanced visualization: manifest status `generated`, including objective/constraint history, surrogate verification, and parameter importance.
+- Boundary: no hand-picked candidates, formula changes, PSF parsing, OCEAN formula rewrite, or raw Cadence artifact commit.
+- current_scope: C-47 Real OpenBox Advanced Visualization Flow complete.

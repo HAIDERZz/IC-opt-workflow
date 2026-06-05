@@ -271,6 +271,17 @@ docs/debug/2026-06-05-c46-real-scale-optimizer-status-handoff.md
 This C-46 run used a fresh workspace, the updated task packet with
 `optimizer-status`, and completed 100 real OpenBox/Spectre/OCEAN evaluations.
 
+Latest real OpenBox advanced visualization flow:
+
+```text
+docs/debug/2026-06-05-c47-real-openbox-advanced-visualization-flow.md
+```
+
+This C-47 run used the full real OpenBox/Spectre/OCEAN path and generated
+OpenBox official advanced visualization artifacts with manifest status
+`generated`, including objective/constraint history, surrogate verification,
+and parameter importance.
+
 ## Fresh Workspace Preparation
 
 Do not rerun production optimizer acceptance in a stale project with old

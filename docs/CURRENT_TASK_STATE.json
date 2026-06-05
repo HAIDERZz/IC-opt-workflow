@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
-  "current_scope": "C-47 OpenBox Advanced Visualization Artifact complete",
-  "current_status": "C-47 is complete, verified-only. OpenBox backend now generates official post-run visualization artifacts from advisor.get_history().visualize_html(open_html=false, show_importance=true, verify_surrogate=true) at final OpenBox run closeout. The workflow writes reports/openbox_advanced_visualization_manifest.json, stores OpenBox official HTML/JSON under reports/openbox_advanced_visualization/, records openbox.advanced_visualization in optimizer_run_report.json, and links the artifact from optimizer_insight_report.json/md. The status model distinguishes generated, generated_partial, failed, and not_available by inspecting OpenBox visualization JSON rather than trusting HTML existence alone. The OpenBox venv now includes shap==0.44.1, lightgbm==4.6.0, swig==4.4.1, and pyrfr==0.9.0. A real OpenBox-only fake workflow probe generated official HTML/JSON and reported generated with surrogate verification and parameter importance present.",
+  "current_scope": "C-47 Real OpenBox Advanced Visualization Flow complete",
+  "current_status": "C-47 is complete, verified-only. OpenBox backend now generates official post-run visualization artifacts from advisor.get_history().visualize_html(open_html=false, show_importance=true, verify_surrogate=true) at final OpenBox run closeout. The OpenBox venv includes shap==0.44.1, lightgbm==4.6.0, swig==4.4.1, and pyrfr==0.9.0. The feature is now proven in a full real OpenBox/Spectre/OCEAN 100-evaluation flow at /tmp/ic_auto_opt_real_flow_t77ky7/bridge_test_inv. Closeout passed check-optimizer-run, summarize-optimizer-run, finalize-optimizer-run, and optimizer-status. Result summary: 43 feasible, 51 constraint_failed, 6 metric_check_failed, 0 real_check_failed; best observed real_071; decision accept_best_observed; global_optimum_claim=false. OpenBox advanced visualization manifest status is generated, including objective/constraint history, surrogate verification, and parameter importance.",
   "review_status": "verified-only",
   "subagent_dispatch": "available",
   "active_spec": "docs/superpowers/specs/2026-06-05-optimizer-post-run-visualization-insight-design.md",
@@ -12,7 +12,7 @@
     "docs/EXECUTION_PROGRESS_2026-05-29.md",
     "docs/COMPACT_RESUME_CHECKPOINT.md"
   ],
-  "next_allowed_action": "proceed with production optimizer use with full OpenBox advanced visualization available in the OpenBox venv; for the next real run, verify the advanced dependency check in TOOLCHAIN_EXECUTION_REFERENCE before execution.",
+  "next_allowed_action": "inspect the C-47 real OpenBox advanced visualization quality and, if needed, improve offline optimizer insight reporting using the existing 100 real samples without rerunning Spectre/OCEAN.",
   "forbidden_actions": [
     "install unpinned latest shap into the OpenBox venv",
     "run real tool commands without first checking docs/TOOLCHAIN_EXECUTION_REFERENCE.md",
@@ -44,8 +44,8 @@
     "active_spec": "docs/superpowers/specs/2026-06-05-optimizer-post-run-visualization-insight-design.md",
     "active_plan": "docs/superpowers/plans/2026-06-05-openbox-advanced-visualization-artifact.md",
     "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
-    "alignment": "Aligned. C-47 extends post-run optimizer reporting with official OpenBox visualization artifacts while preserving the existing OpenBox/Spectre/OCEAN execution route.",
-    "drift": "No execution-route drift. C-47 did not rerun Spectre/OCEAN, hand-pick candidates, change formulas, parse PSF, or replace the optimizer backend."
+    "alignment": "Aligned. C-47 extends post-run optimizer reporting with official OpenBox visualization artifacts while preserving the existing OpenBox/Spectre/OCEAN execution route. The feature has now been verified in a full real 100-evaluation OpenBox/Spectre/OCEAN flow.",
+    "drift": "No execution-route drift. C-47 did not hand-pick candidates, change formulas, parse PSF, or replace the optimizer backend. The real flow used the accepted OpenBox ask-and-tell path, approved Spectre/OCEAN adapter boundary, and preserved Maestro/ADE netlist layout."
   },
   "latest_valid_commit": "a65fde9",
   "review_evidence": {
@@ -54,6 +54,7 @@
     "c47_full_suite": "Full suite passed: /home/zzchen/.venvs/openclaw/bin/python -m pytest (574 passed, 1 skipped).",
     "c47_ruff": "Targeted ruff passed for openbox_backend.py, optimizer_insights.py, and related tests.",
     "c47_openbox_probe": "/tmp/ic_auto_opt_c47_openbox_full_visual_probe/bridge_test_inv generated OpenBox official HTML/JSON and recorded generated with surrogate verification and parameter importance present.",
-    "c47_dependency_resolution": "Installed swig==4.4.1 in /tmp/ic_auto_opt_openbox_spike/.venv, then built pyrfr==0.9.0 with pip install --no-build-isolation pyrfr. No system package change was needed."
+    "c47_dependency_resolution": "Installed swig==4.4.1 in /tmp/ic_auto_opt_openbox_spike/.venv, then built pyrfr==0.9.0 with pip install --no-build-isolation pyrfr. No system package change was needed.",
+    "c47_real_flow": "/tmp/ic_auto_opt_real_flow_t77ky7/bridge_test_inv completed 100 real OpenBox/Spectre/OCEAN evaluations. Closeout accepted best observed real_071 and OpenBox advanced visualization manifest status was generated with objective/constraint history, surrogate verification, and parameter importance."
   }
 }

@@ -23,7 +23,7 @@
 
 ## Current Implementation Node
 
-As of 2026-06-05, Plan A, Plan B, and Plan C through C-45 are complete. The
+As of 2026-06-05, Plan A, Plan B, and Plan C through C-47 are complete. The
 accepted route is no longer an abstract contract-only optimizer plan; it is a
 practice-first production handoff flow that has been exercised with real
 OpenBox, Spectre, and OCEAN runs.
@@ -67,6 +67,11 @@ Completed optimizer milestones since C-26:
   evaluations from a fresh workspace. The run produced `43 feasible`,
   `51 constraint_failed`, and `6 metric_check_failed`; closeout accepted best
   observed `real_071` with confidence `medium` and `global_optimum_claim=false`.
+- C-47 added OpenBox official post-run advanced visualization artifacts and
+  proved the feature in a full real 100-evaluation OpenBox/Spectre/OCEAN flow.
+  The generated manifest status was `generated`, including
+  objective/constraint history, surrogate verification, and parameter
+  importance.
 
 Current code-level entry points:
 
@@ -81,9 +86,10 @@ Current code-level entry points:
 - `hermes-workflow optimizer-status PROJECT_DIR`
 
 The next work should stay narrow and practice-first. Do not start a broad
-optimizer framework rewrite. The likely next production step is user/workflow
-adoption: run the current handoff on the user-selected real project scale, then
-fix only bugs or usability gaps that appear from that real flow.
+optimizer framework rewrite. The likely next production step is to inspect the
+real C-47 OpenBox advanced visualization output quality and, if needed, improve
+the offline insight report using existing real samples without rerunning
+Spectre/OCEAN.
 
 ## Current Route Alignment
 
