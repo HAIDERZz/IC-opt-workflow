@@ -1,18 +1,18 @@
 {
   "schema_version": "1.0",
-  "current_scope": "C-33 Optimizer Production Handoff Guide complete",
-  "current_status": "C-33 is complete, verified-only. Added a concise production handoff guide for supervisor agents and execution agents, covering backend choice, task packet generation, execution-agent responsibilities, required returned artifacts, finalize-optimizer-run acceptance, failure categories, and forbidden actions. It does not run real tools or change optimizer behavior.",
+  "current_scope": "C-34 Production Optimizer Handoff Acceptance Task 1 complete",
+  "current_status": "C-34 Task 1 is complete, verified-only. Added a narrow production handoff acceptance plan and generated an OpenBox optimizer execution task packet for /tmp/ic_auto_opt_c29_openbox_real/bridge_test_inv. Local-only handoff evidence is in /tmp/ic_auto_opt_c34 with EXECUTION_TASK.md, optimizer_execution_manifest.json, and task_packet_sha256.txt. No real Virtuoso/Spectre/OCEAN/SSH/bridge command was run.",
   "review_status": "verified-only",
   "subagent_dispatch": "available",
   "active_spec": "docs/OPTIMIZER_PRODUCTION_HANDOFF_GUIDE.md",
-  "active_plan": "docs/OPTIMIZER_PRODUCTION_HANDOFF_GUIDE.md",
+  "active_plan": "docs/superpowers/plans/2026-06-05-production-optimizer-handoff-acceptance.md",
   "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
   "progress_files": [
     "docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md",
     "docs/EXECUTION_PROGRESS_2026-05-29.md",
     "docs/COMPACT_RESUME_CHECKPOINT.md"
   ],
-  "next_allowed_action": "wait for user confirmation before the next narrow step; recommended next is one user-approved production-style optimizer handoff using the guide, not more backend validation",
+  "next_allowed_action": "wait for explicit user approval before C-34 Task 2 real Cadence execution; do not run run-openbox-real, Spectre, OCEAN, SSH, or bridge before that approval",
   "forbidden_actions": [
     "start broad optimizer framework work",
     "replace TuRBO before OpenBox evidence spike approval",
@@ -43,10 +43,10 @@
   ],
   "route_audit": {
     "active_spec": "docs/OPTIMIZER_PRODUCTION_HANDOFF_GUIDE.md",
-    "active_plan": "docs/OPTIMIZER_PRODUCTION_HANDOFF_GUIDE.md",
+    "active_plan": "docs/superpowers/plans/2026-06-05-production-optimizer-handoff-acceptance.md",
     "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
-    "alignment": "Aligned. C-33 documents the existing supervisor-to-execution-agent optimizer handoff and finalize/audit path without changing execution behavior.",
-    "drift": "No route drift. This is a concise production guide, not a new framework or backend validation loop."
+    "alignment": "Aligned. C-34 Task 1 uses the C-33 guide to prepare one production-style optimizer handoff packet without running real tools.",
+    "drift": "No route drift. This is the existing OpenBox production command and finalize/audit path, not a new backend validation loop."
   },
   "latest_valid_commit": "fbdb0c3",
   "review_evidence": {
@@ -98,6 +98,7 @@
     "c30_complete": "Complete, verified-only. Added design spec docs/superpowers/specs/2026-06-05-openbox-execution-agent-task-packet-design.md and implementation plan docs/superpowers/plans/2026-06-05-openbox-execution-agent-task-packet.md. package-optimizer-task now accepts --backend native-turbo|openbox, preserves native TuRBO as default, and renders OpenBox execution-agent packets with run-openbox-real, dependency-blocker wording, no-silent-fallback instructions, backend-neutral required artifacts, and post-run check-optimizer-run/summarize-optimizer-run audit commands. Verification passed: python3 -m pytest -q (551 passed, 1 skipped); python3 -m ruff check src tests tools; python3 tools/check_development_cadence.py; git diff --check.",
     "c31_complete": "Complete, verified-only. Added design spec docs/superpowers/specs/2026-06-05-optimizer-post-run-visualization-insight-design.md and implementation plan docs/superpowers/plans/2026-06-05-optimizer-post-run-visualization-insight.md. Added src/hermes_workflow/optimizer_insights.py and hermes-workflow visualize-optimizer-run. The command reads existing optimizer artifacts and writes reports/optimizer_insight_report.json, reports/optimizer_insight_report.md, reports/optimizer_visuals/convergence.svg, reports/optimizer_visuals/status_distribution.svg, and reports/optimizer_visuals/parameter_objective_scatter.svg. C-31 uses standard-library SVG only; OpenBox advanced surrogate/SHAP visualization is recorded as a future optional add-on. Focused verification passed: python3 -m pytest tests/test_optimizer_insights.py tests/test_optimizer_completion.py tests/test_optimizer_acceptance.py tests/test_optimizer_task_package.py -q and targeted ruff.",
     "c32_complete": "Complete, verified-only. Added design spec docs/superpowers/specs/2026-06-05-optimizer-finalize-workflow-design.md and implementation plan docs/superpowers/plans/2026-06-05-optimizer-finalize-workflow.md. Added src/hermes_workflow/optimizer_finalize.py and hermes-workflow finalize-optimizer-run. The command runs check_optimizer_run, summarize_optimizer_run, and generate_optimizer_insight_report in order, writes reports/optimizer_finalize_report.json, and fails closed when acceptance or completion fails. Focused verification passed: python3 -m pytest tests/test_optimizer_finalize.py tests/test_optimizer_insights.py tests/test_optimizer_completion.py tests/test_optimizer_acceptance.py -q and targeted ruff.",
-    "c33_complete": "Complete, verified-only. Added docs/OPTIMIZER_PRODUCTION_HANDOFF_GUIDE.md as a concise supervisor/execution-agent production guide. It documents backend choice, package-optimizer-task usage, execution-agent command responsibilities, required returned artifacts, finalize-optimizer-run acceptance rules, failure categories, and forbidden actions. No code, real tools, backend behavior, PSF parsing, or OCEAN formula handling changed."
+    "c33_complete": "Complete, verified-only. Added docs/OPTIMIZER_PRODUCTION_HANDOFF_GUIDE.md as a concise supervisor/execution-agent production guide. It documents backend choice, package-optimizer-task usage, execution-agent command responsibilities, required returned artifacts, finalize-optimizer-run acceptance rules, failure categories, and forbidden actions. No code, real tools, backend behavior, PSF parsing, or OCEAN formula handling changed.",
+    "c34_task1": "Complete, verified-only. Added docs/superpowers/plans/2026-06-05-production-optimizer-handoff-acceptance.md and generated the OpenBox task packet for /tmp/ic_auto_opt_c29_openbox_real/bridge_test_inv using package-optimizer-task --backend openbox --max-evals 100 --parallel. Local-only evidence copied to /tmp/ic_auto_opt_c34: EXECUTION_TASK.md, optimizer_execution_manifest.json, task_packet_sha256.txt. Verified the packet contains run-openbox-real, check-optimizer-run, summarize-optimizer-run, and Do not hand-pick wording. No real tools were run."
   }
 }

@@ -699,6 +699,18 @@ C-33 completion result:
 - Boundary: no code changes, no real tools, no optimizer backend changes, no PSF parsing, no OCEAN formula rewriting.
 - Current next step: wait for user confirmation before the next narrow step; recommended next is one user-approved production-style optimizer handoff using the guide, not more backend validation.
 
+C-34 Task 1 result:
+
+- Status: complete, verified-only.
+- current_scope: C-34 Production Optimizer Handoff Acceptance Task 1 complete.
+- Active spec: `docs/OPTIMIZER_PRODUCTION_HANDOFF_GUIDE.md`.
+- Active plan: `docs/superpowers/plans/2026-06-05-production-optimizer-handoff-acceptance.md`.
+- Generated OpenBox production handoff task packet for `/tmp/ic_auto_opt_c29_openbox_real/bridge_test_inv`.
+- Local-only evidence: `/tmp/ic_auto_opt_c34/EXECUTION_TASK.md`, `/tmp/ic_auto_opt_c34/optimizer_execution_manifest.json`, `/tmp/ic_auto_opt_c34/task_packet_sha256.txt`.
+- Command in packet: `hermes-workflow run-openbox-real /tmp/ic_auto_opt_c29_openbox_real/bridge_test_inv --max-evals 100 --batch-size 10 --parallel-jobs 10 --cadence-cshrc /home/zzchen/cadence_ic231_env.csh`.
+- Boundary: no real Virtuoso/Spectre/OCEAN/SSH/bridge command was run.
+- Current next step: wait for explicit user approval before C-34 Task 2 real Cadence execution; do not run `run-openbox-real`, Spectre, OCEAN, SSH, or bridge before that approval.
+
 Read the handoff files first:
 
 ```text
@@ -708,6 +720,7 @@ ic-auto-opt-workflow/docs/EXECUTION_PROGRESS_2026-05-29.md
 ic-auto-opt-workflow/docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md
 ic-auto-opt-workflow/docs/COMPACT_RESUME_CHECKPOINT.md
 ic-auto-opt-workflow/docs/OPTIMIZER_PRODUCTION_HANDOFF_GUIDE.md
+ic-auto-opt-workflow/docs/superpowers/plans/2026-06-05-production-optimizer-handoff-acceptance.md
 ```
 
 ## Resume Prompt
@@ -722,6 +735,7 @@ Use this prompt after compact:
 4. ic-auto-opt-workflow/docs/EXECUTION_PROGRESS_2026-05-29.md
 5. ic-auto-opt-workflow/docs/COMPACT_RESUME_CHECKPOINT.md
 6. ic-auto-opt-workflow/docs/OPTIMIZER_PRODUCTION_HANDOFF_GUIDE.md
+7. ic-auto-opt-workflow/docs/superpowers/plans/2026-06-05-production-optimizer-handoff-acceptance.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-33 Optimizer Production Handoff Guide 已完成。下一步是 wait for user confirmation before the next narrow step; recommended next is one user-approved production-style optimizer handoff using the guide, not more backend validation。不要运行真实 Virtuoso/Spectre/OCEAN/SSH/virtuoso-bridge，除非用户明确批准；不要直接替换 TuRBO，不要删除 native_turbo，不要创建 broad optimizer framework，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-34 Production Optimizer Handoff Acceptance Task 1 已完成，local-only evidence 在 /tmp/ic_auto_opt_c34。下一步是 wait for explicit user approval before C-34 Task 2 real Cadence execution; do not run run-openbox-real, Spectre, OCEAN, SSH, or bridge before that approval。不要直接替换 TuRBO，不要删除 native_turbo，不要创建 broad optimizer framework，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
 ```
