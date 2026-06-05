@@ -1138,6 +1138,9 @@ Next required action:
 - C-34 Production Optimizer Handoff Acceptance Task 2: complete, verified-only. The initial OpenBox dependency blocker was resolved by using the existing OpenBox venv and installing Hermes workflow tooling editable into it. A clean approved workspace was rebuilt at `/tmp/ic_auto_opt_c34_clean2/bridge_test_inv` with config, netlists, standard execution manifest, optimizer task packet, and matching supervisor instruction. Real OpenBox handoff completed 100 evaluations: 43 feasible, 51 constraint_failed, 6 metric_check_failed, 0 real_check_failed. `finalize-optimizer-run` passed with best observed `real_071`. Sanitized note: `docs/debug/2026-06-05-c34-production-openbox-handoff-success.md`.
 - current_scope: C-34 Production Optimizer Handoff Acceptance complete.
 
+- C-35 Toolchain Execution Reference: complete, verified-only. Added `docs/TOOLCHAIN_EXECUTION_REFERENCE.md` and updated `AGENTS.md` so future real-tool work starts from the proven C-34 environment and execution path: project `.venv` for normal Hermes/test commands, `/tmp/ic_auto_opt_openbox_spike/.venv` for OpenBox real execution, Cadence cshrc `/home/zzchen/cadence_ic231_env.csh`, non-sandbox/escalated real-tool command rule, clean workspace package sequence, and `finalize-optimizer-run` closeout. Fake-run guidance is now stricter: at most one focused fake/local smoke per new command path before the smallest meaningful real practice flow.
+- current_scope: C-35 Toolchain Execution Reference complete.
+
 ## Locked Role Model
 
 Status: locked as of 2026-06-02.

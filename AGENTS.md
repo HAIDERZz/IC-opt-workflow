@@ -36,6 +36,7 @@ Do not use "Hermes agent" as a role name. In this project, Hermes means workflow
 - Do not start the next task until the user confirms. Do not jump to C-11 local smoke or real tool/agent integration until C-10 passes review/final gate.
 - Keep progress files aligned with implementation before context compaction.
 - When the user explicitly authorizes a fast real-tool debug lane, label the work `verified-only`, keep changes surgical, record a concise debug note under `docs/debug/`, keep raw tool artifacts local-only, and return to the normal task/review cadence before claiming a reviewed implementation task is complete.
+- Before running real Virtuoso/Spectre/OCEAN/OpenBox/native-TuRBO/bridge commands, read `docs/TOOLCHAIN_EXECUTION_REFERENCE.md` and use its known-good environment, sandbox, workspace-preparation, and closeout commands. If a real-tool run fails, compare it against that reference before inventing a new debug path.
 
 ## Practice-First Tool Integration
 
@@ -46,6 +47,7 @@ Use real, working Cadence/Maestro/ADE/OCEAN behavior as the foundation. Do not r
 - If a needed behavior has not been practically confirmed, the active design spec and implementation plan must include a scoped evidence-gathering task before code tries to generalize it.
 - Treat successful local evidence as a constraint. When new code fails, compare against the successful evidence first and move the code toward that known-good path before adding new abstractions or contract fields.
 - Do not change approved metric formulas to compensate for adapter/layout bugs. Fix the adapter/layout so the approved formulas run in the same context that made them valid.
+- Reduce fake-run ladders. Fake/local runs are for contract, schema, CLI wiring, or unit behavior only. For features whose value depends on Cadence/OpenBox behavior, run at most one focused fake/local smoke per new command path, then move to the smallest meaningful real practice flow.
 - Do not create speculative, overlapping, or overly broad assets.
 - Prefer one narrow artifact per verified need. Avoid broad new specs, duplicate plans, extra schemas, or catch-all debug frameworks unless the current evidence proves they are necessary.
 

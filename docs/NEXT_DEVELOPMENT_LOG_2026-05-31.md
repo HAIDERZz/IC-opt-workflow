@@ -1451,8 +1451,21 @@ C-34 Production Optimizer Handoff Acceptance Completion:
 - current_scope: C-34 Production Optimizer Handoff Acceptance complete.
 - next_allowed_action: wait for user confirmation before the next narrow production step; recommended next is productizing the OpenBox execution environment requirement or planning continuation/multi-run optimizer workflow.
 
+C-35 Toolchain Execution Reference Completion:
+
+- Status: complete, verified-only.
+- Reference: `docs/TOOLCHAIN_EXECUTION_REFERENCE.md`.
+- Purpose: stop repeating known setup/debug failures before real tool work.
+- Captured known-good path: project `.venv` for normal Hermes/test/contract commands; `/tmp/ic_auto_opt_openbox_spike/.venv` for OpenBox real execution; Cadence cshrc `/home/zzchen/cadence_ic231_env.csh`; non-sandbox/escalated real-tool command rule; fresh workspace package sequence; C-34 OpenBox handoff success reference; `finalize-optimizer-run` closeout.
+- `AGENTS.md` updated so future real Virtuoso/Spectre/OCEAN/OpenBox/native-TuRBO/bridge work must read this reference first and compare failures against it before inventing new debug paths.
+- Fake-run policy tightened: at most one focused fake/local smoke per new command path, then smallest meaningful real practice flow when the feature depends on real tool behavior.
+- Boundary: no code changes, no real tools, no optimizer backend behavior changes, no PSF parsing, no OCEAN formula handling changes.
+- current_scope: C-35 Toolchain Execution Reference complete.
+- next_allowed_action: wait for user confirmation; recommended next is either productizing a stable OpenBox/Hermes execution environment requirement or planning continuation/multi-run optimizer workflow using the reference first.
+- State next_allowed_action: wait for user confirmation before the next narrow production step; recommended next is productizing the stable OpenBox/Hermes execution environment requirement or planning continuation/multi-run optimizer workflow using docs/TOOLCHAIN_EXECUTION_REFERENCE.md first
+
 ## Resume Prompt
 
 ```text
-请继续 IC auto optimization workflow。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。先阅读 AGENTS.md、docs/CURRENT_TASK_STATE.json、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/OPTIMIZER_PRODUCTION_HANDOFF_GUIDE.md、docs/superpowers/plans/2026-06-05-production-optimizer-handoff-acceptance.md、docs/debug/2026-06-05-c34-production-openbox-handoff-success.md。C-34 Production Optimizer Handoff Acceptance 已完成：OpenBox real handoff 100 evaluations，finalize-optimizer-run passed，best observed real_071。下一步等待用户确认后选择一个窄的生产步骤：productize OpenBox execution environment requirement，或规划 continuation/multi-run optimizer workflow。不要 silent fallback，不要替换 TuRBO，不要删除 native_turbo，不要创建 broad optimizer framework，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
+请继续 IC auto optimization workflow。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。先阅读 AGENTS.md、docs/CURRENT_TASK_STATE.json、docs/TOOLCHAIN_EXECUTION_REFERENCE.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/OPTIMIZER_PRODUCTION_HANDOFF_GUIDE.md、docs/debug/2026-06-05-c34-production-openbox-handoff-success.md。C-35 Toolchain Execution Reference 已完成：真实 Virtuoso/Spectre/OCEAN/OpenBox/native-TuRBO/bridge 工作必须先对照 docs/TOOLCHAIN_EXECUTION_REFERENCE.md，使用已验证的 venv/Cadence/non-sandbox/clean-workspace/closeout 路径，避免重复 OpenBox venv 和 sandbox 失败。下一步等待用户确认后选择一个窄的生产步骤：productize stable OpenBox/Hermes execution environment requirement，或规划 continuation/multi-run optimizer workflow。减少无意义 fake run；不要 silent fallback，不要替换 TuRBO，不要删除 native_turbo，不要创建 broad optimizer framework，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
 ```

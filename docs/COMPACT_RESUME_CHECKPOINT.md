@@ -737,11 +737,22 @@ C-34 completion result:
 - Sanitized success note: `docs/debug/2026-06-05-c34-production-openbox-handoff-success.md`.
 - Current next step: wait for user confirmation before the next narrow production step; recommended next is productizing the OpenBox execution environment requirement or planning continuation/multi-run optimizer workflow.
 
+C-35 Toolchain Execution Reference result:
+
+- Status: complete, verified-only.
+- current_scope: C-35 Toolchain Execution Reference complete.
+- Added `docs/TOOLCHAIN_EXECUTION_REFERENCE.md` as the mandatory reference before real Virtuoso/Spectre/OCEAN/OpenBox/native-TuRBO/bridge execution.
+- The reference records the known-good C-34 setup: project `.venv` for normal Hermes/test/contract commands, `/tmp/ic_auto_opt_openbox_spike/.venv` for OpenBox real execution, `/home/zzchen/cadence_ic231_env.csh`, non-sandbox/escalated real-tool execution, clean workspace package sequence, matching `supervisor_instruction.json`, and `finalize-optimizer-run` closeout.
+- `AGENTS.md` now requires reading this reference before real tool work and limits fake/local smoke to one focused pass per new command path before moving to meaningful real practice.
+- Boundary: no code changes, no real tools, no optimizer backend behavior changes, no PSF parsing, no OCEAN formula handling changes.
+- Current next step: wait for user confirmation; recommended next is productizing a stable OpenBox/Hermes execution environment requirement or planning continuation/multi-run optimizer workflow using this reference first.
+
 Read the handoff files first:
 
 ```text
 ic-auto-opt-workflow/AGENTS.md
 ic-auto-opt-workflow/docs/CURRENT_TASK_STATE.json
+ic-auto-opt-workflow/docs/TOOLCHAIN_EXECUTION_REFERENCE.md
 ic-auto-opt-workflow/docs/EXECUTION_PROGRESS_2026-05-29.md
 ic-auto-opt-workflow/docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md
 ic-auto-opt-workflow/docs/COMPACT_RESUME_CHECKPOINT.md
@@ -759,11 +770,11 @@ Use this prompt after compact:
 请继续 IC auto optimization workflow。先阅读：
 1. ic-auto-opt-workflow/AGENTS.md
 2. ic-auto-opt-workflow/docs/CURRENT_TASK_STATE.json
-3. ic-auto-opt-workflow/docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md
-4. ic-auto-opt-workflow/docs/EXECUTION_PROGRESS_2026-05-29.md
-5. ic-auto-opt-workflow/docs/COMPACT_RESUME_CHECKPOINT.md
-6. ic-auto-opt-workflow/docs/OPTIMIZER_PRODUCTION_HANDOFF_GUIDE.md
-7. ic-auto-opt-workflow/docs/superpowers/plans/2026-06-05-production-optimizer-handoff-acceptance.md
+3. ic-auto-opt-workflow/docs/TOOLCHAIN_EXECUTION_REFERENCE.md
+4. ic-auto-opt-workflow/docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md
+5. ic-auto-opt-workflow/docs/EXECUTION_PROGRESS_2026-05-29.md
+6. ic-auto-opt-workflow/docs/COMPACT_RESUME_CHECKPOINT.md
+7. ic-auto-opt-workflow/docs/OPTIMIZER_PRODUCTION_HANDOFF_GUIDE.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-34 Production Optimizer Handoff Acceptance 已完成：OpenBox real handoff 在 /tmp/ic_auto_opt_c34_clean2/bridge_test_inv 跑完 100 evaluations，finalize-optimizer-run passed，best observed real_071。下一步等待用户确认后选择一个窄的生产步骤：productize OpenBox execution environment requirement，或规划 continuation/multi-run optimizer workflow。不要 silent fallback，不要直接替换 TuRBO，不要删除 native_turbo，不要创建 broad optimizer framework，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-35 Toolchain Execution Reference 已完成：真实 Virtuoso/Spectre/OCEAN/OpenBox/native-TuRBO/bridge 工作必须先对照 docs/TOOLCHAIN_EXECUTION_REFERENCE.md，使用已验证的 venv/Cadence/non-sandbox/clean-workspace/closeout 路径，避免重复 OpenBox venv 和 sandbox 失败。下一步等待用户确认后选择一个窄的生产步骤：productize stable OpenBox/Hermes execution environment requirement，或规划 continuation/multi-run optimizer workflow。减少无意义 fake run；不要 silent fallback，不要直接替换 TuRBO，不要删除 native_turbo，不要创建 broad optimizer framework，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
 ```

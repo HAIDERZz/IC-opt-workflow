@@ -35,6 +35,10 @@ Execution agent:
 
 ## Preconditions
 
+- Read `docs/TOOLCHAIN_EXECUTION_REFERENCE.md` before any real
+  Virtuoso/Spectre/OCEAN/OpenBox/native-TuRBO/bridge execution. That file is the
+  authoritative reference for known-good venvs, Cadence cshrc, non-sandbox
+  execution, fresh workspace preparation, and closeout commands.
 - `config/*.yaml` is already reviewed and valid.
 - `metrics.yaml` contains approved OCEAN formulas.
 - `netlists/exported/input.scs` and native Maestro/ADE sidecars are present.
