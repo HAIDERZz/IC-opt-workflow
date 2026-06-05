@@ -41,7 +41,11 @@ Execution agent:
 - First real-run approval and real-tool contracts have already been satisfied.
 - Cadence cshrc path is known, for example `/home/zzchen/cadence_ic231_env.csh`.
 - Real Cadence execution is run outside restrictive sandboxes.
-- OpenBox execution requires OpenBox importable in the execution environment.
+- OpenBox execution requires OpenBox and Hermes workflow tooling importable in
+  the same execution environment.
+- Fresh production workspaces need both `execution_package/execution_manifest.json`
+  and an approved `supervisor_instruction.json` whose config hashes match that
+  execution manifest.
 
 Do not proceed if the project only has chat claims and no validated contract
 files or Hermes reports.
@@ -66,26 +70,36 @@ coupling such as `FP=FN` unless it is present in the approved project contract.
 
 ## Supervisor Handoff Flow
 
-1. Generate the optimizer execution task packet:
+1. Confirm or generate the standard execution manifest:
+
+```bash
+.venv/bin/hermes-workflow package PROJECT_DIR
+```
+
+If `supervisor_instruction.json` is copied from a known-good approved project,
+the `approved_config_hashes` must exactly match
+`execution_package/execution_manifest.json`.
+
+2. Generate the optimizer execution task packet:
 
 ```bash
 .venv/bin/hermes-workflow package-optimizer-task PROJECT_DIR --backend BACKEND --max-evals 100 --cadence-cshrc CADENCE_CSHRC --parallel
 ```
 
-2. Give the execution agent these files:
+3. Give the execution agent these files:
 
 - `execution_package/OPTIMIZER_EXECUTION_TASK.md`
 - `execution_package/optimizer_execution_manifest.json`
 
-3. Wait for the execution agent to finish and return file artifacts.
+4. Wait for the execution agent to finish and return file artifacts.
 
-4. Run the closeout command:
+5. Run the closeout command:
 
 ```bash
 .venv/bin/hermes-workflow finalize-optimizer-run PROJECT_DIR
 ```
 
-5. Read:
+6. Read:
 
 - `reports/optimizer_finalize_report.json`
 - `reports/optimizer_run_acceptance_report.json`

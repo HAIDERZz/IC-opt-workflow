@@ -118,7 +118,9 @@ Task 2 status as of 2026-06-05:
 - [x] The generated OpenBox command was attempted.
 - [x] The run stopped before real Spectre/OCEAN because OpenBox is not installed in the active execution environment.
 - [x] Sanitized blocker note written to `docs/debug/2026-06-05-c34-production-openbox-handoff-dependency-blocker.md`.
-- [ ] User decision required: install OpenBox in the active execution environment, regenerate/rerun with native TuRBO, or pause.
+- [x] OpenBox/Hermes environment fixed by using `/tmp/ic_auto_opt_openbox_spike/.venv` with Hermes workflow tooling installed editable.
+- [x] Clean production workspace rebuilt at `/tmp/ic_auto_opt_c34_clean2/bridge_test_inv` with `config/`, `netlists/`, standard `execution_manifest.json`, optimizer task manifest, and matching approved `supervisor_instruction.json`.
+- [x] Real OpenBox run completed: 100 evaluations, 43 feasible, 51 constraint_failed, 6 metric_check_failed, 0 real_check_failed.
 
 ## Task 3: Supervisor Finalize And Closeout
 
@@ -130,17 +132,17 @@ Task 2 status as of 2026-06-05:
 - Modify: `docs/EXECUTION_PROGRESS_2026-05-29.md`
 - Modify: `docs/COMPACT_RESUME_CHECKPOINT.md`
 
-- [ ] Run final supervisor closeout.
+- [x] Run final supervisor closeout.
 
 ```bash
 .venv/bin/hermes-workflow finalize-optimizer-run /tmp/ic_auto_opt_c29_openbox_real/bridge_test_inv
 ```
 
-- [ ] Archive a sanitized note.
+- [x] Archive a sanitized note.
 
 The note must include backend, evaluation count, status distribution, best observed candidate, Spectre/OCEAN settings audit, finalize status, and next recommendation. It must not include raw netlists, PSF paths, or full Cadence logs.
 
-- [ ] Run docs/checks before commit.
+- [x] Run docs/checks before commit.
 
 ```bash
 python3 tools/check_development_cadence.py

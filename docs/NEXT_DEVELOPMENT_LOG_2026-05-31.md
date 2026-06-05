@@ -1429,17 +1429,30 @@ C-34 Production Optimizer Handoff Acceptance Task 1:
 
 C-34 Production Optimizer Handoff Acceptance Task 2 Blocker:
 
-- Status: blocked, verified-only.
+- Status: resolved, verified-only.
 - User said "继续进行", so the generated OpenBox command was attempted.
 - The command exited before real Spectre/OCEAN with: `OpenBox is not installed; install it in the active environment to run the OpenBox backend`.
 - Sanitized note: `docs/debug/2026-06-05-c34-production-openbox-handoff-dependency-blocker.md`.
 - Interpretation: execution-environment dependency blocker; not a Spectre failure, not an OCEAN metric failure, not a candidate-level failure.
 - No silent fallback to TuRBO was performed.
-- current_scope: C-34 Production Optimizer Handoff Acceptance Task 2 blocked.
-- next_allowed_action: wait for user decision: install OpenBox in the active execution environment and rerun C-34 Task 2, explicitly switch to native TuRBO with a fresh packet, or pause production handoff acceptance.
+- Resolution: used `/tmp/ic_auto_opt_openbox_spike/.venv`, installed Hermes workflow tooling editable into that venv, rebuilt a clean approved workspace at `/tmp/ic_auto_opt_c34_clean2/bridge_test_inv`, and reran the same OpenBox production command.
+
+C-34 Production Optimizer Handoff Acceptance Completion:
+
+- Status: complete, verified-only.
+- Clean workspace: `/tmp/ic_auto_opt_c34_clean2/bridge_test_inv`.
+- Real OpenBox run completed `100` evaluations with `43 feasible`, `51 constraint_failed`, `6 metric_check_failed`, and `0 real_check_failed`.
+- `check-optimizer-run`: accepted.
+- `summarize-optimizer-run`: `accept_best_observed`, confidence `medium`, `global_optimum_claim=false`.
+- `finalize-optimizer-run`: passed.
+- Best observed: `real_071`, `FN=12`, `WN=2.7u`, `FP=7`, `WP=0.7u`, objective `4.1325534822170306e-14`.
+- Sanitized success note: `docs/debug/2026-06-05-c34-production-openbox-handoff-success.md`.
+- Production guide updated with the real preconditions learned from C-34: OpenBox and Hermes tooling must be in the same execution environment; fresh workspaces need standard `execution_manifest.json` and matching approved `supervisor_instruction.json`.
+- current_scope: C-34 Production Optimizer Handoff Acceptance complete.
+- next_allowed_action: wait for user confirmation before the next narrow production step; recommended next is productizing the OpenBox execution environment requirement or planning continuation/multi-run optimizer workflow.
 
 ## Resume Prompt
 
 ```text
-请继续 IC auto optimization workflow。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。先阅读 AGENTS.md、docs/CURRENT_TASK_STATE.json、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/OPTIMIZER_PRODUCTION_HANDOFF_GUIDE.md、docs/superpowers/plans/2026-06-05-production-optimizer-handoff-acceptance.md、docs/debug/2026-06-05-c34-production-openbox-handoff-dependency-blocker.md。C-34 Production Optimizer Handoff Acceptance Task 2 当前 blocked：OpenBox is not installed in the active execution environment。下一步必须等待用户决定：安装 OpenBox 后重跑 C-34 Task 2，显式切换 native TuRBO 并生成新 packet，或暂停 production handoff acceptance。不要 silent fallback，不要替换 TuRBO，不要删除 native_turbo，不要创建 broad optimizer framework，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
+请继续 IC auto optimization workflow。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。先阅读 AGENTS.md、docs/CURRENT_TASK_STATE.json、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/OPTIMIZER_PRODUCTION_HANDOFF_GUIDE.md、docs/superpowers/plans/2026-06-05-production-optimizer-handoff-acceptance.md、docs/debug/2026-06-05-c34-production-openbox-handoff-success.md。C-34 Production Optimizer Handoff Acceptance 已完成：OpenBox real handoff 100 evaluations，finalize-optimizer-run passed，best observed real_071。下一步等待用户确认后选择一个窄的生产步骤：productize OpenBox execution environment requirement，或规划 continuation/multi-run optimizer workflow。不要 silent fallback，不要替换 TuRBO，不要删除 native_turbo，不要创建 broad optimizer framework，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
 ```

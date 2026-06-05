@@ -713,8 +713,8 @@ C-34 Task 1 result:
 
 C-34 Task 2 blocker:
 
-- Status: blocked, verified-only.
-- current_scope: C-34 Production Optimizer Handoff Acceptance Task 2 blocked.
+- Status: resolved, verified-only.
+- Historical scope at blocker time: C-34 Production Optimizer Handoff Acceptance Task 2 blocked.
 - User said "继续进行"; this was treated as approval to attempt Task 2.
 - Attempted generated command:
   `hermes-workflow run-openbox-real /tmp/ic_auto_opt_c29_openbox_real/bridge_test_inv --max-evals 100 --batch-size 10 --parallel-jobs 10 --cadence-cshrc /home/zzchen/cadence_ic231_env.csh`.
@@ -722,7 +722,20 @@ C-34 Task 2 blocker:
 - Error text: `OpenBox is not installed; install it in the active environment to run the OpenBox backend`.
 - Sanitized note: `docs/debug/2026-06-05-c34-production-openbox-handoff-dependency-blocker.md`.
 - No silent fallback to TuRBO was performed.
-- Current next step: wait for user decision: install OpenBox in the active execution environment and rerun C-34 Task 2, explicitly switch to native TuRBO with a fresh packet, or pause production handoff acceptance.
+- Resolution: used `/tmp/ic_auto_opt_openbox_spike/.venv` with Hermes workflow tooling installed editable, rebuilt a clean approved workspace at `/tmp/ic_auto_opt_c34_clean2/bridge_test_inv`, and reran OpenBox successfully.
+
+C-34 completion result:
+
+- Status: complete, verified-only.
+- current_scope: C-34 Production Optimizer Handoff Acceptance complete.
+- Clean workspace: `/tmp/ic_auto_opt_c34_clean2/bridge_test_inv`.
+- Real OpenBox handoff completed `100` evaluations: `43 feasible`, `51 constraint_failed`, `6 metric_check_failed`, `0 real_check_failed`.
+- `check-optimizer-run`: accepted.
+- `summarize-optimizer-run`: `accept_best_observed`, confidence `medium`, `global_optimum_claim=false`.
+- `finalize-optimizer-run`: passed.
+- Best observed: `real_071`, `FN=12`, `WN=2.7u`, `FP=7`, `WP=0.7u`, objective `4.1325534822170306e-14`.
+- Sanitized success note: `docs/debug/2026-06-05-c34-production-openbox-handoff-success.md`.
+- Current next step: wait for user confirmation before the next narrow production step; recommended next is productizing the OpenBox execution environment requirement or planning continuation/multi-run optimizer workflow.
 
 Read the handoff files first:
 
@@ -735,6 +748,7 @@ ic-auto-opt-workflow/docs/COMPACT_RESUME_CHECKPOINT.md
 ic-auto-opt-workflow/docs/OPTIMIZER_PRODUCTION_HANDOFF_GUIDE.md
 ic-auto-opt-workflow/docs/superpowers/plans/2026-06-05-production-optimizer-handoff-acceptance.md
 ic-auto-opt-workflow/docs/debug/2026-06-05-c34-production-openbox-handoff-dependency-blocker.md
+ic-auto-opt-workflow/docs/debug/2026-06-05-c34-production-openbox-handoff-success.md
 ```
 
 ## Resume Prompt
@@ -751,5 +765,5 @@ Use this prompt after compact:
 6. ic-auto-opt-workflow/docs/OPTIMIZER_PRODUCTION_HANDOFF_GUIDE.md
 7. ic-auto-opt-workflow/docs/superpowers/plans/2026-06-05-production-optimizer-handoff-acceptance.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-34 Production Optimizer Handoff Acceptance Task 2 当前 blocked：OpenBox is not installed in the active execution environment。local-only evidence 在 /tmp/ic_auto_opt_c34。下一步必须等待用户决定：安装 OpenBox 后重跑 C-34 Task 2，显式切换 native TuRBO 并生成新 packet，或暂停 production handoff acceptance。不要 silent fallback，不要直接替换 TuRBO，不要删除 native_turbo，不要创建 broad optimizer framework，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-34 Production Optimizer Handoff Acceptance 已完成：OpenBox real handoff 在 /tmp/ic_auto_opt_c34_clean2/bridge_test_inv 跑完 100 evaluations，finalize-optimizer-run passed，best observed real_071。下一步等待用户确认后选择一个窄的生产步骤：productize OpenBox execution environment requirement，或规划 continuation/multi-run optimizer workflow。不要 silent fallback，不要直接替换 TuRBO，不要删除 native_turbo，不要创建 broad optimizer framework，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
 ```
