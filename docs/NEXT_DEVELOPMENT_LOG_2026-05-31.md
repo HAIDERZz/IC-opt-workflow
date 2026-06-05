@@ -1405,8 +1405,18 @@ C-32 Optimizer Finalize Workflow Completion:
 - current_scope: C-32 Optimizer Finalize Workflow complete.
 - next_allowed_action: wait for user confirmation before choosing the next narrow step; recommended next is a concise production usage guide for supervisor and execution agents, not more backend validation.
 
+C-33 Optimizer Production Handoff Guide Completion:
+
+- Status: complete, verified-only.
+- Guide: `docs/OPTIMIZER_PRODUCTION_HANDOFF_GUIDE.md`.
+- Scope: concise production handoff instructions for supervisor agent, Hermes workflow tooling, and execution agent.
+- Contents: backend choice, `package-optimizer-task`, execution-agent command responsibilities, required returned artifacts, `finalize-optimizer-run` acceptance rules, failure categories, and forbidden actions.
+- Boundary: no code changes, no real tools, no backend behavior changes, no broad framework work, no PSF parsing, no OCEAN formula rewriting.
+- current_scope: C-33 Optimizer Production Handoff Guide complete.
+- next_allowed_action: wait for user confirmation before the next narrow step; recommended next is one user-approved production-style optimizer handoff using the guide, not more backend validation.
+
 ## Resume Prompt
 
 ```text
-请继续 IC auto optimization workflow。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。先阅读 AGENTS.md、docs/CURRENT_TASK_STATE.json、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/specs/2026-06-05-optimizer-finalize-workflow-design.md、docs/superpowers/plans/2026-06-05-optimizer-finalize-workflow.md。C-32 Optimizer Finalize Workflow 已完成。下一步是 wait for user confirmation before choosing the next narrow step; recommended next is a concise production usage guide for supervisor and execution agents, not more backend validation。不要运行真实 Virtuoso/Spectre/OCEAN/SSH/virtuoso-bridge，除非用户明确批准；不要替换 TuRBO，不要删除 native_turbo，不要创建 broad optimizer framework，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
+请继续 IC auto optimization workflow。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。先阅读 AGENTS.md、docs/CURRENT_TASK_STATE.json、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/OPTIMIZER_PRODUCTION_HANDOFF_GUIDE.md。C-33 Optimizer Production Handoff Guide 已完成。下一步是 wait for user confirmation before the next narrow step; recommended next is one user-approved production-style optimizer handoff using the guide, not more backend validation。不要运行真实 Virtuoso/Spectre/OCEAN/SSH/virtuoso-bridge，除非用户明确批准；不要替换 TuRBO，不要删除 native_turbo，不要创建 broad optimizer framework，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
 ```

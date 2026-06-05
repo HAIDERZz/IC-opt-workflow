@@ -1129,6 +1129,9 @@ Next required action:
 - C-32 Optimizer Finalize Workflow completion: complete, verified-only. Added design spec `docs/superpowers/specs/2026-06-05-optimizer-finalize-workflow-design.md` and implementation plan `docs/superpowers/plans/2026-06-05-optimizer-finalize-workflow.md`. Added `src/hermes_workflow/optimizer_finalize.py` and CLI `hermes-workflow finalize-optimizer-run PROJECT_DIR`. The command runs acceptance, completion summary, and insight report generation in order, then writes `reports/optimizer_finalize_report.json`. It fails closed if acceptance rejects or completion fails, and does not run real tools or modify optimizer behavior. Focused verification passed for finalize, insights, completion, acceptance, and targeted ruff.
 - current_scope: C-32 Optimizer Finalize Workflow complete.
 
+- C-33 Optimizer Production Handoff Guide completion: complete, verified-only. Added `docs/OPTIMIZER_PRODUCTION_HANDOFF_GUIDE.md`, a concise supervisor/execution-agent usage guide covering backend choice, task packet generation, execution-agent responsibilities, returned artifacts, `finalize-optimizer-run` acceptance, failure categories, and forbidden actions. No code, real-tool, backend, PSF, or OCEAN formula behavior changed.
+- current_scope: C-33 Optimizer Production Handoff Guide complete.
+
 ## Locked Role Model
 
 Status: locked as of 2026-06-02.

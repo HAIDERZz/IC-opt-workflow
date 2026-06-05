@@ -1,18 +1,18 @@
 {
   "schema_version": "1.0",
-  "current_scope": "C-32 Optimizer Finalize Workflow complete",
-  "current_status": "C-32 implementation is complete, verified-only. Added a thin supervisor-side finalize-optimizer-run command that runs optimizer acceptance, completion summary, and insight report generation in order, then writes reports/optimizer_finalize_report.json. It does not run real tools or change optimizer behavior.",
+  "current_scope": "C-33 Optimizer Production Handoff Guide complete",
+  "current_status": "C-33 is complete, verified-only. Added a concise production handoff guide for supervisor agents and execution agents, covering backend choice, task packet generation, execution-agent responsibilities, required returned artifacts, finalize-optimizer-run acceptance, failure categories, and forbidden actions. It does not run real tools or change optimizer behavior.",
   "review_status": "verified-only",
   "subagent_dispatch": "available",
-  "active_spec": "docs/superpowers/specs/2026-06-05-optimizer-finalize-workflow-design.md",
-  "active_plan": "docs/superpowers/plans/2026-06-05-optimizer-finalize-workflow.md",
+  "active_spec": "docs/OPTIMIZER_PRODUCTION_HANDOFF_GUIDE.md",
+  "active_plan": "docs/OPTIMIZER_PRODUCTION_HANDOFF_GUIDE.md",
   "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
   "progress_files": [
     "docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md",
     "docs/EXECUTION_PROGRESS_2026-05-29.md",
     "docs/COMPACT_RESUME_CHECKPOINT.md"
   ],
-  "next_allowed_action": "wait for user confirmation before choosing the next narrow step; recommended next is a concise production usage guide for supervisor and execution agents, not more backend validation",
+  "next_allowed_action": "wait for user confirmation before the next narrow step; recommended next is one user-approved production-style optimizer handoff using the guide, not more backend validation",
   "forbidden_actions": [
     "start broad optimizer framework work",
     "replace TuRBO before OpenBox evidence spike approval",
@@ -42,11 +42,11 @@
     "git status --short"
   ],
   "route_audit": {
-    "active_spec": "docs/superpowers/specs/2026-06-05-optimizer-finalize-workflow-design.md",
-    "active_plan": "docs/superpowers/plans/2026-06-05-optimizer-finalize-workflow.md",
+    "active_spec": "docs/OPTIMIZER_PRODUCTION_HANDOFF_GUIDE.md",
+    "active_plan": "docs/OPTIMIZER_PRODUCTION_HANDOFF_GUIDE.md",
     "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
-    "alignment": "Aligned. C-32 wraps existing post-run supervisor reports into one closeout command and does not alter execution or optimizer behavior.",
-    "drift": "No route drift. This is a thin wrapper over existing reports, not a new workflow engine."
+    "alignment": "Aligned. C-33 documents the existing supervisor-to-execution-agent optimizer handoff and finalize/audit path without changing execution behavior.",
+    "drift": "No route drift. This is a concise production guide, not a new framework or backend validation loop."
   },
   "latest_valid_commit": "e450b48",
   "review_evidence": {
@@ -97,6 +97,7 @@
     "c29_complete": "Complete, verified-only. Added run-openbox-real, effective OpenBox stepped-grid upper handling, no hidden FN=FP fallback, shared fake/real OpenBox batch runner, and real evaluator integration through existing Spectre/OCEAN candidate package and record path. Real acceptance on /tmp/ic_auto_opt_c29_openbox_real/bridge_test_inv completed 100 evaluations: 43 feasible, 51 constraint_failed, 6 metric_check_failed, 0 real_check_failed, 0 duplicate replacements; C-25 accepted; C-26 decision accept_best_observed with confidence medium and global_optimum_claim=false. Sanitized evidence: docs/debug/2026-06-05-openbox-production-backend-real-acceptance.md.",
     "c30_complete": "Complete, verified-only. Added design spec docs/superpowers/specs/2026-06-05-openbox-execution-agent-task-packet-design.md and implementation plan docs/superpowers/plans/2026-06-05-openbox-execution-agent-task-packet.md. package-optimizer-task now accepts --backend native-turbo|openbox, preserves native TuRBO as default, and renders OpenBox execution-agent packets with run-openbox-real, dependency-blocker wording, no-silent-fallback instructions, backend-neutral required artifacts, and post-run check-optimizer-run/summarize-optimizer-run audit commands. Verification passed: python3 -m pytest -q (551 passed, 1 skipped); python3 -m ruff check src tests tools; python3 tools/check_development_cadence.py; git diff --check.",
     "c31_complete": "Complete, verified-only. Added design spec docs/superpowers/specs/2026-06-05-optimizer-post-run-visualization-insight-design.md and implementation plan docs/superpowers/plans/2026-06-05-optimizer-post-run-visualization-insight.md. Added src/hermes_workflow/optimizer_insights.py and hermes-workflow visualize-optimizer-run. The command reads existing optimizer artifacts and writes reports/optimizer_insight_report.json, reports/optimizer_insight_report.md, reports/optimizer_visuals/convergence.svg, reports/optimizer_visuals/status_distribution.svg, and reports/optimizer_visuals/parameter_objective_scatter.svg. C-31 uses standard-library SVG only; OpenBox advanced surrogate/SHAP visualization is recorded as a future optional add-on. Focused verification passed: python3 -m pytest tests/test_optimizer_insights.py tests/test_optimizer_completion.py tests/test_optimizer_acceptance.py tests/test_optimizer_task_package.py -q and targeted ruff.",
-    "c32_complete": "Complete, verified-only. Added design spec docs/superpowers/specs/2026-06-05-optimizer-finalize-workflow-design.md and implementation plan docs/superpowers/plans/2026-06-05-optimizer-finalize-workflow.md. Added src/hermes_workflow/optimizer_finalize.py and hermes-workflow finalize-optimizer-run. The command runs check_optimizer_run, summarize_optimizer_run, and generate_optimizer_insight_report in order, writes reports/optimizer_finalize_report.json, and fails closed when acceptance or completion fails. Focused verification passed: python3 -m pytest tests/test_optimizer_finalize.py tests/test_optimizer_insights.py tests/test_optimizer_completion.py tests/test_optimizer_acceptance.py -q and targeted ruff."
+    "c32_complete": "Complete, verified-only. Added design spec docs/superpowers/specs/2026-06-05-optimizer-finalize-workflow-design.md and implementation plan docs/superpowers/plans/2026-06-05-optimizer-finalize-workflow.md. Added src/hermes_workflow/optimizer_finalize.py and hermes-workflow finalize-optimizer-run. The command runs check_optimizer_run, summarize_optimizer_run, and generate_optimizer_insight_report in order, writes reports/optimizer_finalize_report.json, and fails closed when acceptance or completion fails. Focused verification passed: python3 -m pytest tests/test_optimizer_finalize.py tests/test_optimizer_insights.py tests/test_optimizer_completion.py tests/test_optimizer_acceptance.py -q and targeted ruff.",
+    "c33_complete": "Complete, verified-only. Added docs/OPTIMIZER_PRODUCTION_HANDOFF_GUIDE.md as a concise supervisor/execution-agent production guide. It documents backend choice, package-optimizer-task usage, execution-agent command responsibilities, required returned artifacts, finalize-optimizer-run acceptance rules, failure categories, and forbidden actions. No code, real tools, backend behavior, PSF parsing, or OCEAN formula handling changed."
   }
 }
