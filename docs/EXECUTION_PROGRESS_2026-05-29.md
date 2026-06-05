@@ -1126,6 +1126,9 @@ Next required action:
 - C-31 Optimizer Post-Run Visualization And Insight Report completion: complete, verified-only. Added design spec `docs/superpowers/specs/2026-06-05-optimizer-post-run-visualization-insight-design.md` and implementation plan `docs/superpowers/plans/2026-06-05-optimizer-post-run-visualization-insight.md`. Added `src/hermes_workflow/optimizer_insights.py` and CLI `hermes-workflow visualize-optimizer-run PROJECT_DIR`. The command reads existing optimizer artifacts and writes `reports/optimizer_insight_report.json`, `reports/optimizer_insight_report.md`, `reports/optimizer_visuals/convergence.svg`, `reports/optimizer_visuals/status_distribution.svg`, and `reports/optimizer_visuals/parameter_objective_scatter.svg`. C-31 uses standard-library SVG only and reports observed correlations without causal/global-optimum claims. Advanced OpenBox SHAP/surrogate HTML remains an optional future add-on. Focused verification passed for optimizer insights, completion, acceptance, task package, and targeted ruff.
 - current_scope: C-31 Optimizer Post-Run Visualization And Insight Report complete.
 
+- C-32 Optimizer Finalize Workflow completion: complete, verified-only. Added design spec `docs/superpowers/specs/2026-06-05-optimizer-finalize-workflow-design.md` and implementation plan `docs/superpowers/plans/2026-06-05-optimizer-finalize-workflow.md`. Added `src/hermes_workflow/optimizer_finalize.py` and CLI `hermes-workflow finalize-optimizer-run PROJECT_DIR`. The command runs acceptance, completion summary, and insight report generation in order, then writes `reports/optimizer_finalize_report.json`. It fails closed if acceptance rejects or completion fails, and does not run real tools or modify optimizer behavior. Focused verification passed for finalize, insights, completion, acceptance, and targeted ruff.
+- current_scope: C-32 Optimizer Finalize Workflow complete.
+
 ## Locked Role Model
 
 Status: locked as of 2026-06-02.

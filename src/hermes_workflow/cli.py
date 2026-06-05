@@ -21,6 +21,7 @@ from hermes_workflow.openbox_backend import (
 )
 from hermes_workflow.optimizer_acceptance import check_optimizer_run
 from hermes_workflow.optimizer_completion import summarize_optimizer_run
+from hermes_workflow.optimizer_finalize import finalize_optimizer_run
 from hermes_workflow.optimizer_insights import generate_optimizer_insight_report
 from hermes_workflow.optimizer_suggestion import suggest_candidate_request
 from hermes_workflow.optimizer_task_package import (
@@ -636,6 +637,35 @@ def visualize_optimizer_run_command(
     for issue in report.issues:
         typer.echo(issue)
     typer.echo("report: reports/optimizer_insight_report.json")
+    raise typer.Exit(code=1)
+
+
+@app.command("finalize-optimizer-run")
+def finalize_optimizer_run_command(
+    project_dir: Annotated[
+        Path,
+        typer.Argument(help="Project directory with completed optimizer artifacts."),
+    ],
+) -> None:
+    try:
+        report = finalize_optimizer_run(project_dir)
+    except (OSError, ValueError) as exc:
+        _exit_with_error(exc)
+    if report.status == "pass":
+        typer.echo("optimizer finalization passed")
+        typer.echo(f"decision: {report.decision}")
+        typer.echo(f"confidence: {report.confidence}")
+        if report.best_observed_run_id is not None:
+            typer.echo(f"best observed: {report.best_observed_run_id}")
+        typer.echo("report: reports/optimizer_finalize_report.json")
+        for name, path in sorted(report.reports.items()):
+            typer.echo(f"{name}: {path}")
+        return
+
+    typer.echo("optimizer finalization failed")
+    for issue in report.issues:
+        typer.echo(issue)
+    typer.echo("report: reports/optimizer_finalize_report.json")
     raise typer.Exit(code=1)
 
 
