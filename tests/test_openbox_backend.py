@@ -8,6 +8,7 @@ from typer.testing import CliRunner
 from hermes_workflow.approvals import decide_first_real_run
 from hermes_workflow.cli import app
 from hermes_workflow.openbox_backend import (
+    OPENBOX_ADVANCED_VISUALIZATION_MANIFEST_RELATIVE,
     _build_openbox_space,
     run_openbox_fake_optimization,
     run_openbox_real_optimization,
@@ -46,6 +47,69 @@ class FakeAdvisor:
         self.updated_batches += 1
         self.updated_observations.extend(observations)
         assert observations
+
+
+class FakeOpenBoxVisualizer:
+    def __init__(self, output_dir: Path) -> None:
+        self.output_dir = output_dir
+        self.html_path = output_dir / "hermes_openbox_real.html"
+        self.json_path = output_dir / "visualization_data_hermes_openbox_real.json"
+
+
+class FakeOpenBoxHistory:
+    def __init__(self, *, fail: bool = False, partial: bool = False) -> None:
+        self.fail = fail
+        self.partial = partial
+        self.calls: list[dict[str, object]] = []
+
+    def visualize_html(
+        self,
+        *,
+        logging_dir: str,
+        open_html: bool,
+        show_importance: bool,
+        verify_surrogate: bool,
+        advisor: object,
+        task_info: dict[str, object],
+    ) -> FakeOpenBoxVisualizer:
+        self.calls.append(
+            {
+                "logging_dir": logging_dir,
+                "open_html": open_html,
+                "show_importance": show_importance,
+                "verify_surrogate": verify_surrogate,
+                "advisor": advisor,
+                "task_info": task_info,
+            }
+        )
+        if self.fail:
+            raise ModuleNotFoundError("No module named 'shap'")
+        output_dir = Path(logging_dir) / "history" / "hermes_openbox_real"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        visualizer = FakeOpenBoxVisualizer(output_dir)
+        visualizer.html_path.write_text("<html>advanced</html>", encoding="utf-8")
+        if self.partial:
+            data = 'var info={"data": {"importance_data": null}};'
+        else:
+            data = (
+                'var info={"data": {'
+                '"importance_data": {"data": {}}, '
+                '"pred_label_data": {"data": []}, '
+                '"grade_data": {"data": []}, '
+                '"cons_pred_label_data": {"data": []}'
+                "}};"
+            )
+        visualizer.json_path.write_text(data, encoding="utf-8")
+        return visualizer
+
+
+class VisualizingAdvisor(FakeAdvisor):
+    def __init__(self, *, fail: bool = False, partial: bool = False) -> None:
+        super().__init__()
+        self.history = FakeOpenBoxHistory(fail=fail, partial=partial)
+
+    def get_history(self) -> FakeOpenBoxHistory:
+        return self.history
 
 
 class ContinuationAdvisor:
@@ -189,6 +253,97 @@ def test_openbox_fake_runner_writes_backend_neutral_artifacts(
     assert rows[0]["result_manifest"] is None
     assert rows[0]["metric_result_manifest"] is None
     assert rows[0]["batch_id"] == "batch_001"
+
+
+def test_openbox_runner_writes_advanced_visualization_artifact(
+    tmp_path: Path,
+) -> None:
+    project_dir = create_approved_real_project(tmp_path)
+    advisor = VisualizingAdvisor()
+
+    run_openbox_fake_optimization(
+        project_dir,
+        max_evals=2,
+        batch_size=2,
+        advisor_factory=lambda _space, _seed: advisor,
+    )
+
+    manifest = json.loads(
+        (project_dir / OPENBOX_ADVANCED_VISUALIZATION_MANIFEST_RELATIVE).read_text(
+            encoding="utf-8"
+        )
+    )
+    report = json.loads((project_dir / REPORT_RELATIVE).read_text(encoding="utf-8"))
+
+    assert advisor.history.calls
+    assert advisor.history.calls[0]["open_html"] is False
+    assert advisor.history.calls[0]["show_importance"] is True
+    assert advisor.history.calls[0]["verify_surrogate"] is True
+    assert manifest["status"] == "generated"
+    assert manifest["includes"] == [
+        "objective_and_constraint_history",
+        "surrogate_fit_verification",
+        "parameter_importance",
+    ]
+    assert manifest["html_path"].endswith("hermes_openbox_real.html")
+    assert manifest["json_path"].endswith("visualization_data_hermes_openbox_real.json")
+    assert (project_dir / manifest["html_path"]).exists()
+    assert report["openbox"]["advanced_visualization"]["status"] == "generated"
+    assert report["openbox"]["advanced_visualization"]["manifest_path"] == (
+        OPENBOX_ADVANCED_VISUALIZATION_MANIFEST_RELATIVE.as_posix()
+    )
+
+
+def test_openbox_runner_records_advanced_visualization_dependency_failure(
+    tmp_path: Path,
+) -> None:
+    project_dir = create_approved_real_project(tmp_path)
+    advisor = VisualizingAdvisor(fail=True)
+
+    result = run_openbox_fake_optimization(
+        project_dir,
+        max_evals=2,
+        batch_size=2,
+        advisor_factory=lambda _space, _seed: advisor,
+    )
+
+    manifest = json.loads(
+        (project_dir / OPENBOX_ADVANCED_VISUALIZATION_MANIFEST_RELATIVE).read_text(
+            encoding="utf-8"
+        )
+    )
+    report = json.loads((project_dir / REPORT_RELATIVE).read_text(encoding="utf-8"))
+
+    assert result.evaluation_count == 2
+    assert manifest["status"] == "failed"
+    assert manifest["failure_kind"] == "dependency_missing"
+    assert "shap" in manifest["reason"]
+    assert report["status"] == "completed"
+    assert report["openbox"]["advanced_visualization"]["status"] == "failed"
+
+
+def test_openbox_runner_records_partial_advanced_visualization(
+    tmp_path: Path,
+) -> None:
+    project_dir = create_approved_real_project(tmp_path)
+    advisor = VisualizingAdvisor(partial=True)
+
+    run_openbox_fake_optimization(
+        project_dir,
+        max_evals=2,
+        batch_size=2,
+        advisor_factory=lambda _space, _seed: advisor,
+    )
+
+    manifest = json.loads(
+        (project_dir / OPENBOX_ADVANCED_VISUALIZATION_MANIFEST_RELATIVE).read_text(
+            encoding="utf-8"
+        )
+    )
+
+    assert manifest["status"] == "generated_partial"
+    assert manifest["includes"] == ["objective_and_constraint_history"]
+    assert "parameter importance data was not generated" in manifest["warnings"]
 
 
 def test_openbox_fake_continuation_warm_starts_and_writes_cumulative_artifacts(

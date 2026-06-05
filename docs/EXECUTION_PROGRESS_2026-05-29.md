@@ -1268,3 +1268,18 @@ C-46 Real-Scale Optimizer Status Handoff Completion:
 - Boundary: no hand-picked candidates, no variable/formula changes, no PSF parsing, no OCEAN formula rewrite, and no raw Cadence artifacts committed.
 - current_scope: C-46 Real-Scale Optimizer Status Handoff complete.
 - next_allowed_action: wait for user confirmation before the next production step; recommended next is user-selected project adoption at the desired evaluation budget, or a narrow usability/reporting fix if the C-46 real-scale evidence exposes a specific need.
+
+
+C-47 OpenBox Advanced Visualization Artifact Completion:
+
+- Status: complete, verified-only.
+- Active plan: `docs/superpowers/plans/2026-06-05-openbox-advanced-visualization-artifact.md`.
+- OpenBox backend now generates official post-run HTML/JSON visualization artifacts from `advisor.get_history().visualize_html(...)` at final OpenBox closeout.
+- Manifest: `reports/openbox_advanced_visualization_manifest.json`.
+- Report linkage: `optimizer_run_report.json` records `openbox.advanced_visualization`; `optimizer_insight_report.{json,md}` links the artifact and warnings.
+- Status model: `generated`, `generated_partial`, `failed`, `not_available`.
+- Real OpenBox-only probe produced `generated_partial`: surrogate verification was present, parameter importance was missing because OpenBox 0.9 imports `pyrfr` for feature importance and `pyrfr` requires system `swig`.
+- OpenBox venv dependency correction: latest unpinned SHAP briefly upgraded OpenBox-incompatible numeric packages; venv was restored to `numpy==1.26.4`, `scipy==1.12.0`, `scikit-learn==1.3.2`, `pandas==2.1.4`, `shap==0.44.1`, `lightgbm==4.6.0`.
+- Verification: full suite passed (`574 passed, 1 skipped`) and targeted ruff passed.
+- Boundary: no real Spectre/OCEAN rerun, no metric formula changes, no PSF parsing, no backend replacement.
+- current_scope: C-47 OpenBox Advanced Visualization Artifact complete.

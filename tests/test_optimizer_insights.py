@@ -67,6 +67,43 @@ def test_generate_optimizer_insight_report_records_metric_relationships(
     }
 
 
+def test_generate_optimizer_insight_report_links_openbox_advanced_visualization(
+    tmp_path: Path,
+) -> None:
+    project_dir = _write_accepted_optimizer_project(tmp_path)
+    report_path = project_dir / "reports/native_turbo_optimizer_report.json"
+    optimizer_report = json.loads(report_path.read_text(encoding="utf-8"))
+    optimizer_report["openbox"] = {
+        "advanced_visualization": {
+            "status": "generated",
+            "mode": "advanced",
+            "html_path": "reports/openbox_advanced_visualization/history/run/run.html",
+            "json_path": "reports/openbox_advanced_visualization/history/run/data.json",
+            "manifest_path": "reports/openbox_advanced_visualization_manifest.json",
+            "includes": [
+                "objective_and_constraint_history",
+                "surrogate_fit_verification",
+                "parameter_importance",
+            ],
+            "open_html": False,
+            "show_importance": True,
+            "verify_surrogate": True,
+        }
+    }
+    report_path.write_text(
+        json.dumps(optimizer_report, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+    report = generate_optimizer_insight_report(project_dir)
+
+    assert report.advanced_surrogate_visualization["status"] == "generated"
+    assert report.advanced_surrogate_visualization["html_path"].endswith("run.html")
+    markdown = report.markdown_path.read_text(encoding="utf-8")
+    assert "reports/openbox_advanced_visualization/history/run/run.html" in markdown
+    assert "parameter_importance" in markdown
+
+
 def test_visualize_optimizer_run_cli_writes_report(tmp_path: Path) -> None:
     project_dir = _write_accepted_optimizer_project(tmp_path)
 

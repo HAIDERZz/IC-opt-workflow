@@ -85,6 +85,32 @@ Required import check:
 /tmp/ic_auto_opt_openbox_spike/.venv/bin/python -c "import openbox, hermes_workflow.openbox_backend; print('openbox hermes env ok')"
 ```
 
+Advanced visualization dependency check after C-47:
+
+```bash
+/tmp/ic_auto_opt_openbox_spike/.venv/bin/python -c "import openbox, shap, lightgbm; print('openbox advanced visualization deps ok')"
+```
+
+Do not install unpinned latest `shap` into this venv. OpenBox 0.9 requires the
+older numeric stack; latest SHAP can upgrade `numpy`, `scipy`, `scikit-learn`,
+and `pandas` beyond OpenBox's supported versions. The compatible stack used by
+C-47 is:
+
+```text
+numpy==1.26.4
+scipy==1.12.0
+scikit-learn==1.3.2
+pandas==2.1.4
+shap==0.44.1
+lightgbm==4.6.0
+```
+
+OpenBox 0.9's feature-importance import path also references `pyrfr`. Installing
+`pyrfr` currently requires system `swig`. If `swig`/`pyrfr` are absent, C-47
+still generates OpenBox official HTML/JSON and surrogate verification, but the
+manifest reports `generated_partial` with `parameter importance data was not
+generated`.
+
 Preferred project gate after C-36:
 
 ```bash

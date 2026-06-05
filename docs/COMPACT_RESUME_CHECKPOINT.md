@@ -957,3 +957,23 @@ C-46 Real-Scale Optimizer Status Handoff Completion:
 ```text
 请继续 IC auto optimization workflow。先阅读 AGENTS.md、docs/CURRENT_TASK_STATE.json、docs/TOOLCHAIN_EXECUTION_REFERENCE.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/OPTIMIZER_PRODUCTION_HANDOFF_GUIDE.md、docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-46 Real-Scale Optimizer Status Handoff 已完成：fresh workspace 通过 current packet/status handoff 跑了 100 real OpenBox/Spectre/OCEAN evaluations，结果 43 feasible / 51 constraint_failed / 6 metric_check_failed，best observed real_071，decision accept_best_observed，confidence medium，global_optimum_claim=false，continuation recommended=false。下一步等待用户确认；推荐按用户选择的真实项目和目标 eval budget 进入生产采用，或只做 C-46 暴露出的窄 usability/reporting fix。真实 OpenBox 前必须先读 TOOLCHAIN_EXECUTION_REFERENCE 并跑 check-toolchain-env。不要创建 broad framework，不要 hand-pick optimizer points，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
 ```
+
+
+C-47 OpenBox Advanced Visualization Artifact Completion:
+
+- Status: complete, verified-only.
+- Active plan: `docs/superpowers/plans/2026-06-05-openbox-advanced-visualization-artifact.md`.
+- Code: OpenBox backend now calls `advisor.get_history().visualize_html(...)` after final OpenBox run closeout and records `reports/openbox_advanced_visualization_manifest.json`.
+- Outputs: OpenBox official HTML/JSON under `reports/openbox_advanced_visualization/`; `optimizer_run_report.json` records `openbox.advanced_visualization`; `optimizer_insight_report.{json,md}` links the official artifact.
+- Status model: `generated`, `generated_partial`, `failed`, `not_available`; JSON is inspected so an HTML file alone is not treated as full advanced visualization.
+- Toolchain note: `/tmp/ic_auto_opt_openbox_spike/.venv` now has OpenBox-compatible `shap==0.44.1` and `lightgbm==4.6.0`; latest unpinned SHAP must not be installed because it upgrades OpenBox 0.9-incompatible numeric packages.
+- Real OpenBox-only probe: official HTML/JSON generated, status `generated_partial`; surrogate verification present, parameter importance missing because OpenBox 0.9 imports `pyrfr`, and installing `pyrfr` failed without system `swig`.
+- Verification: `/home/zzchen/.venvs/openclaw/bin/python -m pytest` passed (`574 passed, 1 skipped`); targeted ruff passed.
+- Boundary: no real Spectre/OCEAN rerun, no formula changes, no hand-picked candidates, no PSF parsing, no OCEAN formula rewrite.
+- current_scope: C-47 OpenBox Advanced Visualization Artifact complete.
+
+## Resume Prompt
+
+```text
+请继续 IC auto optimization workflow。先阅读 AGENTS.md、docs/CURRENT_TASK_STATE.json、docs/TOOLCHAIN_EXECUTION_REFERENCE.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/OPTIMIZER_PRODUCTION_HANDOFF_GUIDE.md。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-47 OpenBox Advanced Visualization Artifact 已完成：OpenBox backend 在 final closeout 后调用 advisor.get_history().visualize_html(open_html=false, show_importance=true, verify_surrogate=true)，写 reports/openbox_advanced_visualization_manifest.json 和 OpenBox 官方 HTML/JSON，并在 optimizer_run_report 与 optimizer_insight_report 中链接。状态会区分 generated/generated_partial/failed/not_available。当前真实 OpenBox-only probe 是 generated_partial：surrogate verification 有，parameter importance 缺失，因为 OpenBox 0.9 feature importance 需要 pyrfr，而 pyrfr 安装需要系统 swig。OpenBox venv 已恢复到兼容 pins：numpy 1.26.4、scipy 1.12.0、sklearn 1.3.2、pandas 2.1.4、shap 0.44.1、lightgbm 4.6.0；不要 unpinned install latest shap。下一步由用户决定：安装 system swig/pyrfr 以得到完整 parameter importance，或者先接受 generated_partial 并继续真实项目优化流程。真实 OpenBox/Spectre/OCEAN 前必须先读 TOOLCHAIN_EXECUTION_REFERENCE 并跑 check-toolchain-env。不要创建 broad framework，不要 hand-pick optimizer points，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
+```

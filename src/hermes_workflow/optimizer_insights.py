@@ -65,13 +65,7 @@ def generate_optimizer_insight_report(project_dir: str | Path) -> OptimizerInsig
         "status_distribution": STATUS_DISTRIBUTION_RELATIVE.as_posix(),
     }
     relationships = _observed_relationships(traces, warnings)
-    advanced = {
-        "status": "not_generated",
-        "reason": (
-            "C-31 MVP uses dependency-light static plots; OpenBox History/SHAP "
-            "integration is a future optional add-on."
-        ),
-    }
+    advanced = _advanced_visualization_payload(report_payload)
 
     report = OptimizerInsightReport(
         status="fail" if issues else "pass",
@@ -445,13 +439,72 @@ def _markdown_report(report: OptimizerInsightReport) -> str:
             "## Advanced surrogate visualization",
             "",
             f"- Status: `{report.advanced_surrogate_visualization['status']}`",
-            f"- Reason: {report.advanced_surrogate_visualization['reason']}",
+        ]
+    )
+    if reason := report.advanced_surrogate_visualization.get("reason"):
+        lines.append(f"- Reason: {reason}")
+    if html_path := report.advanced_surrogate_visualization.get("html_path"):
+        lines.append(f"- HTML: `{html_path}`")
+    if json_path := report.advanced_surrogate_visualization.get("json_path"):
+        lines.append(f"- JSON data: `{json_path}`")
+    if manifest_path := report.advanced_surrogate_visualization.get("manifest_path"):
+        lines.append(f"- Manifest: `{manifest_path}`")
+    if includes := report.advanced_surrogate_visualization.get("includes"):
+        lines.append(f"- Includes: `{json.dumps(includes)}`")
+    if warnings := report.advanced_surrogate_visualization.get("warnings"):
+        lines.append(f"- Warnings: `{json.dumps(warnings)}`")
+    lines.extend(
+        [
             "",
             "Note: relationships are observed correlations from evaluated samples, not causal guarantees.",
             "",
         ]
     )
     return "\n".join(lines)
+
+
+def _advanced_visualization_payload(report_payload: dict[str, Any]) -> dict[str, Any]:
+    openbox_payload = _dict_value(report_payload.get("openbox"), default={})
+    advanced = _dict_value(openbox_payload.get("advanced_visualization"), default={})
+    if not advanced:
+        return {
+            "status": "not_generated",
+            "reason": (
+                "OpenBox advanced visualization was not recorded in the optimizer "
+                "run report."
+            ),
+        }
+    status = _string_value(advanced.get("status")) or "unknown"
+    payload: dict[str, Any] = {
+        "status": status,
+    }
+    for key in (
+        "reason",
+        "failure_kind",
+        "mode",
+        "html_path",
+        "json_path",
+        "output_dir",
+        "manifest_path",
+        "logging_dir",
+    ):
+        value = advanced.get(key)
+        if isinstance(value, str) and value:
+            payload[key] = value
+    includes = advanced.get("includes")
+    if isinstance(includes, list):
+        payload["includes"] = [str(item) for item in includes]
+    requested_includes = advanced.get("requested_includes")
+    if isinstance(requested_includes, list):
+        payload["requested_includes"] = [str(item) for item in requested_includes]
+    warnings = advanced.get("warnings")
+    if isinstance(warnings, list):
+        payload["warnings"] = [str(item) for item in warnings]
+    for key in ("open_html", "show_importance", "verify_surrogate"):
+        value = advanced.get(key)
+        if isinstance(value, bool):
+            payload[key] = value
+    return payload
 
 
 def _empty_svg(title: str, message: str) -> str:

@@ -40,6 +40,12 @@ FAKE_EXECUTION_MODE = "fake"
 REAL_EXECUTION_MODE = "real"
 OPENBOX_BATCH_PHASE = "openbox_batch"
 OPENBOX_SOURCE = "openbox_optimizer"
+OPENBOX_ADVANCED_VISUALIZATION_MANIFEST_RELATIVE = Path(
+    "reports/openbox_advanced_visualization_manifest.json"
+)
+OPENBOX_ADVANCED_VISUALIZATION_LOGGING_RELATIVE = Path(
+    "reports/openbox_advanced_visualization"
+)
 
 AdvisorFactory = Callable[[object, int], object]
 BatchEvaluator = Callable[[list[NativeTurboBatchCandidate]], list[NativeTurboObservation]]
@@ -242,6 +248,7 @@ def write_openbox_reports(
     *,
     settings: OpenBoxBatchRunSettings,
     duplicate_replacements: int,
+    advanced_visualization: dict[str, Any] | None = None,
 ) -> tuple[Path, Path]:
     reports_dir = Path(project_dir) / "reports"
     reports_dir.mkdir(parents=True, exist_ok=True)
@@ -282,6 +289,11 @@ def write_openbox_reports(
                 "prior_evaluation_count": settings.prior_evaluation_count,
                 "additional_evals": settings.additional_evals,
                 "target_total_evals": settings.max_evals,
+            },
+            "advanced_visualization": advanced_visualization
+            or {
+                "status": "not_generated",
+                "reason": "OpenBox advanced visualization is generated only at final run closeout.",
             },
         },
     }
@@ -495,11 +507,17 @@ def _run_openbox_batches(
         traces=traces,
         best_trace=_best_trace(traces),
     )
+    advanced_visualization = _write_openbox_advanced_visualization_manifest(
+        project_dir,
+        advisor=advisor,
+        max_evals=max_evals,
+    )
     report_path, evaluations_path = write_openbox_reports(
         project_dir,
         result,
         settings=settings,
         duplicate_replacements=duplicate_replacements,
+        advanced_visualization=advanced_visualization,
     )
     return NativeTurboRunResult(
         evaluation_count=result.evaluation_count,
@@ -508,6 +526,165 @@ def _run_openbox_batches(
         report_path=report_path,
         evaluations_path=evaluations_path,
     )
+
+
+def _write_openbox_advanced_visualization_manifest(
+    project_dir: Path,
+    *,
+    advisor: object,
+    max_evals: int,
+) -> dict[str, Any]:
+    manifest_path = project_dir / OPENBOX_ADVANCED_VISUALIZATION_MANIFEST_RELATIVE
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    payload = _generate_openbox_advanced_visualization(
+        project_dir,
+        advisor=advisor,
+        max_evals=max_evals,
+    )
+    payload["schema_version"] = "1.0"
+    payload["manifest_path"] = OPENBOX_ADVANCED_VISUALIZATION_MANIFEST_RELATIVE.as_posix()
+    manifest_path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return payload
+
+
+def _generate_openbox_advanced_visualization(
+    project_dir: Path,
+    *,
+    advisor: object,
+    max_evals: int,
+) -> dict[str, Any]:
+    requested_includes = [
+        "objective_and_constraint_history",
+        "surrogate_fit_verification",
+        "parameter_importance",
+    ]
+    base = {
+        "mode": "advanced",
+        "open_html": False,
+        "show_importance": True,
+        "verify_surrogate": True,
+        "logging_dir": OPENBOX_ADVANCED_VISUALIZATION_LOGGING_RELATIVE.as_posix(),
+        "requested_includes": requested_includes,
+    }
+    if not hasattr(advisor, "get_history"):
+        return {
+            **base,
+            "status": "not_available",
+            "reason": "OpenBox advisor history is unavailable for this runner.",
+        }
+
+    try:
+        history = advisor.get_history()
+        if not hasattr(history, "visualize_html"):
+            return {
+                **base,
+                "status": "not_available",
+                "reason": "OpenBox history does not provide visualize_html.",
+            }
+        visualizer = history.visualize_html(
+            logging_dir=str(project_dir / OPENBOX_ADVANCED_VISUALIZATION_LOGGING_RELATIVE),
+            open_html=False,
+            show_importance=True,
+            verify_surrogate=True,
+            advisor=advisor,
+            task_info={"max_runs": max_evals},
+        )
+    except ModuleNotFoundError as exc:
+        return {
+            **base,
+            "status": "failed",
+            "failure_kind": "dependency_missing",
+            "reason": str(exc),
+        }
+    except Exception as exc:
+        return {
+            **base,
+            "status": "failed",
+            "failure_kind": "visualization_error",
+            "reason": str(exc),
+        }
+
+    raw_html_path = getattr(visualizer, "html_path", None)
+    raw_json_path = getattr(visualizer, "json_path", None)
+    if not raw_html_path or not raw_json_path:
+        return {
+            **base,
+            "status": "failed",
+            "failure_kind": "artifact_missing",
+            "reason": "OpenBox visualizer did not expose HTML/JSON artifact paths.",
+        }
+    html_path = Path(raw_html_path)
+    json_path = Path(raw_json_path)
+    if not html_path.exists() or not json_path.exists():
+        return {
+            **base,
+            "status": "failed",
+            "failure_kind": "artifact_missing",
+            "reason": "OpenBox visualizer returned without expected HTML/JSON artifacts.",
+            "html_path": _project_relative(project_dir, html_path),
+            "json_path": _project_relative(project_dir, json_path),
+        }
+
+    includes, warnings = _openbox_visualization_capabilities(json_path)
+    status = (
+        "generated"
+        if set(requested_includes).issubset(set(includes))
+        else "generated_partial"
+    )
+    payload = {
+        **base,
+        "status": status,
+        "html_path": _project_relative(project_dir, html_path),
+        "json_path": _project_relative(project_dir, json_path),
+        "output_dir": _project_relative(
+            project_dir,
+            Path(getattr(visualizer, "output_dir", html_path.parent)),
+        ),
+        "includes": includes,
+    }
+    if warnings:
+        payload["warnings"] = warnings
+    return payload
+
+
+def _openbox_visualization_capabilities(json_path: Path) -> tuple[list[str], list[str]]:
+    includes = ["objective_and_constraint_history"]
+    warnings: list[str] = []
+    try:
+        text = json_path.read_text(encoding="utf-8").strip()
+        if text.startswith("var info="):
+            text = text[len("var info=") :]
+        if text.endswith(";"):
+            text = text[:-1]
+        payload = json.loads(text)
+    except (OSError, json.JSONDecodeError) as exc:
+        return includes, [f"could not inspect OpenBox visualization data: {exc}"]
+
+    data = payload.get("data") if isinstance(payload, dict) else None
+    if not isinstance(data, dict):
+        return includes, ["OpenBox visualization data is missing the data object"]
+
+    if data.get("pred_label_data") is not None or data.get("grade_data") is not None:
+        includes.append("surrogate_fit_verification")
+    else:
+        warnings.append("surrogate verification data was not generated")
+
+    if data.get("importance_data") is not None:
+        includes.append("parameter_importance")
+    else:
+        warnings.append("parameter importance data was not generated")
+
+    return includes, warnings
+
+
+def _project_relative(project_dir: Path, path: Path) -> str:
+    try:
+        return path.resolve().relative_to(project_dir.resolve()).as_posix()
+    except ValueError:
+        return path.as_posix()
 
 
 def _seen_keys_from_traces(
