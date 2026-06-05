@@ -47,7 +47,7 @@
     "alignment": "Aligned. C-48 improves the supervisor-facing post-run insight report using existing optimizer artifacts and the C-47 real samples. It stays inside the accepted OpenBox/Spectre/OCEAN route.",
     "drift": "No execution-route drift. C-48 did not hand-pick candidates, change formulas, parse PSF, rerun Spectre/OCEAN, change optimizer acceptance, or replace the optimizer backend."
   },
-  "latest_valid_commit": "15456a7",
+  "latest_valid_commit": "fe02035",
   "review_evidence": {
     "c47_plan": "docs/superpowers/plans/2026-06-05-openbox-advanced-visualization-artifact.md",
     "c47_tests": "Targeted tests passed: /home/zzchen/.venvs/openclaw/bin/python -m pytest tests/test_openbox_backend.py tests/test_optimizer_insights.py tests/test_optimizer_finalize.py",
