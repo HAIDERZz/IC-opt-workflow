@@ -63,6 +63,10 @@ Completed optimizer milestones since C-26:
   `finalize-optimizer-run`, and `optimizer-status`. The 10-eval smoke produced
   `9 constraint_failed` and `1 metric_check_failed`, no feasible point, and the
   correct supervisor decision `stop_for_user_review` with confidence `low`.
+- C-46 validated the same current packet/status route at 100 real
+  evaluations from a fresh workspace. The run produced `43 feasible`,
+  `51 constraint_failed`, and `6 metric_check_failed`; closeout accepted best
+  observed `real_071` with confidence `medium` and `global_optimum_claim=false`.
 
 Current code-level entry points:
 

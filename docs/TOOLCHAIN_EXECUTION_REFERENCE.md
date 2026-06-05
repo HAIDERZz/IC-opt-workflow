@@ -226,6 +226,15 @@ docs/debug/2026-06-05-c45-fresh-optimizer-status-handoff-drill.md
 This C-45 smoke used a fresh workspace and the updated task packet with
 `optimizer-status` in `audit_commands`.
 
+Latest real-scale packet/status handoff:
+
+```text
+docs/debug/2026-06-05-c46-real-scale-optimizer-status-handoff.md
+```
+
+This C-46 run used a fresh workspace, the updated task packet with
+`optimizer-status`, and completed 100 real OpenBox/Spectre/OCEAN evaluations.
+
 ## Fresh Workspace Preparation
 
 Do not rerun production optimizer acceptance in a stale project with old

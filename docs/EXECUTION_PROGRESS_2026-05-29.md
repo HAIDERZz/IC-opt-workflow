@@ -1250,3 +1250,21 @@ C-45 Fresh Optimizer Status Handoff Drill Completion:
 - Boundary: no hand-picked candidates, no variable/formula changes, no PSF parsing, no OCEAN formula rewrite, and no raw Cadence artifacts committed.
 - current_scope: C-45 Fresh Optimizer Status Handoff Drill complete.
 - next_allowed_action: wait for user confirmation before the next production step; recommended next is user-selected real project scale adoption using the current packet/status handoff, or a narrow usability fix only if the user wants one before adoption.
+
+
+C-46 Real-Scale Optimizer Status Handoff Completion:
+
+- Status: complete, verified-only.
+- Active spec: `docs/superpowers/specs/2026-06-05-optimizer-status-handoff-integration-design.md`.
+- Active plan: `docs/superpowers/plans/2026-06-05-real-scale-optimizer-status-handoff.md`.
+- Sanitized evidence: `docs/debug/2026-06-05-c46-real-scale-optimizer-status-handoff.md`.
+- Workspace: `/tmp/ic_auto_opt_c46_real_scale_status_handoff_001/bridge_test_inv`.
+- Fresh workspace preparation copied only `config/`, `netlists/`, and matching `supervisor_instruction.json`; old `ledger/`, `state/`, `reports/`, and `runs/` were not copied.
+- Generated updated OpenBox task packet with `--max-evals 100`; packet includes `optimizer-status`, `parallel_jobs=10`, `batch_size=10`, and `threads_per_run=10`.
+- Real execution passed `check-toolchain-env` and completed 100 OpenBox-generated Spectre/OCEAN evaluations.
+- Closeout passed through `check-optimizer-run`, `summarize-optimizer-run`, `finalize-optimizer-run`, and `optimizer-status`.
+- Result summary: `43 feasible`, `51 constraint_failed`, `6 metric_check_failed`, best observed `real_071`, decision `accept_best_observed`, confidence `medium`, `global_optimum_claim=false`, continuation recommended `false`, plateau detected `true`.
+- Best observed parameters: `FN=12`, `WN=2.7u`, `FP=7`, `WP=0.7u`; metrics: `rise=69.604322ps`, `fall=56.781892ps`, `DC=326.978183uW`; objective `4.1325534822170306e-14`.
+- Boundary: no hand-picked candidates, no variable/formula changes, no PSF parsing, no OCEAN formula rewrite, and no raw Cadence artifacts committed.
+- current_scope: C-46 Real-Scale Optimizer Status Handoff complete.
+- next_allowed_action: wait for user confirmation before the next production step; recommended next is user-selected project adoption at the desired evaluation budget, or a narrow usability/reporting fix if the C-46 real-scale evidence exposes a specific need.

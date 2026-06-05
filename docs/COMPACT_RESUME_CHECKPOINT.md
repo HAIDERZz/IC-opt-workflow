@@ -933,3 +933,27 @@ C-45 Fresh Optimizer Status Handoff Drill Completion:
 ```text
 请继续 IC auto optimization workflow。先阅读 AGENTS.md、docs/CURRENT_TASK_STATE.json、docs/TOOLCHAIN_EXECUTION_REFERENCE.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/OPTIMIZER_PRODUCTION_HANDOFF_GUIDE.md、docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-45 Fresh Optimizer Status Handoff Drill 已完成：从 clean config/netlists 生成 updated OpenBox packet，真实运行 10 evals，closeout 通过 check/summarize/finalize/optimizer-status，结果为 9 constraint_failed、1 metric_check_failed、0 feasible，decision stop_for_user_review，confidence low。AGENTS.md、顶层 plan current node、TOOLCHAIN_EXECUTION_REFERENCE 已同步到当前 C-45 路线。下一步等待用户确认；推荐用当前 packet/status handoff 跑用户选择的真实项目规模，或只做用户明确要求的小 usability fix。真实 OpenBox 前必须先读 TOOLCHAIN_EXECUTION_REFERENCE 并跑 check-toolchain-env。不要创建 broad framework，不要 hand-pick optimizer points，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
 ```
+
+
+C-46 Real-Scale Optimizer Status Handoff Completion:
+
+- Status: complete, verified-only.
+- Active spec: `docs/superpowers/specs/2026-06-05-optimizer-status-handoff-integration-design.md`.
+- Active plan: `docs/superpowers/plans/2026-06-05-real-scale-optimizer-status-handoff.md`.
+- Sanitized evidence: `docs/debug/2026-06-05-c46-real-scale-optimizer-status-handoff.md`.
+- Workspace: `/tmp/ic_auto_opt_c46_real_scale_status_handoff_001/bridge_test_inv`.
+- Fresh workspace preparation copied only `config/`, `netlists/`, and matching `supervisor_instruction.json`; old `ledger/`, `state/`, `reports/`, and `runs/` were not copied.
+- Generated updated OpenBox task packet with `--max-evals 100`; packet includes `optimizer-status`, `parallel_jobs=10`, `batch_size=10`, and `threads_per_run=10`.
+- Real execution passed `check-toolchain-env` and completed 100 OpenBox-generated Spectre/OCEAN evaluations.
+- Closeout passed through `check-optimizer-run`, `summarize-optimizer-run`, `finalize-optimizer-run`, and `optimizer-status`.
+- Result summary: `43 feasible`, `51 constraint_failed`, `6 metric_check_failed`, best observed `real_071`, decision `accept_best_observed`, confidence `medium`, `global_optimum_claim=false`, continuation recommended `false`, plateau detected `true`.
+- Best observed parameters: `FN=12`, `WN=2.7u`, `FP=7`, `WP=0.7u`; metrics: `rise=69.604322ps`, `fall=56.781892ps`, `DC=326.978183uW`; objective `4.1325534822170306e-14`.
+- Boundary: no hand-picked candidates, no variable/formula changes, no PSF parsing, no OCEAN formula rewrite, and no raw Cadence artifacts committed.
+- current_scope: C-46 Real-Scale Optimizer Status Handoff complete.
+- next_allowed_action: wait for user confirmation before the next production step; recommended next is user-selected project adoption at the desired evaluation budget, or a narrow usability/reporting fix if the C-46 real-scale evidence exposes a specific need.
+
+## Resume Prompt
+
+```text
+请继续 IC auto optimization workflow。先阅读 AGENTS.md、docs/CURRENT_TASK_STATE.json、docs/TOOLCHAIN_EXECUTION_REFERENCE.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/OPTIMIZER_PRODUCTION_HANDOFF_GUIDE.md、docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-46 Real-Scale Optimizer Status Handoff 已完成：fresh workspace 通过 current packet/status handoff 跑了 100 real OpenBox/Spectre/OCEAN evaluations，结果 43 feasible / 51 constraint_failed / 6 metric_check_failed，best observed real_071，decision accept_best_observed，confidence medium，global_optimum_claim=false，continuation recommended=false。下一步等待用户确认；推荐按用户选择的真实项目和目标 eval budget 进入生产采用，或只做 C-46 暴露出的窄 usability/reporting fix。真实 OpenBox 前必须先读 TOOLCHAIN_EXECUTION_REFERENCE 并跑 check-toolchain-env。不要创建 broad framework，不要 hand-pick optimizer points，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
+```
