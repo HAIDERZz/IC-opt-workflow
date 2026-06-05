@@ -28,6 +28,7 @@ class OptimizerCompletionReport:
     status_counts: dict[str, int]
     search_space: dict[str, Any]
     improvement: dict[str, Any]
+    continuation: dict[str, Any]
     reasons: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     issues: list[str] = field(default_factory=list)
@@ -66,6 +67,13 @@ def summarize_optimizer_run(project_dir: str | Path) -> OptimizerCompletionRepor
         search_space=search_space,
         improvement=improvement,
     )
+    continuation = _summarize_continuation(
+        decision=decision,
+        status_counts=status_counts,
+        evaluation_count=evaluation_count,
+        search_space=search_space,
+        improvement=improvement,
+    )
 
     report_path = project_root / REPORT_RELATIVE
     report = OptimizerCompletionReport(
@@ -78,6 +86,7 @@ def summarize_optimizer_run(project_dir: str | Path) -> OptimizerCompletionRepor
         status_counts=status_counts,
         search_space=search_space,
         improvement=improvement,
+        continuation=continuation,
         reasons=reasons,
         warnings=warnings,
         issues=issues,
@@ -291,6 +300,74 @@ def _decide_completion(
         False,
         ["accepted best observed candidate; no recent improvement detected"],
     )
+
+
+def _summarize_continuation(
+    *,
+    decision: str,
+    status_counts: dict[str, int],
+    evaluation_count: int,
+    search_space: dict[str, Any],
+    improvement: dict[str, Any],
+) -> dict[str, Any]:
+    feasible_count = status_counts.get("feasible", 0)
+    feasible_ratio = feasible_count / evaluation_count if evaluation_count else 0.0
+    recent_best_improved = improvement.get("recent_best_improved") is True
+    recommended = decision == "continue_more_evals"
+    estimated = _int_or_none(search_space.get("estimated_discrete_combinations"))
+    remaining = (
+        max(0, estimated - evaluation_count)
+        if estimated is not None
+        else None
+    )
+    suggested = _suggest_additional_evals(
+        recommended=recommended,
+        remaining=remaining,
+        recent_window=_int_or_none(improvement.get("recent_window")) or 0,
+    )
+    return {
+        "recommended": recommended,
+        "suggested_additional_evals": suggested,
+        "recent_window": _int_or_none(improvement.get("recent_window")) or 0,
+        "recent_best_improved": recent_best_improved,
+        "plateau_detected": feasible_count > 0 and not recent_best_improved,
+        "feasible_count": feasible_count,
+        "feasible_ratio": feasible_ratio,
+        "low_feasible_ratio": 0 < feasible_ratio < 0.1,
+        "estimated_remaining_combinations": remaining,
+        "reason": _continuation_reason(
+            recommended=recommended,
+            recent_best_improved=recent_best_improved,
+            feasible_count=feasible_count,
+        ),
+    }
+
+
+def _suggest_additional_evals(
+    *,
+    recommended: bool,
+    remaining: int | None,
+    recent_window: int,
+) -> int:
+    if not recommended:
+        return 0
+    suggestion = max(20, recent_window)
+    if remaining is not None:
+        return min(suggestion, remaining)
+    return suggestion
+
+
+def _continuation_reason(
+    *,
+    recommended: bool,
+    recent_best_improved: bool,
+    feasible_count: int,
+) -> str:
+    if feasible_count == 0:
+        return "no feasible candidate observed; user review is required"
+    if recommended and recent_best_improved:
+        return "recent window improved; continue with another bounded batch"
+    return "no recent best improvement; accept best observed unless user wants more exploration"
 
 
 def _dict_value(value: Any) -> dict[str, Any] | None:

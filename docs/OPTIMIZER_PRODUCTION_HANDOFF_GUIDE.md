@@ -205,6 +205,8 @@ The run is production-accepted only when:
 The best candidate is always the best observed candidate, not a global optimum.
 The supervisor should use the completion report decision and confidence fields
 to decide whether to accept, continue, revise the search space, or escalate.
+The completion report also includes a `continuation` object with recent-window
+improvement, plateau, feasible-ratio, and suggested-additional-eval details.
 
 ## Failure Handling
 

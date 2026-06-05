@@ -1153,6 +1153,9 @@ Next required action:
 - C-40 OpenBox Continuation Production Handoff: complete, verified-only. Added design spec `docs/superpowers/specs/2026-06-05-openbox-continuation-production-handoff-design.md` and plan `docs/superpowers/plans/2026-06-05-openbox-continuation-production-handoff.md`. Strengthened generated OpenBox task packets so continuation handoff includes the toolchain gate, known-good OpenBox venv, non-sandbox/escalated execution note, `finalize-optimizer-run`, and supervisor closeout artifacts. Updated `docs/OPTIMIZER_PRODUCTION_HANDOFF_GUIDE.md` with first-run and continuation packet flows. No real tools were run.
 - current_scope: C-40 OpenBox Continuation Production Handoff complete.
 
+- C-41 Optimizer Continuation Decision Detail: complete, verified-only. Added design spec `docs/superpowers/specs/2026-06-05-optimizer-continuation-decision-detail-design.md` and plan `docs/superpowers/plans/2026-06-05-optimizer-continuation-decision-detail.md`. `summarize-optimizer-run` now writes `continuation` detail into `reports/optimizer_completion_report.json`, including whether continuation is recommended, suggested additional eval count, recent-window improvement, plateau detection, feasible ratio, low-feasible-ratio flag, estimated remaining finite combinations, and reason. Existing top-level decisions remain unchanged. No real tools were run.
+- current_scope: C-41 Optimizer Continuation Decision Detail complete.
+
 ## Locked Role Model
 
 Status: locked as of 2026-06-02.

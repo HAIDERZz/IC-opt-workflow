@@ -1,18 +1,18 @@
 {
   "schema_version": "1.0",
-  "current_scope": "C-40 OpenBox Continuation Production Handoff complete",
-  "current_status": "C-40 is complete, verified-only. Productized the C-39 proven continuation route in the generated optimizer execution-agent packet and production guide. OpenBox packets now include a check-toolchain-env gate, known-good OpenBox venv reference, non-sandbox/escalated execution note, finalize-optimizer-run audit command, and supervisor closeout artifacts. No real optimizer run, Spectre, OCEAN, Virtuoso, bridge, PSF parsing, or OCEAN formula rewrite occurred.",
+  "current_scope": "C-41 Optimizer Continuation Decision Detail complete",
+  "current_status": "C-41 is complete, verified-only. Added a continuation object to optimizer_completion_report.json so supervisor agents can see whether continuation is recommended, suggested additional eval count, recent-window improvement, plateau detection, feasible ratio, low-feasible-ratio flag, and estimated remaining finite combinations. Existing top-level decisions remain unchanged. No real optimizer run, Spectre, OCEAN, Virtuoso, bridge, PSF parsing, or OCEAN formula rewrite occurred.",
   "review_status": "verified-only",
   "subagent_dispatch": "available",
-  "active_spec": "docs/superpowers/specs/2026-06-05-openbox-continuation-production-handoff-design.md",
-  "active_plan": "docs/superpowers/plans/2026-06-05-openbox-continuation-production-handoff.md",
+  "active_spec": "docs/superpowers/specs/2026-06-05-optimizer-continuation-decision-detail-design.md",
+  "active_plan": "docs/superpowers/plans/2026-06-05-optimizer-continuation-decision-detail.md",
   "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
   "progress_files": [
     "docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md",
     "docs/EXECUTION_PROGRESS_2026-05-29.md",
     "docs/COMPACT_RESUME_CHECKPOINT.md"
   ],
-  "next_allowed_action": "wait for user confirmation before the next narrow production step; recommended next is either a one-command supervisor closeout wrapper or a focused optimizer continuation decision improvement",
+  "next_allowed_action": "wait for user confirmation before the next narrow production step; recommended next is a small supervisor-facing optimizer run-status command or a real continuation handoff drill using the C-40 packet",
   "forbidden_actions": [
     "run real tool commands without first checking docs/TOOLCHAIN_EXECUTION_REFERENCE.md",
     "run long fake-run ladders before a meaningful real practice flow",
@@ -44,13 +44,13 @@
     "git status --short"
   ],
   "route_audit": {
-    "active_spec": "docs/superpowers/specs/2026-06-05-openbox-continuation-production-handoff-design.md",
-    "active_plan": "docs/superpowers/plans/2026-06-05-openbox-continuation-production-handoff.md",
+    "active_spec": "docs/superpowers/specs/2026-06-05-optimizer-continuation-decision-detail-design.md",
+    "active_plan": "docs/superpowers/plans/2026-06-05-optimizer-continuation-decision-detail.md",
     "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
-    "alignment": "Aligned. C-40 turns the C-39 accepted OpenBox continuation route into a reusable execution-agent handoff packet and production guide while preserving backend-neutral artifacts, C-25/C-26/C-32 reports, and the existing metric/result contracts.",
-    "drift": "No route drift. C-40 changes packet and guide semantics only; it does not run real tools, replace TuRBO, change optimizer formulas, alter Spectre/OCEAN execution, parse PSF, or rewrite formulas."
+    "alignment": "Aligned. C-41 strengthens supervisor reporting after accepted optimizer runs while preserving backend-neutral artifacts, C-25/C-26/C-32 reports, OpenBox/TuRBO execution, and existing metric/result contracts.",
+    "drift": "No route drift. C-41 adds report detail only; it does not run real tools, replace TuRBO, change optimizer formulas, alter Spectre/OCEAN execution, parse PSF, or rewrite formulas."
   },
-  "latest_valid_commit": "e93f4a8",
+  "latest_valid_commit": "e2f51cc",
   "review_evidence": {
     "optimizer_skill_real_practice": "Complete, verified-only. Temporary practice at /tmp/ic_auto_opt_optimizer_skill_flow_001 ran Turbo1.optimize() for 100 evaluations with 8 initialization and 92 trust-region evaluations. 73 candidates were recorded through real Spectre/OCEAN, 24 duplicate quantized candidates were skipped, and 3 metric non-scalar candidates were converted to finite penalties. Best candidate was real_011: FN=11, WN=1.9u, FP=9, WP=0.5u, rise=72.489655ps, fall=64.569947ps, DC=301.334349uW, objective=4.1300765965648685e-14.",
     "archive_doc": "docs/debug/2026-06-04-optimizer-skill-real-flow-practice.md",
@@ -108,6 +108,7 @@
     "c36_complete": "Complete, verified-only. Added src/hermes_workflow/toolchain_env.py, tests/test_toolchain_env.py, and CLI hermes-workflow check-toolchain-env. The gate checks the OpenBox execution venv, venv Python, venv hermes-workflow script, Cadence cshrc, and same-Python imports of openbox plus hermes_workflow.openbox_backend. Current C-34 venv passed with report /tmp/toolchain_environment_report_c36.json. No real optimizer run, Spectre, OCEAN, Virtuoso, bridge, PSF parsing, or OCEAN formula rewrite occurred.",
     "c38_complete": "Complete, verified-only. Added design spec docs/superpowers/specs/2026-06-05-openbox-continuation-multi-run-workflow-design.md and plan docs/superpowers/plans/2026-06-05-openbox-continuation-multi-run-workflow.md. Added OpenBox continuation support in openbox_backend.py, CLI hermes-workflow continue-openbox-real, and OpenBox continuation task packet rendering. Continuation loads prior OpenBox backend-neutral traces, warm-starts the advisor with prior observations, seeds duplicate detection, continues evaluation/run/batch numbering, and writes cumulative optimizer artifacts. Verification passed: python3 -m pytest -q (566 passed, 1 skipped); python3 -m ruff check src tests tools. No real optimizer run, Spectre, OCEAN, Virtuoso, bridge, PSF parsing, or OCEAN formula rewrite occurred.",
     "c39_complete": "Complete, verified-only. Added docs/superpowers/plans/2026-06-05-openbox-real-continuation-acceptance.md and sanitized evidence docs/debug/2026-06-05-c39-openbox-real-continuation-acceptance.md. First attempt exposed that explicit continuation candidate packaging rejected prior completed optimizer_state; fixed with a continuation-only allowance while keeping normal non-continuation completed/stopped-state guards intact. Real rerun on /tmp/ic_auto_opt_c39_continuation_002/bridge_test_inv passed toolchain gate, continued C34 from 100 to 120 cumulative evaluations, added real_101 through real_120, and closed out with check-optimizer-run accepted, summarize-optimizer-run accept_best_observed confidence medium global_optimum_claim=false, and finalize-optimizer-run passed. New continuation statuses: 15 feasible, 5 constraint_failed; cumulative statuses: 58 feasible, 56 constraint_failed, 6 metric_check_failed; best observed remained real_071.",
-    "c40_complete": "Complete, verified-only. Added design spec docs/superpowers/specs/2026-06-05-openbox-continuation-production-handoff-design.md and plan docs/superpowers/plans/2026-06-05-openbox-continuation-production-handoff.md. Productized the OpenBox continuation handoff packet: OpenBox packets now render check-toolchain-env, known-good OpenBox venv /tmp/ic_auto_opt_openbox_spike/.venv, non-sandbox/escalated execution wording, finalize-optimizer-run audit command, and supervisor closeout artifacts. Updated docs/OPTIMIZER_PRODUCTION_HANDOFF_GUIDE.md with first-run and continuation flows. No real tools were run."
+    "c40_complete": "Complete, verified-only. Added design spec docs/superpowers/specs/2026-06-05-openbox-continuation-production-handoff-design.md and plan docs/superpowers/plans/2026-06-05-openbox-continuation-production-handoff.md. Productized the OpenBox continuation handoff packet: OpenBox packets now render check-toolchain-env, known-good OpenBox venv /tmp/ic_auto_opt_openbox_spike/.venv, non-sandbox/escalated execution wording, finalize-optimizer-run audit command, and supervisor closeout artifacts. Updated docs/OPTIMIZER_PRODUCTION_HANDOFF_GUIDE.md with first-run and continuation flows. No real tools were run.",
+    "c41_complete": "Complete, verified-only. Added design spec docs/superpowers/specs/2026-06-05-optimizer-continuation-decision-detail-design.md and plan docs/superpowers/plans/2026-06-05-optimizer-continuation-decision-detail.md. Extended optimizer_completion_report.json with continuation detail: recommended, suggested_additional_evals, recent_window, recent_best_improved, plateau_detected, feasible_count, feasible_ratio, low_feasible_ratio, estimated_remaining_combinations, and reason. Existing top-level decisions remain unchanged. No real tools were run."
   }
 }

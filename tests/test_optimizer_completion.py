@@ -267,7 +267,64 @@ def test_summarize_optimizer_run_recommends_continue_when_recent_best_improves(
 
     assert report.decision == "continue_more_evals"
     assert report.improvement["recent_best_improved"] is True
+    assert report.continuation["recommended"] is True
+    assert report.continuation["suggested_additional_evals"] == 20
+    assert report.continuation["recent_best_improved"] is True
+    assert report.continuation["plateau_detected"] is False
+    assert report.continuation["feasible_ratio"] == 4 / 6
     assert any("recent window" in reason for reason in report.reasons)
+
+
+def test_summarize_optimizer_run_reports_plateau_when_recent_best_stalls(
+    tmp_path: Path,
+) -> None:
+    rows = [
+        _trace_row(
+            evaluation_index=1,
+            run_id="real_001",
+            status="feasible",
+            objective=1.0,
+        ),
+        _trace_row(
+            evaluation_index=2,
+            run_id="real_002",
+            status="feasible",
+            objective=1.1,
+        ),
+        _trace_row(
+            evaluation_index=3,
+            run_id="real_003",
+            status="feasible",
+            objective=1.2,
+        ),
+        _trace_row(
+            evaluation_index=4,
+            run_id="real_004",
+            status="feasible",
+            objective=1.3,
+        ),
+        _trace_row(
+            evaluation_index=5,
+            run_id="real_005",
+            status="feasible",
+            objective=1.4,
+        ),
+        _trace_row(
+            evaluation_index=6,
+            run_id="real_006",
+            status="feasible",
+            objective=1.5,
+        ),
+    ]
+    project_dir = _write_accepted_optimizer_project(tmp_path, rows=rows)
+
+    report = summarize_optimizer_run(project_dir)
+
+    assert report.decision == "accept_best_observed"
+    assert report.continuation["recommended"] is False
+    assert report.continuation["suggested_additional_evals"] == 0
+    assert report.continuation["plateau_detected"] is True
+    assert report.continuation["recent_best_improved"] is False
 
 
 def test_summarize_optimizer_run_recommends_accept_when_trace_exhausts_space(
