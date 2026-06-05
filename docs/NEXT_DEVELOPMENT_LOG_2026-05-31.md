@@ -1475,6 +1475,7 @@ C-36 Stable OpenBox/Hermes Execution Environment Gate Completion:
 - Current C-34 OpenBox/Hermes venv passed:
   `.venv/bin/hermes-workflow check-toolchain-env --openbox-venv /tmp/ic_auto_opt_openbox_spike/.venv --cadence-cshrc /home/zzchen/cadence_ic231_env.csh --report /tmp/toolchain_environment_report_c36.json`.
 - Boundary: no real optimizer run, Spectre, OCEAN, Virtuoso, bridge, PSF parsing, or OCEAN formula rewrite occurred.
+- Commit: `2a7441e`.
 - current_scope: C-36 Stable OpenBox/Hermes Execution Environment Gate complete.
 - next_allowed_action: wait for user confirmation before the next narrow production step; recommended next is continuation/multi-run optimizer workflow or OpenBox advanced visualization, with check-toolchain-env run first before any real OpenBox execution
 

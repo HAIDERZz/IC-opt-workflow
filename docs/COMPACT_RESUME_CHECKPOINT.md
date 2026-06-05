@@ -757,6 +757,7 @@ C-36 Stable OpenBox/Hermes Execution Environment Gate result:
 - The gate checks OpenBox execution venv existence, venv Python, venv `hermes-workflow`, Cadence cshrc, and same-Python imports of `openbox` plus `hermes_workflow.openbox_backend`.
 - Current C-34 venv `/tmp/ic_auto_opt_openbox_spike/.venv` passed and wrote `/tmp/toolchain_environment_report_c36.json`.
 - Boundary: no real optimizer run, Spectre, OCEAN, Virtuoso, bridge, PSF parsing, or OCEAN formula rewrite occurred.
+- Commit: `2a7441e`.
 - Current next step: wait for user confirmation; recommended next is continuation/multi-run optimizer workflow or OpenBox advanced visualization, with `check-toolchain-env` run before any real OpenBox execution.
 
 Read the handoff files first:
