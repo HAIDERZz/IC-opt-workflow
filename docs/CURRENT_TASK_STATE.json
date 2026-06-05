@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
-  "current_scope": "C-34 Production Optimizer Handoff Acceptance Task 1 complete",
-  "current_status": "C-34 Task 1 is complete, verified-only. Added a narrow production handoff acceptance plan and generated an OpenBox optimizer execution task packet for /tmp/ic_auto_opt_c29_openbox_real/bridge_test_inv. Local-only handoff evidence is in /tmp/ic_auto_opt_c34 with EXECUTION_TASK.md, optimizer_execution_manifest.json, and task_packet_sha256.txt. No real Virtuoso/Spectre/OCEAN/SSH/bridge command was run.",
+  "current_scope": "C-34 Production Optimizer Handoff Acceptance Task 2 blocked",
+  "current_status": "C-34 Task 2 is blocked, verified-only. The generated OpenBox command was attempted after user confirmation, but it exited before real Spectre/OCEAN because OpenBox is not installed in the active execution environment. Sanitized blocker note: docs/debug/2026-06-05-c34-production-openbox-handoff-dependency-blocker.md. No real Spectre/OCEAN execution completed.",
   "review_status": "verified-only",
   "subagent_dispatch": "available",
   "active_spec": "docs/OPTIMIZER_PRODUCTION_HANDOFF_GUIDE.md",
@@ -12,7 +12,7 @@
     "docs/EXECUTION_PROGRESS_2026-05-29.md",
     "docs/COMPACT_RESUME_CHECKPOINT.md"
   ],
-  "next_allowed_action": "wait for explicit user approval before C-34 Task 2 real Cadence execution; do not run run-openbox-real, Spectre, OCEAN, SSH, or bridge before that approval",
+  "next_allowed_action": "wait for user decision: install OpenBox in the active execution environment and rerun C-34 Task 2, explicitly switch to native TuRBO with a fresh packet, or pause production handoff acceptance",
   "forbidden_actions": [
     "start broad optimizer framework work",
     "replace TuRBO before OpenBox evidence spike approval",
@@ -45,8 +45,8 @@
     "active_spec": "docs/OPTIMIZER_PRODUCTION_HANDOFF_GUIDE.md",
     "active_plan": "docs/superpowers/plans/2026-06-05-production-optimizer-handoff-acceptance.md",
     "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
-    "alignment": "Aligned. C-34 Task 1 uses the C-33 guide to prepare one production-style optimizer handoff packet without running real tools.",
-    "drift": "No route drift. This is the existing OpenBox production command and finalize/audit path, not a new backend validation loop."
+    "alignment": "Aligned. C-34 used the C-33 guide and stopped on an execution-environment dependency blocker instead of silently falling back.",
+    "drift": "No route drift. The blocker is an environment issue: OpenBox is missing in the active execution environment."
   },
   "latest_valid_commit": "6956558",
   "review_evidence": {
@@ -99,6 +99,7 @@
     "c31_complete": "Complete, verified-only. Added design spec docs/superpowers/specs/2026-06-05-optimizer-post-run-visualization-insight-design.md and implementation plan docs/superpowers/plans/2026-06-05-optimizer-post-run-visualization-insight.md. Added src/hermes_workflow/optimizer_insights.py and hermes-workflow visualize-optimizer-run. The command reads existing optimizer artifacts and writes reports/optimizer_insight_report.json, reports/optimizer_insight_report.md, reports/optimizer_visuals/convergence.svg, reports/optimizer_visuals/status_distribution.svg, and reports/optimizer_visuals/parameter_objective_scatter.svg. C-31 uses standard-library SVG only; OpenBox advanced surrogate/SHAP visualization is recorded as a future optional add-on. Focused verification passed: python3 -m pytest tests/test_optimizer_insights.py tests/test_optimizer_completion.py tests/test_optimizer_acceptance.py tests/test_optimizer_task_package.py -q and targeted ruff.",
     "c32_complete": "Complete, verified-only. Added design spec docs/superpowers/specs/2026-06-05-optimizer-finalize-workflow-design.md and implementation plan docs/superpowers/plans/2026-06-05-optimizer-finalize-workflow.md. Added src/hermes_workflow/optimizer_finalize.py and hermes-workflow finalize-optimizer-run. The command runs check_optimizer_run, summarize_optimizer_run, and generate_optimizer_insight_report in order, writes reports/optimizer_finalize_report.json, and fails closed when acceptance or completion fails. Focused verification passed: python3 -m pytest tests/test_optimizer_finalize.py tests/test_optimizer_insights.py tests/test_optimizer_completion.py tests/test_optimizer_acceptance.py -q and targeted ruff.",
     "c33_complete": "Complete, verified-only. Added docs/OPTIMIZER_PRODUCTION_HANDOFF_GUIDE.md as a concise supervisor/execution-agent production guide. It documents backend choice, package-optimizer-task usage, execution-agent command responsibilities, required returned artifacts, finalize-optimizer-run acceptance rules, failure categories, and forbidden actions. No code, real tools, backend behavior, PSF parsing, or OCEAN formula handling changed.",
-    "c34_task1": "Complete, verified-only. Added docs/superpowers/plans/2026-06-05-production-optimizer-handoff-acceptance.md and generated the OpenBox task packet for /tmp/ic_auto_opt_c29_openbox_real/bridge_test_inv using package-optimizer-task --backend openbox --max-evals 100 --parallel. Local-only evidence copied to /tmp/ic_auto_opt_c34: EXECUTION_TASK.md, optimizer_execution_manifest.json, task_packet_sha256.txt. Verified the packet contains run-openbox-real, check-optimizer-run, summarize-optimizer-run, and Do not hand-pick wording. No real tools were run."
+    "c34_task1": "Complete, verified-only. Added docs/superpowers/plans/2026-06-05-production-optimizer-handoff-acceptance.md and generated the OpenBox task packet for /tmp/ic_auto_opt_c29_openbox_real/bridge_test_inv using package-optimizer-task --backend openbox --max-evals 100 --parallel. Local-only evidence copied to /tmp/ic_auto_opt_c34: EXECUTION_TASK.md, optimizer_execution_manifest.json, task_packet_sha256.txt. Verified the packet contains run-openbox-real, check-optimizer-run, summarize-optimizer-run, and Do not hand-pick wording. No real tools were run.",
+    "c34_task2_blocker": "Blocked, verified-only. After user said continue, the generated OpenBox command was attempted. It exited before Spectre/OCEAN with: OpenBox is not installed; install it in the active environment to run the OpenBox backend. Sanitized note: docs/debug/2026-06-05-c34-production-openbox-handoff-dependency-blocker.md. No fallback to TuRBO was performed."
   }
 }

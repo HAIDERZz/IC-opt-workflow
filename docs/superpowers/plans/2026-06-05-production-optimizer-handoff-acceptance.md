@@ -112,6 +112,14 @@ Keep raw logs local-only under `/tmp/ic_auto_opt_c34/`.
 
 Expected candidate-level `constraint_failed` and `metric_check_failed` samples are not unexpected by themselves. Unexpected failures include missing optimizer reports, result manifest absence, command dependency blockers, or real-tool failures that prevent final audit.
 
+Task 2 status as of 2026-06-05:
+
+- [x] User approved entering Task 2 with "继续进行".
+- [x] The generated OpenBox command was attempted.
+- [x] The run stopped before real Spectre/OCEAN because OpenBox is not installed in the active execution environment.
+- [x] Sanitized blocker note written to `docs/debug/2026-06-05-c34-production-openbox-handoff-dependency-blocker.md`.
+- [ ] User decision required: install OpenBox in the active execution environment, regenerate/rerun with native TuRBO, or pause.
+
 ## Task 3: Supervisor Finalize And Closeout
 
 **Files:**

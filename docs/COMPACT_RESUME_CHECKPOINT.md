@@ -711,6 +711,19 @@ C-34 Task 1 result:
 - Boundary: no real Virtuoso/Spectre/OCEAN/SSH/bridge command was run.
 - Current next step: wait for explicit user approval before C-34 Task 2 real Cadence execution; do not run `run-openbox-real`, Spectre, OCEAN, SSH, or bridge before that approval.
 
+C-34 Task 2 blocker:
+
+- Status: blocked, verified-only.
+- current_scope: C-34 Production Optimizer Handoff Acceptance Task 2 blocked.
+- User said "继续进行"; this was treated as approval to attempt Task 2.
+- Attempted generated command:
+  `hermes-workflow run-openbox-real /tmp/ic_auto_opt_c29_openbox_real/bridge_test_inv --max-evals 100 --batch-size 10 --parallel-jobs 10 --cadence-cshrc /home/zzchen/cadence_ic231_env.csh`.
+- Result: command exited before real Spectre/OCEAN because OpenBox is not installed in the active execution environment.
+- Error text: `OpenBox is not installed; install it in the active environment to run the OpenBox backend`.
+- Sanitized note: `docs/debug/2026-06-05-c34-production-openbox-handoff-dependency-blocker.md`.
+- No silent fallback to TuRBO was performed.
+- Current next step: wait for user decision: install OpenBox in the active execution environment and rerun C-34 Task 2, explicitly switch to native TuRBO with a fresh packet, or pause production handoff acceptance.
+
 Read the handoff files first:
 
 ```text
@@ -721,6 +734,7 @@ ic-auto-opt-workflow/docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md
 ic-auto-opt-workflow/docs/COMPACT_RESUME_CHECKPOINT.md
 ic-auto-opt-workflow/docs/OPTIMIZER_PRODUCTION_HANDOFF_GUIDE.md
 ic-auto-opt-workflow/docs/superpowers/plans/2026-06-05-production-optimizer-handoff-acceptance.md
+ic-auto-opt-workflow/docs/debug/2026-06-05-c34-production-openbox-handoff-dependency-blocker.md
 ```
 
 ## Resume Prompt
@@ -737,5 +751,5 @@ Use this prompt after compact:
 6. ic-auto-opt-workflow/docs/OPTIMIZER_PRODUCTION_HANDOFF_GUIDE.md
 7. ic-auto-opt-workflow/docs/superpowers/plans/2026-06-05-production-optimizer-handoff-acceptance.md
 
-当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-34 Production Optimizer Handoff Acceptance Task 1 已完成，local-only evidence 在 /tmp/ic_auto_opt_c34。下一步是 wait for explicit user approval before C-34 Task 2 real Cadence execution; do not run run-openbox-real, Spectre, OCEAN, SSH, or bridge before that approval。不要直接替换 TuRBO，不要删除 native_turbo，不要创建 broad optimizer framework，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
+当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-34 Production Optimizer Handoff Acceptance Task 2 当前 blocked：OpenBox is not installed in the active execution environment。local-only evidence 在 /tmp/ic_auto_opt_c34。下一步必须等待用户决定：安装 OpenBox 后重跑 C-34 Task 2，显式切换 native TuRBO 并生成新 packet，或暂停 production handoff acceptance。不要 silent fallback，不要直接替换 TuRBO，不要删除 native_turbo，不要创建 broad optimizer framework，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence log、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
 ```
