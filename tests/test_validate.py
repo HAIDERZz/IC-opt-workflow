@@ -55,18 +55,30 @@ def test_batch_size_must_not_exceed_spectre_parallel_jobs(tmp_path: Path) -> Non
     )
 
 
-def test_objective_expression_rejects_function_calls(tmp_path: Path) -> None:
+def test_objective_expression_allows_safe_math_functions(tmp_path: Path) -> None:
     project_dir = copy_fixture_project(tmp_path)
     metrics_path = project_dir / "config" / "metrics.yaml"
     payload = read_yaml(metrics_path)
-    payload["objective"]["expression"] = "max(rise, fall)"
+    payload["objective"]["expression"] = "min(max(rise, fall), ln(DC))"
+    write_yaml(metrics_path, payload)
+
+    report = validate_project_files(project_dir)
+
+    assert report.ok is True
+
+
+def test_objective_expression_rejects_unknown_function_calls(tmp_path: Path) -> None:
+    project_dir = copy_fixture_project(tmp_path)
+    metrics_path = project_dir / "config" / "metrics.yaml"
+    payload = read_yaml(metrics_path)
+    payload["objective"]["expression"] = "abs(rise)"
     write_yaml(metrics_path, payload)
 
     report = validate_project_files(project_dir)
 
     assert report.ok is False
     assert any(
-        "unsupported objective expression node Call" in issue.message
+        "unsupported objective function abs" in issue.message
         for issue in report.issues
     )
 

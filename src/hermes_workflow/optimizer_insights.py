@@ -11,11 +11,13 @@ from typing import Any
 import yaml
 
 from hermes_workflow.optimizer_artifacts import load_optimizer_artifacts
+from hermes_workflow.validate import evaluate_objective
 
 
 REPORT_RELATIVE = Path("reports/optimizer_insight_report.json")
 MARKDOWN_RELATIVE = Path("reports/optimizer_insight_report.md")
 VISUALS_DIR_RELATIVE = Path("reports/optimizer_visuals")
+ALL_EVALUABLE_FOM_RELATIVE = VISUALS_DIR_RELATIVE / "all_evaluable_fom.svg"
 CONVERGENCE_RELATIVE = VISUALS_DIR_RELATIVE / "convergence.svg"
 FEASIBLE_CONVERGENCE_RELATIVE = VISUALS_DIR_RELATIVE / "feasible_convergence.svg"
 STATUS_DISTRIBUTION_RELATIVE = VISUALS_DIR_RELATIVE / "status_distribution.svg"
@@ -30,6 +32,7 @@ class OptimizerInsightReport:
     status_counts: dict[str, int]
     best_observed: dict[str, Any] | None
     plots: dict[str, str]
+    all_evaluable_fom_summary: dict[str, Any]
     ic_metric_summary: dict[str, Any]
     top_feasible_candidates: list[dict[str, Any]]
     constraint_margin_summary: dict[str, Any]
@@ -68,6 +71,7 @@ def generate_optimizer_insight_report(project_dir: str | Path) -> OptimizerInsig
         )
 
     plot_paths = {
+        "all_evaluable_fom": ALL_EVALUABLE_FOM_RELATIVE.as_posix(),
         "convergence": CONVERGENCE_RELATIVE.as_posix(),
         "feasible_convergence": FEASIBLE_CONVERGENCE_RELATIVE.as_posix(),
         "parameter_objective_scatter": PARAMETER_OBJECTIVE_RELATIVE.as_posix(),
@@ -75,6 +79,10 @@ def generate_optimizer_insight_report(project_dir: str | Path) -> OptimizerInsig
         "status_distribution": STATUS_DISTRIBUTION_RELATIVE.as_posix(),
     }
     metric_contract = _load_metric_contract(project_root)
+    all_evaluable_fom = _all_evaluable_fom_summary(
+        traces,
+        _string_value(metric_contract.get("objective_expression")),
+    )
     top_feasible = _top_feasible_candidates(traces)
     constraint_margins = _constraint_margin_summary(traces, metric_contract)
     ic_summary = _ic_metric_summary(top_feasible, traces)
@@ -88,6 +96,7 @@ def generate_optimizer_insight_report(project_dir: str | Path) -> OptimizerInsig
         status_counts=status_counts,
         best_observed=best_observed,
         plots=plot_paths,
+        all_evaluable_fom_summary=all_evaluable_fom,
         ic_metric_summary=ic_summary,
         top_feasible_candidates=top_feasible,
         constraint_margin_summary=constraint_margins,
@@ -110,6 +119,10 @@ def _write_outputs(
 ) -> None:
     visuals_dir = project_root / VISUALS_DIR_RELATIVE
     visuals_dir.mkdir(parents=True, exist_ok=True)
+    (project_root / ALL_EVALUABLE_FOM_RELATIVE).write_text(
+        _all_evaluable_fom_svg(report.all_evaluable_fom_summary),
+        encoding="utf-8",
+    )
     (project_root / CONVERGENCE_RELATIVE).write_text(
         _convergence_svg(traces),
         encoding="utf-8",
@@ -153,9 +166,9 @@ def _load_metric_contract(project_root: Path) -> dict[str, Any]:
     try:
         payload = yaml.safe_load(path.read_text(encoding="utf-8"))
     except (FileNotFoundError, yaml.YAMLError):
-        return {"metrics": {}, "constraints": []}
+        return {"metrics": {}, "constraints": [], "objective_expression": ""}
     if not isinstance(payload, dict):
-        return {"metrics": {}, "constraints": []}
+        return {"metrics": {}, "constraints": [], "objective_expression": ""}
     metrics: dict[str, dict[str, Any]] = {}
     for metric in payload.get("metrics", []):
         if not isinstance(metric, dict) or not isinstance(metric.get("name"), str):
@@ -179,7 +192,15 @@ def _load_metric_contract(project_root: Path) -> dict[str, Any]:
                     "unit": metrics.get(metric_name, {}).get("unit", ""),
                 }
             )
-    return {"metrics": metrics, "constraints": constraints}
+    objective = payload.get("objective", {})
+    objective_expression = (
+        _string_value(objective.get("expression")) if isinstance(objective, dict) else ""
+    )
+    return {
+        "metrics": metrics,
+        "constraints": constraints,
+        "objective_expression": objective_expression,
+    }
 
 
 def _top_feasible_candidates(
@@ -414,6 +435,79 @@ def _convergence_svg(traces: list[dict[str, Any]]) -> str:
         ],
         x_label="evaluation",
         y_label="objective",
+    )
+
+
+def _all_evaluable_fom_summary(
+    traces: list[dict[str, Any]],
+    objective_expression: str,
+) -> dict[str, Any]:
+    source = "configured_objective" if objective_expression else "stored_objective"
+    series: list[dict[str, Any]] = []
+    for row_index, row in enumerate(traces):
+        objective = (
+            _evaluate_configured_objective(row, objective_expression)
+            if objective_expression
+            else _finite_float(row.get("objective"))
+        )
+        if objective is None:
+            continue
+        evaluation_index = _int_value(row.get("evaluation_index")) or row_index + 1
+        series.append(
+            {
+                "evaluation_index": evaluation_index,
+                "run_id": _string_value(row.get("run_id")),
+                "objective": objective,
+                "objective_display": _format_scientific(objective),
+            }
+        )
+    best = min(series, key=lambda item: item["objective"]) if series else {}
+    return {
+        "source": source,
+        "objective_expression": objective_expression or None,
+        "sample_count": len(series),
+        "best_run_id": best.get("run_id"),
+        "best_evaluation_index": best.get("evaluation_index"),
+        "best_objective": best.get("objective"),
+        "best_objective_display": best.get("objective_display"),
+        "series": series,
+    }
+
+
+def _evaluate_configured_objective(
+    row: dict[str, Any],
+    objective_expression: str,
+) -> float | None:
+    metrics: dict[str, float] = {}
+    for name, value in _dict_value(row.get("metrics"), default={}).items():
+        numeric = _parse_number(value)
+        if numeric is not None:
+            metrics[str(name)] = numeric
+    if not metrics:
+        return None
+    try:
+        objective = evaluate_objective(objective_expression, metrics)
+    except (KeyError, ValueError, ZeroDivisionError, OverflowError):
+        return None
+    return objective if math.isfinite(objective) else None
+
+
+def _all_evaluable_fom_svg(summary: dict[str, Any]) -> str:
+    rows = [
+        (
+            _int_value(point.get("evaluation_index")),
+            float(point["objective"]),
+        )
+        for point in summary.get("series", [])
+        if isinstance(point, dict) and _finite_float(point.get("objective")) is not None
+    ]
+    if not rows:
+        return _empty_svg("All Evaluable FoM", "No finite FoM values")
+    return _line_svg(
+        title="All Evaluable FoM",
+        series=[("FoM/objective", rows, "#5a6ff0")],
+        x_label="evaluation",
+        y_label="FoM objective (all evaluable samples)",
     )
 
 
@@ -675,6 +769,14 @@ def _markdown_report(report: OptimizerInsightReport) -> str:
         f"- Best feasible run: `{report.ic_metric_summary['objective']['best_feasible_run_id'] or 'n/a'}`",
         f"- Feasible count: `{report.ic_metric_summary['objective']['feasible_count']}`",
         f"- Best feasible objective: `{report.ic_metric_summary['objective']['best_feasible_objective_display'] or 'n/a'}`",
+        "",
+        "## All evaluable FoM",
+        "",
+        f"- Source: `{report.all_evaluable_fom_summary['source']}`",
+        f"- Sample count: `{report.all_evaluable_fom_summary['sample_count']}`",
+        f"- Best run: `{report.all_evaluable_fom_summary['best_run_id'] or 'n/a'}`",
+        f"- Best objective: `{report.all_evaluable_fom_summary['best_objective_display'] or 'n/a'}`",
+        f"- Plot: `{report.plots['all_evaluable_fom']}`",
         "",
         "## Top feasible candidates",
         "",

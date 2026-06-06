@@ -44,6 +44,7 @@ _ALLOWED_OBJECTIVE_NODES = (
     ast.Expression,
     ast.BinOp,
     ast.UnaryOp,
+    ast.Call,
     ast.Name,
     ast.Load,
     ast.Constant,
@@ -56,6 +57,7 @@ _ALLOWED_OBJECTIVE_NODES = (
     ast.UAdd,
     ast.USub,
 )
+_OBJECTIVE_FUNCTIONS = {"min": min, "max": max, "ln": math.log}
 
 
 @dataclass(frozen=True)
@@ -473,7 +475,29 @@ def _validate_objective_expression(
             )
             continue
 
-        if isinstance(node, ast.Name) and node.id not in declared_metrics:
+        if isinstance(node, ast.Call):
+            if not isinstance(node.func, ast.Name) or node.func.id not in _OBJECTIVE_FUNCTIONS:
+                function_name = getattr(node.func, "id", type(node.func).__name__)
+                issues.append(
+                    _issue(
+                        "metrics.yaml",
+                        "objective.expression",
+                        f"unsupported objective function {function_name}",
+                    )
+                )
+            if node.keywords:
+                issues.append(
+                    _issue(
+                        "metrics.yaml",
+                        "objective.expression",
+                        "objective function keyword arguments are unsupported",
+                    )
+                )
+        elif (
+            isinstance(node, ast.Name)
+            and node.id not in declared_metrics
+            and node.id not in _OBJECTIVE_FUNCTIONS
+        ):
             issues.append(
                 _issue(
                     "metrics.yaml",
@@ -533,7 +557,15 @@ def evaluate_objective(expression: str, metrics: dict[str, float]) -> float:
             raise ValueError(
                 f"unsupported objective expression node {type(node).__name__}"
             )
-        if isinstance(node, ast.Name):
+        if isinstance(node, ast.Call):
+            if not isinstance(node.func, ast.Name) or node.func.id not in _OBJECTIVE_FUNCTIONS:
+                function_name = getattr(node.func, "id", type(node.func).__name__)
+                raise ValueError(f"unsupported objective function {function_name}")
+            if node.keywords:
+                raise ValueError("objective function keyword arguments are unsupported")
+        elif isinstance(node, ast.Name):
+            if node.id in _OBJECTIVE_FUNCTIONS:
+                continue
             if node.id not in metrics:
                 raise ValueError(f"objective references unknown metric {node.id}")
         elif isinstance(node, ast.Constant):
@@ -550,7 +582,22 @@ def _eval_ast(node: ast.AST, metrics: dict[str, float]) -> float:
     if isinstance(node, ast.Constant):
         return float(node.value)
     if isinstance(node, ast.Name):
+        if node.id in _OBJECTIVE_FUNCTIONS:
+            raise ValueError(f"objective function {node.id} must be called")
         return metrics[node.id]
+    if isinstance(node, ast.Call):
+        if not isinstance(node.func, ast.Name) or node.func.id not in _OBJECTIVE_FUNCTIONS:
+            function_name = getattr(node.func, "id", type(node.func).__name__)
+            raise ValueError(f"unsupported objective function {function_name}")
+        if node.keywords:
+            raise ValueError("objective function keyword arguments are unsupported")
+        args = [_eval_ast(arg, metrics) for arg in node.args]
+        if node.func.id == "ln":
+            if len(args) != 1:
+                raise ValueError("objective function ln expects one argument")
+            if args[0] <= 0:
+                raise ValueError("objective function ln argument must be positive")
+        return float(_OBJECTIVE_FUNCTIONS[node.func.id](*args))
     if isinstance(node, ast.UnaryOp):
         operand = _eval_ast(node.operand, metrics)
         if isinstance(node.op, ast.UAdd):

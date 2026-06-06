@@ -1,6 +1,8 @@
 import json
+import math
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
 from hermes_workflow.cli import app
@@ -32,6 +34,7 @@ def test_generate_optimizer_insight_report_writes_json_markdown_and_svgs(
     assert "FN" in payload["observed_relationships"]
     assert "objective" in payload["observed_relationships"]["FN"]
     assert payload["plots"] == {
+        "all_evaluable_fom": "reports/optimizer_visuals/all_evaluable_fom.svg",
         "constraint_margins": "reports/optimizer_visuals/constraint_margins.svg",
         "convergence": "reports/optimizer_visuals/convergence.svg",
         "feasible_convergence": "reports/optimizer_visuals/feasible_convergence.svg",
@@ -45,6 +48,7 @@ def test_generate_optimizer_insight_report_writes_json_markdown_and_svgs(
     assert "# Optimizer Insight Report" in markdown
     assert "Best observed" in markdown
     assert "Observed Relationships" in markdown
+    assert "all_evaluable_fom" in markdown
 
     for relative_plot in payload["plots"].values():
         plot_text = (project_dir / relative_plot).read_text(encoding="utf-8")
@@ -184,6 +188,62 @@ objective:
     assert "Top feasible candidates" in markdown
     assert "Constraint margins" in markdown
     assert "real_003" in markdown
+
+
+def test_generate_optimizer_insight_report_recomputes_all_evaluable_fom(
+    tmp_path: Path,
+) -> None:
+    rows = [
+        _trace_row(
+            evaluation_index=1,
+            run_id="real_001",
+            status="feasible",
+            objective=100.0,
+        ),
+        _trace_row(
+            evaluation_index=2,
+            run_id="real_002",
+            status="feasible",
+            objective=1.0,
+        ),
+    ]
+    rows[0]["metrics"] = {"rise": "10", "fall": 2.0, "DC": "20"}
+    rows[1]["metrics"] = {"rise": "5", "fall": 6.0, "DC": "1000"}
+    project_dir = _write_accepted_optimizer_project(tmp_path, rows=rows)
+    (project_dir / "config" / "metrics.yaml").write_text(
+        """
+schema_version: "1.0"
+metrics:
+  - name: rise
+    unit: s
+  - name: fall
+    unit: s
+  - name: DC
+    unit: W
+constraints: []
+objective:
+  direction: minimize
+  expression: "min(max(rise, fall), ln(DC))"
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    report = generate_optimizer_insight_report(project_dir)
+
+    payload = json.loads(report.report_path.read_text(encoding="utf-8"))
+    summary = payload["all_evaluable_fom_summary"]
+    assert summary["source"] == "configured_objective"
+    assert summary["sample_count"] == 2
+    assert summary["best_run_id"] == "real_001"
+    assert summary["best_objective"] == pytest.approx(math.log(20))
+    assert summary["series"][0]["objective"] == pytest.approx(math.log(20))
+    assert summary["series"][1]["objective"] == pytest.approx(6.0)
+    svg = (project_dir / payload["plots"]["all_evaluable_fom"]).read_text(
+        encoding="utf-8"
+    )
+    assert "All Evaluable FoM" in svg
+    markdown = report.markdown_path.read_text(encoding="utf-8")
+    assert "Source: `configured_objective`" in markdown
 
 
 def test_visualize_optimizer_run_cli_writes_report(tmp_path: Path) -> None:

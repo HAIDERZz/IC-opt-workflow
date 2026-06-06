@@ -1127,3 +1127,21 @@ C-48 IC-native Offline Optimizer Insight Report Completion:
 ```text
 请继续 IC auto optimization workflow。先阅读 AGENTS.md、docs/CURRENT_TASK_STATE.json、docs/TOOLCHAIN_EXECUTION_REFERENCE.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md、docs/superpowers/specs/2026-06-06-multi-testbench-candidate-evaluation-design.md、docs/superpowers/plans/2026-06-06-multi-testbench-candidate-evaluation.md。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-50 Multi-Testbench Candidate Evaluation 正在进行；Task 1 Contract Shape And Intake Mapping 和 Task 2 Multi-Testbench Netlist Import And Render 已完成 verified-only。当前多 testbench requirement preparation 会把每个 named maestro_point_root/netlist 导入到 netlists/testbenches/<id>/exported/，模板写到 netlists/testbenches/<id>/templates/template.scs，并保留 primary legacy netlists/exported/ + netlists/templates/ 路径。dry-run 会把同一 lower-bound candidate 渲染到 runs/dry_run/testbenches/<id>/input.scs。验证通过：Task 2 targeted tests 3 passed，requirement/netlist/dry-run/validate 59 passed，package/CLI 46 passed。下一步是 C-50 Task 3 Child Run Manifests And Aggregated Metric Manifest。不要运行真实工具，直到 fake multi-testbench aggregate manifest path 完成并验证。不要创建 broad scheduler/framework，不要合并多个 testbench 到 synthetic Spectre deck，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence logs、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
 ```
+
+Post-C50 Objective Safe Math And All-Evaluable FoM Plot Completion:
+
+- Status: complete, verified-only.
+- Objective expressions now allow safe `min()`, `max()`, and `ln()` calls and still reject unsupported functions.
+- `optimizer_insight_report.{json,md}` now includes `all_evaluable_fom_summary`; `reports/optimizer_visuals/all_evaluable_fom.svg` plots all samples whose FoM can be computed.
+- If `config/metrics.yaml` contains `objective.expression`, the all-evaluable FoM series is recomputed from recorded metrics. This allows FoM formula iteration without rerunning Spectre/OCEAN.
+- Real project refresh: `/home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb` regenerated with `source=configured_objective`, `sample_count=84`, best current-objective run `real_059`.
+- Temporary formula probe: `/tmp/ic_auto_opt_fom_formula_probe` used the user's proposed normalized FoM formula with existing metric name `P1DB`; it recomputed 84 samples and selected `real_093` without rerunning Spectre/OCEAN.
+- Verification: `tests/test_validate.py tests/test_mock_optimizer.py tests/test_optimizer_insights.py tests/test_native_turbo.py tests/test_openbox_backend.py` passed (`147 passed, 1 skipped`); targeted ruff passed.
+- current_scope: Post-C50 Objective Safe Math And All-Evaluable FoM Plot complete.
+- next_allowed_action: if the user confirms the normalized FoM formula, write it into the real project config and regenerate reports only; otherwise continue the next narrow landing task without rerunning real tools for formatting.
+
+## Latest Resume Prompt
+
+```text
+请继续 IC auto optimization workflow。先阅读 AGENTS.md、docs/CURRENT_TASK_STATE.json、docs/TOOLCHAIN_EXECUTION_REFERENCE.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-50 Multi-Testbench Candidate Evaluation 已完成，并且 Post-C50 Objective Safe Math And All-Evaluable FoM Plot 也已完成 verified-only。objective.expression 支持 min/max/ln；optimizer_insight_report 现在生成 all_evaluable_fom_summary 和 reports/optimizer_visuals/all_evaluable_fom.svg。真实项目 /home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb 已刷新报告，当前 objective 下 sample_count=84、best_run_id=real_059。临时 probe /tmp/ic_auto_opt_fom_formula_probe 使用用户提出的新 normalized FoM 公式并将 P1dB 调整为现有 metric 名 P1DB，离线重算 84 个样本，best_run_id=real_093；没有重跑 Spectre/OCEAN。下一步若用户确认，可把新 FoM 正式写入项目 config/metrics.yaml 后只重新生成报告；否则继续下一个窄 landing task。不要为了报告格式重跑真实工具，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence logs、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
+```

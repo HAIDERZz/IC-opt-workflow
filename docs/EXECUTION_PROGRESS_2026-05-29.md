@@ -1519,3 +1519,13 @@ C-49 Requirement.md Driven Config Intake Design:
 - current_scope: C-49 Requirement.md Driven Config Intake design spec complete.
 - Direction: users create `~/spectre_opt_prj/<project_name>/`, write strict `opt_requirement.md` with fixed Markdown headings and fenced YAML blocks, optionally write `constraints.md`, and provide `maestro_point_root`; Hermes later validates/renders existing config YAML and imports the Maestro point-root netlist bundle.
 - Boundary: design-only; no code change, real tool run, optimizer behavior change, formula rewrite, PSF parsing, or schema replacement.
+
+Post-C50 Objective Safe Math And All-Evaluable FoM Plot:
+
+- Status: complete, verified-only.
+- Objective expression evaluator now supports `min()`, `max()`, and `ln()` with validation and runtime rejection for unsupported functions.
+- `optimizer_insight_report` now writes `all_evaluable_fom_summary` and `reports/optimizer_visuals/all_evaluable_fom.svg`.
+- Existing-result formula probe succeeded without Spectre/OCEAN rerun: the user's proposed normalized FoM formula, using the current metric name `P1DB`, recomputed 84 samples and selected `real_093` in `/tmp/ic_auto_opt_fom_formula_probe`.
+- Real project `/home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb` was refreshed under its current objective: `source=configured_objective`, `sample_count=84`, best current-objective run `real_059`.
+- Verification: targeted optimizer/report tests passed (`147 passed, 1 skipped`) and targeted ruff passed.
+- current_scope: Post-C50 Objective Safe Math And All-Evaluable FoM Plot complete.

@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
-  "current_scope": "C-50 Multi-Testbench Candidate Evaluation complete",
-  "current_status": "C-50 is complete, verified-only. The multi-testbench route now supports requirement intake, namespaced Maestro/ADE point-root imports, per-testbench child Spectre/OCEAN runs, aggregated candidate-level result and metric manifests, and OpenBox real optimizer integration. Real evidence: /home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb completed 100 real three-testbench OpenBox/Spectre/OCEAN evaluations with 19 feasible, 65 constraint_failed, 16 metric_check_failed, and 0 recorded real_check_failed. Best observed real_068 used F=26, W=1u, L=40n, VB_LO=310m and produced BW=19171311625.11458 Hz, MAX_GAIN=4.242801858394763 dB, NF_3G=11.81241967045868 dB, IIP3=3.206487765822459 dBm, P1DB=-0.8997623115419788 dBm. Completion decision: accept_best_observed, confidence medium, global_optimum_claim false.",
+  "current_scope": "Post-C50 Objective Safe Math And All-Evaluable FoM Plot complete",
+  "current_status": "Post-C50 reporting refinement is complete, verified-only. Objective expressions now support the safe math functions min(), max(), and ln(), while still rejecting unsupported function calls. optimizer_insight_report now writes all_evaluable_fom_summary and reports/optimizer_visuals/all_evaluable_fom.svg. When config/metrics.yaml has an objective.expression, the all-evaluable FoM series is recomputed from each row's recorded metrics, so users can change the FoM formula and regenerate reports without rerunning Spectre/OCEAN. Real project refresh: /home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb regenerated optimizer_insight_report with source=configured_objective, sample_count=84, best_run_id=real_059 for the current objective. Temporary probe with the user's proposed normalized FoM formula, using P1DB as the existing metric name, recomputed 84 samples and selected real_093.",
   "review_status": "verified-only",
   "subagent_dispatch": "available",
   "active_spec": "docs/superpowers/specs/2026-06-06-multi-testbench-candidate-evaluation-design.md",
@@ -12,7 +12,7 @@
     "docs/EXECUTION_PROGRESS_2026-05-29.md",
     "docs/COMPACT_RESUME_CHECKPOINT.md"
   ],
-  "next_allowed_action": "choose the next narrow landing task after C-50, preferably productionizing the user-facing opt_requirement.md/multi-testbench guide and tightening final optimizer closeout/status reporting. Do not start another broad optimizer framework or rerun real tools just for formatting.",
+  "next_allowed_action": "decide whether to adopt the proposed normalized FoM formula in the real Mixer multi-testbench project config, then regenerate reports without rerunning Spectre/OCEAN; otherwise continue the next narrow landing task around production guide/status polish. Do not start another broad optimizer framework or rerun real tools just for report formatting.",
   "forbidden_actions": [
     "install unpinned latest shap into the OpenBox venv",
     "run real tool commands without first checking docs/TOOLCHAIN_EXECUTION_REFERENCE.md",
@@ -46,10 +46,10 @@
     "active_spec": "docs/superpowers/specs/2026-06-06-multi-testbench-candidate-evaluation-design.md",
     "active_plan": "docs/superpowers/plans/2026-06-06-multi-testbench-candidate-evaluation.md",
     "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
-    "alignment": "Aligned. C-50 completed the spec route: named testbench intake, preserved per-testbench Maestro/ADE netlist bundles, child Spectre/OCEAN runs, aggregate candidate-level manifests, and OpenBox observations through the multi-testbench evaluator.",
-    "drift": "No execution-route drift. The real evidence exceeded the first-evidence target by completing a three-testbench 100-evaluation optimizer run, but it did not merge testbenches into a synthetic deck, parse PSF, rewrite formulas, change approved formulas, multiply parallel_jobs per testbench, or replace the OpenBox route."
+    "alignment": "Aligned as a narrow reporting refinement after C-50. It does not change candidate generation, Spectre/OCEAN execution, multi-testbench aggregation, acceptance logic, or approved metric formulas.",
+    "drift": "No execution-route drift. The change only extends objective expression validation/evaluation and offline optimizer insight plotting. It does not rerun tools, parse PSF, rewrite OCEAN formulas, merge testbenches, or replace the OpenBox route."
   },
-  "latest_valid_commit": "439e1df",
+  "latest_valid_commit": "8e6ecd4",
   "review_evidence": {
     "c47_plan": "docs/superpowers/plans/2026-06-05-openbox-advanced-visualization-artifact.md",
     "c47_tests": "Targeted tests passed: /home/zzchen/.venvs/openclaw/bin/python -m pytest tests/test_openbox_backend.py tests/test_optimizer_insights.py tests/test_optimizer_finalize.py",
@@ -78,6 +78,7 @@
     "c50_task2_netlist_import_render": "Implemented namespaced multi-testbench Maestro point-root imports, child template generation, primary legacy path preservation, child dry-run rendering, and unsafe child symlink rejection. Verification passed: python3 -m pytest targeted Task 2 tests (3 passed), python3 -m pytest tests/test_requirement_intake.py tests/test_netlists.py tests/test_dry_run.py tests/test_validate.py (59 passed), and python3 -m pytest tests/test_package.py tests/test_cli.py (46 passed).",
     "c50_task3_manifest_aggregation": "Implemented aggregate_multi_testbench_run with child result/metric manifest references, candidate-level aggregate result_manifest.json, and aggregate metrics/metric_result_manifest.json. Verification passed: python3 -m pytest tests/test_multi_testbench_aggregation.py (3 passed), python3 -m pytest tests/test_result_handoff.py tests/test_metric_results.py tests/test_requirement_intake.py (101 passed), python3 -m pytest tests/test_package.py tests/test_cli.py tests/test_validate.py (65 passed), and targeted ruff passed.",
     "c50_task4_real_multi_testbench_smoke": "/home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb real_068 has child result and metric manifests succeeded for cg_nf, iip3, and p1db. The aggregate metric manifest succeeded with BW, MAX_GAIN, NF_3G, IIP3, and P1DB, and the aggregate result manifest preserved child_results for all three testbenches.",
-    "c50_task5_optimizer_integration": "/home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb completed 100 real OpenBox/Spectre/OCEAN multi-testbench evaluations in 10 batches of 10. optimizer_run_report status completed with evaluation_count=100; optimizer_evaluations.jsonl has 19 feasible, 65 constraint_failed, and 16 metric_check_failed; acceptance, completion, finalization, and insight reports were refreshed after the process finished. Best observed real_068, decision accept_best_observed, confidence medium, global_optimum_claim false."
+    "c50_task5_optimizer_integration": "/home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb completed 100 real OpenBox/Spectre/OCEAN multi-testbench evaluations in 10 batches of 10. optimizer_run_report status completed with evaluation_count=100; optimizer_evaluations.jsonl has 19 feasible, 65 constraint_failed, and 16 metric_check_failed; acceptance, completion, finalization, and insight reports were refreshed after the process finished. Best observed real_068, decision accept_best_observed, confidence medium, global_optimum_claim false.",
+    "post_c50_objective_safe_math_and_fom_plot": "Implemented verified-only. Objective expressions allow min(), max(), and ln() and still reject unsupported functions. optimizer_insight_report now includes all_evaluable_fom_summary and reports/optimizer_visuals/all_evaluable_fom.svg. Verification passed: python3 -m pytest tests/test_validate.py tests/test_mock_optimizer.py tests/test_optimizer_insights.py tests/test_native_turbo.py tests/test_openbox_backend.py -q (147 passed, 1 skipped), targeted ruff passed. Real report refresh: /home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb source=configured_objective, sample_count=84, best_run_id=real_059 under the current objective. Temporary probe with the user's proposed normalized FoM formula and existing metric name P1DB recomputed 84 samples and selected real_093 without rerunning Spectre/OCEAN."
   }
 }

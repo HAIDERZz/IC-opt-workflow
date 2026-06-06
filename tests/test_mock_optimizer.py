@@ -240,14 +240,22 @@ def test_evaluate_objective_complex_expression() -> None:
     assert evaluate_objective("(rise + fall) * DC", METRICS) == 11400.0
 
 
+def test_evaluate_objective_safe_math_functions() -> None:
+    expression = "-min(max(rise, fall), ln(DC))"
+
+    assert evaluate_objective(expression, METRICS) == pytest.approx(
+        -min(max(52.0, 43.0), 4.787491742782046)
+    )
+
+
 def test_evaluate_objective_rejects_unknown_metric() -> None:
     with pytest.raises(ValueError, match="unknown metric"):
         evaluate_objective("rise + slew", METRICS)
 
 
-def test_evaluate_objective_rejects_function_calls() -> None:
-    with pytest.raises(ValueError, match="unsupported objective expression node Call"):
-        evaluate_objective("max(rise, fall)", METRICS)
+def test_evaluate_objective_rejects_unknown_function_calls() -> None:
+    with pytest.raises(ValueError, match="unsupported objective function abs"):
+        evaluate_objective("abs(rise)", METRICS)
 
 
 def test_evaluate_objective_rejects_boolean_literal() -> None:

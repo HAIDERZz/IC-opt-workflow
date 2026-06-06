@@ -2118,3 +2118,18 @@ C-49 Requirement.md Driven Config Intake Design:
 - Boundary: docs/design only; no code change, real tool run, optimizer behavior change, formula rewrite, PSF parsing, or schema replacement.
 - current_scope: C-49 Requirement.md Driven Config Intake design spec complete.
 - next_allowed_action: review docs/superpowers/specs/2026-06-05-requirement-md-config-intake-design.md, then write the narrow C-49 implementation plan if approved; do not implement code before the spec is accepted.
+
+Post-C50 Objective Safe Math And All-Evaluable FoM Plot:
+
+- Status: complete, verified-only.
+- Code: `src/hermes_workflow/validate.py` and `src/hermes_workflow/optimizer_insights.py`.
+- Behavior: objective expressions now support the safe math functions `min()`, `max()`, and `ln()` while unsupported function calls still fail validation/evaluation.
+- Reporting: `optimizer_insight_report.{json,md}` now includes `all_evaluable_fom_summary`; `reports/optimizer_visuals/all_evaluable_fom.svg` plots every sample whose FoM can be computed.
+- Important behavior: when `config/metrics.yaml` has `objective.expression`, the all-evaluable FoM series is recomputed from recorded metrics, so a user can change the FoM formula and regenerate reports without rerunning Spectre/OCEAN.
+- Real project refresh: `/home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb` regenerated with `source=configured_objective`, `sample_count=84`, best current-objective run `real_059`.
+- Formula probe: a temporary `/tmp/ic_auto_opt_fom_formula_probe` copy used the user's proposed normalized FoM formula with existing metric name `P1DB`; it recomputed `84` samples and selected `real_093` without rerunning Spectre/OCEAN.
+- Verification: `/home/zzchen/.venvs/openclaw/bin/python -m pytest tests/test_validate.py tests/test_mock_optimizer.py tests/test_optimizer_insights.py tests/test_native_turbo.py tests/test_openbox_backend.py -q` passed (`147 passed, 1 skipped`); targeted ruff passed.
+- Boundary: no Spectre/OCEAN rerun for the formula probe, no PSF parsing, no OCEAN formula rewrite, no candidate generation change, no acceptance logic change.
+- current_scope: Post-C50 Objective Safe Math And All-Evaluable FoM Plot complete.
+- next_allowed_action: if the user confirms the normalized FoM formula, write it into the real project config and regenerate reports only; otherwise continue the next narrow landing task without rerunning real tools for formatting.
+- next_allowed_action exact: decide whether to adopt the proposed normalized FoM formula in the real Mixer multi-testbench project config, then regenerate reports without rerunning Spectre/OCEAN; otherwise continue the next narrow landing task around production guide/status polish. Do not start another broad optimizer framework or rerun real tools just for report formatting.
