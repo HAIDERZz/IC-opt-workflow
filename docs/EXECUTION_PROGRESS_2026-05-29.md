@@ -1529,3 +1529,13 @@ Post-C50 Objective Safe Math And All-Evaluable FoM Plot:
 - Real project `/home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb` was refreshed under its current objective: `source=configured_objective`, `sample_count=84`, best current-objective run `real_059`.
 - Verification: targeted optimizer/report tests passed (`147 passed, 1 skipped`) and targeted ruff passed.
 - current_scope: Post-C50 Objective Safe Math And All-Evaluable FoM Plot complete.
+
+Post-C50 Configured Objective Ranking:
+
+- Status: complete, verified-only.
+- `optimizer_insight_report` now includes `configured_objective_ranking`, a current-objective re-score/re-rank view that does not overwrite original run-time `best_observed`.
+- Real project `/home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb` now uses the normalized FoM formula in `config/metrics.yaml` and `opt_requirement.multi_testbench.md`.
+- Real project checks passed: `validate`, `check-requirement`, and offline `visualize-optimizer-run`; no Spectre/OCEAN rerun.
+- Configured ranking result: `84` computable samples, best `real_093`, feasible, objective `-0.7085522728550304`, parameters `F=20`, `W=1.4u`, `L=30n`, `VB_LO=310m`.
+- Verification: optimizer insight/closeout/status/OpenBox backend tests passed (`36 passed`) and targeted ruff passed.
+- current_scope: Post-C50 Configured Objective Ranking complete.

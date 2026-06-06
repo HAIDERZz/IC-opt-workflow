@@ -33,6 +33,7 @@ class OptimizerInsightReport:
     best_observed: dict[str, Any] | None
     plots: dict[str, str]
     all_evaluable_fom_summary: dict[str, Any]
+    configured_objective_ranking: dict[str, Any]
     ic_metric_summary: dict[str, Any]
     top_feasible_candidates: list[dict[str, Any]]
     constraint_margin_summary: dict[str, Any]
@@ -83,6 +84,7 @@ def generate_optimizer_insight_report(project_dir: str | Path) -> OptimizerInsig
         traces,
         _string_value(metric_contract.get("objective_expression")),
     )
+    configured_ranking = _configured_objective_ranking(traces, all_evaluable_fom)
     top_feasible = _top_feasible_candidates(traces)
     constraint_margins = _constraint_margin_summary(traces, metric_contract)
     ic_summary = _ic_metric_summary(top_feasible, traces)
@@ -97,6 +99,7 @@ def generate_optimizer_insight_report(project_dir: str | Path) -> OptimizerInsig
         best_observed=best_observed,
         plots=plot_paths,
         all_evaluable_fom_summary=all_evaluable_fom,
+        configured_objective_ranking=configured_ranking,
         ic_metric_summary=ic_summary,
         top_feasible_candidates=top_feasible,
         constraint_margin_summary=constraint_margins,
@@ -492,6 +495,62 @@ def _evaluate_configured_objective(
     return objective if math.isfinite(objective) else None
 
 
+def _configured_objective_ranking(
+    traces: list[dict[str, Any]],
+    all_evaluable_fom: dict[str, Any],
+    *,
+    limit: int = 10,
+) -> dict[str, Any]:
+    rows_by_run_id = {
+        _string_value(row.get("run_id")): row
+        for row in traces
+        if _string_value(row.get("run_id"))
+    }
+    rows_by_index = {
+        _int_value(row.get("evaluation_index")): row
+        for row in traces
+        if _int_value(row.get("evaluation_index"))
+    }
+    ranked_points = sorted(
+        [
+            point
+            for point in all_evaluable_fom.get("series", [])
+            if isinstance(point, dict) and _finite_float(point.get("objective")) is not None
+        ],
+        key=lambda point: float(point["objective"]),
+    )
+    top_candidates: list[dict[str, Any]] = []
+    for point in ranked_points[:limit]:
+        run_id = _string_value(point.get("run_id"))
+        evaluation_index = _int_value(point.get("evaluation_index"))
+        row = rows_by_run_id.get(run_id) or rows_by_index.get(evaluation_index) or {}
+        metrics = _dict_value(row.get("metrics"), default={})
+        top_candidates.append(
+            {
+                "run_id": run_id,
+                "evaluation_index": evaluation_index,
+                "status": _string_value(row.get("status")),
+                "objective": _finite_float(point.get("objective")),
+                "objective_display": _format_scientific(_finite_float(point.get("objective"))),
+                "parameters": _dict_value(row.get("parameters"), default={}),
+                "metrics": metrics,
+                "metrics_display": {
+                    name: _format_metric_value(name, value)
+                    for name, value in sorted(metrics.items())
+                    if _parse_number(value) is not None
+                },
+            }
+        )
+    best = top_candidates[0] if top_candidates else None
+    return {
+        "source": all_evaluable_fom.get("source"),
+        "objective_expression": all_evaluable_fom.get("objective_expression"),
+        "sample_count": all_evaluable_fom.get("sample_count", 0),
+        "best_candidate": best,
+        "top_candidates": top_candidates,
+    }
+
+
 def _all_evaluable_fom_svg(summary: dict[str, Any]) -> str:
     rows = [
         (
@@ -778,9 +837,38 @@ def _markdown_report(report: OptimizerInsightReport) -> str:
         f"- Best objective: `{report.all_evaluable_fom_summary['best_objective_display'] or 'n/a'}`",
         f"- Plot: `{report.plots['all_evaluable_fom']}`",
         "",
-        "## Top feasible candidates",
+        "## Configured Objective Ranking",
         "",
+        f"- Source: `{report.configured_objective_ranking['source']}`",
+        f"- Sample count: `{report.configured_objective_ranking['sample_count']}`",
     ]
+    configured_best = report.configured_objective_ranking.get("best_candidate") or {}
+    lines.extend(
+        [
+            f"- Best run: `{configured_best.get('run_id') or 'n/a'}`",
+            f"- Best objective: `{configured_best.get('objective_display') or 'n/a'}`",
+            "",
+        ]
+    )
+    configured_top = report.configured_objective_ranking.get("top_candidates", [])
+    if configured_top:
+        for candidate in configured_top[:5]:
+            lines.append(
+                "- "
+                f"{candidate['run_id']}: objective={candidate['objective_display']}, "
+                f"status={candidate['status']}, "
+                f"parameters={json.dumps(candidate['parameters'], sort_keys=True)}, "
+                f"metrics={json.dumps(candidate['metrics_display'], sort_keys=True)}"
+            )
+    else:
+        lines.append("- No configured objective candidates.")
+    lines.extend(
+        [
+            "",
+            "## Top feasible candidates",
+            "",
+        ]
+    )
     if report.top_feasible_candidates:
         for candidate in report.top_feasible_candidates[:5]:
             lines.append(

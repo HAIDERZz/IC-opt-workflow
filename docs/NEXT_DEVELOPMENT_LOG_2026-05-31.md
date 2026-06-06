@@ -2133,3 +2133,16 @@ Post-C50 Objective Safe Math And All-Evaluable FoM Plot:
 - current_scope: Post-C50 Objective Safe Math And All-Evaluable FoM Plot complete.
 - next_allowed_action: if the user confirms the normalized FoM formula, write it into the real project config and regenerate reports only; otherwise continue the next narrow landing task without rerunning real tools for formatting.
 - next_allowed_action exact: decide whether to adopt the proposed normalized FoM formula in the real Mixer multi-testbench project config, then regenerate reports without rerunning Spectre/OCEAN; otherwise continue the next narrow landing task around production guide/status polish. Do not start another broad optimizer framework or rerun real tools just for report formatting.
+
+Post-C50 Configured Objective Ranking:
+
+- Status: complete, verified-only.
+- Code: `src/hermes_workflow/optimizer_insights.py`.
+- Behavior: `optimizer_insight_report` now keeps original run-time `best_observed` separate from `configured_objective_ranking`, which re-scores and re-ranks evaluated rows using the current `config/metrics.yaml` objective expression.
+- Real project update: `/home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb/config/metrics.yaml` and `opt_requirement.multi_testbench.md` now use the normalized FoM formula with existing metric name `P1DB`.
+- Real project verification: `validate` passed, `check-requirement` passed, and `visualize-optimizer-run` regenerated the report without rerunning Spectre/OCEAN.
+- Result: configured objective ranking used `84` computable samples and selected feasible `real_093`: `F=20`, `W=1.4u`, `L=30n`, `VB_LO=310m`, objective `-0.7085522728550304`.
+- Verification: `/home/zzchen/.venvs/openclaw/bin/python -m pytest tests/test_optimizer_insights.py tests/test_optimizer_finalize.py tests/test_optimizer_completion.py tests/test_optimizer_status.py tests/test_openbox_backend.py -q` passed (`36 passed`); targeted ruff passed.
+- Boundary: reporting-only code change plus user-approved project FoM update; no Spectre/OCEAN rerun, no OCEAN formula rewrite, no PSF parsing, no candidate generation change.
+- current_scope: Post-C50 Configured Objective Ranking complete.
+- next_allowed_action: inspect the refreshed Mixer multi-testbench optimizer report and decide whether real_093 should be accepted under the normalized FoM, whether to continue optimization from the existing run, or whether to adjust the normalized FoM/constraints. Do not rerun real tools solely for report formatting.

@@ -1145,3 +1145,21 @@ Post-C50 Objective Safe Math And All-Evaluable FoM Plot Completion:
 ```text
 请继续 IC auto optimization workflow。先阅读 AGENTS.md、docs/CURRENT_TASK_STATE.json、docs/TOOLCHAIN_EXECUTION_REFERENCE.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-50 Multi-Testbench Candidate Evaluation 已完成，并且 Post-C50 Objective Safe Math And All-Evaluable FoM Plot 也已完成 verified-only。objective.expression 支持 min/max/ln；optimizer_insight_report 现在生成 all_evaluable_fom_summary 和 reports/optimizer_visuals/all_evaluable_fom.svg。真实项目 /home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb 已刷新报告，当前 objective 下 sample_count=84、best_run_id=real_059。临时 probe /tmp/ic_auto_opt_fom_formula_probe 使用用户提出的新 normalized FoM 公式并将 P1dB 调整为现有 metric 名 P1DB，离线重算 84 个样本，best_run_id=real_093；没有重跑 Spectre/OCEAN。下一步若用户确认，可把新 FoM 正式写入项目 config/metrics.yaml 后只重新生成报告；否则继续下一个窄 landing task。不要为了报告格式重跑真实工具，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence logs、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
 ```
+
+Post-C50 Configured Objective Ranking Completion:
+
+- Status: complete, verified-only.
+- `optimizer_insight_report` now includes `configured_objective_ranking`, preserving original `best_observed` while adding current-objective re-score/re-rank top candidates.
+- Real project `/home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb` adopted the normalized FoM formula in both `config/metrics.yaml` and `opt_requirement.multi_testbench.md`.
+- Real project checks passed: `validate`, `check-requirement`, and `visualize-optimizer-run`.
+- No Spectre/OCEAN rerun was performed; report refresh used existing evaluated metrics.
+- Configured ranking selected feasible `real_093`: objective `-0.7085522728550304`, parameters `F=20`, `W=1.4u`, `L=30n`, `VB_LO=310m`.
+- Verification: optimizer insight/closeout/status/OpenBox backend tests passed (`36 passed`) and targeted ruff passed.
+- current_scope: Post-C50 Configured Objective Ranking complete.
+- next_allowed_action: inspect the refreshed Mixer multi-testbench optimizer report and decide whether real_093 should be accepted under the normalized FoM, whether to continue optimization from the existing run, or whether to adjust the normalized FoM/constraints. Do not rerun real tools solely for report formatting.
+
+## Latest Resume Prompt
+
+```text
+请继续 IC auto optimization workflow。先阅读 AGENTS.md、docs/CURRENT_TASK_STATE.json、docs/TOOLCHAIN_EXECUTION_REFERENCE.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-50 Multi-Testbench Candidate Evaluation 已完成；Post-C50 Objective Safe Math / All-Evaluable FoM Plot 已完成；Post-C50 Configured Objective Ranking 也已完成 verified-only。optimizer_insight_report 现在保留原 best_observed，同时新增 configured_objective_ranking，按当前 config/metrics.yaml objective.expression 离线重评分和排序。真实项目 /home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb 已将 normalized FoM 公式写入 config/metrics.yaml 和 opt_requirement.multi_testbench.md，validate/check-requirement/visualize-optimizer-run 通过，没有重跑 Spectre/OCEAN。当前 configured ranking 使用 84 个可计算样本，选择 feasible real_093：F=20、W=1.4u、L=30n、VB_LO=310m、objective=-0.7085522728550304。下一步由用户决定是否接受 real_093、是否继续从已有 run 做 continuation、或调整 FoM/constraints。不要为了报告格式重跑真实工具，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence logs、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
+```

@@ -238,12 +238,19 @@ objective:
     assert summary["best_objective"] == pytest.approx(math.log(20))
     assert summary["series"][0]["objective"] == pytest.approx(math.log(20))
     assert summary["series"][1]["objective"] == pytest.approx(6.0)
+    ranking = payload["configured_objective_ranking"]
+    assert ranking["source"] == "configured_objective"
+    assert ranking["best_candidate"]["run_id"] == "real_001"
+    assert ranking["best_candidate"]["objective"] == pytest.approx(math.log(20))
+    assert ranking["top_candidates"][0]["run_id"] == "real_001"
+    assert ranking["top_candidates"][1]["run_id"] == "real_002"
     svg = (project_dir / payload["plots"]["all_evaluable_fom"]).read_text(
         encoding="utf-8"
     )
     assert "All Evaluable FoM" in svg
     markdown = report.markdown_path.read_text(encoding="utf-8")
     assert "Source: `configured_objective`" in markdown
+    assert "Configured Objective Ranking" in markdown
 
 
 def test_visualize_optimizer_run_cli_writes_report(tmp_path: Path) -> None:
