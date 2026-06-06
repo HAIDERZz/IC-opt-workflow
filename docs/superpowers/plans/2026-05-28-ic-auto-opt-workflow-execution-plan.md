@@ -23,15 +23,15 @@
 
 ## Current Implementation Node
 
-As of 2026-06-06, Plan A, Plan B, and Plan C through C-52 are complete, with
+As of 2026-06-06, Plan A, Plan B, and Plan C through C-53 are complete, with
 post-C-49 real Mixer OpenBox/Spectre/OCEAN evidence through 200 cumulative
 NF=12dB evaluations and C-50 real multi-testbench evidence through 100
-three-testbench evaluations. Post-C50/C-52 reporting now re-scores existing
+three-testbench evaluations. Post-C50/C-53 reporting now re-scores existing
 results under the configured FoM, plots bottleneck/weighted normalized-margin
 tradeoffs, writes a supervisor-facing optimizer decision report, and records a
-supervisor acceptance decision for the selected best observed point. The next
-active scope should stay narrow and production-facing, preferably user-facing
-final optimization summary, multi-testbench guide tightening,
+supervisor acceptance decision for the selected best observed point, then
+writes a user-facing final optimization summary. The next active scope should
+stay narrow and production-facing, preferably multi-testbench guide tightening,
 formula/variable/resource approval polish, and continuation operation rather
 than broad framework work.
 
@@ -114,17 +114,20 @@ Completed optimizer milestones since C-26:
   C-50 did not merge testbenches into a synthetic deck, parse PSF, rewrite
   formulas, change approved formulas, or multiply `parallel_jobs` per
   testbench.
-- Post-C50/C-52 completed offline decision reporting from existing evaluated
+- Post-C50/C-53 completed offline decision reporting from existing evaluated
   artifacts. `optimizer_insight_report` now provides configured-objective
   ranking and bottleneck/weighted score data, while
   `hermes-workflow decide-optimizer-run PROJECT_DIR` writes
   `optimizer_decision_report.{json,md}` and
   `hermes-workflow record-optimizer-decision PROJECT_DIR` writes
-  `optimizer_supervisor_decision.{json,md}`. The real Mixer multi-testbench
-  project `/home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb` accepted feasible
-  `real_093` under the normalized FoM as the current best observed point,
-  marks it as best observed rather than global optimum, identifies `BW` as the
-  bottleneck, and does not rerun Spectre/OCEAN for reporting or recording.
+  `optimizer_supervisor_decision.{json,md}`.
+  `hermes-workflow write-optimizer-final-summary PROJECT_DIR` writes
+  `optimizer_final_summary.{json,md}`. The real Mixer multi-testbench project
+  `/home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb` accepted feasible `real_093`
+  under the normalized FoM as the current best observed point, marks it as best
+  observed rather than global optimum, identifies `BW` as the bottleneck, links
+  the visualization/report artifacts, and does not rerun Spectre/OCEAN for
+  reporting or recording.
 
 Current code-level entry points:
 
@@ -139,6 +142,7 @@ Current code-level entry points:
 - `hermes-workflow optimizer-status PROJECT_DIR`
 - `hermes-workflow decide-optimizer-run PROJECT_DIR`
 - `hermes-workflow record-optimizer-decision PROJECT_DIR`
+- `hermes-workflow write-optimizer-final-summary PROJECT_DIR`
 
 The next work should stay narrow and practice-first. Do not start a broad
 optimizer framework rewrite. The next production step should convert the proven

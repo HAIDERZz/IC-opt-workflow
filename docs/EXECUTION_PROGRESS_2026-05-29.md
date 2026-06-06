@@ -1566,3 +1566,11 @@ C-52 Optimizer Supervisor Decision Record:
 - Real project `/home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb` recorded `accept_best_observed` for `real_093`, with `global_optimum_claim=false` and no Spectre/OCEAN rerun.
 - Verification: new supervisor decision tests passed (`2 passed`), adjacent optimizer report/closeout/status tests passed (`28 passed`), and targeted ruff passed.
 - current_scope: C-52 Optimizer Supervisor Decision Record complete.
+
+C-53 Optimizer Final Summary:
+
+- Status: complete, verified-only.
+- `write-optimizer-final-summary` now writes a user-facing final summary from accepted optimizer decision artifacts.
+- Real project `/home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb` generated `optimizer_final_summary.{json,md}` for accepted `real_093`, including parameters, metrics, score/bottleneck, status counts, visual links, report links, and boundaries.
+- Verification: new final summary tests passed (`2 passed`), adjacent optimizer report/closeout/status tests passed (`30 passed`), and targeted ruff passed.
+- current_scope: C-53 Optimizer Final Summary complete.

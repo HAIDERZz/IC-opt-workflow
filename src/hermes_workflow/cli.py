@@ -23,6 +23,7 @@ from hermes_workflow.openbox_backend import (
 from hermes_workflow.optimizer_acceptance import check_optimizer_run
 from hermes_workflow.optimizer_completion import summarize_optimizer_run
 from hermes_workflow.optimizer_decision import generate_optimizer_decision_report
+from hermes_workflow.optimizer_final_summary import generate_optimizer_final_summary
 from hermes_workflow.optimizer_finalize import finalize_optimizer_run
 from hermes_workflow.optimizer_insights import generate_optimizer_insight_report
 from hermes_workflow.optimizer_suggestion import suggest_candidate_request
@@ -824,6 +825,33 @@ def record_optimizer_decision_command(
     for issue in report.issues:
         typer.echo(issue)
     typer.echo("report: reports/optimizer_supervisor_decision.json")
+    raise typer.Exit(code=1)
+
+
+@app.command("write-optimizer-final-summary")
+def write_optimizer_final_summary_command(
+    project_dir: Annotated[
+        Path,
+        typer.Argument(help="Project directory with optimizer supervisor decision."),
+    ],
+) -> None:
+    try:
+        report = generate_optimizer_final_summary(project_dir)
+    except (OSError, ValueError) as exc:
+        _exit_with_error(exc)
+    if report.status == "pass":
+        typer.echo("optimizer final summary written")
+        typer.echo(f"accepted: {report.accepted_run_id}")
+        typer.echo(f"action: {report.action}")
+        typer.echo(f"global optimum claim: {str(report.global_optimum_claim).lower()}")
+        typer.echo("report: reports/optimizer_final_summary.json")
+        typer.echo("markdown: reports/optimizer_final_summary.md")
+        return
+
+    typer.echo("optimizer final summary failed")
+    for issue in report.issues:
+        typer.echo(issue)
+    typer.echo("report: reports/optimizer_final_summary.json")
     raise typer.Exit(code=1)
 
 

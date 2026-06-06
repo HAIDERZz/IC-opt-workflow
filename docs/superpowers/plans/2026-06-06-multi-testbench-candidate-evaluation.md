@@ -175,3 +175,11 @@ Status: complete through C-51, verified-only.
   `accept_best_observed` for feasible `real_093` as the current optimizer
   result. This is still a best-observed decision, not a global-optimum claim,
   and it did not rerun Spectre/OCEAN.
+- `hermes-workflow write-optimizer-final-summary PROJECT_DIR` now writes
+  `reports/optimizer_final_summary.json` and
+  `reports/optimizer_final_summary.md`.
+- The final summary is user-facing and gathers accepted run, parameters,
+  metrics, score summary, bottleneck, status counts, visual links, source
+  reports, next steps, and boundaries from existing artifacts. The real Mixer
+  multi-testbench project generated this report for accepted `real_093`
+  without rerunning Spectre/OCEAN.

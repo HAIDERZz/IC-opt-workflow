@@ -2187,3 +2187,16 @@ C-52 Optimizer Supervisor Decision Record:
 - current_scope: C-52 Optimizer Supervisor Decision Record complete.
 - next_allowed_action: inspect reports/optimizer_supervisor_decision.md for /home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb, then either prepare a concise user-facing final optimization summary from accepted real_093 or start a narrowly scoped continuation/constraint-adjustment task if the user requests it. Do not rerun real tools solely for report formatting.
 - next_allowed_action exact: inspect reports/optimizer_supervisor_decision.md for /home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb, then either prepare a concise user-facing final optimization summary from accepted real_093 or start a narrowly scoped continuation/constraint-adjustment task if the user requests it. Do not rerun real tools solely for report formatting.
+
+C-53 Optimizer Final Summary:
+
+- Status: complete, verified-only.
+- Code: `src/hermes_workflow/optimizer_final_summary.py`; CLI: `hermes-workflow write-optimizer-final-summary`.
+- Behavior: writes `reports/optimizer_final_summary.json` and `reports/optimizer_final_summary.md` from existing optimizer supervisor decision, decision report, and insight artifacts.
+- The final summary is user-facing: accepted run, action, parameters, metrics, score summary, bottleneck, status counts, visual artifact links, source reports, next steps, and best-observed/no-global-optimum boundaries.
+- Real project refresh: `/home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb` generated the final summary for accepted `real_093` without rerunning Spectre/OCEAN.
+- Verification: `tests/test_optimizer_final_summary.py` passed (`2 passed`), adjacent optimizer report/closeout/status tests passed (`30 passed`), targeted ruff passed.
+- Boundary: no Spectre/OCEAN rerun, no PSF parsing, no OCEAN formula rewrite, no candidate generation change, no OpenBox route change.
+- current_scope: C-53 Optimizer Final Summary complete.
+- next_allowed_action: inspect reports/optimizer_final_summary.md for /home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb, then decide whether to stop this optimization as accepted, run a continuation from existing artifacts, or adjust FoM/constraints. Do not rerun real tools solely for report formatting.
+- next_allowed_action exact: inspect reports/optimizer_final_summary.md for /home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb, then decide whether to stop this optimization as accepted, run a continuation from existing artifacts, or adjust FoM/constraints. Do not rerun real tools solely for report formatting.

@@ -1214,3 +1214,19 @@ C-52 Optimizer Supervisor Decision Record Completion:
 ```text
 请继续 IC auto optimization workflow。先阅读 AGENTS.md、docs/CURRENT_TASK_STATE.json、docs/TOOLCHAIN_EXECUTION_REFERENCE.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-50 Multi-Testbench Candidate Evaluation 已完成；Post-C50 Objective Safe Math / All-Evaluable FoM Plot、Configured Objective Ranking、Bottleneck Weighted Score Plot、C-51 Optimizer Decision Report MVP 均已完成；C-52 Optimizer Supervisor Decision Record 也已完成 verified-only。hermes-workflow record-optimizer-decision 现在从 optimizer_decision_report 生成 reports/optimizer_supervisor_decision.json 和 .md，不重跑 Spectre/OCEAN。真实项目 /home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb 已记录 accept_best_observed for feasible real_093：F=20、W=1.4u、L=30n、VB_LO=310m，global_optimum_claim=false。下一步可以准备面向用户的最终优化摘要，或在用户明确要求时从现有 artifacts 做 continuation/调整 FoM 或 constraints。不要为了报告格式重跑真实工具，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence logs、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
 ```
+
+C-53 Optimizer Final Summary Completion:
+
+- Status: complete, verified-only.
+- `src/hermes_workflow/optimizer_final_summary.py` and `hermes-workflow write-optimizer-final-summary` now write `reports/optimizer_final_summary.json` and `reports/optimizer_final_summary.md` from existing supervisor decision, optimizer decision, and optimizer insight artifacts.
+- The final summary is user-facing: accepted run, action, parameters, metrics, score summary, bottleneck, status counts, visual artifact links, source reports, next steps, and best-observed/no-global-optimum boundaries.
+- Real project `/home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb` generated the final summary for accepted `real_093` without rerunning Spectre/OCEAN.
+- Verification: `tests/test_optimizer_final_summary.py` passed (`2 passed`), adjacent optimizer report/closeout/status tests passed (`30 passed`), targeted ruff passed.
+- current_scope: C-53 Optimizer Final Summary complete.
+- next_allowed_action: inspect reports/optimizer_final_summary.md for /home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb, then decide whether to stop this optimization as accepted, run a continuation from existing artifacts, or adjust FoM/constraints. Do not rerun real tools solely for report formatting.
+
+## Latest Resume Prompt
+
+```text
+请继续 IC auto optimization workflow。先阅读 AGENTS.md、docs/CURRENT_TASK_STATE.json、docs/TOOLCHAIN_EXECUTION_REFERENCE.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-50 Multi-Testbench Candidate Evaluation 已完成；Post-C50 Objective Safe Math / All-Evaluable FoM Plot、Configured Objective Ranking、Bottleneck Weighted Score Plot、C-51 Optimizer Decision Report MVP、C-52 Optimizer Supervisor Decision Record 均已完成；C-53 Optimizer Final Summary 也已完成 verified-only。hermes-workflow write-optimizer-final-summary 现在从现有 supervisor decision、optimizer decision、optimizer insight artifacts 生成 reports/optimizer_final_summary.json 和 .md，不重跑 Spectre/OCEAN。真实项目 /home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb 的 final summary 接受 real_093：F=20、W=1.4u、L=30n、VB_LO=310m；metrics BW=20427078494.05402、MAX_GAIN=4.34394017341075、NF_3G=11.79600779830737、IIP3=2.739385297952587、P1DB=-1.547739364191455；bottleneck=BW；global_optimum_claim=false。下一步由用户决定是否停止本轮优化、从现有 artifacts continuation、或调整 FoM/constraints。不要为了报告格式重跑真实工具，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence logs、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
+```
