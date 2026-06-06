@@ -27,6 +27,9 @@ from hermes_workflow.optimizer_finalize import finalize_optimizer_run
 from hermes_workflow.optimizer_insights import generate_optimizer_insight_report
 from hermes_workflow.optimizer_suggestion import suggest_candidate_request
 from hermes_workflow.optimizer_status import summarize_optimizer_status
+from hermes_workflow.optimizer_supervisor_decision import (
+    record_optimizer_supervisor_decision,
+)
 from hermes_workflow.optimizer_task_package import (
     build_optimizer_execution_task_package,
 )
@@ -776,6 +779,51 @@ def decide_optimizer_run_command(
     for issue in report.issues:
         typer.echo(issue)
     typer.echo("report: reports/optimizer_decision_report.json")
+    raise typer.Exit(code=1)
+
+
+@app.command("record-optimizer-decision")
+def record_optimizer_decision_command(
+    project_dir: Annotated[
+        Path,
+        typer.Argument(help="Project directory with optimizer decision artifacts."),
+    ],
+    action: Annotated[
+        str,
+        typer.Option(
+            "--action",
+            help=(
+                "Supervisor action: accept_best_observed, continue_optimization, "
+                "or revise_fom_or_constraints."
+            ),
+        ),
+    ] = "accept_best_observed",
+    reason: Annotated[
+        str,
+        typer.Option("--reason", help="Supervisor reason for this decision."),
+    ] = "Supervisor accepted the current optimizer decision report.",
+) -> None:
+    try:
+        report = record_optimizer_supervisor_decision(
+            project_dir,
+            action=action,
+            reason=reason,
+        )
+    except (OSError, ValueError) as exc:
+        _exit_with_error(exc)
+    if report.status == "pass":
+        typer.echo("optimizer supervisor decision recorded")
+        typer.echo(f"action: {report.action}")
+        typer.echo(f"accepted: {report.accepted_run_id}")
+        typer.echo(f"global optimum claim: {str(report.global_optimum_claim).lower()}")
+        typer.echo("report: reports/optimizer_supervisor_decision.json")
+        typer.echo("markdown: reports/optimizer_supervisor_decision.md")
+        return
+
+    typer.echo("optimizer supervisor decision failed")
+    for issue in report.issues:
+        typer.echo(issue)
+    typer.echo("report: reports/optimizer_supervisor_decision.json")
     raise typer.Exit(code=1)
 
 

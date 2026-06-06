@@ -1558,3 +1558,11 @@ C-51 Optimizer Decision Report MVP:
 - Real decision: recommended feasible `real_093`, action `accept_best_observed_or_continue`, confidence `medium`, `global_optimum_claim=false`, bottleneck `BW`.
 - Verification: new decision tests passed (`2 passed`), adjacent optimizer report/closeout/status tests passed (`26 passed`), and targeted ruff passed.
 - current_scope: C-51 Optimizer Decision Report MVP complete.
+
+C-52 Optimizer Supervisor Decision Record:
+
+- Status: complete, verified-only.
+- `record-optimizer-decision` now records a supervisor action from the existing optimizer decision report into `optimizer_supervisor_decision.{json,md}`.
+- Real project `/home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb` recorded `accept_best_observed` for `real_093`, with `global_optimum_claim=false` and no Spectre/OCEAN rerun.
+- Verification: new supervisor decision tests passed (`2 passed`), adjacent optimizer report/closeout/status tests passed (`28 passed`), and targeted ruff passed.
+- current_scope: C-52 Optimizer Supervisor Decision Record complete.

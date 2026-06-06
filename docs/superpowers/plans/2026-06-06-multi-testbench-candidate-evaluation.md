@@ -168,3 +168,10 @@ Status: complete through C-51, verified-only.
   feasible `real_093` under the normalized FoM, with action
   `accept_best_observed_or_continue`, confidence `medium`,
   `global_optimum_claim=false`, and bottleneck `BW`.
+- `hermes-workflow record-optimizer-decision PROJECT_DIR` now writes
+  `reports/optimizer_supervisor_decision.json` and
+  `reports/optimizer_supervisor_decision.md`.
+- Real project `/home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb` recorded
+  `accept_best_observed` for feasible `real_093` as the current optimizer
+  result. This is still a best-observed decision, not a global-optimum claim,
+  and it did not rerun Spectre/OCEAN.
