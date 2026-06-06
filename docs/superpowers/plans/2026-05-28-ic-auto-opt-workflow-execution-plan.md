@@ -23,12 +23,15 @@
 
 ## Current Implementation Node
 
-As of 2026-06-06, Plan A, Plan B, and Plan C through C-50 are complete, with
+As of 2026-06-06, Plan A, Plan B, and Plan C through C-51 are complete, with
 post-C-49 real Mixer OpenBox/Spectre/OCEAN evidence through 200 cumulative
 NF=12dB evaluations and C-50 real multi-testbench evidence through 100
-three-testbench evaluations. The next active scope should stay narrow and
-production-facing, preferably user-facing `opt_requirement.md` /
-multi-testbench guide tightening and final optimizer closeout/status reporting.
+three-testbench evaluations. Post-C50/C-51 reporting now re-scores existing
+results under the configured FoM, plots bottleneck/weighted normalized-margin
+tradeoffs, and writes a supervisor-facing optimizer decision report. The next
+active scope should stay narrow and production-facing, preferably user-facing
+multi-testbench guide tightening, formula/variable/resource approval polish,
+and continuation/acceptance operation rather than broad framework work.
 
 The accepted route is no longer an abstract contract-only optimizer plan; it is
 a practice-first production handoff flow that has been exercised with real
@@ -109,6 +112,15 @@ Completed optimizer milestones since C-26:
   C-50 did not merge testbenches into a synthetic deck, parse PSF, rewrite
   formulas, change approved formulas, or multiply `parallel_jobs` per
   testbench.
+- Post-C50/C-51 completed offline decision reporting from existing evaluated
+  artifacts. `optimizer_insight_report` now provides configured-objective
+  ranking and bottleneck/weighted score data, while
+  `hermes-workflow decide-optimizer-run PROJECT_DIR` writes
+  `optimizer_decision_report.{json,md}`. The real Mixer multi-testbench project
+  `/home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb` recommends feasible
+  `real_093` under the normalized FoM, marks it as best observed rather than
+  global optimum, identifies `BW` as the bottleneck, and does not rerun
+  Spectre/OCEAN for reporting.
 
 Current code-level entry points:
 
@@ -121,6 +133,7 @@ Current code-level entry points:
 - `hermes-workflow summarize-optimizer-run PROJECT_DIR`
 - `hermes-workflow finalize-optimizer-run PROJECT_DIR`
 - `hermes-workflow optimizer-status PROJECT_DIR`
+- `hermes-workflow decide-optimizer-run PROJECT_DIR`
 
 The next work should stay narrow and practice-first. Do not start a broad
 optimizer framework rewrite. The next production step should convert the proven

@@ -147,3 +147,24 @@ single candidate with two testbenches; the final evidence is stronger: a real
 three-testbench Mixer OpenBox/Spectre/OCEAN optimizer run completed 100
 candidate evaluations without merging testbenches, parsing PSF, rewriting
 OCEAN formulas, or multiplying `parallel_jobs` per testbench.
+
+## Post-C50 Reporting Refinements
+
+Status: complete through C-51, verified-only.
+
+- Objective expressions now support safe `min()`, `max()`, and `ln()` for
+  offline report re-scoring.
+- `optimizer_insight_report` now includes all-evaluable FoM ranking,
+  configured-objective ranking, and bottleneck/weighted normalized-margin
+  plot data.
+- `hermes-workflow decide-optimizer-run PROJECT_DIR` now writes
+  `reports/optimizer_decision_report.json` and
+  `reports/optimizer_decision_report.md`.
+- The decision report is supervisor-facing: recommended run, basis,
+  action, confidence, best-observed/no-global-optimum boundary, bottleneck
+  metric, status counts, and next steps.
+- Real project `/home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb` generated
+  the C-51 decision report without rerunning Spectre/OCEAN. It recommends
+  feasible `real_093` under the normalized FoM, with action
+  `accept_best_observed_or_continue`, confidence `medium`,
+  `global_optimum_claim=false`, and bottleneck `BW`.

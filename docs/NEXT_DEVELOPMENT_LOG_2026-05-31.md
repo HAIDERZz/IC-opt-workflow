@@ -2160,3 +2160,17 @@ Post-C50 Bottleneck Weighted Score Plot:
 - current_scope: Post-C50 Bottleneck Weighted Score Plot complete.
 - next_allowed_action: inspect the refreshed Mixer multi-testbench optimizer report and `bottleneck_weighted_score.svg`, then decide whether real_093 should be accepted under the normalized FoM, whether to continue optimization from the existing run, or whether to adjust the normalized FoM/constraints. Do not rerun real tools solely for report formatting.
 - next_allowed_action exact: inspect the refreshed Mixer multi-testbench optimizer report and bottleneck_weighted_score.svg, then decide whether real_093 should be accepted under the normalized FoM, whether to continue optimization from the existing run, or whether to adjust the normalized FoM/constraints. Do not rerun real tools solely for report formatting.
+
+C-51 Optimizer Decision Report MVP:
+
+- Status: complete, verified-only.
+- Code: `src/hermes_workflow/optimizer_decision.py`; CLI: `hermes-workflow decide-optimizer-run`.
+- Behavior: writes `reports/optimizer_decision_report.json` and `reports/optimizer_decision_report.md` from existing optimizer insight artifacts.
+- The decision report selects the configured-objective best candidate, states that the selected point is best observed rather than a global optimum, identifies the bottleneck metric, summarizes status counts, and gives a concise supervisor next action.
+- Real project refresh: `/home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb` generated the decision report without rerunning Spectre/OCEAN.
+- Result: recommended feasible `real_093`, action `accept_best_observed_or_continue`, confidence `medium`, `global_optimum_claim=false`, bottleneck `BW`, status counts `feasible=19`, `constraint_failed=65`, `metric_check_failed=16`.
+- Verification: `tests/test_optimizer_decision.py` passed (`2 passed`), adjacent optimizer report/closeout/status tests passed (`26 passed`), targeted ruff passed.
+- Boundary: no Spectre/OCEAN rerun, no PSF parsing, no OCEAN formula rewrite, no candidate generation change, no OpenBox route change.
+- current_scope: C-51 Optimizer Decision Report MVP complete.
+- next_allowed_action: inspect reports/optimizer_decision_report.md for /home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb, then decide whether to accept real_093 as the current best observed point, continue optimization from existing artifacts, or adjust FoM/constraints. Do not rerun real tools solely for report formatting.
+- next_allowed_action exact: inspect reports/optimizer_decision_report.md for /home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb, then decide whether to accept real_093 as the current best observed point, continue optimization from existing artifacts, or adjust FoM/constraints. Do not rerun real tools solely for report formatting.

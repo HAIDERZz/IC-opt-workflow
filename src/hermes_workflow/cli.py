@@ -22,6 +22,7 @@ from hermes_workflow.openbox_backend import (
 )
 from hermes_workflow.optimizer_acceptance import check_optimizer_run
 from hermes_workflow.optimizer_completion import summarize_optimizer_run
+from hermes_workflow.optimizer_decision import generate_optimizer_decision_report
 from hermes_workflow.optimizer_finalize import finalize_optimizer_run
 from hermes_workflow.optimizer_insights import generate_optimizer_insight_report
 from hermes_workflow.optimizer_suggestion import suggest_candidate_request
@@ -748,6 +749,33 @@ def visualize_optimizer_run_command(
     for issue in report.issues:
         typer.echo(issue)
     typer.echo("report: reports/optimizer_insight_report.json")
+    raise typer.Exit(code=1)
+
+
+@app.command("decide-optimizer-run")
+def decide_optimizer_run_command(
+    project_dir: Annotated[
+        Path,
+        typer.Argument(help="Project directory with optimizer decision artifacts."),
+    ],
+) -> None:
+    try:
+        report = generate_optimizer_decision_report(project_dir)
+    except (OSError, ValueError) as exc:
+        _exit_with_error(exc)
+    if report.status == "pass":
+        typer.echo("optimizer decision report written")
+        typer.echo(f"recommended: {report.recommended_run_id}")
+        typer.echo(f"action: {report.recommended_action}")
+        typer.echo(f"global optimum claim: {str(report.global_optimum_claim).lower()}")
+        typer.echo("report: reports/optimizer_decision_report.json")
+        typer.echo("markdown: reports/optimizer_decision_report.md")
+        return
+
+    typer.echo("optimizer decision report failed")
+    for issue in report.issues:
+        typer.echo(issue)
+    typer.echo("report: reports/optimizer_decision_report.json")
     raise typer.Exit(code=1)
 
 

@@ -1181,3 +1181,20 @@ Post-C50 Bottleneck Weighted Score Plot Completion:
 ```text
 请继续 IC auto optimization workflow。先阅读 AGENTS.md、docs/CURRENT_TASK_STATE.json、docs/TOOLCHAIN_EXECUTION_REFERENCE.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-50 Multi-Testbench Candidate Evaluation 已完成；Post-C50 Objective Safe Math / All-Evaluable FoM Plot 已完成；Post-C50 Configured Objective Ranking 已完成；Post-C50 Bottleneck Weighted Score Plot 也已完成 verified-only。optimizer_insight_report 现在有 configured_objective_ranking、all_evaluable_fom_summary、bottleneck_weighted_score_summary，以及 reports/optimizer_visuals/bottleneck_weighted_score.svg。该图 x=weighted-sum score，y=bottleneck min(z_i)，等值线为 0.7*bottleneck+0.3*weighted，画出所有可计算点并按 status 着色。真实项目 /home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb 已刷新报告，没有重跑 Spectre/OCEAN；SVG 有 84 个点，best feasible real_093，combined_score=0.7085522728550304。下一步由用户决定是否接受 real_093、是否 continuation、或调整 FoM/constraints。不要为了报告格式重跑真实工具，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence logs、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
 ```
+
+C-51 Optimizer Decision Report MVP Completion:
+
+- Status: complete, verified-only.
+- `src/hermes_workflow/optimizer_decision.py` and `hermes-workflow decide-optimizer-run` now write `reports/optimizer_decision_report.json` and `reports/optimizer_decision_report.md` from existing optimizer insight artifacts.
+- The report is a supervisor decision closeout: recommended run, configured-objective basis, recommended action, confidence, best-observed/no-global-optimum boundary, bottleneck metric, status counts, and next steps.
+- Real project `/home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb` generated the report without rerunning Spectre/OCEAN.
+- Real decision result: recommended feasible `real_093`, action `accept_best_observed_or_continue`, confidence `medium`, `global_optimum_claim=false`, bottleneck `BW`, status counts `feasible=19`, `constraint_failed=65`, `metric_check_failed=16`.
+- Verification: `tests/test_optimizer_decision.py` passed (`2 passed`), adjacent optimizer report/closeout/status tests passed (`26 passed`), targeted ruff passed.
+- current_scope: C-51 Optimizer Decision Report MVP complete.
+- next_allowed_action: inspect reports/optimizer_decision_report.md for /home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb, then decide whether to accept real_093 as the current best observed point, continue optimization from existing artifacts, or adjust FoM/constraints. Do not rerun real tools solely for report formatting.
+
+## Latest Resume Prompt
+
+```text
+请继续 IC auto optimization workflow。先阅读 AGENTS.md、docs/CURRENT_TASK_STATE.json、docs/TOOLCHAIN_EXECUTION_REFERENCE.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-50 Multi-Testbench Candidate Evaluation 已完成；Post-C50 Objective Safe Math / All-Evaluable FoM Plot、Configured Objective Ranking、Bottleneck Weighted Score Plot 均已完成；C-51 Optimizer Decision Report MVP 也已完成 verified-only。hermes-workflow decide-optimizer-run 现在从现有 optimizer insight artifacts 生成 reports/optimizer_decision_report.json 和 .md，不重跑 Spectre/OCEAN。真实项目 /home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb 的 decision report 推荐 feasible real_093：F=20、W=1.4u、L=30n、VB_LO=310m，action=accept_best_observed_or_continue，confidence=medium，global_optimum_claim=false，瓶颈 BW，状态分布 feasible=19、constraint_failed=65、metric_check_failed=16。下一步由用户决定是否接受 real_093、是否从现有 artifacts continuation、或调整 FoM/constraints。不要为了报告格式重跑真实工具，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence logs、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
+```
