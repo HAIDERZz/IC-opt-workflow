@@ -3,6 +3,9 @@
 This is the shortest supported path for using `ic-auto-opt-workflow` on a real
 Maestro-exported Spectre/OCEAN optimization project.
 
+For a user-facing manual that explains how to ask a supervisor agent to run the
+workflow, read `docs/AGENT_OPTIMIZER_USAGE_MANUAL.md`.
+
 The workflow is file based. Do not describe machine-critical setup only in
 chat. Put the request in `opt_requirement.md`, optionally put human guidance in
 `constraints.md`, then let Hermes generate and check the contracts.
