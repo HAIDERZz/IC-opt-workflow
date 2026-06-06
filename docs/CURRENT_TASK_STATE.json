@@ -1,18 +1,18 @@
 {
   "schema_version": "1.0",
-  "current_scope": "C-54 Production Landing MVP complete",
-  "current_status": "C-54 Production Landing MVP is complete, verified-only. docs/OPTIMIZER_PRODUCTION_QUICKSTART.md now gives the shortest supported production path from user project creation through final summary. hermes-workflow check-project-ready now writes reports/project_readiness_report.json without running real tools. The readiness check validates opt_requirement presence, core config files, contract validation, single- or multi-testbench netlist bundles, and final summary availability. The template OPT_REQUIREMENT_README now points users to check-project-ready and the production quickstart. Real project /home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb passed readiness with ready_for_closeout_review, 3 testbench netlist bundles, final summary accepted real_093, and no Spectre/OCEAN rerun.",
+  "current_scope": "C-55 Production Landing Acceptance complete",
+  "current_status": "C-55 Production Landing Acceptance is complete, verified-only. docs/PRODUCTION_LANDING_ACCEPTANCE_2026-06-07.md records first production trial acceptance for the proven opt_requirement.md -> prepare-from-requirement -> OpenBox/Spectre/OCEAN -> final summary route. Real project /home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb passed check-project-ready with readiness=ready_for_closeout_review, 3 testbench netlist bundles, and final summary acceptance of real_093. The accepted result remains best observed, not a global optimum claim. No Spectre/OCEAN rerun, PSF parsing, formula rewrite, synthetic testbench merge, or optimizer framework expansion occurred.",
   "review_status": "verified-only",
   "subagent_dispatch": "available",
-  "active_spec": "docs/superpowers/specs/2026-06-06-multi-testbench-candidate-evaluation-design.md",
-  "active_plan": "docs/superpowers/plans/2026-06-06-multi-testbench-candidate-evaluation.md",
+  "active_spec": "docs/PRODUCTION_LANDING_ACCEPTANCE_2026-06-07.md",
+  "active_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
   "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
   "progress_files": [
     "docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md",
     "docs/EXECUTION_PROGRESS_2026-05-29.md",
     "docs/COMPACT_RESUME_CHECKPOINT.md"
   ],
-  "next_allowed_action": "use docs/OPTIMIZER_PRODUCTION_QUICKSTART.md and hermes-workflow check-project-ready to onboard the next real optimization project, or decide whether to run continuation on /home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb from existing artifacts. Do not add new optimizer features before a real user project needs them.",
+  "next_allowed_action": "use docs/OPTIMIZER_PRODUCTION_QUICKSTART.md to onboard the next real optimization project, or continue /home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb only if the user explicitly asks. Add new features only when a real workflow exposes a concrete missing capability.",
   "forbidden_actions": [
     "install unpinned latest shap into the OpenBox venv",
     "run real tool commands without first checking docs/TOOLCHAIN_EXECUTION_REFERENCE.md",
@@ -43,13 +43,13 @@
     "git status --short"
   ],
   "route_audit": {
-    "active_spec": "docs/superpowers/specs/2026-06-06-multi-testbench-candidate-evaluation-design.md",
-    "active_plan": "docs/superpowers/plans/2026-06-06-multi-testbench-candidate-evaluation.md",
+    "active_spec": "docs/PRODUCTION_LANDING_ACCEPTANCE_2026-06-07.md",
+    "active_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
     "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
-    "alignment": "Aligned as a production landing refinement after C-50/C-53. It does not change candidate generation, Spectre/OCEAN execution, multi-testbench aggregation, acceptance logic, or OCEAN metric formulas.",
-    "drift": "No execution-route drift. The change only adds a production quickstart and offline project readiness check. It does not rerun tools, parse PSF, rewrite OCEAN formulas, merge testbenches, or replace the OpenBox route."
+    "alignment": "Aligned as a production landing acceptance closeout after C-54. It records the already-proven route and real readiness evidence without changing candidate generation, Spectre/OCEAN execution, multi-testbench aggregation, acceptance logic, or OCEAN metric formulas.",
+    "drift": "No execution-route drift. The change only records production acceptance and syncs progress files. It does not rerun tools, parse PSF, rewrite OCEAN formulas, merge testbenches, or replace the OpenBox route."
   },
-  "latest_valid_commit": "b5b1156",
+  "latest_valid_commit": "014cc99",
   "review_evidence": {
     "c47_plan": "docs/superpowers/plans/2026-06-05-openbox-advanced-visualization-artifact.md",
     "c47_tests": "Targeted tests passed: /home/zzchen/.venvs/openclaw/bin/python -m pytest tests/test_openbox_backend.py tests/test_optimizer_insights.py tests/test_optimizer_finalize.py",
@@ -85,6 +85,7 @@
     "c51_optimizer_decision_report": "Implemented verified-only. New hermes_workflow.optimizer_decision.generate_optimizer_decision_report and CLI command decide-optimizer-run write reports/optimizer_decision_report.json and .md from existing insight artifacts. Verification passed: python3 -m pytest tests/test_optimizer_decision.py -q (2 passed), python3 -m pytest tests/test_optimizer_decision.py tests/test_optimizer_insights.py tests/test_optimizer_completion.py tests/test_optimizer_finalize.py tests/test_optimizer_status.py -q (26 passed), and targeted ruff passed. Real project /home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb generated the decision report without rerunning Spectre/OCEAN: recommended real_093, action accept_best_observed_or_continue, confidence medium, global_optimum_claim=false, bottleneck BW, status_counts feasible=19 constraint_failed=65 metric_check_failed=16.",
     "c52_optimizer_supervisor_decision_record": "Implemented verified-only. New hermes_workflow.optimizer_supervisor_decision.record_optimizer_supervisor_decision and CLI command record-optimizer-decision write reports/optimizer_supervisor_decision.json and .md from the optimizer decision report. Verification passed: python3 -m pytest tests/test_optimizer_supervisor_decision.py -q (2 passed), python3 -m pytest tests/test_optimizer_supervisor_decision.py tests/test_optimizer_decision.py tests/test_optimizer_insights.py tests/test_optimizer_completion.py tests/test_optimizer_finalize.py tests/test_optimizer_status.py -q (28 passed), and targeted ruff passed. Real project /home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb recorded accept_best_observed for real_093 with no Spectre/OCEAN rerun.",
     "c53_optimizer_final_summary": "Implemented verified-only. New hermes_workflow.optimizer_final_summary.generate_optimizer_final_summary and CLI command write-optimizer-final-summary write reports/optimizer_final_summary.json and .md from existing supervisor decision, decision, and insight artifacts. Verification passed: python3 -m pytest tests/test_optimizer_final_summary.py -q (2 passed), python3 -m pytest tests/test_optimizer_final_summary.py tests/test_optimizer_supervisor_decision.py tests/test_optimizer_decision.py tests/test_optimizer_insights.py tests/test_optimizer_completion.py tests/test_optimizer_finalize.py tests/test_optimizer_status.py -q (30 passed), and targeted ruff passed. Real project /home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb generated the final summary for accepted real_093 with no Spectre/OCEAN rerun.",
-    "c54_production_landing_mvp": "Implemented verified-only. Added docs/OPTIMIZER_PRODUCTION_QUICKSTART.md, project readiness module hermes_workflow.project_readiness.check_project_ready, CLI command check-project-ready, tests/test_project_readiness.py, and template README updates. Verification passed: python3 -m pytest tests/test_project_readiness.py tests/test_requirement_intake.py tests/test_validate.py tests/test_optimizer_final_summary.py tests/test_optimizer_supervisor_decision.py tests/test_optimizer_decision.py -q (53 passed), targeted ruff passed, cadence check passed, and git diff --check passed. Real project /home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb check-project-ready passed with readiness=ready_for_closeout_review, 3 testbench netlist bundles, and final summary accepting real_093."
+    "c54_production_landing_mvp": "Implemented verified-only. Added docs/OPTIMIZER_PRODUCTION_QUICKSTART.md, project readiness module hermes_workflow.project_readiness.check_project_ready, CLI command check-project-ready, tests/test_project_readiness.py, and template README updates. Verification passed: python3 -m pytest tests/test_project_readiness.py tests/test_requirement_intake.py tests/test_validate.py tests/test_optimizer_final_summary.py tests/test_optimizer_supervisor_decision.py tests/test_optimizer_decision.py -q (53 passed), targeted ruff passed, cadence check passed, and git diff --check passed. Real project /home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb check-project-ready passed with readiness=ready_for_closeout_review, 3 testbench netlist bundles, and final summary accepting real_093.",
+    "c55_production_landing_acceptance": "Implemented verified-only. Added docs/PRODUCTION_LANDING_ACCEPTANCE_2026-06-07.md and synchronized progress/top-plan files. Fresh check-project-ready for /home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb passed with readiness=ready_for_closeout_review and final summary accepting real_093. No Spectre/OCEAN rerun or report re-generation was performed."
   }
 }

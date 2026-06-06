@@ -20,17 +20,14 @@ ic-auto-opt-workflow/AGENTS.md
 
 Current execution state:
 
-- Latest baseline: `docs/PROJECT_LANDING_BASELINE_2026-06-05.md`.
-- Current scope: C-50 Multi-Testbench Candidate Evaluation complete.
-- Current status: C-50 is complete, verified-only. Requirement intake,
-  namespaced Maestro/ADE point-root imports, per-testbench child
-  Spectre/OCEAN runs, aggregate candidate-level manifests, and OpenBox
-  multi-testbench optimizer integration are all exercised by real evidence.
-  Latest multi-testbench evidence:
-  `/home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb` completed 100 real
-  three-testbench OpenBox/Spectre/OCEAN evaluations with `19 feasible`,
-  `65 constraint_failed`, `16 metric_check_failed`, and no recorded
-  `real_check_failed`. Best observed is `real_068`.
+- Latest production acceptance note:
+  `docs/PRODUCTION_LANDING_ACCEPTANCE_2026-06-07.md`.
+- Current scope: C-55 Production Landing Acceptance complete.
+- Current status: C-55 is complete, verified-only. The project is accepted for
+  a first production trial. Latest multi-testbench evidence:
+  `/home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb` passed
+  `check-project-ready` with `readiness=ready_for_closeout_review`, three
+  testbench netlist bundles, and final summary acceptance of `real_093`.
 - Key real evidence: `/tmp/ic_auto_opt_real_flow_t77ky7/bridge_test_inv`
   completed 100 real OpenBox/Spectre/OCEAN evaluations with `43 feasible`,
   `51 constraint_failed`, `6 metric_check_failed`, `0 real_check_failed`, best
@@ -40,10 +37,9 @@ Current execution state:
   now addressed by C-49 Requirement.md Driven Config Intake. The generated
   Mixer project passed a real single-point smoke after user confirmation. Do
   not put a generic natural-language parser inside Hermes.
-- Other remaining landing gaps: production guide tightening for the full
-  user-to-run entry flow, concise formula/variable/resource approval checkpoint,
-  final optimizer closeout/status reporting polish, and possible continuation
-  policy for multi-testbench projects.
+- Other remaining landing gaps should now be handled only when the next real
+  project exposes a concrete need. Do not add speculative optimizer framework
+  layers after C-55.
 - Do not start broad optimizer framework work, hand-pick optimizer points,
   replace the OpenBox route, parse PSF, rewrite OCEAN formulas, or rerun
   Spectre/OCEAN solely for report formatting.
@@ -59,7 +55,7 @@ Current execution state:
   mistakes such as `W` being overwritten by `L`. Import evidence: 69 netlist
   files copied, 1 safe symlink materialized, and template variables `F`, `W`,
   `L`, and `VB_LO` approved. No Spectre/OCEAN run was launched.
-- current_scope: C-50 Multi-Testbench Candidate Evaluation complete.
+- current_scope: C-55 Production Landing Acceptance complete.
 - C-50 files: `docs/superpowers/specs/2026-06-06-multi-testbench-candidate-evaluation-design.md`
   and `docs/superpowers/plans/2026-06-06-multi-testbench-candidate-evaluation.md`.
 - C-49 verification: targeted tests passed with `88 passed`; full suite passed
@@ -68,10 +64,10 @@ Current execution state:
   rewrite; no Maestro/ADE netlist flattening; no optimizer execution behavior
   change. The only schema extension was accepting `optimizer.algorithm: openbox`
   to match the existing OpenBox backend route.
-- next_allowed_action: choose the next narrow landing task after C-50,
-  preferably productionizing the user-facing `opt_requirement.md` /
-  multi-testbench guide and tightening final optimizer closeout/status
-  reporting. Do not rerun real tools only for report formatting.
+- next_allowed_action: onboard the next real optimization project using
+  `docs/OPTIMIZER_PRODUCTION_QUICKSTART.md`, or continue the existing Mixer
+  project only if the user explicitly asks. Add new features only when a real
+  workflow exposes a concrete missing capability.
 - Post-C-49 real Mixer smoke: `real_002` used `F=26`, `W=1u`, `L=40n`,
   `VB_LO=310m`, ran Spectre 25.1, ran batch OCEAN with approved formulas
   unchanged, passed `check-real-run`, and passed `check-metric-results`.

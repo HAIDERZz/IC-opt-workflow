@@ -23,7 +23,7 @@
 
 ## Current Implementation Node
 
-As of 2026-06-07, Plan A, Plan B, and Plan C through C-54 are complete, with
+As of 2026-06-07, Plan A, Plan B, and Plan C through C-55 are complete, with
 post-C-49 real Mixer OpenBox/Spectre/OCEAN evidence through 200 cumulative
 NF=12dB evaluations and C-50 real multi-testbench evidence through 100
 three-testbench evaluations. Post-C50/C-54 reporting now re-scores existing
@@ -35,6 +35,13 @@ quickstart and `check-project-ready` readiness command. The workflow is now
 usable as a first production landing MVP; the next active scope should be driven
 by the next real user project or continuation need rather than broad framework
 work.
+
+C-55 records the production landing acceptance note at
+`docs/PRODUCTION_LANDING_ACCEPTANCE_2026-06-07.md`. The real Mixer
+multi-testbench project passed `check-project-ready` with
+`readiness=ready_for_closeout_review` and final summary acceptance of
+`real_093`. The accepted boundary is first production trial readiness, not a
+claim of global optimizer completeness.
 
 The accepted route is no longer an abstract contract-only optimizer plan; it is
 a practice-first production handoff flow that has been exercised with real
@@ -157,7 +164,10 @@ The next work should stay narrow and practice-first. Do not start a broad
 optimizer framework rewrite. The next production step should convert the proven
 C-49/C-50 route into clearer user-facing operation: requirement template/README
 tightening, multi-testbench guide, formula/variable/resource approval
-checkpoint, and final optimizer closeout/status reporting polish.
+checkpoint, and final optimizer closeout/status reporting polish. After C-55,
+the preferred next step is to onboard another real project using
+`docs/OPTIMIZER_PRODUCTION_QUICKSTART.md`; new features should be added only
+when that real workflow exposes a specific missing capability.
 
 ## Current Route Alignment
 

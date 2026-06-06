@@ -192,3 +192,20 @@ Status: complete through C-51, verified-only.
 - Real project `/home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb` passed
   `check-project-ready` with `readiness=ready_for_closeout_review`, three
   testbench netlist bundles, and final summary accepting `real_093`.
+
+## C-55 Production Landing Acceptance
+
+Status: complete, verified-only.
+
+The production landing acceptance note is:
+
+```text
+docs/PRODUCTION_LANDING_ACCEPTANCE_2026-06-07.md
+```
+
+Fresh offline readiness evidence confirmed that
+`/home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb` is ready for closeout review
+and accepts `real_093` as the current best observed result. This closes the
+C-50 through C-54 reporting/readiness work as a first production trial route.
+Future optimizer work should be driven by the next real project or an explicit
+continuation request, not by speculative framework expansion.

@@ -4,12 +4,12 @@
 
 - Repository: `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow`
 - Branch: `plan-a-hermes-file-contract-mvp`
-- Current scope: C-50 Multi-Testbench Candidate Evaluation complete
-- Current status: verified-only; C-50 is complete. The multi-testbench route now covers strict requirement intake, namespaced Maestro/ADE point-root imports, child Spectre/OCEAN runs, aggregated candidate-level manifests, and OpenBox optimizer observations through the multi-testbench evaluator. Real evidence: `/home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb` completed 100 real three-testbench evaluations.
-- Active spec: `docs/superpowers/specs/2026-06-06-multi-testbench-candidate-evaluation-design.md`
-- Active plan: `docs/superpowers/plans/2026-06-06-multi-testbench-candidate-evaluation.md`
-- Next required action: choose the next narrow landing task after C-50, preferably productionizing the user-facing `opt_requirement.md` / multi-testbench guide and tightening final optimizer closeout/status reporting.
-- next_allowed_action: choose the next narrow landing task after C-50, preferably productionizing the user-facing opt_requirement.md/multi-testbench guide and tightening final optimizer closeout/status reporting. Do not start another broad optimizer framework or rerun real tools just for formatting.
+- Current scope: C-55 Production Landing Acceptance complete
+- Current status: verified-only; C-55 records that the proven optimizer route is accepted for a first production trial. The real project `/home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb` passed `check-project-ready` with `readiness=ready_for_closeout_review`, three testbench netlist bundles, and final summary acceptance of `real_093`.
+- Active spec: `docs/PRODUCTION_LANDING_ACCEPTANCE_2026-06-07.md`
+- Active plan: `docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md`
+- Next required action: onboard the next real optimization project through `docs/OPTIMIZER_PRODUCTION_QUICKSTART.md`, or continue the existing Mixer project only if the user explicitly asks.
+- next_allowed_action: use docs/OPTIMIZER_PRODUCTION_QUICKSTART.md to onboard the next real optimization project, or continue /home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb only if the user explicitly asks. Add new features only when a real workflow exposes a concrete missing capability.
 
 C-3 Task 6 final verification is complete. C-4 is confirmed as a contract-only first real-run package; it must not run Spectre, Virtuoso, subprocesses, or the optimizer loop. C-4 is now complete and reviewed. C-5 validates the execution agent's returned `result_manifest.json` and declared artifacts without running Spectre or parsing metrics. C-5.5 rehearsed the C-4/C-5 handoff with simulated execution-agent and Hermes-observer roles. After C-5.5, the project paused implementation to validate the real metric backend. Spectre + OCEAN is now confirmed as the backend route: standalone Spectre generates PSF, batch OCEAN opens the PSF and evaluates exact user/project-approved formulas, and Python only records OCEAN-produced scalar outputs and provenance. C-6 turned that route into deterministic file contracts and a Hermes validator without physical adapter wiring. C-7 added an explicit execution-side adapter and tool entry point while preserving the rule that Hermes workflow tooling still validates returned files after execution. C-8 records checked real metric results into optimizer ledger/state after `check-real-run` and `check-metric-results` pass, while preserving the contract-only boundary. C-9 prepares the next real-run package from strict ledger/state and deterministic optimizer initialization sequence, while still not running real tools or writing ledger/state. C-10 classifies failed/partial/pending real-run packages, writes explicit recovery decisions, prepares retry packages, exposes supervisor-facing recovery CLI commands, and blocks C-9 from advancing while unresolved real-run packages exist. C-10 final review fixes aligned unsafe artifact classification with the spec and hardened symlinked recovery decision reads.
 
@@ -211,6 +211,49 @@ Files:
 docs/superpowers/specs/2026-06-06-multi-testbench-candidate-evaluation-design.md
 docs/superpowers/plans/2026-06-06-multi-testbench-candidate-evaluation.md
 ```
+
+## C-55 Production Landing Acceptance 2026-06-07
+
+C-55 is complete, verified-only.
+
+Acceptance note:
+
+```text
+docs/PRODUCTION_LANDING_ACCEPTANCE_2026-06-07.md
+```
+
+Fresh readiness evidence:
+
+```text
+hermes-workflow check-project-ready /home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb
+project readiness: pass
+readiness: ready_for_closeout_review
+optimizer_final_summary: pass - final optimizer summary accepts real_093
+```
+
+Accepted result:
+
+```text
+run_id: real_093
+action: accept_best_observed
+global_optimum_claim: false
+parameters: F=20, W=1.4u, L=30n, VB_LO=310m
+status_counts: feasible=19, constraint_failed=65, metric_check_failed=16
+score: combined_score=0.7085522728550304, bottleneck_metric=BW
+```
+
+Route audit:
+
+- This is a production landing closeout, not a new optimizer feature.
+- No real Spectre/OCEAN rerun was needed.
+- No PSF parsing, OCEAN formula rewrite, or synthetic testbench merge was
+  introduced.
+- The accepted result remains best observed, not a global optimum claim.
+
+Next action:
+
+- Use the production quickstart to onboard the next real project.
+- Keep future work practice-first and driven by concrete production issues.
 
 Purpose:
 

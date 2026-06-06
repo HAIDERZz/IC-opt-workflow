@@ -9,10 +9,10 @@ This note preserves the implementation state for continuing Plan A after context
 - Baseline branch: `master`
 - Baseline commit: `885e97f docs: capture workflow planning baseline`
 - Latest C-3 code commit before docs-only cleanup: `edb107f fix: harden preflight readiness gates`; docs cleanup continues through current HEAD
-- Active plan: `docs/superpowers/plans/2026-06-06-multi-testbench-candidate-evaluation.md`
-- Current scope: C-50 Multi-Testbench Candidate Evaluation complete
-- Current status: C-50 is complete, verified-only. Requirement intake, namespaced Maestro/ADE point-root import, child Spectre/OCEAN runs, aggregate manifests, and OpenBox multi-testbench optimizer integration are all exercised by real evidence.
-- Next allowed action: choose the next narrow landing task after C-50. Recommended next scope is productionizing the user-facing `opt_requirement.md` / multi-testbench guide and tightening final optimizer closeout/status reporting.
+- Active plan: `docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md`
+- Current scope: C-55 Production Landing Acceptance complete
+- Current status: C-55 is complete, verified-only. The proven route is accepted for a first production trial. `/home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb` passed `check-project-ready` with `readiness=ready_for_closeout_review`, three testbench netlist bundles, and final summary acceptance of `real_093`.
+- Next allowed action: onboard the next real optimization project using `docs/OPTIMIZER_PRODUCTION_QUICKSTART.md`, or continue the existing Mixer project only on explicit user request. Add new features only when a real workflow exposes a concrete missing capability.
 - Execution method: `superpowers:subagent-driven-development`
 - Dependencies installed in active Python environment on 2026-05-29: `pytest`, `typer`, `pydantic`, `PyYAML`, `ruff`
 
@@ -136,6 +136,21 @@ C-50 closeout route audit:
   two-testbench single candidate.
 - No broad scheduler/framework rewrite, synthetic merged Spectre deck, PSF
   parsing, formula rewrite, or `parallel_jobs` multiplication was introduced.
+
+## C-55 Production Landing Acceptance 2026-06-07
+
+Status: complete, verified-only.
+
+- Added `docs/PRODUCTION_LANDING_ACCEPTANCE_2026-06-07.md`.
+- Fresh readiness check passed for
+  `/home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb`.
+- Readiness state: `ready_for_closeout_review`.
+- Final summary accepts `real_093`.
+- Accepted point: `F=20`, `W=1.4u`, `L=30n`, `VB_LO=310m`.
+- Accepted scope: best observed under evaluated artifacts and configured FoM,
+  not a global optimum certificate.
+- No Spectre/OCEAN rerun, PSF parsing, formula rewrite, or synthetic
+  multi-testbench merge was introduced.
 
 Post-C-49 real smoke:
 
