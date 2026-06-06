@@ -23,17 +23,18 @@
 
 ## Current Implementation Node
 
-As of 2026-06-06, Plan A, Plan B, and Plan C through C-53 are complete, with
+As of 2026-06-07, Plan A, Plan B, and Plan C through C-54 are complete, with
 post-C-49 real Mixer OpenBox/Spectre/OCEAN evidence through 200 cumulative
 NF=12dB evaluations and C-50 real multi-testbench evidence through 100
-three-testbench evaluations. Post-C50/C-53 reporting now re-scores existing
+three-testbench evaluations. Post-C50/C-54 reporting now re-scores existing
 results under the configured FoM, plots bottleneck/weighted normalized-margin
 tradeoffs, writes a supervisor-facing optimizer decision report, and records a
 supervisor acceptance decision for the selected best observed point, then
-writes a user-facing final optimization summary. The next active scope should
-stay narrow and production-facing, preferably multi-testbench guide tightening,
-formula/variable/resource approval polish, and continuation operation rather
-than broad framework work.
+writes a user-facing final optimization summary. C-54 adds the production
+quickstart and `check-project-ready` readiness command. The workflow is now
+usable as a first production landing MVP; the next active scope should be driven
+by the next real user project or continuation need rather than broad framework
+work.
 
 The accepted route is no longer an abstract contract-only optimizer plan; it is
 a practice-first production handoff flow that has been exercised with real
@@ -114,7 +115,7 @@ Completed optimizer milestones since C-26:
   C-50 did not merge testbenches into a synthetic deck, parse PSF, rewrite
   formulas, change approved formulas, or multiply `parallel_jobs` per
   testbench.
-- Post-C50/C-53 completed offline decision reporting from existing evaluated
+- Post-C50/C-54 completed offline decision reporting from existing evaluated
   artifacts. `optimizer_insight_report` now provides configured-objective
   ranking and bottleneck/weighted score data, while
   `hermes-workflow decide-optimizer-run PROJECT_DIR` writes
@@ -128,6 +129,13 @@ Completed optimizer milestones since C-26:
   observed rather than global optimum, identifies `BW` as the bottleneck, links
   the visualization/report artifacts, and does not rerun Spectre/OCEAN for
   reporting or recording.
+- C-54 completed production landing polish. `docs/OPTIMIZER_PRODUCTION_QUICKSTART.md`
+  documents the supported user path from `opt_requirement.md` to final summary.
+  `hermes-workflow check-project-ready PROJECT_DIR` writes
+  `reports/project_readiness_report.json` and checks requirement/config/netlist
+  readiness plus final summary availability without running real tools. The
+  real Mixer multi-testbench project passed with
+  `readiness=ready_for_closeout_review`.
 
 Current code-level entry points:
 
@@ -143,6 +151,7 @@ Current code-level entry points:
 - `hermes-workflow decide-optimizer-run PROJECT_DIR`
 - `hermes-workflow record-optimizer-decision PROJECT_DIR`
 - `hermes-workflow write-optimizer-final-summary PROJECT_DIR`
+- `hermes-workflow check-project-ready PROJECT_DIR`
 
 The next work should stay narrow and practice-first. Do not start a broad
 optimizer framework rewrite. The next production step should convert the proven

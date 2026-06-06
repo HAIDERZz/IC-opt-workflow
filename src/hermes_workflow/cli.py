@@ -39,6 +39,7 @@ from hermes_workflow.package import (
     build_execution_package,
     create_project_from_template,
 )
+from hermes_workflow.project_readiness import check_project_ready
 from hermes_workflow.real_run import (
     prepare_candidate_real_run,
     prepare_next_real_run,
@@ -256,6 +257,34 @@ def prepare_from_requirement_command(
     for issue in report.issues:
         typer.echo(issue)
     typer.echo("report: reports/requirement_intake_report.json")
+    raise typer.Exit(code=1)
+
+
+@app.command("check-project-ready")
+def check_project_ready_command(
+    project_dir: Annotated[
+        Path,
+        typer.Argument(help="Project directory prepared from opt_requirement.md."),
+    ],
+) -> None:
+    try:
+        report = check_project_ready(project_dir)
+    except (OSError, ValueError) as exc:
+        _exit_with_error(exc)
+    typer.echo(f"project readiness: {report.status}")
+    typer.echo(f"readiness: {report.readiness}")
+    typer.echo(f"core ready: {str(report.core_ready).lower()}")
+    typer.echo(f"final summary ready: {str(report.final_summary_ready).lower()}")
+    for check in report.checks:
+        typer.echo(f"{check['name']}: {check['status']} - {check['detail']}")
+    if report.warnings:
+        for warning in report.warnings:
+            typer.echo(f"warning: {warning}")
+    typer.echo("report: reports/project_readiness_report.json")
+    if report.status == "pass":
+        return
+    for issue in report.issues:
+        typer.echo(issue)
     raise typer.Exit(code=1)
 
 

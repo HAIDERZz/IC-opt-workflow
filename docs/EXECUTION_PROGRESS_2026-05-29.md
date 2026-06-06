@@ -1574,3 +1574,12 @@ C-53 Optimizer Final Summary:
 - Real project `/home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb` generated `optimizer_final_summary.{json,md}` for accepted `real_093`, including parameters, metrics, score/bottleneck, status counts, visual links, report links, and boundaries.
 - Verification: new final summary tests passed (`2 passed`), adjacent optimizer report/closeout/status tests passed (`30 passed`), and targeted ruff passed.
 - current_scope: C-53 Optimizer Final Summary complete.
+
+C-54 Production Landing MVP:
+
+- Status: complete, verified-only.
+- Added a production quickstart and `check-project-ready` CLI for offline project readiness checks.
+- `check-project-ready` writes `reports/project_readiness_report.json` and checks requirement files, core config files, contract validation, native netlist bundle readiness, and final summary availability.
+- Real project `/home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb` passed with `readiness=ready_for_closeout_review`, 3 testbench netlist bundles, and accepted `real_093`.
+- Verification: project readiness/intake/validate/final-report tests passed (`53 passed`), targeted ruff passed, cadence check passed, and `git diff --check` passed.
+- current_scope: C-54 Production Landing MVP complete.

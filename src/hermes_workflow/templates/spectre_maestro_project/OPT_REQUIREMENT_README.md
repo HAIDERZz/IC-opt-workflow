@@ -52,7 +52,13 @@ to.
 ```bash
 hermes-workflow check-requirement ~/spectre_opt_prj/<project_name>
 hermes-workflow prepare-from-requirement ~/spectre_opt_prj/<project_name>
+hermes-workflow validate ~/spectre_opt_prj/<project_name>
+hermes-workflow check-project-ready ~/spectre_opt_prj/<project_name>
 ```
+
+For the full production command sequence, including optimizer execution,
+decision recording, final summary generation, and continuation boundaries, read
+`docs/OPTIMIZER_PRODUCTION_QUICKSTART.md`.
 
 ## Required Sections
 
@@ -97,6 +103,16 @@ For circuits that need multiple Maestro/ADE testbenches for one candidate, use
 `Maestro Source` contains a `testbenches:` list, and each metric declares a
 `testbench:` routing key. The routing key only decides which child Spectre/OCEAN
 run evaluates the formula; it is not part of the OCEAN expression.
+
+After `prepare-from-requirement`, multi-testbench projects should pass:
+
+```bash
+hermes-workflow check-project-ready ~/spectre_opt_prj/<project_name>
+```
+
+Before the first optimizer run, the expected readiness is
+`ready_for_first_run`. After optimizer closeout and final summary generation,
+the expected readiness is `ready_for_closeout_review`.
 
 ## Metrics
 

@@ -1,0 +1,141 @@
+# Optimizer Production Quickstart
+
+This is the shortest supported path for using `ic-auto-opt-workflow` on a real
+Maestro-exported Spectre/OCEAN optimization project.
+
+The workflow is file based. Do not describe machine-critical setup only in
+chat. Put the request in `opt_requirement.md`, optionally put human guidance in
+`constraints.md`, then let Hermes generate and check the contracts.
+
+## 1. Create A User Project
+
+Recommended layout:
+
+```text
+~/spectre_opt_prj/<project_name>/
+├── opt_requirement.md
+├── constraints.md
+└── context/
+```
+
+Use:
+
+- `opt_requirement.md` for the strict optimization request.
+- `constraints.md` for supervisor-agent guidance and user preferences.
+- `context/` for notes, screenshots, prior reports, or circuit explanations.
+
+Do not hand-build `config/`, `netlists/`, `runs/`, or `reports/`.
+
+## 2. Provide Maestro Point Roots
+
+For each testbench, first run one known-good Maestro/ADE point. The path must be
+the point root containing:
+
+```text
+<maestro_point_root>/netlist/input.scs
+```
+
+For a single testbench, `Maestro Source` contains one `maestro_point_root`.
+
+For multiple testbenches, `Maestro Source` contains a `testbenches:` list. Each
+metric must declare `testbench: <id>`. Hermes copies each native netlist bundle
+into a namespaced project path and keeps each testbench separate.
+
+## 3. Prepare And Check The Project
+
+From the repo virtualenv:
+
+```bash
+./.venv/bin/hermes-workflow check-requirement ~/spectre_opt_prj/<project_name>
+./.venv/bin/hermes-workflow prepare-from-requirement ~/spectre_opt_prj/<project_name>
+./.venv/bin/hermes-workflow validate ~/spectre_opt_prj/<project_name>
+./.venv/bin/hermes-workflow check-project-ready ~/spectre_opt_prj/<project_name>
+```
+
+`check-project-ready` does not run real tools. It checks the user request,
+rendered config, imported netlist bundles, contract validation, and known report
+artifacts.
+
+Expected state before the first optimizer run:
+
+```text
+project readiness: pass
+readiness: ready_for_first_run
+```
+
+## 4. Run The Optimizer
+
+Before a real run, read `docs/TOOLCHAIN_EXECUTION_REFERENCE.md` and use the
+known-good Cadence/OpenBox environment.
+
+Example OpenBox run:
+
+```bash
+./.venv/bin/hermes-workflow run-openbox-real ~/spectre_opt_prj/<project_name> \
+  --max-evals 100 \
+  --batch-size 10 \
+  --parallel-jobs 10 \
+  --cadence-cshrc /home/zzchen/cadence_ic231_env.csh
+```
+
+Resource meanings:
+
+- `spectre.parallel_jobs`: how many Spectre child jobs may run at once.
+- `spectre.threads_per_run`: Spectre `+mt` threads per individual simulation.
+- `optimizer.optimizer_cpu_threads`: Python/OpenBox-side optimizer math threads.
+
+## 5. Close Out The Run
+
+Use the report chain:
+
+```bash
+./.venv/bin/hermes-workflow check-optimizer-run ~/spectre_opt_prj/<project_name>
+./.venv/bin/hermes-workflow summarize-optimizer-run ~/spectre_opt_prj/<project_name>
+./.venv/bin/hermes-workflow finalize-optimizer-run ~/spectre_opt_prj/<project_name>
+./.venv/bin/hermes-workflow visualize-optimizer-run ~/spectre_opt_prj/<project_name>
+./.venv/bin/hermes-workflow decide-optimizer-run ~/spectre_opt_prj/<project_name>
+./.venv/bin/hermes-workflow record-optimizer-decision ~/spectre_opt_prj/<project_name> \
+  --reason "User accepted the current best observed optimizer result."
+./.venv/bin/hermes-workflow write-optimizer-final-summary ~/spectre_opt_prj/<project_name>
+./.venv/bin/hermes-workflow check-project-ready ~/spectre_opt_prj/<project_name>
+```
+
+Expected state after accepted closeout:
+
+```text
+project readiness: pass
+readiness: ready_for_closeout_review
+```
+
+## 6. Read The Final Artifacts
+
+Primary user-facing report:
+
+```text
+reports/optimizer_final_summary.md
+```
+
+Supporting reports:
+
+```text
+reports/optimizer_insight_report.md
+reports/optimizer_decision_report.md
+reports/optimizer_supervisor_decision.md
+reports/project_readiness_report.json
+```
+
+Important boundary: the accepted point is `best observed`, not a mathematical
+global optimum certificate.
+
+## Common Failure Meanings
+
+- `metric_check_failed`: OCEAN returned missing, non-scalar, or invalid metric
+  output for that candidate/testbench.
+- `constraint_failed`: real tools ran, but the candidate did not satisfy one or
+  more user constraints.
+- `real_check_failed`: Spectre/OCEAN result artifacts or manifests failed
+  structural checks.
+- Few or zero feasible points: review constraints, FoM, variable bounds, and
+  whether the initial Maestro point roots match the approved formulas.
+- Missing netlist sidecars: provide the Maestro point root and let Hermes copy
+  the full `netlist/` bundle; do not hand-pick only `input.scs`.

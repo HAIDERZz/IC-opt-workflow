@@ -1230,3 +1230,21 @@ C-53 Optimizer Final Summary Completion:
 ```text
 请继续 IC auto optimization workflow。先阅读 AGENTS.md、docs/CURRENT_TASK_STATE.json、docs/TOOLCHAIN_EXECUTION_REFERENCE.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-50 Multi-Testbench Candidate Evaluation 已完成；Post-C50 Objective Safe Math / All-Evaluable FoM Plot、Configured Objective Ranking、Bottleneck Weighted Score Plot、C-51 Optimizer Decision Report MVP、C-52 Optimizer Supervisor Decision Record 均已完成；C-53 Optimizer Final Summary 也已完成 verified-only。hermes-workflow write-optimizer-final-summary 现在从现有 supervisor decision、optimizer decision、optimizer insight artifacts 生成 reports/optimizer_final_summary.json 和 .md，不重跑 Spectre/OCEAN。真实项目 /home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb 的 final summary 接受 real_093：F=20、W=1.4u、L=30n、VB_LO=310m；metrics BW=20427078494.05402、MAX_GAIN=4.34394017341075、NF_3G=11.79600779830737、IIP3=2.739385297952587、P1DB=-1.547739364191455；bottleneck=BW；global_optimum_claim=false。下一步由用户决定是否停止本轮优化、从现有 artifacts continuation、或调整 FoM/constraints。不要为了报告格式重跑真实工具，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence logs、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
 ```
+
+C-54 Production Landing MVP Completion:
+
+- Status: complete, verified-only.
+- Added `docs/OPTIMIZER_PRODUCTION_QUICKSTART.md`, which documents the supported production path from `~/spectre_opt_prj/<project_name>/opt_requirement.md` through prepare/check/run/closeout/final summary.
+- Added `src/hermes_workflow/project_readiness.py` and CLI `hermes-workflow check-project-ready PROJECT_DIR`.
+- `check-project-ready` writes `reports/project_readiness_report.json` without running real tools. It checks `opt_requirement*.md`, required config files, contract validation, single- or multi-testbench netlist bundles, and final summary availability.
+- Updated template `OPT_REQUIREMENT_README.md` with readiness commands and the production quickstart pointer.
+- Real project `/home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb` passed readiness with `ready_for_closeout_review`, 3 testbench netlist bundles, and final summary accepting `real_093`; no Spectre/OCEAN rerun.
+- Verification: project readiness/intake/validate/final-report tests passed (`53 passed`), targeted ruff passed, cadence check passed, and `git diff --check` passed.
+- current_scope: C-54 Production Landing MVP complete.
+- next_allowed_action: use docs/OPTIMIZER_PRODUCTION_QUICKSTART.md and hermes-workflow check-project-ready to onboard the next real optimization project, or decide whether to run continuation on /home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb from existing artifacts. Do not add new optimizer features before a real user project needs them.
+
+## Latest Resume Prompt
+
+```text
+请继续 IC auto optimization workflow。先阅读 AGENTS.md、docs/CURRENT_TASK_STATE.json、docs/TOOLCHAIN_EXECUTION_REFERENCE.md、docs/OPTIMIZER_PRODUCTION_QUICKSTART.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-54 Production Landing MVP 已完成 verified-only。当前项目已有生产 Quickstart、check-project-ready CLI、multi-testbench真实优化闭环、decision/supervisor-decision/final-summary/readiness 报告。真实项目 /home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb readiness=ready_for_closeout_review，final summary 接受 real_093：F=20、W=1.4u、L=30n、VB_LO=310m；global_optimum_claim=false；bottleneck=BW。下一步优先用 Quickstart 和 check-project-ready onboarding 下一个真实优化项目，或按用户要求从现有 artifacts continuation/调整 FoM/constraints。不要为了报告格式重跑真实工具，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence logs、docs/OCEAN_DOC_*、docs/toolchain_evidence/，不要新增 optimizer 功能除非真实项目需要。
+```

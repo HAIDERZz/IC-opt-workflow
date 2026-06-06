@@ -183,3 +183,12 @@ Status: complete through C-51, verified-only.
   reports, next steps, and boundaries from existing artifacts. The real Mixer
   multi-testbench project generated this report for accepted `real_093`
   without rerunning Spectre/OCEAN.
+- C-54 added the production landing quickstart and offline readiness check.
+  `docs/OPTIMIZER_PRODUCTION_QUICKSTART.md` documents the supported user path
+  from project creation through final summary. `hermes-workflow
+  check-project-ready PROJECT_DIR` writes
+  `reports/project_readiness_report.json` and checks requirement/config/netlist
+  readiness plus final summary availability without running real tools.
+- Real project `/home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb` passed
+  `check-project-ready` with `readiness=ready_for_closeout_review`, three
+  testbench netlist bundles, and final summary accepting `real_093`.

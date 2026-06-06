@@ -2200,3 +2200,17 @@ C-53 Optimizer Final Summary:
 - current_scope: C-53 Optimizer Final Summary complete.
 - next_allowed_action: inspect reports/optimizer_final_summary.md for /home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb, then decide whether to stop this optimization as accepted, run a continuation from existing artifacts, or adjust FoM/constraints. Do not rerun real tools solely for report formatting.
 - next_allowed_action exact: inspect reports/optimizer_final_summary.md for /home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb, then decide whether to stop this optimization as accepted, run a continuation from existing artifacts, or adjust FoM/constraints. Do not rerun real tools solely for report formatting.
+
+C-54 Production Landing MVP:
+
+- Status: complete, verified-only.
+- Docs: `docs/OPTIMIZER_PRODUCTION_QUICKSTART.md`.
+- Code: `src/hermes_workflow/project_readiness.py`; CLI: `hermes-workflow check-project-ready`.
+- Template update: `src/hermes_workflow/templates/spectre_maestro_project/OPT_REQUIREMENT_README.md` now includes readiness checks and points users to the production quickstart.
+- Behavior: `check-project-ready` writes `reports/project_readiness_report.json` without running real tools. It checks user request presence, required config files, contract validation, single- or multi-testbench netlist bundles, and final summary availability.
+- Real project refresh: `/home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb` passed readiness with `ready_for_closeout_review`, 3 testbench netlist bundles, and final summary accepting `real_093`; no Spectre/OCEAN rerun.
+- Verification: project readiness/intake/validate/final-report tests passed (`53 passed`), targeted ruff passed, cadence check passed, and `git diff --check` passed.
+- Boundary: no Spectre/OCEAN rerun, no PSF parsing, no OCEAN formula rewrite, no candidate generation change, no OpenBox route change.
+- current_scope: C-54 Production Landing MVP complete.
+- next_allowed_action: use docs/OPTIMIZER_PRODUCTION_QUICKSTART.md and hermes-workflow check-project-ready to onboard the next real optimization project, or decide whether to run continuation on /home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb from existing artifacts. Do not add new optimizer features before a real user project needs them.
+- next_allowed_action exact: use docs/OPTIMIZER_PRODUCTION_QUICKSTART.md and hermes-workflow check-project-ready to onboard the next real optimization project, or decide whether to run continuation on /home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb from existing artifacts. Do not add new optimizer features before a real user project needs them.
