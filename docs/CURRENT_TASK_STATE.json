@@ -49,7 +49,7 @@
     "alignment": "Aligned as a narrow reporting refinement after C-50. It does not change candidate generation, Spectre/OCEAN execution, multi-testbench aggregation, acceptance logic, or OCEAN metric formulas.",
     "drift": "No execution-route drift. The change only adds an offline normalized-margin bottleneck/weighted plot to optimizer_insight_report. It does not rerun tools, parse PSF, rewrite OCEAN formulas, merge testbenches, or replace the OpenBox route."
   },
-  "latest_valid_commit": "c8cfd5d",
+  "latest_valid_commit": "98d48e6",
   "review_evidence": {
     "c47_plan": "docs/superpowers/plans/2026-06-05-openbox-advanced-visualization-artifact.md",
     "c47_tests": "Targeted tests passed: /home/zzchen/.venvs/openclaw/bin/python -m pytest tests/test_openbox_backend.py tests/test_optimizer_insights.py tests/test_optimizer_finalize.py",
