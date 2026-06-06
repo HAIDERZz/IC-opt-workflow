@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Callable, Sequence
 
 from hermes_workflow.metric_results import check_metric_results
+from hermes_workflow.optimizer_resources import optimizer_cpu_thread_limits
 from hermes_workflow.real_result_record import record_real_result
 from hermes_workflow.real_run import prepare_explicit_candidate_real_run
 from hermes_workflow.real_run_recovery import resolve_real_run_failure
@@ -187,6 +188,7 @@ class NativeTurboRunner:
         self.evaluator = evaluator
         self.turbo_factory = turbo_factory or _default_turbo_factory
         self.max_evals = max_evals or optimizer.optimizer.max_evaluations
+        self.optimizer_cpu_threads = optimizer.optimizer.optimizer_cpu_threads
         self.replacement_attempts = replacement_attempts
         self.workflow_failure_limit = workflow_failure_limit
         self.traces: list[NativeTurboEvaluationTrace] = []
@@ -198,16 +200,20 @@ class NativeTurboRunner:
         lb, ub = _raw_bounds(self.variables)
         n_params = len(self.variables.variables)
         n_init = 2 * n_params
-        turbo = self.turbo_factory(
-            f=self._objective,
-            lb=lb,
-            ub=ub,
-            n_init=n_init,
-            max_evals=self.max_evals,
-            batch_size=1,
-            verbose=False,
-        )
-        turbo.optimize()
+        with optimizer_cpu_thread_limits(
+            self.optimizer_cpu_threads,
+            set_environment=False,
+        ):
+            turbo = self.turbo_factory(
+                f=self._objective,
+                lb=lb,
+                ub=ub,
+                n_init=n_init,
+                max_evals=self.max_evals,
+                batch_size=1,
+                verbose=False,
+            )
+            turbo.optimize()
         return NativeTurboRunResult(
             evaluation_count=len(self.traces),
             traces=list(self.traces),
@@ -367,16 +373,20 @@ class NativeTurboBatchRunner(NativeTurboRunner):
         lb, ub = _raw_bounds(self.variables)
         n_params = len(self.variables.variables)
         n_init = 2 * n_params
-        turbo = self.turbo_factory(
-            f_batch=self._objective_batch,
-            lb=lb,
-            ub=ub,
-            n_init=n_init,
-            max_evals=self.max_evals,
-            batch_size=self.optimizer.optimizer.batch_size,
-            verbose=False,
-        )
-        turbo.optimize()
+        with optimizer_cpu_thread_limits(
+            self.optimizer_cpu_threads,
+            set_environment=False,
+        ):
+            turbo = self.turbo_factory(
+                f_batch=self._objective_batch,
+                lb=lb,
+                ub=ub,
+                n_init=n_init,
+                max_evals=self.max_evals,
+                batch_size=self.optimizer.optimizer.batch_size,
+                verbose=False,
+            )
+            turbo.optimize()
         return NativeTurboRunResult(
             evaluation_count=len(self.traces),
             traces=list(self.traces),

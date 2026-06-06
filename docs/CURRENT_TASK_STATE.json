@@ -1,23 +1,25 @@
 {
   "schema_version": "1.0",
-  "current_scope": "C-48 IC-native Offline Optimizer Insight Report complete",
-  "current_status": "C-48 is complete, verified-only. Existing optimizer_insight_report generation now adds IC-native offline report sections from evaluated samples: best feasible objective summary, top feasible candidates with display units, constraint margin summary, feasible-only convergence plot, constraint margin plot, and OpenBox SHAP parameter-importance summary parsed from the official visualization data when available. This is post-run reporting only: it does not change OpenBox candidate selection, Spectre/OCEAN execution, metric formulas, optimizer acceptance, or continuation decisions. It was validated against the C-47 real 100-evaluation workspace /tmp/ic_auto_opt_real_flow_t77ky7/bridge_test_inv without rerunning Spectre/OCEAN.",
+  "current_scope": "C-50 Multi-Testbench Candidate Evaluation",
+  "current_status": "C-50 Task 3 Child Run Manifests And Aggregated Metric Manifest is complete, verified-only. Multi-testbench child result and metric manifests under runs/real/<run_id>/testbenches/<id>/ can now be aggregated into the existing candidate-level result_manifest.json and metrics/metric_result_manifest.json. Existing check-real-run and check-metric-results operate on the aggregate files, while optional child_results and child_metric_results preserve per-testbench diagnosis. The latest real evidence remains /home/zzchen/spectre_opt_prj/Mixer_opt_openbox_nf12_001 with 200 cumulative NF=12dB OpenBox/Spectre/OCEAN evaluations and best observed real_100.",
   "review_status": "verified-only",
   "subagent_dispatch": "available",
-  "active_spec": "docs/superpowers/specs/2026-06-05-optimizer-post-run-visualization-insight-design.md",
-  "active_plan": "docs/superpowers/plans/2026-06-05-openbox-advanced-visualization-artifact.md",
+  "active_spec": "docs/superpowers/specs/2026-06-06-multi-testbench-candidate-evaluation-design.md",
+  "active_plan": "docs/superpowers/plans/2026-06-06-multi-testbench-candidate-evaluation.md",
   "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
   "progress_files": [
     "docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md",
     "docs/EXECUTION_PROGRESS_2026-05-29.md",
     "docs/COMPACT_RESUME_CHECKPOINT.md"
   ],
-  "next_allowed_action": "review the improved IC-native optimizer_insight_report from /tmp/ic_auto_opt_real_flow_t77ky7/bridge_test_inv and decide whether the report quality is sufficient for production adoption; do not rerun Spectre/OCEAN solely for report formatting.",
+  "next_allowed_action": "start C-50 Task 4: Single-Candidate Real Multi-Testbench Smoke only after user confirms the additional point-root/testbench inputs and real-tool execution.",
   "forbidden_actions": [
     "install unpinned latest shap into the OpenBox venv",
     "run real tool commands without first checking docs/TOOLCHAIN_EXECUTION_REFERENCE.md",
     "run long fake-run ladders before a meaningful real practice flow",
     "start broad optimizer framework work",
+    "merge multiple testbenches into one synthetic Spectre deck",
+    "multiply spectre.parallel_jobs per testbench",
     "hand-pick optimizer points instead of using OpenBox ask-and-tell",
     "replace optimizer backend again without an evidence-backed decision checkpoint",
     "run Virtuoso before explicit task confirmation",
@@ -41,11 +43,11 @@
     "git status --short"
   ],
   "route_audit": {
-    "active_spec": "docs/superpowers/specs/2026-06-05-optimizer-post-run-visualization-insight-design.md",
-    "active_plan": "docs/superpowers/plans/2026-06-05-openbox-advanced-visualization-artifact.md",
+    "active_spec": "docs/superpowers/specs/2026-06-06-multi-testbench-candidate-evaluation-design.md",
+    "active_plan": "docs/superpowers/plans/2026-06-06-multi-testbench-candidate-evaluation.md",
     "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
-    "alignment": "Aligned. C-48 improves the supervisor-facing post-run insight report using existing optimizer artifacts and the C-47 real samples. It stays inside the accepted OpenBox/Spectre/OCEAN route.",
-    "drift": "No execution-route drift. C-48 did not hand-pick candidates, change formulas, parse PSF, rerun Spectre/OCEAN, change optimizer acceptance, or replace the optimizer backend."
+    "alignment": "Aligned. C-50 Task 3 implements the spec's child-manifest aggregation route while preserving the existing candidate-level check-real-run and check-metric-results contract.",
+    "drift": "No execution-route drift. Task 3 did not run real tools, merge testbenches into a synthetic deck, parse PSF, rewrite formulas, change optimizer candidate generation, or change resource-control semantics."
   },
   "latest_valid_commit": "fe02035",
   "review_evidence": {
@@ -58,6 +60,22 @@
     "c47_real_flow": "/tmp/ic_auto_opt_real_flow_t77ky7/bridge_test_inv completed 100 real OpenBox/Spectre/OCEAN evaluations. Closeout accepted best observed real_071 and OpenBox advanced visualization manifest status was generated with objective/constraint history, surrogate verification, and parameter importance.",
     "c48_tests": "RED/GREEN targeted TDD: python3 -m pytest tests/test_optimizer_insights.py::test_generate_optimizer_insight_report_writes_ic_native_sections -q; full optimizer insights tests passed: python3 -m pytest tests/test_optimizer_insights.py -q.",
     "c48_adjacent_tests": "Adjacent closeout/report tests passed: python3 -m pytest tests/test_optimizer_insights.py tests/test_optimizer_finalize.py tests/test_optimizer_completion.py tests/test_optimizer_status.py -q (22 passed). Targeted ruff passed for optimizer_insights.py and test_optimizer_insights.py.",
-    "c48_real_sample_probe": "Regenerated optimizer_insight_report for /tmp/ic_auto_opt_real_flow_t77ky7/bridge_test_inv without rerunning Spectre/OCEAN; report status pass, OpenBox importance available, IC-native sections and new SVG paths generated."
+    "c48_real_sample_probe": "Regenerated optimizer_insight_report for /tmp/ic_auto_opt_real_flow_t77ky7/bridge_test_inv without rerunning Spectre/OCEAN; report status pass, OpenBox importance available, IC-native sections and new SVG paths generated.",
+    "c49_design_spec": "docs/superpowers/specs/2026-06-05-requirement-md-config-intake-design.md",
+    "c49_implementation_plan": "docs/superpowers/plans/2026-06-05-requirement-md-config-intake.md",
+    "c49_targeted_tests": "python3 -m pytest tests/test_requirement_intake.py tests/test_validate.py tests/test_netlists.py tests/test_package.py tests/test_cli.py -q (88 passed)",
+    "c49_full_suite": "python3 -m pytest -q (592 passed, 1 skipped)",
+    "c49_ruff": "python3 -m ruff check src tests tools (passed)",
+    "post_c49_mixer_single_point_smoke": "/home/zzchen/spectre_opt_prj/Mixer_opt/runs/real/real_002 passed Spectre 25.1, OCEAN, check-real-run, and check-metric-results. Scalars: BW=19171311623.07684 Hz, MAX_GAIN=4.242801858622344 dB, NF_3G=11.81241967045867 dB.",
+    "post_c49_mixer_openbox_optimizer_practice": "/home/zzchen/spectre_opt_prj/Mixer_opt_openbox_001 completed 100 real OpenBox/Spectre/OCEAN evaluations with Spectre 25.1. check-optimizer-run, summarize-optimizer-run, finalize-optimizer-run, and optimizer-status passed. Counts: constraint_failed=59, metric_check_failed=41, real_check_failed=0, feasible=0. NF_3G passed 0/59 scalar candidates.",
+    "post_c49_mixer_nf12_openbox_optimizer_practice": "/home/zzchen/spectre_opt_prj/Mixer_opt_openbox_nf12_001 changed only NF_3G lt 11.5 dB to NF_3G lt 12 dB, completed 100 real OpenBox/Spectre/OCEAN evaluations, and passed acceptance/finalize/status. Counts: constraint_failed=70, feasible=12, metric_check_failed=18, real_check_failed=0. Best feasible observed real_100: objective=1.134258035990259e-10, F=24, W=1.4u, L=40n, VB_LO=350m, BW=19225783343.99703 Hz, MAX_GAIN=5.48152961454769 dB, NF_3G=11.95357122269306 dB.",
+    "post_c49_mixer_nf12_continuation_blocker": "continue-openbox-real --additional-evals 100 --batch-size 10 --parallel-jobs 10 loaded prior observations but created no real_101+ directories and appended no evaluations. The OpenBox Python process stayed high-CPU for about 10 minutes before termination. Existing 100-eval results remained valid. Root cause: OpenBox default gp/eic/random_scipy candidate generation after 100 prior observations was too slow before any real Spectre/OCEAN run could start.",
+    "post_c49_mixer_nf12_continuation_fix": "A narrow backend/CLI fix exposed OpenBox Advisor strategy overrides. Rerun command used --surrogate-type prf --acq-type eic --acq-optimizer-type local_random and completed the requested +100 continuation. /home/zzchen/spectre_opt_prj/Mixer_opt_openbox_nf12_001 now has 200 cumulative real evaluations: constraint_failed=134, feasible=48, metric_check_failed=18, real_check_failed=0. Acceptance, completion, finalization, status, and insight report generation passed. Best observed remains real_100: F=24, W=1.4u, L=40n, VB_LO=350m, objective=1.134258035990259e-10. Continuation recommendation is false with plateau detected.",
+    "optimizer_cpu_threads": "Implemented verified-only. config/optimizer.yaml now supports optimizer_cpu_threads for Python optimizer math/threadpool control only. It is separate from spectre.parallel_jobs and spectre.threads_per_run. Targeted tests passed: python3 -m pytest tests/test_schemas.py tests/test_openbox_backend.py tests/test_native_turbo.py (53 passed, 1 skipped).",
+    "c50_design_spec": "docs/superpowers/specs/2026-06-06-multi-testbench-candidate-evaluation-design.md",
+    "c50_implementation_plan": "docs/superpowers/plans/2026-06-06-multi-testbench-candidate-evaluation.md",
+    "c50_task1_contract_intake": "Implemented optional TestbenchesConfig, metric.testbench routing validation, and requirement intake support for either single Maestro Source or Maestro Source.testbenches. Verification passed: python3 -m pytest tests/test_schemas.py tests/test_requirement_intake.py (39 passed) and python3 -m pytest tests/test_validate.py tests/test_package.py tests/test_cli.py (65 passed).",
+    "c50_task2_netlist_import_render": "Implemented namespaced multi-testbench Maestro point-root imports, child template generation, primary legacy path preservation, child dry-run rendering, and unsafe child symlink rejection. Verification passed: python3 -m pytest targeted Task 2 tests (3 passed), python3 -m pytest tests/test_requirement_intake.py tests/test_netlists.py tests/test_dry_run.py tests/test_validate.py (59 passed), and python3 -m pytest tests/test_package.py tests/test_cli.py (46 passed).",
+    "c50_task3_manifest_aggregation": "Implemented aggregate_multi_testbench_run with child result/metric manifest references, candidate-level aggregate result_manifest.json, and aggregate metrics/metric_result_manifest.json. Verification passed: python3 -m pytest tests/test_multi_testbench_aggregation.py (3 passed), python3 -m pytest tests/test_result_handoff.py tests/test_metric_results.py tests/test_requirement_intake.py (101 passed), python3 -m pytest tests/test_package.py tests/test_cli.py tests/test_validate.py (65 passed), and targeted ruff passed."
   }
 }

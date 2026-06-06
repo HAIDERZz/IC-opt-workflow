@@ -844,6 +844,17 @@ def _write_real_run_package(
             json.dumps(manifest_payload, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
+        _write_multi_testbench_real_run_packages(
+            bundle,
+            selected_run_id,
+            candidate,
+            candidate_id,
+            created_at_utc,
+            instruction,
+            approved_hashes,
+            candidate_relative,
+            manifest_extra,
+        )
     except Exception:
         if created_run_dir and run_dir.exists():
             shutil.rmtree(run_dir, ignore_errors=True)
@@ -863,9 +874,21 @@ def _write_real_run_package(
 
 
 def _copy_exported_netlist_bundle(bundle: ContractBundle, run_dir: Path) -> None:
-    exported_input = _project_path(
+    _copy_exported_netlist_bundle_from_relative(
         bundle,
         bundle.project_config.netlist.exported_input_scs,
+        run_dir,
+    )
+
+
+def _copy_exported_netlist_bundle_from_relative(
+    bundle: ContractBundle,
+    exported_input_relative: str,
+    run_dir: Path,
+) -> None:
+    exported_input = _project_path(
+        bundle,
+        exported_input_relative,
     )
     exported_root = exported_input.parent
     if exported_root.is_symlink():
@@ -889,6 +912,89 @@ def _copy_exported_netlist_bundle(bundle: ContractBundle, run_dir: Path) -> None
             raise ValueError(f"exported netlist bundle file is not regular: {source}")
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, destination)
+
+
+def _write_multi_testbench_real_run_packages(
+    bundle: ContractBundle,
+    selected_run_id: str,
+    candidate: dict,
+    candidate_id: str,
+    created_at_utc: str,
+    instruction: dict,
+    approved_hashes: dict[str, str],
+    candidate_relative: str,
+    manifest_extra: dict,
+) -> None:
+    if bundle.testbenches is None:
+        return
+
+    for testbench in bundle.testbenches.testbenches:
+        testbench_id = testbench.id
+        child_prefix = f"{REAL_RUN_ROOT}/{selected_run_id}/testbenches/{testbench_id}"
+        template_relative = f"netlists/testbenches/{testbench_id}/templates/template.scs"
+        exported_input_relative = f"netlists/testbenches/{testbench_id}/exported/input.scs"
+        rendered_relative = f"{child_prefix}/{SPECTRE_NETLIST_DIR}/input.scs"
+        metric_request_relative = f"{child_prefix}/metric_extraction_request.json"
+
+        template_path = _project_path(bundle, template_relative)
+        if not template_path.exists():
+            raise FileNotFoundError(f"template.scs is missing: {template_relative}")
+
+        child_dir = _project_path(bundle, child_prefix)
+        child_netlist_dir = child_dir / SPECTRE_NETLIST_DIR
+        child_netlist_dir.mkdir(parents=True, exist_ok=True)
+        _copy_exported_netlist_bundle_from_relative(
+            bundle,
+            exported_input_relative,
+            child_netlist_dir,
+        )
+
+        rendered_path = _project_path(bundle, rendered_relative)
+        rendered_path.write_text(
+            _render_template(
+                template_path.read_text(encoding="utf-8"),
+                candidate["parameters"],
+            ),
+            encoding="utf-8",
+        )
+        metrics_subset = [
+            metric for metric in bundle.metrics.metrics if metric.testbench == testbench_id
+        ]
+        metric_request_path = _project_path(bundle, metric_request_relative)
+        metric_request_payload = build_metric_extraction_request(
+            bundle,
+            run_id=selected_run_id,
+            candidate_id=candidate_id,
+            prepared_input_scs=rendered_relative,
+            prepared_input_sha256=sha256_file(rendered_path),
+            run_prefix=child_prefix,
+            metrics_subset=metrics_subset,
+        )
+        metric_request_path.write_text(
+            json.dumps(metric_request_payload, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        child_manifest = _build_manifest(
+            bundle,
+            selected_run_id,
+            candidate_id,
+            created_at_utc,
+            instruction,
+            approved_hashes,
+            template_relative,
+            rendered_relative,
+            candidate_relative,
+            metric_request_relative,
+            template_path,
+            rendered_path,
+            metric_request_path,
+        )
+        child_manifest.update(manifest_extra)
+        child_manifest["testbench_id"] = testbench_id
+        (child_dir / "real_run_manifest.json").write_text(
+            json.dumps(child_manifest, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
 
 
 def _render_template(template_text: str, candidate: dict[str, str]) -> str:

@@ -9,9 +9,168 @@ This note preserves the implementation state for continuing Plan A after context
 - Baseline branch: `master`
 - Baseline commit: `885e97f docs: capture workflow planning baseline`
 - Latest C-3 code commit before docs-only cleanup: `edb107f fix: harden preflight readiness gates`; docs cleanup continues through current HEAD
-- Active plan: `docs/superpowers/plans/2026-05-28-hermes-file-contract-mvp.md`
+- Active plan: `docs/superpowers/plans/2026-06-06-multi-testbench-candidate-evaluation.md`
+- Current scope: C-50 Multi-Testbench Candidate Evaluation
+- Current status: C-50 Task 3 Child Run Manifests And Aggregated Metric Manifest is complete, verified-only. Multi-testbench child result and metric manifests under `runs/real/<run_id>/testbenches/<id>/` can now be aggregated into the existing candidate-level `result_manifest.json` and `metrics/metric_result_manifest.json`; optional child refs preserve per-testbench diagnosis.
+- Next allowed action: start C-50 Task 4 Single-Candidate Real Multi-Testbench Smoke only after the user confirms the additional point-root/testbench inputs and real-tool execution.
 - Execution method: `superpowers:subagent-driven-development`
 - Dependencies installed in active Python environment on 2026-05-29: `pytest`, `typer`, `pydantic`, `PyYAML`, `ruff`
+
+## Current C-50 Checkpoint 2026-06-06
+
+Active spec:
+
+```text
+docs/superpowers/specs/2026-06-06-multi-testbench-candidate-evaluation-design.md
+```
+
+Active implementation plan:
+
+```text
+docs/superpowers/plans/2026-06-06-multi-testbench-candidate-evaluation.md
+```
+
+C-50 introduces the multi-testbench candidate evaluation route required for
+real Mixer optimization:
+
+```text
+candidate parameters
+-> render same parameters into each named Maestro/ADE testbench bundle
+-> run child Spectre/OCEAN jobs
+-> aggregate child scalar metric manifests
+-> evaluate constraints/objective once at candidate level
+```
+
+Planned scope:
+
+- preserve each testbench's native Maestro point-root netlist bundle;
+- route metrics by `metric.testbench`;
+- aggregate child result/metric manifests without parsing PSF or rewriting
+  formulas;
+- respect global `spectre.parallel_jobs` across all child jobs;
+- keep OpenBox/native TuRBO as candidate generators.
+
+Task 1 result:
+
+- `TestbenchesConfig` and `metric.testbench` routing are available in the
+  contract layer.
+- `prepare-from-requirement` writes `config/testbenches.yaml` only for
+  multi-testbench intake and preserves the old single-testbench layout
+  otherwise.
+- Duplicate testbench ids and unknown metric routes fail closed.
+- Verification passed:
+  `python3 -m pytest tests/test_schemas.py tests/test_requirement_intake.py`
+  (`39 passed`) and
+  `python3 -m pytest tests/test_validate.py tests/test_package.py tests/test_cli.py`
+  (`65 passed`).
+
+Task 2 result:
+
+- Multi-testbench point-root imports are namespaced under
+  `netlists/testbenches/<id>/exported/` while the primary legacy
+  `netlists/exported/` path is preserved for existing commands.
+- Child templates are written under
+  `netlists/testbenches/<id>/templates/template.scs`.
+- `dry-run` writes child rendered candidates under
+  `runs/dry_run/testbenches/<id>/input.scs`.
+- Unsafe symlinks in any named child point-root fail closed and include the
+  testbench id in the issue text.
+- Verification passed:
+  targeted Task 2 tests (`3 passed`),
+  requirement/netlist/dry-run/validate tests (`59 passed`), and
+  package/CLI tests (`46 passed`).
+
+Task 3 result:
+
+- `aggregate_multi_testbench_run()` aggregates child result/metric manifests
+  from `runs/real/<run_id>/testbenches/<id>/`.
+- Aggregate candidate-level manifests are written to the existing
+  `runs/real/<run_id>/result_manifest.json` and
+  `runs/real/<run_id>/metrics/metric_result_manifest.json` paths.
+- Optional `child_results` and `child_metric_results` fields preserve child
+  provenance while keeping single-testbench manifests backward-compatible.
+- Existing `check-real-run` and `check-metric-results` pass on a fake
+  two-testbench aggregate and distinguish metric failures from real-tool
+  failures.
+- Verification passed:
+  `python3 -m pytest tests/test_multi_testbench_aggregation.py` (`3 passed`),
+  `python3 -m pytest tests/test_result_handoff.py tests/test_metric_results.py tests/test_requirement_intake.py`
+  (`101 passed`),
+  `python3 -m pytest tests/test_package.py tests/test_cli.py tests/test_validate.py`
+  (`65 passed`), and targeted `ruff check`.
+
+Post-C-49 real smoke:
+
+- `real_001`: default lower-bound candidate `F=14`, `W=0.4u`, `L=30n`,
+  `VB_LO=150m`; Spectre 25.1 and OCEAN ran, but `BW` was non-scalar at this
+  candidate, so it is candidate-level evidence rather than the clean pass.
+- `real_002`: approved-grid baseline smoke `F=26`, `W=1u`, `L=40n`,
+  `VB_LO=310m`; Spectre 25.1 succeeded, OCEAN succeeded, `check-real-run`
+  passed, and `check-metric-results` passed.
+- `real_002` scalar results: `BW=19171311623.07684 Hz`,
+  `MAX_GAIN=4.242801858622344 dB`, `NF_3G=11.81241967045867 dB`.
+- Mixer encrypted `ade_e.scs` requires Spectre 25.1. Spectre 23.1 reports
+  `FATAL (SFE-79): Cannot decrypt the data` for this bundle.
+
+Post-C-49 Mixer OpenBox optimizer practice:
+
+- Clean workspace: `/home/zzchen/spectre_opt_prj/Mixer_opt_openbox_001`.
+- Run settings: OpenBox, `max_evals=100`, `batch_size=10`,
+  `parallel_jobs=10`, `threads_per_run=10`, `preset=cx`, Spectre 25.1 wrapper
+  `/tmp/ic_auto_opt_mixer_spectre251_env.csh`.
+- Result: `run-openbox-real` completed 100 real evaluations;
+  `check-optimizer-run`, `summarize-optimizer-run`, `finalize-optimizer-run`,
+  and `optimizer-status` all passed.
+- Status counts: `constraint_failed=59`, `metric_check_failed=41`,
+  `real_check_failed=0`, `feasible=0`.
+- Scalar constraint pass counts: `BW=15/59`, `MAX_GAIN=15/59`,
+  `NF_3G=0/59`.
+- Decision: `stop_for_user_review`, confidence `low`,
+  `global_optimum_claim=false`, continuation not recommended before user
+  review.
+- OpenBox advanced visualization generated under
+  `reports/openbox_advanced_visualization/`.
+- Follow-up: no-feasible best-candidate semantics need improvement because
+  `best observed` can point at a metric-check-failed row when no feasible
+  candidate exists.
+
+Post-C-49 Mixer NF=12dB optimizer practice:
+
+- Clean workspace: `/home/zzchen/spectre_opt_prj/Mixer_opt_openbox_nf12_001`.
+- Only contract change: `NF_3G lt 11.5 dB` -> `NF_3G lt 12 dB`.
+- Run settings: OpenBox, `max_evals=100`, `batch_size=10`,
+  `parallel_jobs=10`, `threads_per_run=10`, `preset=cx`, Spectre 25.1 wrapper
+  `/tmp/ic_auto_opt_mixer_spectre251_env.csh`.
+- Result: `run-openbox-real` completed 100 real evaluations;
+  `check-optimizer-run`, `summarize-optimizer-run`, `finalize-optimizer-run`,
+  and `optimizer-status` all passed.
+- Status counts: `constraint_failed=70`, `feasible=12`,
+  `metric_check_failed=18`, `real_check_failed=0`.
+- Best feasible observed: `real_100`, objective `1.134258035990259e-10`,
+  parameters `F=24`, `W=1.4u`, `L=40n`, `VB_LO=350m`;
+  metrics `BW=19225783343.99703 Hz`, `MAX_GAIN=5.48152961454769 dB`,
+  `NF_3G=11.95357122269306 dB`.
+- Decision: `continue_more_evals`, confidence `medium`,
+  `global_optimum_claim=false`, continuation recommended because recent window
+  improved and plateau was not detected.
+- Continuation blocker: attempting `continue-openbox-real --additional-evals 100
+  --batch-size 10 --parallel-jobs 10` did not create `real_101+` or append
+  evaluations. The OpenBox Python process stayed high-CPU for about 10 minutes
+  in candidate generation after loading prior observations and was terminated.
+  Existing 100-eval results remain valid. This is an OpenBox continuation
+  candidate-generation performance issue, not a Spectre/OCEAN failure.
+
+Verification:
+
+```text
+python3 -m pytest tests/test_requirement_intake.py tests/test_validate.py tests/test_netlists.py tests/test_package.py tests/test_cli.py -q
+python3 -m pytest -q
+python3 -m ruff check src tests tools
+```
+
+Result: targeted tests passed with `88 passed`; full suite passed with `592 passed, 1 skipped`; ruff passed.
+
+Route audit: aligned. C-49 did not run real tools, parse PSF, rewrite OCEAN formulas, change optimizer execution behavior, or flatten the Maestro/ADE netlist layout. The only schema extension was accepting `optimizer.algorithm: openbox`, matching the already-developed OpenBox backend route.
 
 ## Completed Tasks
 
@@ -1305,3 +1464,20 @@ C-48 IC-native Offline Optimizer Insight Report Completion:
 - Verification: `tests/test_optimizer_insights.py` passed, adjacent optimizer report/closeout tests passed (`22 passed`), targeted ruff passed.
 - Boundary: reporting-only change; no candidate selection, formula, adapter, acceptance, continuation, or PSF parsing change.
 - current_scope: C-48 IC-native Offline Optimizer Insight Report complete.
+
+Project Landing Baseline Consolidation:
+
+- Status: complete, verified-only.
+- Baseline: `docs/PROJECT_LANDING_BASELINE_2026-06-05.md`.
+- current_scope: Project landing baseline consolidation after C-48.
+- Solidified state: prepared projects with reviewed config and Maestro/ADE-style exported netlist bundles can run OpenBox optimizer handoff, close out through `finalize-optimizer-run` and `optimizer-status`, generate IC-native insight reports, and continue accepted OpenBox runs.
+- Remaining required landing gaps: user intent to structured intake/config, first user-selected real-cell bootstrap/adoption drill, formula/variable/resource approval checkpoint, and production guide tightening for the full user-to-run entry flow.
+- Boundary: docs/state consolidation only; no code change, real tool run, optimizer behavior change, candidate selection change, formula change, PSF parsing, or OCEAN formula rewrite.
+
+C-49 Requirement.md Driven Config Intake Design:
+
+- Status: complete, verified-only.
+- Design spec: `docs/superpowers/specs/2026-06-05-requirement-md-config-intake-design.md`.
+- current_scope: C-49 Requirement.md Driven Config Intake design spec complete.
+- Direction: users create `~/spectre_opt_prj/<project_name>/`, write strict `opt_requirement.md` with fixed Markdown headings and fenced YAML blocks, optionally write `constraints.md`, and provide `maestro_point_root`; Hermes later validates/renders existing config YAML and imports the Maestro point-root netlist bundle.
+- Boundary: design-only; no code change, real tool run, optimizer behavior change, formula rewrite, PSF parsing, or schema replacement.

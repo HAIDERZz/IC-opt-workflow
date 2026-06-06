@@ -140,6 +140,24 @@ setenv PATH /tmp/ic_auto_opt_openbox_spike/.venv/bin:$PATH
 Do not silently fall back from OpenBox to native TuRBO if this venv is missing
 or broken. Fix the OpenBox/Hermes execution environment first.
 
+### Optimizer And Spectre Resource Controls
+
+Keep these controls separate:
+
+- `config/optimizer.yaml: optimizer.optimizer_cpu_threads` limits Python-side
+  optimizer math and surrogate-model work, including OpenBox candidate
+  generation, OpenBox final visualization, and native TuRBO Torch/threadpool
+  work. It does not mean "run this many Spectre jobs."
+- `config/spectre.yaml: spectre.parallel_jobs` limits how many Spectre/OCEAN
+  candidate runs the execution side may launch at the same time.
+- `config/spectre.yaml: spectre.threads_per_run` maps to per-Spectre threading
+  such as `+mt=N`; it is not the candidate-level parallelism.
+
+For workstation-friendly real optimizer runs, start with
+`optimizer_cpu_threads: 4`, `parallel_jobs` set to the user's approved Cadence
+license/resource limit, and `threads_per_run` set to the validated Spectre
+accuracy/performance setting for the testbench.
+
 ### Cadence Environment
 
 Cadence cshrc:
@@ -147,6 +165,31 @@ Cadence cshrc:
 ```text
 /home/zzchen/cadence_ic231_env.csh
 ```
+
+### Mixer Project Spectre Version Note
+
+The user project at:
+
+```text
+/home/zzchen/spectre_opt_prj/Mixer_opt
+```
+
+imports an encrypted Maestro/ADE netlist bundle that requires Spectre 25.1.
+The IC231 environment's Spectre 23.1 fails on this bundle with:
+
+```text
+FATAL (SFE-79): Cannot decrypt the data
+```
+
+Use this override for the Mixer single-point and optimizer practice runs:
+
+```bash
+setenv SPECTRE_HOME /opt/eda/cadence/spectre_2510_125
+setenv PATH /opt/eda/cadence/spectre_2510_125/bin:$PATH
+```
+
+This is a tool-version compatibility requirement for that imported Maestro
+bundle, not a formula issue and not a reason to rewrite OCEAN expressions.
 
 Spectre/OCEAN/OpenBox real execution command shape:
 
@@ -348,6 +391,38 @@ Acceptance requires:
 - completion status pass;
 - insight status pass;
 - reports and SVGs generated.
+
+## OpenBox Real Continuation Command
+
+For continuation after about 100 prior constrained evaluations, do not rely on
+OpenBox's default `auto` strategy. The observed default route can select
+`gp/eic/random_scipy` and stay CPU-bound before any new Spectre run starts.
+
+Use explicit lightweight settings for continuation unless a later evidence run
+proves a better default:
+
+```bash
+csh -fc 'source /tmp/ic_auto_opt_mixer_spectre251_env.csh; setenv PATH /tmp/ic_auto_opt_openbox_spike/.venv/bin:$PATH; setenv MPLCONFIGDIR /tmp/ic_auto_opt_mixer_nf12_001_mpl; cd /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow; hermes-workflow continue-openbox-real PROJECT_DIR --additional-evals 100 --batch-size 10 --parallel-jobs 10 --cadence-cshrc /tmp/ic_auto_opt_mixer_spectre251_env.csh --surrogate-type prf --acq-type eic --acq-optimizer-type local_random'
+```
+
+Reference successful continuation:
+
+```text
+/home/zzchen/spectre_opt_prj/Mixer_opt_openbox_nf12_001
+```
+
+Result after continuation:
+
+```text
+evaluations: 200
+feasible: 48
+constraint_failed: 134
+metric_check_failed: 18
+real_check_failed: 0
+best_observed: real_100
+plateau_detected: true
+continuation_recommended: false
+```
 
 ## Native TuRBO Real Run Command
 

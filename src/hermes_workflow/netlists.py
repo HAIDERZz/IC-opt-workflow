@@ -14,17 +14,44 @@ ASSIGNMENT_TOKEN_RE = re.compile(r"(?<![A-Za-z0-9_])(?P<name>[A-Za-z_][A-Za-z0-9
 
 def prepare_netlist(project_dir: Path) -> NetlistPreparationReport:
     bundle = assert_valid_project(project_dir)
-    exported_path = _project_path(bundle, bundle.project_config.netlist.exported_input_scs)
-    template_path = _project_path(bundle, bundle.project_config.netlist.template_scs)
     variable_names = [variable.name for variable in bundle.variables.variables]
+    if bundle.testbenches is not None:
+        report = _prepare_multi_testbench_netlists(bundle, variable_names)
+        _write_report(bundle, report)
+        return report
+
+    report = _prepare_one_netlist(
+        bundle,
+        bundle.project_config.netlist.exported_input_scs,
+        bundle.project_config.netlist.template_scs,
+        variable_names,
+    )
+    _write_report(bundle, report)
+    return report
+
+
+def _prepare_one_netlist(
+    bundle: ContractBundle,
+    exported_relative: str,
+    template_relative: str,
+    variable_names: list[str],
+) -> NetlistPreparationReport:
+    exported_path = _project_path(bundle, exported_relative)
+    template_path = _project_path(bundle, template_relative)
     template_status = {name: False for name in variable_names}
     issues: list[str] = []
 
     if not exported_path.exists():
-        issues.append(f"exported input.scs is missing: {bundle.project_config.netlist.exported_input_scs}")
-        report = _build_report(bundle, PassFail.FAIL, template_status, [], False, issues)
-        _write_report(bundle, report)
-        return report
+        issues.append(f"exported input.scs is missing: {exported_relative}")
+        return _build_report(
+            PassFail.FAIL,
+            exported_relative,
+            template_relative,
+            template_status,
+            [],
+            False,
+            issues,
+        )
 
     deck_text = exported_path.read_text(encoding="utf-8")
     (
@@ -45,16 +72,109 @@ def prepare_netlist(project_dir: Path) -> NetlistPreparationReport:
     elif template_path.exists():
         template_path.unlink()
 
-    report = _build_report(
-        bundle,
+    return _build_report(
         status,
+        exported_relative,
+        template_relative,
         template_status,
         analysis_statements,
         forbidden_setup_changes_detected,
         issues,
     )
-    _write_report(bundle, report)
-    return report
+
+
+def _prepare_multi_testbench_netlists(
+    bundle: ContractBundle,
+    variable_names: list[str],
+) -> NetlistPreparationReport:
+    if bundle.testbenches is None:
+        raise TypeError("multi-testbench netlist preparation requires testbenches")
+
+    reports: list[tuple[str, NetlistPreparationReport]] = []
+    for testbench in bundle.testbenches.testbenches:
+        testbench_id = testbench.id
+        reports.append(
+            (
+                testbench_id,
+                _prepare_one_netlist(
+                    bundle,
+                    _testbench_exported_input(testbench_id),
+                    _testbench_template(testbench_id),
+                    variable_names,
+                ),
+            )
+        )
+
+    primary_legacy_report: NetlistPreparationReport | None = None
+    legacy_exported = _project_path(
+        bundle,
+        bundle.project_config.netlist.exported_input_scs,
+    )
+    if legacy_exported.exists():
+        primary_legacy_report = _prepare_one_netlist(
+            bundle,
+            bundle.project_config.netlist.exported_input_scs,
+            bundle.project_config.netlist.template_scs,
+            variable_names,
+        )
+
+    return _aggregate_multi_testbench_reports(
+        bundle,
+        reports,
+        primary_legacy_report,
+        variable_names,
+    )
+
+
+def _aggregate_multi_testbench_reports(
+    bundle: ContractBundle,
+    reports: list[tuple[str, NetlistPreparationReport]],
+    primary_legacy_report: NetlistPreparationReport | None,
+    variable_names: list[str],
+) -> NetlistPreparationReport:
+    all_reports = [report for _testbench_id, report in reports]
+    if primary_legacy_report is not None:
+        all_reports.append(primary_legacy_report)
+
+    template_status = {
+        name: all(
+            report.approved_variables_template_status.get(name, False)
+            for report in all_reports
+        )
+        for name in variable_names
+    }
+    analysis_statements: list[str] = []
+    for report in all_reports:
+        for analysis in report.analysis_statements:
+            if analysis not in analysis_statements:
+                analysis_statements.append(analysis)
+
+    issues: list[str] = []
+    for testbench_id, report in reports:
+        if report.status == PassFail.PASS:
+            continue
+        issues.extend(f"{testbench_id}: {issue}" for issue in report.issues)
+    if primary_legacy_report is not None and primary_legacy_report.status != PassFail.PASS:
+        issues.extend(
+            f"primary: {issue}" for issue in primary_legacy_report.issues
+        )
+
+    status = (
+        PassFail.PASS
+        if not issues
+        and all(report.status == PassFail.PASS for report in all_reports)
+        and all(template_status.values())
+        else PassFail.FAIL
+    )
+    return _build_report(
+        status,
+        "netlists/testbenches",
+        "netlists/testbenches",
+        template_status,
+        analysis_statements,
+        any(report.forbidden_setup_changes_detected for report in all_reports),
+        issues,
+    )
 
 
 def _project_path(bundle: ContractBundle, relative_path: str) -> Path:
@@ -62,6 +182,14 @@ def _project_path(bundle: ContractBundle, relative_path: str) -> Path:
     if path.is_absolute() or ".." in path.parts:
         raise ValueError(f"netlist path must be project-relative and safe: {relative_path}")
     return bundle.project_dir / Path(*path.parts)
+
+
+def _testbench_exported_input(testbench_id: str) -> str:
+    return f"netlists/testbenches/{testbench_id}/exported/input.scs"
+
+
+def _testbench_template(testbench_id: str) -> str:
+    return f"netlists/testbenches/{testbench_id}/templates/template.scs"
 
 
 def _template_deck(
@@ -224,8 +352,9 @@ def _split_rewritten_statement(
 
 
 def _build_report(
-    bundle: ContractBundle,
     status: PassFail,
+    exported_input_scs: str,
+    template_scs: str,
     template_status: dict[str, bool],
     analysis_statements: list[str],
     forbidden_setup_changes_detected: bool,
@@ -234,8 +363,8 @@ def _build_report(
     return NetlistPreparationReport(
         schema_version="1.0",
         status=status,
-        exported_input_scs=bundle.project_config.netlist.exported_input_scs,
-        template_scs=bundle.project_config.netlist.template_scs,
+        exported_input_scs=exported_input_scs,
+        template_scs=template_scs,
         approved_variables_template_status=template_status,
         analysis_statements=analysis_statements,
         forbidden_setup_changes_detected=forbidden_setup_changes_detected,

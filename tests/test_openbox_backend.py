@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from contextlib import contextmanager
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -253,6 +254,42 @@ def test_openbox_fake_runner_writes_backend_neutral_artifacts(
     assert rows[0]["result_manifest"] is None
     assert rows[0]["metric_result_manifest"] is None
     assert rows[0]["batch_id"] == "batch_001"
+
+
+def test_openbox_fake_runner_applies_optimizer_cpu_thread_limit(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    import hermes_workflow.openbox_backend as module
+
+    project_dir = create_approved_real_project(tmp_path)
+    optimizer_path = project_dir / "config" / "optimizer.yaml"
+    optimizer_path.write_text(
+        optimizer_path.read_text(encoding="utf-8").replace(
+            "deduplicate_candidates: true",
+            "deduplicate_candidates: true\n  optimizer_cpu_threads: 3",
+        ),
+        encoding="utf-8",
+    )
+    calls: list[tuple[int, dict[str, object]]] = []
+
+    @contextmanager
+    def fake_limits(threads: int, **kwargs):
+        calls.append((threads, dict(kwargs)))
+        yield
+
+    monkeypatch.setattr(module, "optimizer_cpu_thread_limits", fake_limits)
+
+    run_openbox_fake_optimization(
+        project_dir,
+        max_evals=2,
+        batch_size=2,
+        advisor_factory=lambda _space, _seed: FakeAdvisor(),
+    )
+
+    assert calls
+    assert all(call[0] == 3 for call in calls)
+    assert any(call[1].get("set_environment") is True for call in calls)
 
 
 def test_openbox_runner_writes_advanced_visualization_artifact(
@@ -559,11 +596,17 @@ def test_run_openbox_real_cli_uses_dependency_gate(tmp_path: Path, monkeypatch) 
         batch_size: int | None,
         parallel_jobs: int | None,
         cadence_cshrc: Path | None,
+        surrogate_type: str | None,
+        acq_type: str | None,
+        acq_optimizer_type: str | None,
     ) -> object:
         assert max_evals == 3
         assert batch_size == 2
         assert parallel_jobs == 2
         assert cadence_cshrc is None
+        assert surrogate_type == "prf"
+        assert acq_type == "eic"
+        assert acq_optimizer_type == "local_random"
         return type(
             "Result",
             (),
@@ -586,6 +629,12 @@ def test_run_openbox_real_cli_uses_dependency_gate(tmp_path: Path, monkeypatch) 
             "2",
             "--parallel-jobs",
             "2",
+            "--surrogate-type",
+            "prf",
+            "--acq-type",
+            "eic",
+            "--acq-optimizer-type",
+            "local_random",
         ],
     )
 
@@ -610,6 +659,9 @@ def test_continue_openbox_real_cli_uses_additional_evals(
         batch_size: int | None,
         parallel_jobs: int | None,
         cadence_cshrc: Path | None,
+        surrogate_type: str | None,
+        acq_type: str | None,
+        acq_optimizer_type: str | None,
     ) -> object:
         assert max_evals is None
         assert additional_evals == 5
@@ -617,6 +669,9 @@ def test_continue_openbox_real_cli_uses_additional_evals(
         assert batch_size == 2
         assert parallel_jobs == 2
         assert cadence_cshrc is None
+        assert surrogate_type == "prf"
+        assert acq_type == "eic"
+        assert acq_optimizer_type == "local_random"
         return type(
             "Result",
             (),
@@ -639,6 +694,12 @@ def test_continue_openbox_real_cli_uses_additional_evals(
             "2",
             "--parallel-jobs",
             "2",
+            "--surrogate-type",
+            "prf",
+            "--acq-type",
+            "eic",
+            "--acq-optimizer-type",
+            "local_random",
         ],
     )
 

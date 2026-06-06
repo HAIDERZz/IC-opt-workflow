@@ -6,5 +6,6 @@ optimizer:
   max_evaluations: 100
   batch_size: 10
   random_seed: 20260528
+  optimizer_cpu_threads: 4
   failure_penalty: 1000000.0
   deduplicate_candidates: true

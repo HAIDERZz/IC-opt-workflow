@@ -48,6 +48,7 @@ Use real, working Cadence/Maestro/ADE/OCEAN behavior as the foundation. Do not r
 - If a needed behavior has not been practically confirmed, the active design spec and implementation plan must include a scoped evidence-gathering task before code tries to generalize it.
 - Treat successful local evidence as a constraint. When new code fails, compare against the successful evidence first and move the code toward that known-good path before adding new abstractions or contract fields.
 - Do not change approved metric formulas to compensate for adapter/layout bugs. Fix the adapter/layout so the approved formulas run in the same context that made them valid.
+- For multi-testbench optimization, preserve each Maestro/ADE point-root as its own native netlist bundle. Do not merge multiple testbenches into a synthetic Spectre deck; aggregate child OCEAN scalar metric manifests at the candidate level instead.
 - Reduce fake-run ladders. Fake/local runs are for contract, schema, CLI wiring, or unit behavior only. For features whose value depends on Cadence/OpenBox behavior, run at most one focused fake/local smoke per new command path, then move to the smallest meaningful real practice flow.
 - Do not create speculative, overlapping, or overly broad assets.
 - Prefer one narrow artifact per verified need. Avoid broad new specs, duplicate plans, extra schemas, or catch-all debug frameworks unless the current evidence proves they are necessary.

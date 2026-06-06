@@ -55,10 +55,20 @@ class MetricResultEntry(BaseModel):
     value: object = None
     value_text: str | None = None
     unit: str
-    result: str
+    result: str | None = None
     expression: str
     expression_sha256: str
     expression_source: str
+    issues: list[str] = Field(default_factory=list)
+
+
+class ChildMetricResultReference(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    testbench: str
+    metric_result_manifest: str
+    status: MetricResultStatus
+    metrics: list[str] = Field(default_factory=list)
     issues: list[str] = Field(default_factory=list)
 
 
@@ -75,6 +85,7 @@ class MetricResultManifest(BaseModel):
     psf_dir: str
     ocean: OceanExecution
     metrics: list[MetricResultEntry]
+    child_metric_results: list[ChildMetricResultReference] = Field(default_factory=list)
     issues: list[str] = Field(default_factory=list)
 
 
@@ -107,7 +118,7 @@ class MetricRequestEntry(BaseModel):
     name: str
     unit: str
     required_signals: list[str] = Field(default_factory=list)
-    result: str
+    result: str | None = None
     expression: str
     expression_sha256: str
     expression_source: str

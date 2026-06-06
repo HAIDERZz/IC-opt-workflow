@@ -84,6 +84,7 @@ class SpectrePreset(StrEnum):
 
 class OptimizerAlgorithm(StrEnum):
     TURBO = "turbo"
+    OPENBOX = "openbox"
     RANDOM = "random"
 
 
@@ -111,6 +112,28 @@ class TestbenchConfig(StrictModel):
     maestro_view: NonEmptyStr
     test_name: NonEmptyStr
     corner: NonEmptyStr
+
+
+class NamedTestbenchConfig(TestbenchConfig):
+    id: str
+    maestro_point_root: NonEmptyStr
+
+    @field_validator("id")
+    @classmethod
+    def _id_is_identifier(cls, value: str) -> str:
+        return validate_name(value, "testbench id")
+
+
+class TestbenchesConfig(StrictModel):
+    schema_version: Literal["1.0"]
+    testbenches: list[NamedTestbenchConfig] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def _testbench_ids_are_unique(self) -> "TestbenchesConfig":
+        ids = [testbench.id for testbench in self.testbenches]
+        if len(ids) != len(set(ids)):
+            raise ValueError("testbench ids must be unique")
+        return self
 
 
 class NetlistConfig(StrictModel):
@@ -176,7 +199,7 @@ class VariablesConfig(StrictModel):
 
 class OceanMetricSpec(StrictModel):
     expression: NonEmptyStr
-    result: NonEmptyStr
+    result: NonEmptyStr | None = None
     expression_source: OceanExpressionSource
     source_reference: NonEmptyStr
     expected_value_type: OceanExpectedValueType
@@ -195,7 +218,8 @@ class MetricSpec(StrictModel):
     name: str
     unit: NonEmptyStr
     maestro_formula: NonEmptyStr
-    required_signals: list[NonEmptyStr]
+    testbench: str | None = None
+    required_signals: list[NonEmptyStr] = Field(default_factory=list)
     ocean: OceanMetricSpec | None = None
 
     @field_validator("name")
@@ -203,12 +227,12 @@ class MetricSpec(StrictModel):
     def _name_is_identifier(cls, value: str) -> str:
         return validate_name(value, "metric name")
 
-    @field_validator("required_signals")
+    @field_validator("testbench")
     @classmethod
-    def _required_signals_non_empty(cls, value: list[str]) -> list[str]:
-        if not value:
-            raise ValueError("required_signals must not be empty")
-        return value
+    def _testbench_is_identifier(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return validate_name(value, "metric testbench")
 
 
 class ConstraintSpec(StrictModel):
@@ -264,6 +288,7 @@ class OptimizerSettings(StrictModel):
     max_evaluations: StrictInt = Field(ge=1)
     batch_size: StrictInt = Field(ge=1)
     random_seed: StrictInt
+    optimizer_cpu_threads: StrictInt = Field(default=4, ge=1)
     failure_penalty: StrictFloat = Field(gt=0)
     deduplicate_candidates: StrictBool
 

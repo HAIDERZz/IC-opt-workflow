@@ -24,6 +24,7 @@ from hermes_workflow.optimizer_artifacts import (
     REPORT_RELATIVE,
     load_optimizer_artifacts,
 )
+from hermes_workflow.optimizer_resources import optimizer_cpu_thread_limits
 from hermes_workflow.real_result_record import record_real_result
 from hermes_workflow.real_run import prepare_explicit_candidate_real_run
 from hermes_workflow.schemas import (
@@ -82,6 +83,7 @@ class OpenBoxBatchRunSettings:
     random_seed: int
     parallel_jobs: int
     threads_per_run: int | None
+    optimizer_cpu_threads: int | None
     continuation_enabled: bool = False
     prior_evaluation_count: int = 0
     additional_evals: int | None = None
@@ -116,6 +118,9 @@ def run_openbox_fake_optimization(
     batch_size: int,
     advisor_factory: AdvisorFactory | None = None,
     random_seed: int | None = None,
+    surrogate_type: str | None = None,
+    acq_type: str | None = None,
+    acq_optimizer_type: str | None = None,
 ) -> NativeTurboRunResult:
     if batch_size < 1:
         raise ValueError("batch_size must be >= 1")
@@ -149,8 +154,12 @@ def run_openbox_fake_optimization(
         random_seed=seed,
         parallel_jobs=batch_size,
         threads_per_run=None,
+        optimizer_cpu_threads=contract.optimizer.optimizer.optimizer_cpu_threads,
         prior_traces=prior_traces,
         continuation_additional_evals=additional_evals,
+        surrogate_type=surrogate_type,
+        acq_type=acq_type,
+        acq_optimizer_type=acq_optimizer_type,
     )
     return result
 
@@ -167,6 +176,9 @@ def run_openbox_real_optimization(
     advisor_factory: AdvisorFactory | None = None,
     adapter: Callable[..., object] | None = None,
     random_seed: int | None = None,
+    surrogate_type: str | None = None,
+    acq_type: str | None = None,
+    acq_optimizer_type: str | None = None,
 ) -> NativeTurboRunResult:
     project_root = Path(project_dir)
     bundle = assert_valid_project(project_root)
@@ -212,8 +224,12 @@ def run_openbox_real_optimization(
         random_seed=seed,
         parallel_jobs=selected_parallel_jobs,
         threads_per_run=bundle.spectre.spectre.threads_per_run,
+        optimizer_cpu_threads=bundle.optimizer.optimizer.optimizer_cpu_threads,
         prior_traces=prior_traces,
         continuation_additional_evals=additional_evals,
+        surrogate_type=surrogate_type,
+        acq_type=acq_type,
+        acq_optimizer_type=acq_optimizer_type,
     )
 
 
@@ -237,6 +253,7 @@ def write_openbox_fake_reports(
                 default=0,
             ),
             threads_per_run=None,
+            optimizer_cpu_threads=None,
         ),
         duplicate_replacements=0,
     )
@@ -283,6 +300,7 @@ def write_openbox_reports(
             "batch_size": settings.batch_size,
             "parallel_jobs": settings.parallel_jobs,
             "threads_per_run": settings.threads_per_run,
+            "optimizer_cpu_threads": settings.optimizer_cpu_threads,
             "duplicate_replacements": duplicate_replacements,
             "continuation": {
                 "enabled": settings.continuation_enabled,
@@ -387,17 +405,29 @@ def _run_openbox_batches(
     random_seed: int,
     parallel_jobs: int,
     threads_per_run: int | None,
+    optimizer_cpu_threads: int,
     prior_traces: list[NativeTurboEvaluationTrace] | None = None,
     continuation_additional_evals: int | None = None,
+    surrogate_type: str | None = None,
+    acq_type: str | None = None,
+    acq_optimizer_type: str | None = None,
 ) -> NativeTurboRunResult:
     contract = load_native_turbo_contract(project_dir)
-    advisor, observation_factory, config_builder = _create_advisor(
-        project_dir,
-        contract.variables,
-        random_seed,
-        advisor_factory=advisor_factory,
-        num_constraints=len(contract.metrics.constraints),
-    )
+    with optimizer_cpu_thread_limits(
+        optimizer_cpu_threads,
+        set_environment=True,
+        set_torch=False,
+    ):
+        advisor, observation_factory, config_builder = _create_advisor(
+            project_dir,
+            contract.variables,
+            random_seed,
+            advisor_factory=advisor_factory,
+            num_constraints=len(contract.metrics.constraints),
+            surrogate_type=surrogate_type,
+            acq_type=acq_type,
+            acq_optimizer_type=acq_optimizer_type,
+        )
     traces: list[NativeTurboEvaluationTrace] = list(prior_traces or [])
     prior_count = len(traces)
     seen_keys: set[tuple[tuple[str, str], ...]] = _seen_keys_from_traces(traces)
@@ -415,38 +445,51 @@ def _run_openbox_batches(
         random_seed=random_seed,
         parallel_jobs=parallel_jobs,
         threads_per_run=threads_per_run,
+        optimizer_cpu_threads=optimizer_cpu_threads,
         continuation_enabled=prior_count > 0,
         prior_evaluation_count=prior_count,
         additional_evals=continuation_additional_evals,
     )
     if traces:
-        _update_observations(
-            advisor,
-            [
-                _make_openbox_observation(
-                    metrics_config=contract.metrics,
-                    trace=trace,
-                    config=config_builder(trace.parameters),
-                    observation_factory=observation_factory,
-                )
-                for trace in traces
-            ],
-        )
+        with optimizer_cpu_thread_limits(
+            optimizer_cpu_threads,
+            set_environment=True,
+            set_torch=False,
+        ):
+            _update_observations(
+                advisor,
+                [
+                    _make_openbox_observation(
+                        metrics_config=contract.metrics,
+                        trace=trace,
+                        config=config_builder(trace.parameters),
+                        observation_factory=observation_factory,
+                    )
+                    for trace in traces
+                ],
+            )
 
     while len(traces) < max_evals:
         batch_index += 1
         selected_batch_size = min(batch_size, max_evals - len(traces))
-        batch = _prepare_unique_batch(
-            advisor=advisor,
-            variables=contract.variables,
-            seen_keys=seen_keys,
-            batch_id=f"batch_{batch_index:03d}",
-            batch_size=selected_batch_size,
-            evaluation_offset=len(traces),
-            run_evaluation_offset=len(traces) - prior_count,
-            run_offset=run_offset,
-            run_prefix=("fake" if execution_mode == FAKE_EXECUTION_MODE else "real"),
-        )
+        with optimizer_cpu_thread_limits(
+            optimizer_cpu_threads,
+            set_environment=True,
+            set_torch=False,
+        ):
+            batch = _prepare_unique_batch(
+                advisor=advisor,
+                variables=contract.variables,
+                seen_keys=seen_keys,
+                batch_id=f"batch_{batch_index:03d}",
+                batch_size=selected_batch_size,
+                evaluation_offset=len(traces),
+                run_evaluation_offset=len(traces) - prior_count,
+                run_offset=run_offset,
+                run_prefix=(
+                    "fake" if execution_mode == FAKE_EXECUTION_MODE else "real"
+                ),
+            )
         duplicate_replacements += batch.duplicate_replacements
         observations = evaluator(
             [
@@ -489,7 +532,12 @@ def _run_openbox_batches(
                 )
             )
 
-        _update_observations(advisor, openbox_observations)
+        with optimizer_cpu_thread_limits(
+            optimizer_cpu_threads,
+            set_environment=True,
+            set_torch=False,
+        ):
+            _update_observations(advisor, openbox_observations)
         partial = NativeTurboRunResult(
             evaluation_count=len(traces),
             traces=list(traces),
@@ -507,11 +555,16 @@ def _run_openbox_batches(
         traces=traces,
         best_trace=_best_trace(traces),
     )
-    advanced_visualization = _write_openbox_advanced_visualization_manifest(
-        project_dir,
-        advisor=advisor,
-        max_evals=max_evals,
-    )
+    with optimizer_cpu_thread_limits(
+        optimizer_cpu_threads,
+        set_environment=True,
+        set_torch=False,
+    ):
+        advanced_visualization = _write_openbox_advanced_visualization_manifest(
+            project_dir,
+            advisor=advisor,
+            max_evals=max_evals,
+        )
     report_path, evaluations_path = write_openbox_reports(
         project_dir,
         result,
@@ -799,6 +852,9 @@ def _create_advisor(
     *,
     advisor_factory: AdvisorFactory | None,
     num_constraints: int,
+    surrogate_type: str | None,
+    acq_type: str | None,
+    acq_optimizer_type: str | None,
 ) -> tuple[object, Callable[..., object], Callable[[dict[str, str]], object]]:
     if advisor_factory is not None:
         return (
@@ -818,6 +874,9 @@ def _create_advisor(
             num_constraints=num_constraints,
             initial_trials=max(2 * len(variables.variables), 1),
             init_strategy="sobol",
+            surrogate_type=surrogate_type or "auto",
+            acq_type=acq_type or "auto",
+            acq_optimizer_type=acq_optimizer_type or "auto",
             task_id="hermes_openbox_real",
             output_dir=str(output_dir),
             random_state=seed,

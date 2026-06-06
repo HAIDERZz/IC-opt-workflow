@@ -15,6 +15,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("project_dir", type=Path)
     parser.add_argument("--run-id", default="real_001")
+    parser.add_argument("--testbench-id")
     parser.add_argument("--allow-overwrite", action="store_true")
     args = parser.parse_args(argv)
 
@@ -22,6 +23,7 @@ def main(argv: list[str] | None = None) -> int:
         result = run_spectre_ocean_adapter(
             args.project_dir,
             run_id=args.run_id,
+            testbench_id=args.testbench_id,
             allow_overwrite=args.allow_overwrite,
         )
     except AdapterPreconditionError as exc:

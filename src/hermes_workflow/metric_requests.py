@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Sequence
+from typing import Any
 
 from hermes_workflow.validate import ContractBundle
 
@@ -21,6 +23,8 @@ def build_metric_extraction_request(
     candidate_id: str,
     prepared_input_scs: str,
     prepared_input_sha256: str,
+    run_prefix: str | None = None,
+    metrics_subset: Sequence[Any] | None = None,
 ) -> dict:
     spectre = bundle.spectre.spectre
     if spectre.output_format not in OCEAN_READY_FORMATS:
@@ -30,27 +34,28 @@ def build_metric_extraction_request(
         )
 
     metrics = []
-    for metric in bundle.metrics.metrics:
+    selected_metrics = metrics_subset or bundle.metrics.metrics
+    for metric in selected_metrics:
         if metric.ocean is None:
             raise ValueError(f"metric {metric.name} is missing ocean formula")
         ocean = metric.ocean
-        metrics.append(
-            {
-                "name": metric.name,
-                "unit": metric.unit,
-                "required_signals": metric.required_signals,
-                "result": ocean.result,
-                "expression": ocean.expression,
-                "expression_sha256": expression_sha256(ocean.expression),
-                "expression_source": ocean.expression_source.value,
-                "source_reference": ocean.source_reference,
-                "expected_value_type": ocean.expected_value_type.value,
-                "nil_policy": ocean.nil_policy.value,
-                "non_finite_policy": ocean.non_finite_policy.value,
-            }
-        )
+        entry = {
+            "name": metric.name,
+            "unit": metric.unit,
+            "required_signals": metric.required_signals,
+            "expression": ocean.expression,
+            "expression_sha256": expression_sha256(ocean.expression),
+            "expression_source": ocean.expression_source.value,
+            "source_reference": ocean.source_reference,
+            "expected_value_type": ocean.expected_value_type.value,
+            "nil_policy": ocean.nil_policy.value,
+            "non_finite_policy": ocean.non_finite_policy.value,
+        }
+        if ocean.result:
+            entry["result"] = ocean.result
+        metrics.append(entry)
 
-    run_prefix = f"runs/real/{run_id}"
+    run_prefix = run_prefix or f"runs/real/{run_id}"
     return {
         "schema_version": "1.0",
         "run_id": run_id,

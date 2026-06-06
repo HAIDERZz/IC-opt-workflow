@@ -11,6 +11,7 @@ from hermes_workflow.schemas import (
     ProjectConfig,
     SpectreConfig,
     SpectrePreset,
+    TestbenchesConfig,
     VariablesConfig,
 )
 
@@ -45,12 +46,13 @@ def test_variables_reject_duplicate_names() -> None:
         VariablesConfig.model_validate(payload)
 
 
-def test_metrics_reject_empty_required_signals() -> None:
+def test_metrics_allow_empty_required_signals() -> None:
     payload = load_yaml("metrics.yaml")
     payload["metrics"][0]["required_signals"] = []
 
-    with pytest.raises(ValidationError, match="required_signals must not be empty"):
-        MetricsConfig.model_validate(payload)
+    metrics = MetricsConfig.model_validate(payload)
+
+    assert metrics.metrics[0].required_signals == []
 
 
 @pytest.mark.parametrize(
@@ -124,3 +126,60 @@ def test_optimizer_rejects_numeric_boolean_literal() -> None:
 
     with pytest.raises(ValidationError):
         OptimizerConfig.model_validate(payload)
+
+
+def test_optimizer_accepts_cpu_thread_limit() -> None:
+    payload = load_yaml("optimizer.yaml")
+    payload["optimizer"]["optimizer_cpu_threads"] = 3
+
+    optimizer = OptimizerConfig.model_validate(payload)
+
+    assert optimizer.optimizer.optimizer_cpu_threads == 3
+
+
+def test_optimizer_rejects_invalid_cpu_thread_limit() -> None:
+    payload = load_yaml("optimizer.yaml")
+    payload["optimizer"]["optimizer_cpu_threads"] = 0
+
+    with pytest.raises(ValidationError):
+        OptimizerConfig.model_validate(payload)
+
+
+def test_optimizer_accepts_openbox_algorithm() -> None:
+    payload = load_yaml("optimizer.yaml")
+    payload["optimizer"]["algorithm"] = "openbox"
+
+    optimizer = OptimizerConfig.model_validate(payload)
+
+    assert optimizer.optimizer.algorithm is OptimizerAlgorithm.OPENBOX
+
+
+def test_testbenches_config_rejects_duplicate_ids() -> None:
+    payload = {
+        "schema_version": "1.0",
+        "testbenches": [
+            {
+                "id": "cg_nf",
+                "maestro_point_root": "/tmp/cg_nf",
+                "virtuoso_library": "MixerLib",
+                "cell": "Mixer",
+                "design_view": "schematic",
+                "maestro_view": "maestro",
+                "test_name": "CG_NF_Test",
+                "corner": "Nominal",
+            },
+            {
+                "id": "cg_nf",
+                "maestro_point_root": "/tmp/iip3",
+                "virtuoso_library": "MixerLib",
+                "cell": "Mixer",
+                "design_view": "schematic",
+                "maestro_view": "maestro",
+                "test_name": "IIP3_Test",
+                "corner": "Nominal",
+            },
+        ],
+    }
+
+    with pytest.raises(ValidationError, match="testbench ids must be unique"):
+        TestbenchesConfig.model_validate(payload)

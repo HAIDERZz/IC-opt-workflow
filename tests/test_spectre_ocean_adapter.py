@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from hermes_workflow.approvals import decide_first_real_run
+from hermes_workflow.dry_run import run_dry_run
 from hermes_workflow.execution_adapters.spectre_ocean import (
     AdapterPreconditionError,
     CommandResult,
@@ -23,8 +24,10 @@ from hermes_workflow.package import (
 )
 from hermes_workflow.real_run import prepare_real_run
 from hermes_workflow.reports import MetricResultCheckStatus, RealRunCheckStatus
+from hermes_workflow.requirement_intake import prepare_from_requirement
 from hermes_workflow.result_handoff import check_real_run
 from tests.report_helpers import write_pass_reports
+from tests.test_requirement_intake import _copy_multi_testbench_requirement_project
 
 
 TEMPLATE_TEXT = """simulator lang=spectre
@@ -61,6 +64,21 @@ def _create_ready_real_run_project(tmp_path: Path) -> Path:
     return project_dir
 
 
+def _create_ready_multi_testbench_project(tmp_path: Path) -> Path:
+    project_dir = _copy_multi_testbench_requirement_project(tmp_path)
+    assert prepare_from_requirement(project_dir).status == "pass"
+    assert run_dry_run(project_dir).status.value == "pass"
+    build_execution_package(project_dir, created_at_utc="2026-06-06T00:00:00Z")
+    write_pass_reports(project_dir)
+    instruction = decide_first_real_run(
+        project_dir,
+        created_at_utc="2026-06-06T00:10:00Z",
+    )
+    assert instruction["decision"] == "approve_first_real_run"
+    prepare_real_run(project_dir, created_at_utc="2026-06-06T00:20:00Z")
+    return project_dir
+
+
 def _refresh_metric_request_hash(run_dir: Path) -> None:
     request_path = run_dir / "metric_extraction_request.json"
     manifest_path = run_dir / "real_run_manifest.json"
@@ -85,6 +103,26 @@ def test_load_adapter_context_accepts_prepared_real_run(tmp_path: Path) -> None:
     assert context.request.spectre["threads_per_run"] == 10
     assert context.request.spectre["parallel_jobs"] == 10
     assert context.request.metrics
+
+
+def test_load_adapter_context_accepts_multi_testbench_child_run(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_multi_testbench_project(tmp_path)
+
+    context = load_adapter_context(project_dir, testbench_id="cg_nf")
+
+    child_relative = "runs/real/real_001/testbenches/cg_nf"
+    assert context.run_id == "real_001"
+    assert context.run_relative == child_relative
+    assert context.run_dir == (
+        project_dir / "runs" / "real" / "real_001" / "testbenches" / "cg_nf"
+    )
+    assert context.input_scs == context.run_dir / "netlist" / "input.scs"
+    assert context.psf_dir == context.run_dir / "psf"
+    assert context.metrics_dir == context.run_dir / "metrics"
+    assert [metric.name for metric in context.request.metrics] == ["MAX_GAIN"]
+    assert context.request.expected_psf_dir == f"{child_relative}/psf"
 
 
 def test_load_adapter_context_rejects_formula_hash_drift(tmp_path: Path) -> None:
@@ -291,6 +329,28 @@ def test_render_ocean_replay_script_preserves_formula_text(tmp_path: Path) -> No
     assert "rewrite" not in script.lower()
 
 
+def test_render_ocean_replay_script_omits_select_result_without_result_hint(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_real_run_project(tmp_path)
+    run_dir = project_dir / "runs" / "real" / "real_001"
+    request_path = run_dir / "metric_extraction_request.json"
+    request = _load_json(request_path)
+    request["metrics"] = [request["metrics"][0]]
+    request["metrics"][0].pop("result")
+    expression = 'value(getData("NF" ?result "pnoise") 3e+09)'
+    request["metrics"][0]["expression"] = expression
+    request["metrics"][0]["expression_sha256"] = expression_sha256(expression)
+    _write_json(request_path, request)
+    _refresh_metric_request_hash(run_dir)
+
+    context = load_adapter_context(project_dir)
+    script = render_ocean_replay_script(context)
+
+    assert expression in script
+    assert "selectResult" not in script
+
+
 def test_parse_ocean_scalars_accepts_finite_pass_rows(tmp_path: Path) -> None:
     scalars_path = tmp_path / "ocean_scalars.tsv"
     scalars_path.write_text(
@@ -493,6 +553,11 @@ def test_render_ocean_replay_script_keeps_drpl_formula_unchanged(
     assert 'VT("/RF_N"' not in script
 
 
+def _metrics_dir_from_ocean_argv(project_dir: Path, argv: list[str]) -> Path:
+    replay_path = Path(argv[argv.index("-replay") + 1])
+    return project_dir / replay_path.parent
+
+
 class FakeSuccessRunner:
     def __init__(self) -> None:
         self.commands: list[list[str]] = []
@@ -516,10 +581,8 @@ class FakeSuccessRunner:
             (psf_dir / "spectre.out").write_text("fake spectre out\n", encoding="utf-8")
         elif argv[0] == "ocean":
             assert cwd.name == "bridge_test_inv"
-            metrics_dir = cwd / "runs" / "real" / "real_001" / "metrics"
-            request = _load_json(
-                cwd / "runs" / "real" / "real_001" / "metric_extraction_request.json"
-            )
+            metrics_dir = _metrics_dir_from_ocean_argv(cwd, argv)
+            request = _load_json(metrics_dir.parent / "metric_extraction_request.json")
             lines = ["metric\tvalue\tunit\tstatus\texpression_sha256\tmessage\n"]
             for index, metric in enumerate(request["metrics"], start=1):
                 lines.append(
@@ -574,7 +637,7 @@ class FakeOceanFailureRunner(FakeSuccessRunner):
             self.commands.append(argv)
             stdout_path.write_text("fake ocean stdout\n", encoding="utf-8")
             stderr_path.write_text("fake ocean failure\n", encoding="utf-8")
-            metrics_dir = cwd / "runs" / "real" / "real_001" / "metrics"
+            metrics_dir = _metrics_dir_from_ocean_argv(cwd, argv)
             (metrics_dir / "ocean.log").write_text(
                 "fake ocean failure log\n",
                 encoding="utf-8",
@@ -617,7 +680,7 @@ class FakeTransientOceanFailureRunner(FakeSuccessRunner):
                 self.commands.append(argv)
                 stdout_path.write_text("fake ocean stdout\n", encoding="utf-8")
                 stderr_path.write_text("fake ocean license failure\n", encoding="utf-8")
-                metrics_dir = cwd / "runs" / "real" / "real_001" / "metrics"
+                metrics_dir = _metrics_dir_from_ocean_argv(cwd, argv)
                 (metrics_dir / "ocean.log").write_text(
                     "license checkout failed\n",
                     encoding="utf-8",
@@ -678,7 +741,7 @@ class FakeOceanMalformedScalarRunner(FakeSuccessRunner):
             self.commands.append(argv)
             stdout_path.write_text("fake ocean stdout\n", encoding="utf-8")
             stderr_path.write_text("", encoding="utf-8")
-            metrics_dir = cwd / "runs" / "real" / "real_001" / "metrics"
+            metrics_dir = _metrics_dir_from_ocean_argv(cwd, argv)
             (metrics_dir / "ocean.log").write_text("fake ocean log\n", encoding="utf-8")
             (metrics_dir / "ocean_scalars.tsv").write_text(
                 "metric\tvalue\tunit\tstatus\texpression_sha256\tmessage\n"
@@ -757,6 +820,46 @@ def test_run_spectre_ocean_adapter_uses_project_root_for_ocean_paths(
     assert '"runs/real/real_001/metrics/ocean_scalars.tsv"' in script
 
 
+def test_run_spectre_ocean_adapter_accepts_multi_testbench_child_run(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_multi_testbench_project(tmp_path)
+    runner = FakeSuccessRunner()
+
+    result = run_spectre_ocean_adapter(
+        project_dir,
+        testbench_id="iip3",
+        runner=runner,
+    )
+
+    child_relative = "runs/real/real_001/testbenches/iip3"
+    assert result.status == "succeeded"
+    assert result.result_manifest_path == (
+        project_dir
+        / "runs"
+        / "real"
+        / "real_001"
+        / "testbenches"
+        / "iip3"
+        / "result_manifest.json"
+    )
+    assert result.metric_result_manifest_path == (
+        project_dir
+        / "runs"
+        / "real"
+        / "real_001"
+        / "testbenches"
+        / "iip3"
+        / "metrics"
+        / "metric_result_manifest.json"
+    )
+    assert runner.commands[1][runner.commands[1].index("-replay") + 1] == (
+        f"{child_relative}/metrics/metric_probe.ocn"
+    )
+    metric_manifest = _load_json(result.metric_result_manifest_path)
+    assert [metric["name"] for metric in metric_manifest["metrics"]] == ["IIP3"]
+
+
 def test_run_spectre_ocean_adapter_records_actual_spectre_settings(
     tmp_path: Path,
 ) -> None:
@@ -799,7 +902,11 @@ def test_tool_entrypoint_reports_success_without_real_tools(
 
     def fake_run(project: Path, **kwargs):
         assert project == project_dir
-        assert kwargs == {"run_id": "real_001", "allow_overwrite": False}
+        assert kwargs == {
+            "run_id": "real_001",
+            "testbench_id": None,
+            "allow_overwrite": False,
+        }
         return type(
             "Result",
             (),

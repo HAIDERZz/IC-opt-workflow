@@ -7,6 +7,7 @@ import pytest
 
 from hermes_workflow import real_run
 from hermes_workflow.approvals import decide_first_real_run
+from hermes_workflow.dry_run import run_dry_run
 from hermes_workflow.metric_requests import expression_sha256
 from hermes_workflow.package import (
     build_execution_package,
@@ -14,7 +15,9 @@ from hermes_workflow.package import (
     sha256_file,
 )
 from hermes_workflow.real_run import prepare_real_run
+from hermes_workflow.requirement_intake import prepare_from_requirement
 from tests.report_helpers import write_pass_reports
+from tests.test_requirement_intake import _copy_multi_testbench_requirement_project
 
 
 TEMPLATE_TEXT = """simulator lang=spectre
@@ -380,6 +383,52 @@ def test_prepare_real_run_writes_metric_extraction_request(tmp_path: Path) -> No
         == "runs/real/real_001/metric_extraction_request.json"
     )
     assert manifest["metric_extraction_request_sha256"] == sha256_file(request_path)
+
+
+def test_prepare_real_run_writes_multi_testbench_child_packages(tmp_path: Path) -> None:
+    project_dir = _copy_multi_testbench_requirement_project(tmp_path)
+    assert prepare_from_requirement(project_dir).status == "pass"
+    assert run_dry_run(project_dir).status.value == "pass"
+    _approve_project(project_dir)
+
+    prepare_real_run(project_dir, created_at_utc="2026-06-06T00:20:00Z")
+
+    run_dir = project_dir / "runs" / "real" / "real_001"
+    top_request = _load_json(run_dir / "metric_extraction_request.json")
+    assert [metric["name"] for metric in top_request["metrics"]] == [
+        "MAX_GAIN",
+        "IIP3",
+    ]
+    for testbench_id, metric_name in (("cg_nf", "MAX_GAIN"), ("iip3", "IIP3")):
+        child_dir = run_dir / "testbenches" / testbench_id
+        child_input = child_dir / "netlist" / "input.scs"
+        child_manifest = _load_json(child_dir / "real_run_manifest.json")
+        child_request = _load_json(child_dir / "metric_extraction_request.json")
+        child_prefix = f"runs/real/real_001/testbenches/{testbench_id}"
+
+        assert child_input.exists()
+        assert (child_dir / "netlist" / "ade_e.scs").exists()
+        assert child_manifest["run_id"] == "real_001"
+        assert child_manifest["candidate_id"] == "real_001"
+        assert child_manifest["testbench_id"] == testbench_id
+        assert child_manifest["template_scs"] == (
+            f"netlists/testbenches/{testbench_id}/templates/template.scs"
+        )
+        assert child_manifest["rendered_input_scs"] == (
+            f"{child_prefix}/netlist/input.scs"
+        )
+        assert child_manifest["metric_extraction_request"] == (
+            f"{child_prefix}/metric_extraction_request.json"
+        )
+        assert child_request["prepared_input_scs"] == (
+            f"{child_prefix}/netlist/input.scs"
+        )
+        assert child_request["prepared_input_sha256"] == sha256_file(child_input)
+        assert child_request["expected_psf_dir"] == f"{child_prefix}/psf"
+        assert child_request["ocean"]["script_file"] == (
+            f"{child_prefix}/metrics/metric_probe.ocn"
+        )
+        assert [metric["name"] for metric in child_request["metrics"]] == [metric_name]
 
 
 def test_prepare_real_run_rejects_metric_without_ocean_formula(tmp_path: Path) -> None:

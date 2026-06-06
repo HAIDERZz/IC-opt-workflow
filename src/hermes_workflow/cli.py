@@ -45,6 +45,10 @@ from hermes_workflow.real_run_recovery import (
     resolve_real_run_failure,
 )
 from hermes_workflow.real_result_record import record_real_result
+from hermes_workflow.requirement_intake import (
+    check_requirement,
+    prepare_from_requirement,
+)
 from hermes_workflow.result_handoff import check_real_run
 from hermes_workflow.validate import validate_project_files
 
@@ -199,6 +203,54 @@ def prepare_netlist_command(
     for issue in report.issues:
         typer.echo(issue)
     typer.echo("report: reports/netlist_preparation_report.json")
+    raise typer.Exit(code=1)
+
+
+@app.command("check-requirement")
+def check_requirement_command(
+    project_dir: Annotated[
+        Path,
+        typer.Argument(help="Project directory containing opt_requirement.md."),
+    ],
+) -> None:
+    try:
+        report = check_requirement(project_dir)
+    except (OSError, ValueError) as exc:
+        _exit_with_error(exc)
+    if report.status == "pass":
+        typer.echo("requirement intake passed")
+        typer.echo("report: reports/requirement_intake_report.json")
+        return
+
+    typer.echo("requirement intake failed")
+    for issue in report.issues:
+        typer.echo(issue)
+    typer.echo("report: reports/requirement_intake_report.json")
+    raise typer.Exit(code=1)
+
+
+@app.command("prepare-from-requirement")
+def prepare_from_requirement_command(
+    project_dir: Annotated[
+        Path,
+        typer.Argument(help="Project directory containing opt_requirement.md."),
+    ],
+) -> None:
+    try:
+        report = prepare_from_requirement(project_dir)
+    except (OSError, ValueError) as exc:
+        _exit_with_error(exc)
+    if report.status == "pass":
+        typer.echo("requirement project preparation passed")
+        typer.echo("report: reports/requirement_intake_report.json")
+        typer.echo("import: reports/maestro_point_import_report.json")
+        typer.echo("netlist: reports/netlist_preparation_report.json")
+        return
+
+    typer.echo("requirement project preparation failed")
+    for issue in report.issues:
+        typer.echo(issue)
+    typer.echo("report: reports/requirement_intake_report.json")
     raise typer.Exit(code=1)
 
 
@@ -838,6 +890,21 @@ def run_openbox_real_command(
             help="Optional Cadence cshrc sourced before running the adapter.",
         ),
     ] = None,
+    surrogate_type: Annotated[
+        str | None,
+        typer.Option("--surrogate-type", help="Optional OpenBox surrogate_type override."),
+    ] = None,
+    acq_type: Annotated[
+        str | None,
+        typer.Option("--acq-type", help="Optional OpenBox acq_type override."),
+    ] = None,
+    acq_optimizer_type: Annotated[
+        str | None,
+        typer.Option(
+            "--acq-optimizer-type",
+            help="Optional OpenBox acq_optimizer_type override.",
+        ),
+    ] = None,
 ) -> None:
     try:
         result = run_openbox_real_optimization(
@@ -846,6 +913,9 @@ def run_openbox_real_command(
             batch_size=batch_size,
             parallel_jobs=parallel_jobs,
             cadence_cshrc=cadence_cshrc,
+            surrogate_type=surrogate_type,
+            acq_type=acq_type,
+            acq_optimizer_type=acq_optimizer_type,
         )
     except (OSError, RuntimeError, ValueError) as exc:
         _exit_with_error(exc)
@@ -891,6 +961,21 @@ def continue_openbox_real_command(
             help="Optional Cadence cshrc sourced before running the adapter.",
         ),
     ] = None,
+    surrogate_type: Annotated[
+        str | None,
+        typer.Option("--surrogate-type", help="Optional OpenBox surrogate_type override."),
+    ] = None,
+    acq_type: Annotated[
+        str | None,
+        typer.Option("--acq-type", help="Optional OpenBox acq_type override."),
+    ] = None,
+    acq_optimizer_type: Annotated[
+        str | None,
+        typer.Option(
+            "--acq-optimizer-type",
+            help="Optional OpenBox acq_optimizer_type override.",
+        ),
+    ] = None,
 ) -> None:
     try:
         result = run_openbox_real_optimization(
@@ -901,6 +986,9 @@ def continue_openbox_real_command(
             batch_size=batch_size,
             parallel_jobs=parallel_jobs,
             cadence_cshrc=cadence_cshrc,
+            surrogate_type=surrogate_type,
+            acq_type=acq_type,
+            acq_optimizer_type=acq_optimizer_type,
         )
     except (OSError, RuntimeError, ValueError) as exc:
         _exit_with_error(exc)

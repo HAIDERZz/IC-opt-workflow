@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import math
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
@@ -564,6 +565,52 @@ def test_run_batch_native_turbo_optimization_uses_optimizer_batch_size(
     assert observed_batch_sizes == [10]
     assert result.evaluation_count == 5
     assert result.report_path == project_dir / "reports/native_turbo_optimizer_report.json"
+
+
+def test_run_batch_native_turbo_optimization_applies_optimizer_cpu_thread_limit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import hermes_workflow.native_turbo as module
+
+    project_dir = tmp_path / "bridge_test_inv"
+    create_project_from_template(project_dir)
+    optimizer_path = project_dir / "config" / "optimizer.yaml"
+    optimizer_path.write_text(
+        optimizer_path.read_text(encoding="utf-8").replace(
+            "deduplicate_candidates: true",
+            "deduplicate_candidates: true\n  optimizer_cpu_threads: 3",
+        ),
+        encoding="utf-8",
+    )
+    calls: list[tuple[int, dict[str, object]]] = []
+
+    @contextmanager
+    def fake_limits(threads: int, **kwargs):
+        calls.append((threads, dict(kwargs)))
+        yield
+
+    monkeypatch.setattr(module, "optimizer_cpu_thread_limits", fake_limits)
+
+    def batch_evaluator(candidates) -> list[NativeTurboObservation]:
+        return [
+            NativeTurboObservation(
+                metrics={"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-6},
+            )
+            for _candidate in candidates
+        ]
+
+    result = run_batch_native_turbo_optimization(
+        project_dir,
+        batch_evaluator=batch_evaluator,
+        batch_turbo_factory=_FakeBatchTurbo,
+        max_evals=5,
+        parallel_jobs=3,
+        threads_per_run=10,
+    )
+
+    assert result.evaluation_count == 5
+    assert calls == [(3, {"set_environment": False})]
 
 
 def test_default_batch_turbo_factory_calls_f_batch_by_chunk() -> None:

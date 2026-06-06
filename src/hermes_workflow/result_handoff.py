@@ -4,7 +4,7 @@ import json
 import re
 from pathlib import Path, PurePosixPath
 
-from pydantic import BaseModel, ConfigDict, ValidationError, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from hermes_workflow.package import sha256_file
 from hermes_workflow.reports import (
@@ -42,6 +42,16 @@ class ResultData(BaseModel):
     spectre_out: str
 
 
+class ChildResultReference(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    testbench: str
+    result_manifest: str
+    status: RealRunResultStatus
+    metric_result_manifest: str | None = None
+    issues: list[str] = Field(default_factory=list)
+
+
 class ResultManifest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -58,6 +68,7 @@ class ResultManifest(BaseModel):
     artifact_files: list[str]
     result_data: ResultData | None = None
     metric_result_manifest: str | None = None
+    child_results: list[ChildResultReference] = Field(default_factory=list)
     notes: str | None = None
 
     @field_validator("started_at_utc", "completed_at_utc")

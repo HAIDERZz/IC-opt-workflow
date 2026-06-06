@@ -57,6 +57,9 @@ def run_dry_run(project_dir: Path) -> DryRunReport:
         candidate,
     )
     issues.extend(placeholder_issues)
+    child_rendered_inputs: dict[str, str] = {}
+    if bundle.testbenches is not None:
+        child_rendered_inputs = _render_testbench_templates(bundle, candidate, issues)
 
     try:
         computed_metrics = compute_mock_metrics(
@@ -100,12 +103,18 @@ def run_dry_run(project_dir: Path) -> DryRunReport:
         try:
             rendered_path.parent.mkdir(parents=True, exist_ok=True)
             rendered_path.write_text(rendered_text, encoding="utf-8")
+            _write_testbench_rendered_inputs(
+                bundle,
+                child_rendered_inputs,
+            )
         except OSError as exc:
             issues.append(f"rendered candidate could not be written: {exc}")
             status = PassFail.FAIL
             _cleanup_rendered(rendered_path)
+            _cleanup_testbench_rendered_inputs(bundle)
     else:
         _cleanup_rendered(rendered_path)
+        _cleanup_testbench_rendered_inputs(bundle)
 
     report = _build_report(
         status,
@@ -161,6 +170,49 @@ def _render_template(
     )
 
 
+def _render_testbench_templates(
+    bundle: ContractBundle,
+    candidate: dict[str, str],
+    issues: list[str],
+) -> dict[str, str]:
+    if bundle.testbenches is None:
+        return {}
+
+    rendered_inputs: dict[str, str] = {}
+    for testbench in bundle.testbenches.testbenches:
+        template_relative = _testbench_template(testbench.id)
+        template_path = _project_path(bundle, template_relative)
+        if not template_path.exists():
+            issues.append(f"{testbench.id}: template.scs is missing: {template_relative}")
+            continue
+        rendered, _placeholder_check, placeholder_issues = _render_template(
+            template_path.read_text(encoding="utf-8"),
+            candidate,
+        )
+        issues.extend(f"{testbench.id}: {issue}" for issue in placeholder_issues)
+        rendered_inputs[testbench.id] = rendered
+    return rendered_inputs
+
+
+def _write_testbench_rendered_inputs(
+    bundle: ContractBundle,
+    child_rendered_inputs: dict[str, str],
+) -> None:
+    for testbench_id, rendered_text in child_rendered_inputs.items():
+        rendered_path = _project_path(bundle, _testbench_rendered_input(testbench_id))
+        rendered_path.parent.mkdir(parents=True, exist_ok=True)
+        rendered_path.write_text(rendered_text, encoding="utf-8")
+
+
+def _cleanup_testbench_rendered_inputs(bundle: ContractBundle) -> None:
+    if bundle.testbenches is None:
+        return
+    for testbench in bundle.testbenches.testbenches:
+        rendered_path = _project_path(bundle, _testbench_rendered_input(testbench.id))
+        if rendered_path.exists():
+            rendered_path.unlink()
+
+
 def _probe_directory_writable(path: Path, issues: list[str]) -> bool:
     probe = path / ".dry_run_write_probe"
     try:
@@ -180,6 +232,14 @@ def _project_path(bundle: ContractBundle, relative_path: str) -> Path:
             f"dry-run path must be project-relative and safe: {relative_path}"
         )
     return bundle.project_dir / Path(*path.parts)
+
+
+def _testbench_template(testbench_id: str) -> str:
+    return f"netlists/testbenches/{testbench_id}/templates/template.scs"
+
+
+def _testbench_rendered_input(testbench_id: str) -> str:
+    return f"runs/dry_run/testbenches/{testbench_id}/input.scs"
 
 
 def _build_report(

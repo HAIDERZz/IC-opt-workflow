@@ -4,12 +4,386 @@
 
 - Repository: `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow`
 - Branch: `plan-a-hermes-file-contract-mvp`
-- Current scope: C-19 Execution-Agent Optimizer Practice Acceptance
-- Current status: verified-only; C-19 Task 3 Supervisor/Hermes Acceptance Audit is complete.
-- Next required action: execute C-19 Task 4 Branch B surgical fix for clean project preparation.
-- next_allowed_action: execute C-19 Task 4 Branch B: surgical fix for clean project preparation by removing stale optimizer ledger rows or initializing matching empty state before rerunning run-native-turbo once
+- Current scope: C-50 Multi-Testbench Candidate Evaluation
+- Current status: verified-only; C-50 Task 3 Child Run Manifests And Aggregated Metric Manifest is complete. Multi-testbench child result and metric manifests under `runs/real/<run_id>/testbenches/<id>/` can now be aggregated into the existing candidate-level `result_manifest.json` and `metrics/metric_result_manifest.json`; child refs remain available for diagnosis.
+- Active spec: `docs/superpowers/specs/2026-06-06-multi-testbench-candidate-evaluation-design.md`
+- Active plan: `docs/superpowers/plans/2026-06-06-multi-testbench-candidate-evaluation.md`
+- Next required action: start C-50 Task 4 Single-Candidate Real Multi-Testbench Smoke.
+- next_allowed_action: start C-50 Task 4: Single-Candidate Real Multi-Testbench Smoke only after user confirms the additional point-root/testbench inputs and real-tool execution.
 
 C-3 Task 6 final verification is complete. C-4 is confirmed as a contract-only first real-run package; it must not run Spectre, Virtuoso, subprocesses, or the optimizer loop. C-4 is now complete and reviewed. C-5 validates the execution agent's returned `result_manifest.json` and declared artifacts without running Spectre or parsing metrics. C-5.5 rehearsed the C-4/C-5 handoff with simulated execution-agent and Hermes-observer roles. After C-5.5, the project paused implementation to validate the real metric backend. Spectre + OCEAN is now confirmed as the backend route: standalone Spectre generates PSF, batch OCEAN opens the PSF and evaluates exact user/project-approved formulas, and Python only records OCEAN-produced scalar outputs and provenance. C-6 turned that route into deterministic file contracts and a Hermes validator without physical adapter wiring. C-7 added an explicit execution-side adapter and tool entry point while preserving the rule that Hermes workflow tooling still validates returned files after execution. C-8 records checked real metric results into optimizer ledger/state after `check-real-run` and `check-metric-results` pass, while preserving the contract-only boundary. C-9 prepares the next real-run package from strict ledger/state and deterministic optimizer initialization sequence, while still not running real tools or writing ledger/state. C-10 classifies failed/partial/pending real-run packages, writes explicit recovery decisions, prepares retry packages, exposes supervisor-facing recovery CLI commands, and blocks C-9 from advancing while unresolved real-run packages exist. C-10 final review fixes aligned unsafe artifact classification with the spec and hardened symlinked recovery decision reads.
+
+## C-49 Requirement.md Driven Config Intake 2026-06-05
+
+C-49 implementation is complete, verified-only.
+
+Real project bootstrap evidence:
+
+- `/home/zzchen/spectre_opt_prj/Mixer_opt` was checked and prepared from `opt_requirement.md`.
+- The first check caught a real input issue: `NF_3G.required_signals` was empty.
+- The second check exposed a more dangerous issue: duplicate YAML keys in `Design Variables` would have silently overwritten `W` with `L`; the intake loader now rejects duplicate YAML keys fail-closed.
+- After correcting the requirement file, `check-requirement`, `prepare-from-requirement`, and `validate` passed.
+- The Maestro point-root netlist import copied 69 files, materialized 1 safe symlink, and generated `netlists/templates/template.scs` with approved variables `F`, `W`, `L`, and `VB_LO`.
+- No real Spectre/OCEAN execution was launched in this bootstrap drill.
+
+Post-C-49 Mixer NF=12dB optimizer continuation evidence:
+
+- Workspace: `/home/zzchen/spectre_opt_prj/Mixer_opt_openbox_nf12_001`.
+- The initial 100-evaluation NF=12dB run completed with `12 feasible`,
+  `70 constraint_failed`, `18 metric_check_failed`, and `0 real_check_failed`;
+  best observed was `real_100`.
+- A requested +100 continuation first exposed an OpenBox candidate-generation
+  performance blocker: the default constrained single-objective auto route
+  selected `gp/eic/random_scipy` and stayed CPU-bound before any `real_101+`
+  Spectre run was created.
+- Narrow fix: expose OpenBox Advisor strategy overrides through the backend and
+  CLI, preserving the existing OpenBox ask/tell flow and real-tool adapter.
+- Successful rerun used
+  `--surrogate-type prf --acq-type eic --acq-optimizer-type local_random`.
+- Cumulative result after 200 real evaluations: `48 feasible`,
+  `134 constraint_failed`, `18 metric_check_failed`, `0 real_check_failed`.
+- Acceptance, completion summary, finalization, status, insight report, and
+  OpenBox advanced visualization generation passed.
+- Best observed remains `real_100`: `F=24`, `W=1.4u`, `L=40n`,
+  `VB_LO=350m`, objective `1.134258035990259e-10`.
+- `optimizer-status` reports `continuation recommended: false` and
+  `plateau detected: true`; this is best-observed evidence, not a global optimum
+  proof.
+
+Files:
+
+```text
+docs/superpowers/specs/2026-06-05-requirement-md-config-intake-design.md
+docs/superpowers/plans/2026-06-05-requirement-md-config-intake.md
+```
+
+## C-50 Multi-Testbench Candidate Evaluation 2026-06-06
+
+C-50 design spec and narrow implementation plan are written, verified-only.
+
+Task 1 completion:
+
+- Added optional named-testbench contract shape through `config/testbenches.yaml`.
+- Extended requirement intake so `opt_requirement.md` may keep the existing
+  single `Maestro Source` block or use `Maestro Source.testbenches`.
+- Added metric routing with `metric.testbench` and fail-closed validation for
+  duplicate ids or unknown metric routes.
+- Preserved single-testbench compatibility: the existing
+  `project_config.yaml`/`netlists/exported/` path remains unchanged when
+  `testbenches` is not present.
+- Verification:
+
+```text
+python3 -m pytest tests/test_schemas.py tests/test_requirement_intake.py
+python3 -m pytest tests/test_validate.py tests/test_package.py tests/test_cli.py
+```
+
+Results: `39 passed` for schema/intake tests and `65 passed` for adjacent
+contract/CLI tests.
+
+Task 2 completion:
+
+- `prepare-from-requirement` imports every named `maestro_point_root/netlist/`
+  into `netlists/testbenches/<id>/exported/`.
+- `prepare-netlist` templates every child deck into
+  `netlists/testbenches/<id>/templates/template.scs`.
+- The primary testbench is still copied to the legacy
+  `netlists/exported/` + `netlists/templates/` path so existing single-run
+  commands keep working during the C-50 transition.
+- `dry-run` renders the same lower-bound candidate into
+  `runs/dry_run/testbenches/<id>/input.scs` for every named testbench.
+- Unsafe symlinks in any child point-root fail closed with the child id in the
+  issue text.
+- Verification:
+
+```text
+python3 -m pytest tests/test_requirement_intake.py::test_prepare_from_requirement_writes_multi_testbench_routing_contracts tests/test_requirement_intake.py::test_dry_run_renders_same_candidate_into_multi_testbench_templates tests/test_requirement_intake.py::test_prepare_from_requirement_rejects_unsafe_multi_testbench_symlink
+python3 -m pytest tests/test_requirement_intake.py tests/test_netlists.py tests/test_dry_run.py tests/test_validate.py
+python3 -m pytest tests/test_package.py tests/test_cli.py
+```
+
+Results: `3 passed`, `59 passed`, and `46 passed`.
+
+Task 3 completion:
+
+- Added `aggregate_multi_testbench_run()` for fake/local child manifest
+  aggregation.
+- Child result manifests remain under
+  `runs/real/<run_id>/testbenches/<id>/result_manifest.json`.
+- Child metric manifests remain under
+  `runs/real/<run_id>/testbenches/<id>/metrics/metric_result_manifest.json`.
+- The aggregate writes the existing top-level
+  `runs/real/<run_id>/result_manifest.json` and
+  `runs/real/<run_id>/metrics/metric_result_manifest.json`, so
+  `check-real-run` and `check-metric-results` keep their current contract.
+- Optional `child_results` and `child_metric_results` references preserve
+  child diagnosis without changing the single-testbench path.
+- Metric failures keep the aggregate real result succeeded and fail the metric
+  check; child real-tool failures mark the aggregate real result failed.
+- Verification:
+
+```text
+python3 -m pytest tests/test_multi_testbench_aggregation.py
+python3 -m pytest tests/test_result_handoff.py tests/test_metric_results.py tests/test_requirement_intake.py
+python3 -m pytest tests/test_package.py tests/test_cli.py tests/test_validate.py
+python3 -m ruff check src/hermes_workflow/multi_testbench_aggregation.py src/hermes_workflow/result_handoff.py src/hermes_workflow/metric_results.py tests/test_multi_testbench_aggregation.py
+```
+
+Results: `3 passed`, `101 passed`, `65 passed`, and ruff passed.
+
+Purpose:
+
+- Extend one-candidate evaluation from one testbench to multiple preserved
+  Maestro/ADE point-root testbenches.
+- Support Mixer-style evaluation where CG/NF/BW, IIP3, and P1dB may come from
+  separate Maestro setups.
+- Keep OpenBox/native TuRBO as candidate generators and keep Spectre/OCEAN as
+  the metric backend.
+- Aggregate child OCEAN scalar metric manifests into one candidate-level metric
+  observation for constraints/objective evaluation.
+
+Locked route constraints:
+
+- Do not merge multiple testbenches into one synthetic Spectre deck.
+- Do not require the user to hand-copy Maestro sidecars.
+- Do not rewrite formulas or parse PSF.
+- Apply `spectre.parallel_jobs` globally across child Spectre/OCEAN jobs; do
+  not multiply it per testbench.
+- Keep `optimizer_cpu_threads`, `spectre.parallel_jobs`, and
+  `spectre.threads_per_run` separate.
+
+Files:
+
+```text
+docs/superpowers/specs/2026-06-06-multi-testbench-candidate-evaluation-design.md
+docs/superpowers/plans/2026-06-06-multi-testbench-candidate-evaluation.md
+```
+
+Purpose:
+
+- Add the user-facing project entry route: `~/spectre_opt_prj/<project_name>/opt_requirement.md` plus optional `constraints.md`.
+- Parse only fixed Markdown headings with fenced YAML blocks; do not build a generic natural-language parser.
+- Render the existing `config/*.yaml` contracts and safely import the full `maestro_point_root/netlist/` bundle into `netlists/exported/`.
+- Preserve approved OCEAN formula text exactly and reuse the existing `validate` and `prepare-netlist` routes.
+
+Implemented:
+
+- `src/hermes_workflow/requirement_intake.py`
+- `hermes-workflow check-requirement PROJECT_DIR`
+- `hermes-workflow prepare-from-requirement PROJECT_DIR`
+- packaged `opt_requirement.md` and `constraints.md` templates
+- safe Maestro point-root netlist import with symlink materialization
+- OpenBox optimizer algorithm accepted by the existing optimizer schema
+
+Verification:
+
+```text
+python3 -m pytest tests/test_requirement_intake.py tests/test_validate.py tests/test_netlists.py tests/test_package.py tests/test_cli.py -q
+python3 -m pytest -q
+python3 -m ruff check src tests tools
+```
+
+Result: targeted tests passed with `88 passed`; full suite passed with `592 passed, 1 skipped`; ruff passed.
+
+Route audit: aligned with the top-level plan and the proven Maestro/ADE netlist bundle -> Spectre/OCEAN -> OpenBox workflow. Drift: none. C-49 did not run real tools, parse PSF, rewrite OCEAN formulas, flatten the Maestro/ADE netlist layout, or change optimizer execution behavior.
+
+next_allowed_action: perform one focused user-project bootstrap drill from `opt_requirement.md` and `maestro_point_root`; run a real single-point Spectre/OCEAN smoke only after user confirmation.
+
+## Post-C-49 Mixer Single-Point Spectre/OCEAN Smoke 2026-06-06
+
+The user-approved real single-point smoke for
+`/home/zzchen/spectre_opt_prj/Mixer_opt` is complete.
+
+Important findings:
+
+- `real_001` used the default lower-bound candidate `F=14`, `W=0.4u`,
+  `L=30n`, `VB_LO=150m`. Spectre 25.1 completed, OCEAN completed, and the
+  approved formulas were evaluated unchanged, but the candidate was not a clean
+  passing scalar point because `BW` was non-scalar at that candidate.
+- A direct diagnostic showed the Mixer Maestro bundle must use Spectre 25.1.
+  The IC231 environment's Spectre 23.1 fails on this encrypted `ade_e.scs`
+  bundle with `FATAL (SFE-79): Cannot decrypt the data`.
+- `real_002` used the nearest approved-grid version of the known Maestro
+  baseline: `F=26`, `W=1u`, `L=40n`, `VB_LO=310m`. The original Maestro point
+  used `VB_LO=320m`, but `320m` is outside the current approved `20m` grid, so
+  the smoke did not silently change the search space.
+- `real_002` passed Spectre, OCEAN, `check-real-run`, and
+  `check-metric-results`.
+
+`real_002` scalar results:
+
+```text
+BW       19171311623.07684 Hz
+MAX_GAIN 4.242801858622344 dB
+NF_3G    11.81241967045867 dB
+```
+
+Route audit: aligned with the proven Maestro/ADE bundle -> Spectre -> OCEAN
+route. The run preserved the imported netlist bundle layout, did not parse PSF
+in Python, did not rewrite OCEAN formulas, and did not change the user-approved
+metric contract. Drift: Spectre version compatibility for this Mixer encrypted
+deck must be recorded and respected; use Spectre 25.1 for this user project.
+
+## Post-C-49 Mixer OpenBox Optimizer Practice Flow 2026-06-06
+
+The first clean Mixer OpenBox optimizer practice run is complete.
+
+Workspace:
+
+```text
+/home/zzchen/spectre_opt_prj/Mixer_opt_openbox_001
+```
+
+Run settings:
+
+```text
+backend=openbox
+max_evals=100
+batch_size=10
+parallel_jobs=10
+threads_per_run=10
+preset=cx
+spectre=/opt/eda/cadence/spectre_2510_125/bin/spectre
+```
+
+Result:
+
+- `run-openbox-real` completed 100 real Spectre/OCEAN evaluations.
+- `check-optimizer-run` passed.
+- `summarize-optimizer-run` produced `stop_for_user_review`, confidence `low`.
+- `finalize-optimizer-run` passed.
+- `optimizer-status` passed.
+- OpenBox advanced visualization was generated.
+
+Status counts:
+
+```text
+constraint_failed=59
+metric_check_failed=41
+real_check_failed=0
+feasible=0
+```
+
+Constraint signal from scalar candidates:
+
+```text
+BW passes 15/59
+MAX_GAIN passes 15/59
+NF_3G passes 0/59
+```
+
+Closest scalar candidates:
+
+- Best NF_3G observed: `real_020`, `NF_3G=11.84815824726642 dB`,
+  parameters `F=20`, `W=1.4u`, `L=30n`, `VB_LO=270m`.
+- Lowest composite constraint penalty among scalar candidates: `real_073`,
+  parameters `F=22`, `W=1.6u`, `L=30n`, `VB_LO=330m`,
+  `BW=18718918752.78271 Hz`, `MAX_GAIN=5.013650778909422 dB`,
+  `NF_3G=12.05941573135692 dB`.
+
+Important interpretation:
+
+- The optimizer/toolchain flow worked; there were no real tool failures.
+- No point met all current constraints. The main bottleneck is the `NF_3G`
+  threshold or the current approved search space.
+- Hermes currently reports `best observed: real_001` when no feasible candidate
+  exists because some metric-check-failed rows carry the base failure penalty.
+  Treat that only as a bookkeeping artifact, not as an engineering best point.
+  A follow-up should improve no-feasible best-candidate semantics.
+
+next_allowed_action: review /home/zzchen/spectre_opt_prj/Mixer_opt_openbox_001 reports with the user, then decide whether to adjust constraints, expand/search-shift variables, seed known-good baseline points, or improve no-feasible reporting before any continuation run.
+
+## Post-C-49 Mixer NF=12dB Optimizer Practice Flow 2026-06-06
+
+The user confirmed that the original `NF_3G < 11.5 dB` requirement was likely
+too strict for the current search space. A second clean optimizer workspace was
+created:
+
+```text
+/home/zzchen/spectre_opt_prj/Mixer_opt_openbox_nf12_001
+```
+
+Only the constraint was changed:
+
+```text
+NF_3G lt 11.5 dB -> NF_3G lt 12 dB
+```
+
+Run settings stayed the same: OpenBox, `max_evals=100`, `batch_size=10`,
+`parallel_jobs=10`, `threads_per_run=10`, `preset=cx`, Spectre 25.1 wrapper.
+
+Result:
+
+- `run-openbox-real` completed 100 real Spectre/OCEAN evaluations.
+- `check-optimizer-run` passed.
+- `summarize-optimizer-run` produced `continue_more_evals`, confidence
+  `medium`.
+- `finalize-optimizer-run` passed.
+- `optimizer-status` passed.
+- OpenBox advanced visualization was generated.
+
+Status counts:
+
+```text
+constraint_failed=70
+feasible=12
+metric_check_failed=18
+real_check_failed=0
+```
+
+Best feasible observed:
+
+```text
+run=real_100
+objective=1.134258035990259e-10
+F=24
+W=1.4u
+L=40n
+VB_LO=350m
+BW=19225783343.99703 Hz
+MAX_GAIN=5.48152961454769 dB
+NF_3G=11.95357122269306 dB
+```
+
+Interpretation:
+
+- The previous zero-feasible result was primarily a user/spec/search-space
+  issue, not a Spectre/OCEAN/OpenBox toolchain failure.
+- Relaxing `NF_3G` to `12 dB` makes the current search space productive.
+- `optimizer-status` recommends continuation because the recent window
+  improved and plateau was not detected.
+
+next_allowed_action: review /home/zzchen/spectre_opt_prj/Mixer_opt_openbox_nf12_001 reports with the user, then decide whether to continue additional OpenBox evaluations, update the canonical opt_requirement constraint to NF_3G lt 12 dB, or improve no-feasible reporting semantics.
+
+### Continuation Attempt Blocker
+
+User requested appending another 100 evaluations to
+`/home/zzchen/spectre_opt_prj/Mixer_opt_openbox_nf12_001`.
+
+Command shape:
+
+```text
+hermes-workflow continue-openbox-real ... --additional-evals 100 --batch-size 10 --parallel-jobs 10
+```
+
+Observed behavior:
+
+- The command loaded OpenBox and initialized the default advisor.
+- No `real_101+` directory was created.
+- `optimizer_evaluations.jsonl` remained at 100 rows.
+- The Python process stayed high-CPU for about 10 minutes before being
+  terminated manually.
+
+Interpretation:
+
+- The existing 100-eval NF=12dB result remains valid and unmodified.
+- The continuation blocker occurs before Spectre/OCEAN execution, likely in
+  OpenBox default `gp + eic + random_scipy` candidate generation after replaying
+  100 prior observations.
+- This is a productization/performance issue in continuation candidate
+  generation, not a Cadence tool failure.
+
+next_allowed_action: decide and implement a narrow OpenBox continuation performance fix, such as exposing surrogate/acquisition settings or using a lighter continuation candidate strategy, before retrying additional real evaluations.
 
 ## C-19 Execution-Agent Optimizer Practice Acceptance Plan 2026-06-04
 
@@ -1666,3 +2040,28 @@ C-48 IC-native Offline Optimizer Insight Report Completion:
 - Boundary: no optimizer candidate selection change, no Spectre/OCEAN rerun, no formula change, no PSF parsing, no acceptance/continuation decision change.
 - current_scope: C-48 IC-native Offline Optimizer Insight Report complete.
 - next_allowed_action: review the improved IC-native optimizer_insight_report from /tmp/ic_auto_opt_real_flow_t77ky7/bridge_test_inv and decide whether the report quality is sufficient for production adoption; do not rerun Spectre/OCEAN solely for report formatting.
+
+Project Landing Baseline Consolidation:
+
+- Status: complete, verified-only.
+- Baseline: `docs/PROJECT_LANDING_BASELINE_2026-06-05.md`.
+- Purpose: freeze the current proven OpenBox/Spectre/OCEAN workflow after C-48 and separate production-usable pieces from remaining real-landing gaps.
+- Solidified route: supervisor agent prepares/approves contracts; Hermes validates, packages, audits, summarizes, and reports; execution agent follows the generated task packet and runs OpenBox/Spectre/OCEAN; supervisor accepts best observed, continues, revises search, or stops.
+- Current production-usable state: prepared projects with reviewed config and Maestro/ADE-style exported netlist bundles can run OpenBox optimizer handoff, close out through `finalize-optimizer-run` and `optimizer-status`, generate IC-native insight reports, and continue accepted OpenBox runs.
+- Remaining required landing gaps: user intent to structured intake/config, first user-selected real-cell bootstrap/adoption drill, concise formula/variable/resource approval checkpoint, and guide tightening for the full user-to-run entry flow.
+- Recommended next narrow step: C-49 User Intake Structured Contract MVP. Hermes should validate and render structured intake; it should not contain a generic natural-language parser.
+- Boundary: docs/state consolidation only; no code change, real tool run, optimizer behavior change, candidate selection change, formula change, PSF parsing, or OCEAN formula rewrite.
+- current_scope: Project landing baseline consolidation after C-48.
+- next_allowed_action: review the baseline, then either write C-49 design spec or run a user-selected first-project bootstrap/adoption drill.
+- next_allowed_action exact: review docs/PROJECT_LANDING_BASELINE_2026-06-05.md, then either write the narrow C-49 User Intake Structured Contract MVP design spec or start a user-selected first-project bootstrap/adoption drill; do not start broad optimizer framework work.
+
+C-49 Requirement.md Driven Config Intake Design:
+
+- Status: complete, verified-only.
+- Design spec: `docs/superpowers/specs/2026-06-05-requirement-md-config-intake-design.md`.
+- Direction: A+B intake model. Users create `~/spectre_opt_prj/<project_name>/`, write strict `opt_requirement.md` with fixed Markdown headings and fenced YAML blocks, optionally write `constraints.md`, and provide `maestro_point_root`.
+- Boundary: supervisor agent may transform structured Markdown into existing YAML contracts; Hermes validates/renders those contracts and imports the Maestro point-root netlist bundle. Hermes must not contain a generic natural-language parser.
+- Important import rule: user provides a point-root path, not hand-selected `input.scs` sidecars. The import step copies the full `maestro_point_root/netlist/` bundle and safely materializes allowed Maestro-internal symlinks as regular files.
+- Boundary: docs/design only; no code change, real tool run, optimizer behavior change, formula rewrite, PSF parsing, or schema replacement.
+- current_scope: C-49 Requirement.md Driven Config Intake design spec complete.
+- next_allowed_action: review docs/superpowers/specs/2026-06-05-requirement-md-config-intake-design.md, then write the narrow C-49 implementation plan if approved; do not implement code before the spec is accepted.

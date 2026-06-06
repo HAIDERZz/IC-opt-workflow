@@ -149,10 +149,15 @@ def run_spectre_ocean_adapter(
     project_dir: Path,
     *,
     run_id: str | None = None,
+    testbench_id: str | None = None,
     runner: CommandRunner | None = None,
     allow_overwrite: bool = False,
 ) -> AdapterRunResult:
-    context = load_adapter_context(project_dir, run_id=run_id)
+    context = load_adapter_context(
+        project_dir,
+        run_id=run_id,
+        testbench_id=testbench_id,
+    )
     _reject_symlinks(context.project_dir, context.metrics_dir, "metrics directory")
     _reject_symlinks(context.project_dir, context.psf_dir, "psf directory")
     context.metrics_dir.mkdir(parents=True, exist_ok=True)
@@ -240,15 +245,19 @@ def load_adapter_context(
     project_dir: Path,
     *,
     run_id: str | None = None,
+    testbench_id: str | None = None,
 ) -> SpectreOceanContext:
     project_dir = Path(project_dir)
     selected_run_id = _validate_run_id(run_id or DEFAULT_RUN_ID)
+    selected_testbench_id = _validate_testbench_id(testbench_id)
     try:
         bundle = assert_valid_project(project_dir)
     except ValueError as exc:
         raise AdapterPreconditionError("project contract validation failed") from exc
 
     run_relative = f"{REAL_RUN_ROOT}/{selected_run_id}"
+    if selected_testbench_id is not None:
+        run_relative = f"{run_relative}/testbenches/{selected_testbench_id}"
     run_dir = _safe_project_path(project_dir, run_relative, "run directory")
     _reject_symlinks(project_dir, run_dir, "run directory")
     if not run_dir.is_dir():
@@ -398,17 +407,18 @@ def render_ocean_replay_script(context: SpectreOceanContext) -> str:
     ]
 
     for metric in context.request.metrics:
-        _validate_emitted_field(metric.result, f"metric {metric.name} result")
-        _validate_result_selector(metric.result, f"metric {metric.name} result")
         _validate_emitted_field(metric.name, "metric name")
         _validate_emitted_field(metric.unit, f"metric {metric.name} unit")
         _validate_emitted_field(
             metric.expression_sha256,
             f"metric {metric.name} expression_sha256",
         )
+        if metric.result is not None:
+            _validate_emitted_field(metric.result, f"metric {metric.name} result")
+            _validate_result_selector(metric.result, f"metric {metric.name} result")
+            lines.append(f"selectResult('{metric.result})")
         lines.extend(
             [
-                f"selectResult('{metric.result})",
                 f"; metric: {metric.name}",
                 f"; expression_sha256: {metric.expression_sha256}",
                 f"hermesResult = errset({metric.expression} t)",
@@ -901,6 +911,14 @@ def _validate_run_id(run_id: str) -> str:
     if not RUN_ID_RE.match(run_id):
         raise AdapterPreconditionError(f"run_id must match real_[0-9]{{3}}: {run_id}")
     return run_id
+
+
+def _validate_testbench_id(testbench_id: str | None) -> str | None:
+    if testbench_id is None:
+        return None
+    if not RESULT_SELECTOR_RE.match(testbench_id):
+        raise AdapterPreconditionError(f"testbench_id is unsafe: {testbench_id}")
+    return testbench_id
 
 
 def _load_model(path: Path, model_class: type[ModelT], label: str) -> ModelT:

@@ -17,6 +17,7 @@ from hermes_workflow.schemas import (
     OptimizerConfig,
     ProjectConfig,
     SpectreConfig,
+    TestbenchesConfig,
     VariableKind,
     VariablesConfig,
 )
@@ -28,6 +29,9 @@ CONFIG_MODELS: dict[str, type[BaseModel]] = {
     "metrics.yaml": MetricsConfig,
     "spectre.yaml": SpectreConfig,
     "optimizer.yaml": OptimizerConfig,
+}
+OPTIONAL_CONFIG_MODELS: dict[str, type[BaseModel]] = {
+    "testbenches.yaml": TestbenchesConfig,
 }
 
 INTEGER_RE = re.compile(r"^[+-]?\d+$")
@@ -81,6 +85,7 @@ class ValidationReport:
 class ContractBundle:
     project_dir: Path
     project_config: ProjectConfig
+    testbenches: TestbenchesConfig | None
     variables: VariablesConfig
     metrics: MetricsConfig
     spectre: SpectreConfig
@@ -147,18 +152,44 @@ def _load_config_models(
         except ValidationError as exc:
             issues.extend(_validation_error_issues(project_dir, config_path, exc))
 
+    for file_name, model in OPTIONAL_CONFIG_MODELS.items():
+        config_path = config_dir / file_name
+        if not config_path.exists():
+            continue
+        try:
+            payload = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+        except yaml.YAMLError as exc:
+            issues.append(
+                ValidationIssue(
+                    file=_display_file(project_dir, config_path),
+                    path="",
+                    message=f"invalid YAML: {exc}",
+                )
+            )
+            continue
+
+        try:
+            loaded[file_name] = model.model_validate(payload)
+        except ValidationError as exc:
+            issues.extend(_validation_error_issues(project_dir, config_path, exc))
+
     return loaded
 
 
 def _bundle_from_loaded(
     project_dir: Path, loaded: dict[str, BaseModel]
 ) -> ContractBundle | None:
-    if set(loaded) != set(CONFIG_MODELS):
+    if not set(CONFIG_MODELS).issubset(loaded):
         return None
 
     return ContractBundle(
         project_dir=project_dir,
         project_config=_cast_model(ProjectConfig, loaded["project_config.yaml"]),
+        testbenches=(
+            _cast_model(TestbenchesConfig, loaded["testbenches.yaml"])
+            if "testbenches.yaml" in loaded
+            else None
+        ),
         variables=_cast_model(VariablesConfig, loaded["variables.yaml"]),
         metrics=_cast_model(MetricsConfig, loaded["metrics.yaml"]),
         spectre=_cast_model(SpectreConfig, loaded["spectre.yaml"]),
@@ -170,7 +201,7 @@ def _validate_contract_bundle(bundle: ContractBundle) -> list[ValidationIssue]:
     issues: list[ValidationIssue] = []
     issues.extend(_validate_netlist_paths(bundle.project_config))
     issues.extend(_validate_variables(bundle.variables))
-    issues.extend(_validate_metrics(bundle.metrics))
+    issues.extend(_validate_metrics(bundle.metrics, bundle.testbenches))
     issues.extend(_validate_objective_expression(bundle.metrics))
     issues.extend(_validate_optimizer_contract(bundle))
     return issues
@@ -364,9 +395,45 @@ def _has_whitespace_unit_suffix(raw: str) -> bool:
     return match.start("unit") > match.end("value")
 
 
-def _validate_metrics(metrics_config: MetricsConfig) -> list[ValidationIssue]:
+def _validate_metrics(
+    metrics_config: MetricsConfig,
+    testbenches_config: TestbenchesConfig | None,
+) -> list[ValidationIssue]:
     declared_metrics = {metric.name for metric in metrics_config.metrics}
     issues: list[ValidationIssue] = []
+    declared_testbenches = (
+        {testbench.id for testbench in testbenches_config.testbenches}
+        if testbenches_config is not None
+        else set()
+    )
+    for index, metric in enumerate(metrics_config.metrics):
+        if testbenches_config is None:
+            if metric.testbench is not None:
+                issues.append(
+                    _issue(
+                        "metrics.yaml",
+                        f"metrics[{index}].testbench",
+                        "metric testbench requires config/testbenches.yaml",
+                    )
+                )
+            continue
+        if metric.testbench is None:
+            issues.append(
+                _issue(
+                    "metrics.yaml",
+                    f"metrics[{index}].testbench",
+                    "metric must declare testbench when config/testbenches.yaml exists",
+                )
+            )
+            continue
+        if metric.testbench not in declared_testbenches:
+            issues.append(
+                _issue(
+                    "metrics.yaml",
+                    f"metrics[{index}].testbench",
+                    f"metric {metric.name} references unknown testbench {metric.testbench}",
+                )
+            )
     for index, constraint in enumerate(metrics_config.constraints):
         if constraint.metric not in declared_metrics:
             issues.append(

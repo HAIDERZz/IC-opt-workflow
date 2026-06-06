@@ -1,0 +1,104 @@
+# Multi-Testbench Candidate Evaluation Implementation Plan
+
+> **For agentic workers:** Use the normal project cadence, but keep this flow
+> practice-first and narrow. Do not build a broad scheduler or optimizer
+> framework. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Extend the current single-testbench candidate evaluation route so one
+optimizer candidate can run multiple preserved Maestro/ADE testbench bundles and
+produce one aggregated metric observation.
+
+**Active spec:** `docs/superpowers/specs/2026-06-06-multi-testbench-candidate-evaluation-design.md`
+
+## Task 1: Contract Shape And Intake Mapping
+
+- [x] Add the smallest schema/config support for named testbenches.
+- [x] Extend requirement intake so `opt_requirement.md` can define either the
+      existing single `Maestro Source` block or a new `testbenches` list.
+- [x] Add metric routing by `metric.testbench`.
+- [x] Preserve single-testbench backwards compatibility.
+- [x] Verify with focused intake/schema tests only.
+
+Status: complete, verified-only. `config/testbenches.yaml` is optional and only
+emitted for multi-testbench intake. Single-testbench requirement projects keep
+the existing `project_config.yaml`/`netlists/exported/` route unchanged.
+
+Acceptance:
+
+- Single-testbench C-49 fixtures still validate.
+- A multi-testbench fixture renders `testbenches.yaml` and metrics with routing
+  keys.
+- Missing or duplicate testbench ids fail closed.
+- Metrics referencing unknown testbench ids fail closed.
+
+## Task 2: Multi-Testbench Netlist Import And Render
+
+- [x] Import each named `maestro_point_root/netlist/` into a namespaced project
+      bundle.
+- [x] Render the same candidate parameters into every named testbench template.
+- [x] Keep the existing single-testbench netlist layout working.
+- [x] Reject unsafe symlinks with the same C-49 policy.
+
+Status: complete, verified-only. Multi-testbench requirement preparation now
+imports each point-root into `netlists/testbenches/<id>/exported/`, templates
+each child deck into `netlists/testbenches/<id>/templates/template.scs`, and
+keeps the primary legacy `netlists/exported/` + `netlists/templates/` path for
+existing commands. `dry-run` renders the lower-bound candidate into
+`runs/dry_run/testbenches/<id>/input.scs` for every named testbench.
+
+Acceptance:
+
+- Namespaced exported bundles keep regular sidecars.
+- Rendered child `input.scs` files contain the same approved candidate values.
+- No PSF parsing, formula rewriting, or synthetic testbench merge is introduced.
+
+## Task 3: Child Run Manifests And Aggregated Metric Manifest
+
+- [x] Define child run directories under `runs/real/<run_id>/testbenches/<id>/`.
+- [x] Let each child produce its own result and metric manifests.
+- [x] Aggregate child manifests into the existing top-level
+      `result_manifest.json` and `metrics/metric_result_manifest.json`.
+- [x] Preserve partial child metrics for diagnosis while failing the candidate
+      if required metrics are missing or invalid.
+
+Status: complete, verified-only. `aggregate_multi_testbench_run()` now combines
+per-testbench child result/metric manifests into the existing candidate-level
+`result_manifest.json` and `metrics/metric_result_manifest.json`. Child
+references are preserved in optional `child_results` and
+`child_metric_results` fields, while existing `check-real-run` and
+`check-metric-results` continue to operate on the aggregate files.
+
+Acceptance:
+
+- One fake multi-testbench candidate can aggregate two child metric manifests.
+- `check-real-run` and `check-metric-results` see the candidate-level aggregate.
+- Failure classes distinguish metric failure from real-tool failure.
+
+## Task 4: Single-Candidate Real Multi-Testbench Smoke
+
+- [ ] Use the existing Mixer CG/NF point-root and one additional user-provided
+      point-root.
+- [ ] Run one approved candidate through both Spectre/OCEAN child runs.
+- [ ] Produce one aggregated metric manifest.
+- [ ] Run supervisor checks on the aggregate.
+
+Acceptance:
+
+- Both child runs preserve native Maestro/ADE netlist layout.
+- The aggregate check passes when both child metrics are scalar.
+- The global `parallel_jobs` cap is respected across child jobs.
+
+## Task 5: Optimizer Integration Gate
+
+- [ ] Route OpenBox/native TuRBO candidate observations through the
+      multi-testbench evaluator when the project has multiple testbenches.
+- [ ] Run a tiny real optimizer smoke only after Task 4 passes.
+- [ ] Keep `optimizer_cpu_threads`, `parallel_jobs`, and `threads_per_run`
+      semantics separate in reports.
+
+Acceptance:
+
+- At least one small real optimizer batch uses multi-testbench candidate
+  evaluation without hand-picked points.
+- Reports make clear that the result is best observed, not global optimum.
+- No broad scheduler/framework rewrite is added.
