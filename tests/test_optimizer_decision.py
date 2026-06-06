@@ -128,3 +128,79 @@ def test_decide_optimizer_run_cli_writes_report(tmp_path: Path) -> None:
     assert "optimizer decision report written" in result.output
     assert "recommended: real_002" in result.output
     assert (project_dir / "reports/optimizer_decision_report.json").exists()
+
+
+def test_generate_optimizer_decision_report_prefers_feasible_candidate_over_configured_failure(
+    tmp_path: Path,
+) -> None:
+    rows = [
+        _trace_row(
+            evaluation_index=1,
+            run_id="real_001",
+            status="constraint_failed",
+            objective=3.0,
+        ),
+        _trace_row(
+            evaluation_index=2,
+            run_id="real_002",
+            status="feasible",
+            objective=1.0,
+        ),
+        _trace_row(
+            evaluation_index=3,
+            run_id="real_003",
+            status="feasible",
+            objective=2.0,
+        ),
+    ]
+    rows[0]["metrics"] = {
+        "BW": 18.0e9,
+        "MAX_GAIN": 5.0,
+        "NF_3G": 11.5,
+        "IIP3": 1.0,
+        "P1DB": -1.0,
+    }
+    rows[1]["metrics"] = {
+        "BW": 22.0e9,
+        "MAX_GAIN": 4.7,
+        "NF_3G": 11.9,
+        "IIP3": 0.5,
+        "P1DB": -0.5,
+    }
+    rows[2]["metrics"] = {
+        "BW": 21.0e9,
+        "MAX_GAIN": 4.5,
+        "NF_3G": 11.8,
+        "IIP3": 0.4,
+        "P1DB": -0.8,
+    }
+    rows[1]["parameters"] = {"F": "20", "W": "1.4u", "L": "30n", "VB_LO": "310m"}
+    project_dir = _write_accepted_optimizer_project(tmp_path, rows=rows)
+    (project_dir / "config" / "metrics.yaml").write_text(
+        """
+schema_version: "1.0"
+metrics:
+  - name: BW
+    unit: Hz
+constraints:
+  - metric: BW
+    op: gt
+    value: "19e9 Hz"
+objective:
+  direction: minimize
+  expression: "BW"
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    report = generate_optimizer_decision_report(project_dir)
+
+    assert report.status == "pass"
+    assert report.recommended_run_id == "real_002"
+    assert report.recommended_candidate["status"] == "feasible"
+    assert report.recommendation_basis == "stored_best_observed_feasible_fallback"
+    assert report.recommended_action == "accept_best_observed_or_continue"
+    assert any(
+        "configured objective best candidate is not feasible" in warning
+        for warning in report.warnings
+    )

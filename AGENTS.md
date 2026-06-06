@@ -38,6 +38,7 @@ Do not use "Hermes agent" as a role name. In this project, Hermes means workflow
 - Keep progress files aligned with implementation before context compaction.
 - When the user explicitly authorizes a fast real-tool debug lane, label the work `verified-only`, keep changes surgical, record a concise debug note under `docs/debug/`, keep raw tool artifacts local-only, and return to the normal task/review cadence before claiming a reviewed implementation task is complete.
 - Before running real Virtuoso/Spectre/OCEAN/OpenBox/native-TuRBO/bridge commands, read `docs/TOOLCHAIN_EXECUTION_REFERENCE.md` and use its known-good environment, sandbox, workspace-preparation, and closeout commands. If a real-tool run fails, compare it against that reference before inventing a new debug path.
+- Production optimizer use should be file-driven and short-request driven. Machine-critical setup belongs in `opt_requirement.md`; do not compensate with long user prompts. The supervisor should be able to start from a short request plus `PROJECT_DIR`, then follow the documented Hermes command sequence.
 
 ## Practice-First Tool Integration
 

@@ -50,8 +50,13 @@ def generate_optimizer_decision_report(
         issues.append("optimizer insight report failed")
         issues.extend(insight.issues)
 
-    candidate, basis = _select_candidate(insight.configured_objective_ranking, insight.best_observed)
-    if not candidate:
+    candidate, basis, selection_warnings = _select_candidate(
+        insight.configured_objective_ranking,
+        insight.best_observed,
+        insight.top_feasible_candidates,
+    )
+    warnings.extend(selection_warnings)
+    if not candidate and basis != "no_feasible_candidate":
         issues.append("no recommended optimizer candidate found")
 
     run_id = _string_value(candidate.get("run_id")) if candidate else None
@@ -112,13 +117,44 @@ def generate_optimizer_decision_report(
 def _select_candidate(
     configured_ranking: dict[str, Any],
     best_observed: dict[str, Any] | None,
-) -> tuple[dict[str, Any] | None, str]:
+    top_feasible_candidates: list[dict[str, Any]],
+) -> tuple[dict[str, Any] | None, str, list[str]]:
+    warnings: list[str] = []
     configured = _dict_value(configured_ranking.get("best_candidate"))
+    if _is_feasible(configured):
+        return configured, "configured_objective_ranking", warnings
     if configured is not None:
-        return configured, "configured_objective_ranking"
+        warnings.append(
+            "configured objective best candidate is not feasible; "
+            f"ignored as primary recommendation: {_candidate_label(configured)}"
+        )
+    if _is_feasible(best_observed):
+        return best_observed, "stored_best_observed_feasible_fallback", warnings
+    top_feasible = _first_dict(top_feasible_candidates)
+    if top_feasible is not None:
+        candidate = dict(top_feasible)
+        candidate.setdefault("status", "feasible")
+        return candidate, "top_feasible_candidate_fallback", warnings
     if best_observed is not None:
-        return best_observed, "stored_best_observed"
-    return None, "none"
+        warnings.append(
+            "stored best observed candidate is not feasible; "
+            f"no primary recommendation: {_candidate_label(best_observed)}"
+        )
+    return None, "no_feasible_candidate", warnings
+
+def _is_feasible(candidate: dict[str, Any] | None) -> bool:
+    return bool(candidate) and _string_value(candidate.get("status")) == "feasible"
+
+def _first_dict(candidates: list[dict[str, Any]]) -> dict[str, Any] | None:
+    for candidate in candidates:
+        if isinstance(candidate, dict):
+            return candidate
+    return None
+
+def _candidate_label(candidate: dict[str, Any]) -> str:
+    run_id = _string_value(candidate.get("run_id")) or "unknown"
+    status = _string_value(candidate.get("status")) or "unknown"
+    return f"{run_id} status={status}"
 
 
 def _recommended_action(
@@ -130,6 +166,8 @@ def _recommended_action(
     if has_issues:
         return "review_artifacts_before_decision"
     if not candidate:
+        if status_counts and status_counts.get("feasible", 0) == 0:
+            return "adjust_constraints_or_continue"
         return "continue_or_review_no_candidate"
     if _string_value(candidate.get("status")) == "feasible":
         return "accept_best_observed_or_continue"

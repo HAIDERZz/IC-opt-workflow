@@ -68,8 +68,25 @@ readiness: ready_for_first_run
 
 ## 4. Run The Optimizer
 
+Before a real run, the supervisor must build and approve the execution package.
+Do not jump directly from readiness to real execution.
+
+```bash
+./.venv/bin/hermes-workflow package ~/spectre_opt_prj/<project_name>
+./.venv/bin/hermes-workflow prepare-netlist ~/spectre_opt_prj/<project_name>
+./.venv/bin/hermes-workflow dry-run ~/spectre_opt_prj/<project_name>
+./.venv/bin/hermes-workflow preflight-health ~/spectre_opt_prj/<project_name>
+./.venv/bin/hermes-workflow approve ~/spectre_opt_prj/<project_name>
+./.venv/bin/hermes-workflow package-optimizer-task ~/spectre_opt_prj/<project_name> \
+  --backend openbox \
+  --max-evals 100 \
+  --parallel \
+  --cadence-cshrc /path/to/user/cadence_env.csh
+```
+
 Before a real run, read `docs/TOOLCHAIN_EXECUTION_REFERENCE.md` and use the
-known-good Cadence/OpenBox environment.
+user/project Cadence/OpenBox environment. The environment setup path must come
+from the user project or user shell setup; do not hardcode a Spectre version.
 
 Example OpenBox run:
 
@@ -78,7 +95,7 @@ Example OpenBox run:
   --max-evals 100 \
   --batch-size 10 \
   --parallel-jobs 10 \
-  --cadence-cshrc /home/zzchen/cadence_ic231_env.csh
+  --cadence-cshrc /path/to/user/cadence_env.csh
 ```
 
 Resource meanings:
@@ -86,6 +103,9 @@ Resource meanings:
 - `spectre.parallel_jobs`: how many Spectre child jobs may run at once.
 - `spectre.threads_per_run`: Spectre `+mt` threads per individual simulation.
 - `optimizer.optimizer_cpu_threads`: Python/OpenBox-side optimizer math threads.
+
+Execution-agent status policy: report start, unexpected failure, completion,
+and only low-frequency heartbeat status for long runs. Do not poll every batch.
 
 ## 5. Close Out The Run
 
@@ -97,6 +117,12 @@ Use the report chain:
 ./.venv/bin/hermes-workflow finalize-optimizer-run ~/spectre_opt_prj/<project_name>
 ./.venv/bin/hermes-workflow visualize-optimizer-run ~/spectre_opt_prj/<project_name>
 ./.venv/bin/hermes-workflow decide-optimizer-run ~/spectre_opt_prj/<project_name>
+```
+
+Only after the user accepts the recommended feasible best-observed candidate,
+record the decision:
+
+```bash
 ./.venv/bin/hermes-workflow record-optimizer-decision ~/spectre_opt_prj/<project_name> \
   --reason "User accepted the current best observed optimizer result."
 ./.venv/bin/hermes-workflow write-optimizer-final-summary ~/spectre_opt_prj/<project_name>
@@ -129,6 +155,10 @@ reports/project_readiness_report.json
 
 Important boundary: the accepted point is `best observed`, not a mathematical
 global optimum certificate.
+
+`decide-optimizer-run` must not present a non-feasible candidate as the primary
+recommended run when any feasible candidate exists. Constraint-failed candidates
+are diagnostic evidence, not acceptance targets.
 
 ## Common Failure Meanings
 

@@ -84,33 +84,21 @@ Good examples:
 Do not put machine-critical formulas only in `constraints.md`. Formulas,
 variable ranges, and resource settings belong in `opt_requirement.md`.
 
-## 4. Give This Prompt To The Supervisor Agent
+## 4. Give One Short Request To The Supervisor Agent
+
+The user-facing request should stay short. All machine-critical information
+belongs in `opt_requirement.md`.
 
 Use a request like this:
 
 ```text
-Please run an IC optimizer workflow for:
-
-PROJECT_DIR = /home/zzchen/spectre_opt_prj/<project_name>
-
-Follow ic-auto-opt-workflow/docs/AGENT_OPTIMIZER_USAGE_MANUAL.md and
-docs/OPTIMIZER_PRODUCTION_QUICKSTART.md.
-
-Use opt_requirement.md as the source of truth.
-Use constraints.md only as supervisor guidance.
-
-Do not hand-pick optimizer points.
-Do not rewrite OCEAN formulas.
-Do not parse PSF in Python.
-Do not merge multiple testbenches into one synthetic Spectre deck.
-Do not commit raw Cadence netlists, PSF data, or full Cadence logs.
-
-First run the intake/readiness checks.
-If the project is ready, run the optimizer with the approved settings.
-After the optimizer finishes, generate the decision report and final summary.
-Stop and report if readiness fails, real-tool execution fails structurally, or
-the final decision needs user approval.
+Run the IC optimizer workflow for /home/zzchen/spectre_opt_prj/<project_name>.
 ```
+
+The supervisor agent must then follow this manual and
+`docs/OPTIMIZER_PRODUCTION_QUICKSTART.md`. It should not ask the user to
+restate formulas, variables, testbench paths, Spectre resources, or optimizer
+settings that are already present in `opt_requirement.md`.
 
 ## 5. Agent Step 1: Intake And Readiness
 
@@ -146,7 +134,29 @@ Typical user-side fixes:
 - metric routes point to unknown testbench ids;
 - OCEAN formula or constraint names do not match declared metrics.
 
-## 6. Agent Step 2: Run Optimizer
+## 6. Agent Step 2: Build The Approved Execution Package
+
+Before any real optimizer execution, the supervisor agent must build and approve
+the file-contract package. Do not skip this gate.
+
+```bash
+./.venv/bin/hermes-workflow package PROJECT_DIR
+./.venv/bin/hermes-workflow prepare-netlist PROJECT_DIR
+./.venv/bin/hermes-workflow dry-run PROJECT_DIR
+./.venv/bin/hermes-workflow preflight-health PROJECT_DIR
+./.venv/bin/hermes-workflow approve PROJECT_DIR
+./.venv/bin/hermes-workflow package-optimizer-task PROJECT_DIR \
+  --backend openbox \
+  --max-evals 100 \
+  --parallel \
+  --cadence-cshrc /path/to/user/cadence_env.csh
+```
+
+`--cadence-cshrc` is the user/project Cadence environment setup script. It must
+come from the user environment or project configuration; do not hardcode a
+Spectre version in prompts, docs, or code.
+
+## 7. Agent Step 3: Run Optimizer
 
 For OpenBox real optimization:
 
@@ -155,7 +165,7 @@ For OpenBox real optimization:
   --max-evals 100 \
   --batch-size 10 \
   --parallel-jobs 10 \
-  --cadence-cshrc /home/zzchen/cadence_ic231_env.csh
+  --cadence-cshrc /path/to/user/cadence_env.csh
 ```
 
 The exact values should come from `opt_requirement.md` unless the user
@@ -169,7 +179,11 @@ Resource meanings:
 
 The agent should not replace this with manually selected candidate points.
 
-## 7. Agent Step 3: Close Out The Run
+Status policy: after a long real optimizer starts, the execution agent should
+avoid per-batch polling. It should report start, unexpected failure, completion,
+and only low-frequency heartbeat status for long runs.
+
+## 8. Agent Step 4: Close Out The Run
 
 After the optimizer run finishes, the agent should run:
 
@@ -198,7 +212,11 @@ The agent should tell the user:
 - whether the run should be accepted, continued, or sent back for user review;
 - whether the result is only best observed.
 
-## 8. User Decision Point
+Important: `decide-optimizer-run` must not present a `constraint_failed`,
+`metric_check_failed`, or `real_check_failed` candidate as the primary
+recommended run when any feasible candidate exists.
+
+## 9. User Decision Point
 
 The supervisor agent should ask for user confirmation before recording the final
 decision unless the user already gave explicit acceptance rules.
@@ -231,7 +249,7 @@ project readiness: pass
 readiness: ready_for_closeout_review
 ```
 
-## 9. What The User Reads
+## 10. What The User Reads
 
 Primary final report:
 
@@ -254,7 +272,7 @@ PROJECT_DIR/reports/optimizer_visuals/
 PROJECT_DIR/reports/openbox_advanced_visualization/
 ```
 
-## 10. How To Continue Optimization
+## 11. How To Continue Optimization
 
 Only continue if the decision report or the user asks for it.
 
@@ -265,7 +283,7 @@ Example:
   --additional-evals 100 \
   --batch-size 10 \
   --parallel-jobs 10 \
-  --cadence-cshrc /home/zzchen/cadence_ic231_env.csh
+  --cadence-cshrc /path/to/user/cadence_env.csh
 ```
 
 Then rerun the closeout chain:
@@ -281,7 +299,7 @@ Then rerun the closeout chain:
 Do not restart from scratch unless the user changes variables, formulas,
 constraints, objective, or Maestro point roots.
 
-## 11. How To Interpret Failures
+## 12. How To Interpret Failures
 
 `constraint_failed` means:
 
@@ -318,7 +336,7 @@ Few or zero feasible points usually means:
 - initial Maestro point roots and formulas do not match;
 - optimizer budget is too small for the space.
 
-## 12. Important Boundaries
+## 13. Important Boundaries
 
 The agent must keep these rules:
 
@@ -332,7 +350,7 @@ The agent must keep these rules:
 - Do not commit raw Cadence netlists, protected sidecars, PSF data, or full
   Cadence logs.
 
-## 13. Minimal Successful Session
+## 14. Minimal Successful Session
 
 A successful first production session looks like:
 
@@ -340,12 +358,13 @@ A successful first production session looks like:
 1. User creates PROJECT_DIR and writes opt_requirement.md.
 2. Agent runs intake/readiness commands.
 3. readiness=ready_for_first_run.
-4. Agent runs run-openbox-real.
-5. Agent runs closeout report chain.
-6. Agent reports best observed result and bottleneck.
-7. User accepts or asks to continue.
-8. Agent records decision and writes optimizer_final_summary.md.
-9. readiness=ready_for_closeout_review.
+4. Supervisor builds package/preflight/approval/optimizer task package.
+5. Execution agent runs run-openbox-real from the approved task package.
+6. Supervisor runs closeout report chain.
+7. Supervisor reports best observed feasible result and bottleneck.
+8. User accepts or asks to continue.
+9. Supervisor records decision and writes optimizer_final_summary.md.
+10. readiness=ready_for_closeout_review.
 ```
 
 At that point, the user can use the accepted candidate as the current optimized
