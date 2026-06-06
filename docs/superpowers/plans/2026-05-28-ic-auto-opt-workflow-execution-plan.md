@@ -23,15 +23,17 @@
 
 ## Current Implementation Node
 
-As of 2026-06-06, Plan A, Plan B, and Plan C through C-49 are complete, with
+As of 2026-06-06, Plan A, Plan B, and Plan C through C-50 are complete, with
 post-C-49 real Mixer OpenBox/Spectre/OCEAN evidence through 200 cumulative
-NF=12dB evaluations. The current active scope is C-50 Multi-Testbench Candidate
-Evaluation.
+NF=12dB evaluations and C-50 real multi-testbench evidence through 100
+three-testbench evaluations. The next active scope should stay narrow and
+production-facing, preferably user-facing `opt_requirement.md` /
+multi-testbench guide tightening and final optimizer closeout/status reporting.
 
 The accepted route is no longer an abstract contract-only optimizer plan; it is
 a practice-first production handoff flow that has been exercised with real
-OpenBox, Spectre, and OCEAN runs. C-50 now addresses the next real Mixer landing
-gap: one optimizer candidate may need metrics from multiple Maestro/ADE
+OpenBox, Spectre, and OCEAN runs. C-50 has addressed the real Mixer landing
+gap where one optimizer candidate needs metrics from multiple Maestro/ADE
 testbenches such as CG/NF/BW, IIP3, and P1dB.
 
 Current production route:
@@ -93,16 +95,20 @@ Completed optimizer milestones since C-26:
 - A narrow resource-control fix added `optimizer_cpu_threads` for Python-side
   optimizer math/threadpool work only. It remains separate from
   `spectre.parallel_jobs` and `spectre.threads_per_run`.
-- C-50 design/plan are now active. C-50 Task 1 added the contract/intake shape
-  for named testbenches and metric routing while preserving the existing
-  single-testbench path. C-50 Task 2 added namespaced multi-testbench netlist
+- C-50 completed the multi-testbench route. Task 1 added the contract/intake
+  shape for named testbenches and metric routing while preserving the existing
+  single-testbench path. Task 2 added namespaced multi-testbench netlist
   import/template/render while preserving the primary legacy single-testbench
-  path. C-50 Task 3 added fake/local child manifest aggregation into the
-  existing candidate-level `result_manifest.json` and
-  `metrics/metric_result_manifest.json` paths. C-50 still must complete a
-  single-candidate real multi-testbench smoke before optimizer integration. It
-  must not merge testbenches into a synthetic deck, parse PSF, rewrite formulas,
-  or multiply `parallel_jobs` per testbench.
+  path. Task 3 added child manifest aggregation into the existing
+  candidate-level `result_manifest.json` and
+  `metrics/metric_result_manifest.json` paths. Task 4/5 completed real
+  evidence in `/home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb`: 100
+  three-testbench OpenBox/Spectre/OCEAN evaluations with `19 feasible`,
+  `65 constraint_failed`, `16 metric_check_failed`, best observed `real_068`,
+  and final decision `accept_best_observed`, `global_optimum_claim=false`.
+  C-50 did not merge testbenches into a synthetic deck, parse PSF, rewrite
+  formulas, change approved formulas, or multiply `parallel_jobs` per
+  testbench.
 
 Current code-level entry points:
 
@@ -117,9 +123,10 @@ Current code-level entry points:
 - `hermes-workflow optimizer-status PROJECT_DIR`
 
 The next work should stay narrow and practice-first. Do not start a broad
-optimizer framework rewrite. The next production step is C-50 Task 4
-Single-Candidate Real Multi-Testbench Smoke after the user confirms the
-additional point-root/testbench inputs and real-tool execution.
+optimizer framework rewrite. The next production step should convert the proven
+C-49/C-50 route into clearer user-facing operation: requirement template/README
+tightening, multi-testbench guide, formula/variable/resource approval
+checkpoint, and final optimizer closeout/status reporting polish.
 
 ## Current Route Alignment
 

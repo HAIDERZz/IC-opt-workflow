@@ -21,15 +21,16 @@ ic-auto-opt-workflow/AGENTS.md
 Current execution state:
 
 - Latest baseline: `docs/PROJECT_LANDING_BASELINE_2026-06-05.md`.
-- Current scope: C-50 Multi-Testbench Candidate Evaluation.
-- Current status: C-50 Task 3 Child Run Manifests And Aggregated Metric
-  Manifest is complete, verified-only. One fake multi-testbench candidate can
-  aggregate child result/metric manifests into the existing candidate-level
-  `result_manifest.json` and `metrics/metric_result_manifest.json` paths, and
-  existing `check-real-run` / `check-metric-results` consume the aggregate.
-  The latest real optimizer evidence remains
-  `/home/zzchen/spectre_opt_prj/Mixer_opt_openbox_nf12_001` with 200 cumulative
-  NF=12dB OpenBox/Spectre/OCEAN evaluations and best observed `real_100`.
+- Current scope: C-50 Multi-Testbench Candidate Evaluation complete.
+- Current status: C-50 is complete, verified-only. Requirement intake,
+  namespaced Maestro/ADE point-root imports, per-testbench child
+  Spectre/OCEAN runs, aggregate candidate-level manifests, and OpenBox
+  multi-testbench optimizer integration are all exercised by real evidence.
+  Latest multi-testbench evidence:
+  `/home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb` completed 100 real
+  three-testbench OpenBox/Spectre/OCEAN evaluations with `19 feasible`,
+  `65 constraint_failed`, `16 metric_check_failed`, and no recorded
+  `real_check_failed`. Best observed is `real_068`.
 - Key real evidence: `/tmp/ic_auto_opt_real_flow_t77ky7/bridge_test_inv`
   completed 100 real OpenBox/Spectre/OCEAN evaluations with `43 feasible`,
   `51 constraint_failed`, `6 metric_check_failed`, `0 real_check_failed`, best
@@ -39,17 +40,18 @@ Current execution state:
   now addressed by C-49 Requirement.md Driven Config Intake. The generated
   Mixer project passed a real single-point smoke after user confirmation. Do
   not put a generic natural-language parser inside Hermes.
-- Other remaining landing gaps: multi-testbench real candidate smoke, first
-  multi-testbench optimizer batch, concise formula/variable/resource approval
-  checkpoint, and production guide tightening for the full user-to-run entry
-  flow.
+- Other remaining landing gaps: production guide tightening for the full
+  user-to-run entry flow, concise formula/variable/resource approval checkpoint,
+  final optimizer closeout/status reporting polish, and possible continuation
+  policy for multi-testbench projects.
 - Do not start broad optimizer framework work, hand-pick optimizer points,
   replace the OpenBox route, parse PSF, rewrite OCEAN formulas, or rerun
   Spectre/OCEAN solely for report formatting.
-- Current C-50 scope: Multi-Testbench Candidate Evaluation. It keeps the C-49
-  A+B intake model but extends the candidate evaluation topology so one
+- Completed C-50 scope: Multi-Testbench Candidate Evaluation. It keeps the
+  C-49 A+B intake model but extends the candidate evaluation topology so one
   candidate can route metrics to named testbenches, run multiple preserved
-  Maestro/ADE netlist bundles, and aggregate child OCEAN scalar metric manifests.
+  Maestro/ADE netlist bundles, and aggregate child OCEAN scalar metric
+  manifests.
 - C-49 real user-project bootstrap drill: `/home/zzchen/spectre_opt_prj/Mixer_opt`
   passed `check-requirement`, `prepare-from-requirement`, and `validate` after
   correcting the requirement file. The drill exposed and fixed a silent-loss
@@ -57,7 +59,7 @@ Current execution state:
   mistakes such as `W` being overwritten by `L`. Import evidence: 69 netlist
   files copied, 1 safe symlink materialized, and template variables `F`, `W`,
   `L`, and `VB_LO` approved. No Spectre/OCEAN run was launched.
-- current_scope: C-50 Multi-Testbench Candidate Evaluation.
+- current_scope: C-50 Multi-Testbench Candidate Evaluation complete.
 - C-50 files: `docs/superpowers/specs/2026-06-06-multi-testbench-candidate-evaluation-design.md`
   and `docs/superpowers/plans/2026-06-06-multi-testbench-candidate-evaluation.md`.
 - C-49 verification: targeted tests passed with `88 passed`; full suite passed
@@ -66,9 +68,10 @@ Current execution state:
   rewrite; no Maestro/ADE netlist flattening; no optimizer execution behavior
   change. The only schema extension was accepting `optimizer.algorithm: openbox`
   to match the existing OpenBox backend route.
-- next_allowed_action: start C-50 Task 4 Single-Candidate Real Multi-Testbench
-  Smoke only after the user confirms the additional point-root/testbench inputs
-  and real-tool execution.
+- next_allowed_action: choose the next narrow landing task after C-50,
+  preferably productionizing the user-facing `opt_requirement.md` /
+  multi-testbench guide and tightening final optimizer closeout/status
+  reporting. Do not rerun real tools only for report formatting.
 - Post-C-49 real Mixer smoke: `real_002` used `F=26`, `W=1u`, `L=40n`,
   `VB_LO=310m`, ran Spectre 25.1, ran batch OCEAN with approved formulas
   unchanged, passed `check-real-run`, and passed `check-metric-results`.
@@ -116,8 +119,22 @@ Current execution state:
   advanced visualization generation passed. Best observed remains `real_100`;
   `optimizer-status` reports plateau detected and no further continuation
   recommended by default.
+- C-50 multi-testbench completion: `/home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb`
+  completed 100 real three-testbench OpenBox/Spectre/OCEAN evaluations in 10
+  batches of 10. Status counts: `19 feasible`, `65 constraint_failed`,
+  `16 metric_check_failed`, and no recorded `real_check_failed`. Best observed
+  `real_068`: `F=26`, `W=1u`, `L=40n`, `VB_LO=310m`; metrics
+  `BW=19171311625.11458 Hz`, `MAX_GAIN=4.242801858394763 dB`,
+  `NF_3G=11.81241967045868 dB`, `IIP3=3.206487765822459 dBm`, and
+  `P1DB=-0.8997623115419788 dBm`; objective `-0.0503357919658288`.
+  Acceptance, completion, finalization, and insight reports were refreshed
+  after the optimizer process finished and all reflect `evaluation_count=100`.
+  Decision: `accept_best_observed`, confidence `medium`,
+  `global_optimum_claim=false`. Route audit: no synthetic merged deck, no PSF
+  parsing, no OCEAN formula rewrite, no approved-formula change, and no
+  `parallel_jobs` multiplication per testbench.
 
-- Current scope: C-24 Generated Optimizer Task Packet Handoff Acceptance.
+- Historical scope: C-24 Generated Optimizer Task Packet Handoff Acceptance.
 - Current status: C-24 implementation plan is written and verified-only. It validates the C-23 generated optimizer task packet through one local worker-agent handoff and supervisor/Hermes manifest-level audit.
 - Current next action: execute C-24 Task 1 workspace and generated packet gate only; do not run the local worker-agent or real tools until Task 1 is complete and the user confirms Task 2.
 - C-18 keeps native `Turbo1.optimize()` as the optimizer route and adds a batch-aware Hermes evaluator so TuRBO batch candidates run Spectre/OCEAN concurrently up to `spectre.parallel_jobs`.

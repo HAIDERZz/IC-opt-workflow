@@ -198,3 +198,26 @@ cg_nf + one additional user-provided point-root
 The acceptance target is one approved candidate evaluated by both testbenches,
 with one aggregated metric manifest. A full 100-point multi-testbench optimizer
 run comes only after that single-candidate multi-testbench smoke succeeds.
+
+## Closeout Evidence
+
+C-50 completed with stronger evidence than the original first-evidence target.
+The user-provided project
+`/home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb` exercised three testbenches
+(`cg_nf`, `iip3`, and `p1db`) through a real OpenBox/Spectre/OCEAN optimizer
+run.
+
+Final evidence:
+
+- 100 real multi-testbench evaluations in 10 batches of 10.
+- `19 feasible`, `65 constraint_failed`, and `16 metric_check_failed`.
+- Best observed `real_068`, with all three child result manifests succeeded
+  and all three child metric manifests succeeded.
+- Aggregated candidate-level metrics: `BW`, `MAX_GAIN`, `NF_3G`, `IIP3`, and
+  `P1DB`.
+- Final decision: `accept_best_observed`, confidence `medium`,
+  `global_optimum_claim=false`.
+
+The closeout preserved the design constraints: no synthetic merged testbench,
+no PSF parsing, no OCEAN formula rewrite, no approved-formula change, and no
+`parallel_jobs` multiplication per testbench.

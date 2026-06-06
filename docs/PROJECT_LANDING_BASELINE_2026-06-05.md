@@ -1,6 +1,7 @@
 # Project Landing Baseline
 
 Date: 2026-06-05
+Last updated: 2026-06-06
 
 This document freezes the current proven workflow after C-48 and lists the
 remaining work needed before routine real-project adoption.
@@ -49,6 +50,16 @@ Optimizer route:
 - Continuation is productized through `continue-openbox-real`.
 - Candidate generation is backend-owned; agents must not hand-pick points.
 - Best result wording is `best observed`, not global optimum.
+
+Multi-testbench route:
+
+- A single optimizer candidate can now render the same approved parameters into
+  multiple preserved Maestro/ADE point-root testbench bundles.
+- Each child testbench runs its own Spectre/OCEAN job and writes child result
+  and metric manifests.
+- Hermes aggregates child scalar metrics into the existing candidate-level
+  `result_manifest.json` and `metrics/metric_result_manifest.json` paths.
+- Testbenches are not merged into a synthetic Spectre deck.
 
 Handoff route:
 
@@ -110,6 +121,11 @@ OpenBox production handoff evidence:
 - C-47: 100-evaluation real OpenBox flow with official advanced visualization.
 - C-48: IC-native offline optimizer insight report regenerated from the C-47
   real samples without rerunning Spectre/OCEAN.
+- C-49: strict `opt_requirement.md` intake generated a real Mixer project from
+  user-provided Maestro point-root data and passed a real single-point
+  Spectre/OCEAN smoke.
+- C-50: multi-testbench Mixer route completed 100 real three-testbench
+  OpenBox/Spectre/OCEAN evaluations.
 
 Current high-value local workspace:
 
@@ -136,18 +152,41 @@ Continuation evidence:
 - C-42: generated continuation packet and continued from 120 to 130
   evaluations through the handoff route.
 
+Multi-testbench evidence:
+
+```text
+/home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb
+```
+
+Its 100-evaluation result:
+
+```text
+19 feasible
+65 constraint_failed
+16 metric_check_failed
+0 recorded real_check_failed
+best observed: real_068
+decision: accept_best_observed
+confidence: medium
+global_optimum_claim: false
+testbenches: cg_nf, iip3, p1db
+metrics: BW, MAX_GAIN, NF_3G, IIP3, P1DB
+```
+
 ## What Is Production-Usable Now
 
-Given an already prepared project with reviewed config files and a correct
-Maestro/ADE-style exported netlist bundle, the workflow can:
+Given a project with a strict `opt_requirement.md` and reviewed Maestro/ADE
+point-root inputs, the workflow can:
 
 1. validate and package the project;
-2. generate an execution-agent OpenBox task packet;
-3. run OpenBox-generated candidates through Spectre/OCEAN;
-4. audit returned manifests;
-5. summarize best observed result and continuation recommendation;
-6. generate supervisor-facing reports and visual artifacts;
-7. continue an accepted OpenBox run for more evaluations.
+2. generate deterministic config files and safe imported netlist bundles;
+3. generate an execution-agent OpenBox task packet;
+4. run OpenBox-generated candidates through single-testbench or
+   multi-testbench Spectre/OCEAN evaluation;
+5. audit returned manifests;
+6. summarize best observed result and continuation recommendation;
+7. generate supervisor-facing reports and visual artifacts;
+8. continue an accepted OpenBox run for more evaluations.
 
 This is enough for controlled adoption on a prepared project.
 
@@ -155,31 +194,22 @@ This is enough for controlled adoption on a prepared project.
 
 Required for a smooth first non-demo adoption:
 
-1. User intake to structured contract.
-   - Missing today: a formal `user_intake.json` or equivalent contract that
-     captures user intent before rendering the existing YAML files.
-   - The correct boundary is: supervisor agent drafts structured intake; Hermes
-     validates and renders deterministic config files.
-   - Do not build a generic natural-language parser inside Hermes.
-
-2. New-project bootstrap drill from a user-selected real cell.
-   - The current proven optimizer flow uses prepared inverter project bundles.
-   - A first real adoption should verify the complete path from user-provided
-     cell/testbench information and exported Maestro netlist sidecars into the
-     current OpenBox handoff route.
-
-3. Formula and variable approval checkpoint.
+1. Formula and variable approval checkpoint.
    - Existing `metrics.yaml`, `variables.yaml`, and `spectre.yaml` are already
      strict once written.
    - The missing product step is a concise supervisor/user approval stage for
      newly drafted formulas, variables, constraints, objective, and resource
      settings before real execution.
 
-4. Production usage guide tightening around the first-project path.
+2. Production usage guide tightening around the first-project path.
    - `docs/OPTIMIZER_PRODUCTION_HANDOFF_GUIDE.md` covers the current handoff.
-   - It still assumes the project contracts already exist and are reviewed.
-   - After the intake/bootstrap work, the guide should describe the complete
-     user-to-run entry flow.
+   - It still needs to describe the complete `opt_requirement.md` to
+     single-testbench/multi-testbench optimizer run entry flow.
+
+3. Final optimizer closeout/status polish.
+   - The current reports are usable, but the supervisor-facing closeout should
+     make per-testbench failures, candidate-level metric failures, continuation
+     advice, and user-action recommendations more concise.
 
 Useful but not blocking:
 
@@ -203,17 +233,15 @@ Not recommended now:
 The next narrow development step should be:
 
 ```text
-C-49 User Intake Structured Contract MVP
+C-51 Production User Entry And Closeout Guide
 ```
 
 Recommended scope:
 
-- define one structured intake contract for supervisor-authored project intent;
-- validate required fields, unknowns, and user-confirmation blockers;
-- render the existing `config/*.yaml` files from that intake only after required
-  fields are explicit;
-- preserve existing config schemas as the execution source of truth;
-- keep LLM/natural-language ambiguity outside Hermes deterministic execution.
-
-After C-49, run a first-project bootstrap/adoption drill using a user-selected
-cell and the current OpenBox handoff route.
+- update the production handoff guide for `opt_requirement.md`;
+- include single-testbench and multi-testbench examples;
+- add a concise user/supervisor approval checkpoint for formulas, variables,
+  constraints, objective, and resource settings;
+- document the C-50 multi-testbench evidence as the reference flow;
+- keep implementation changes minimal unless the guide exposes a concrete
+  missing CLI/report field.

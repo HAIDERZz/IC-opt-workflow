@@ -4,12 +4,12 @@
 
 - Repository: `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow`
 - Branch: `plan-a-hermes-file-contract-mvp`
-- Current scope: C-50 Multi-Testbench Candidate Evaluation
-- Current status: verified-only; C-50 Task 3 Child Run Manifests And Aggregated Metric Manifest is complete. Multi-testbench child result and metric manifests under `runs/real/<run_id>/testbenches/<id>/` can now be aggregated into the existing candidate-level `result_manifest.json` and `metrics/metric_result_manifest.json`; child refs remain available for diagnosis.
+- Current scope: C-50 Multi-Testbench Candidate Evaluation complete
+- Current status: verified-only; C-50 is complete. The multi-testbench route now covers strict requirement intake, namespaced Maestro/ADE point-root imports, child Spectre/OCEAN runs, aggregated candidate-level manifests, and OpenBox optimizer observations through the multi-testbench evaluator. Real evidence: `/home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb` completed 100 real three-testbench evaluations.
 - Active spec: `docs/superpowers/specs/2026-06-06-multi-testbench-candidate-evaluation-design.md`
 - Active plan: `docs/superpowers/plans/2026-06-06-multi-testbench-candidate-evaluation.md`
-- Next required action: start C-50 Task 4 Single-Candidate Real Multi-Testbench Smoke.
-- next_allowed_action: start C-50 Task 4: Single-Candidate Real Multi-Testbench Smoke only after user confirms the additional point-root/testbench inputs and real-tool execution.
+- Next required action: choose the next narrow landing task after C-50, preferably productionizing the user-facing `opt_requirement.md` / multi-testbench guide and tightening final optimizer closeout/status reporting.
+- next_allowed_action: choose the next narrow landing task after C-50, preferably productionizing the user-facing opt_requirement.md/multi-testbench guide and tightening final optimizer closeout/status reporting. Do not start another broad optimizer framework or rerun real tools just for formatting.
 
 C-3 Task 6 final verification is complete. C-4 is confirmed as a contract-only first real-run package; it must not run Spectre, Virtuoso, subprocesses, or the optimizer loop. C-4 is now complete and reviewed. C-5 validates the execution agent's returned `result_manifest.json` and declared artifacts without running Spectre or parsing metrics. C-5.5 rehearsed the C-4/C-5 handoff with simulated execution-agent and Hermes-observer roles. After C-5.5, the project paused implementation to validate the real metric backend. Spectre + OCEAN is now confirmed as the backend route: standalone Spectre generates PSF, batch OCEAN opens the PSF and evaluates exact user/project-approved formulas, and Python only records OCEAN-produced scalar outputs and provenance. C-6 turned that route into deterministic file contracts and a Hermes validator without physical adapter wiring. C-7 added an explicit execution-side adapter and tool entry point while preserving the rule that Hermes workflow tooling still validates returned files after execution. C-8 records checked real metric results into optimizer ledger/state after `check-real-run` and `check-metric-results` pass, while preserving the contract-only boundary. C-9 prepares the next real-run package from strict ledger/state and deterministic optimizer initialization sequence, while still not running real tools or writing ledger/state. C-10 classifies failed/partial/pending real-run packages, writes explicit recovery decisions, prepares retry packages, exposes supervisor-facing recovery CLI commands, and blocks C-9 from advancing while unresolved real-run packages exist. C-10 final review fixes aligned unsafe artifact classification with the spec and hardened symlinked recovery decision reads.
 
@@ -59,7 +59,7 @@ docs/superpowers/plans/2026-06-05-requirement-md-config-intake.md
 
 ## C-50 Multi-Testbench Candidate Evaluation 2026-06-06
 
-C-50 design spec and narrow implementation plan are written, verified-only.
+C-50 implementation is complete, verified-only.
 
 Task 1 completion:
 
@@ -130,6 +130,59 @@ python3 -m ruff check src/hermes_workflow/multi_testbench_aggregation.py src/her
 ```
 
 Results: `3 passed`, `101 passed`, `65 passed`, and ruff passed.
+
+Task 4 completion:
+
+- The user-provided multi-testbench Mixer project
+  `/home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb` was used as real evidence.
+- The project contains three testbenches: `cg_nf`, `iip3`, and `p1db`.
+- The best observed real candidate `real_068` has succeeded child result and
+  metric manifests for all three testbenches.
+- The aggregate candidate-level metric manifest succeeded with `BW`,
+  `MAX_GAIN`, `NF_3G`, `IIP3`, and `P1DB`.
+- The aggregate candidate-level result manifest preserves child result
+  references for all three testbenches.
+
+Task 5 completion:
+
+- The OpenBox real optimizer route completed 100 real multi-testbench
+  evaluations in 10 batches of 10.
+- Final status files were refreshed after the optimizer process finished.
+- `reports/optimizer_run_report.json`: `status=completed`,
+  `evaluation_count=100`.
+- `reports/optimizer_evaluations.jsonl`: 100 rows with `19 feasible`,
+  `65 constraint_failed`, and `16 metric_check_failed`.
+- `reports/optimizer_run_acceptance_report.json`: accepted.
+- `reports/optimizer_completion_report.json`: `accept_best_observed`,
+  `confidence=medium`, `global_optimum_claim=false`.
+- `reports/optimizer_finalize_report.json`: passed.
+- `reports/optimizer_insight_report.md`: regenerated from the final
+  100-evaluation state.
+
+Best observed:
+
+```text
+run_id: real_068
+F=26, W=1u, L=40n, VB_LO=310m
+BW=19171311625.11458 Hz
+MAX_GAIN=4.242801858394763 dB
+NF_3G=11.81241967045868 dB
+IIP3=3.206487765822459 dBm
+P1DB=-0.8997623115419788 dBm
+objective=-0.0503357919658288
+```
+
+C-50 route audit:
+
+- Aligned with the active design spec and top-level plan.
+- No PSF parsing was introduced.
+- No OCEAN formulas were rewritten.
+- No synthetic merged Spectre deck was created.
+- `spectre.parallel_jobs`, `spectre.threads_per_run`, and
+  `optimizer_cpu_threads` remain separate.
+- The original first-evidence target was a two-testbench single candidate; the
+  completed evidence is stronger because it is a three-testbench 100-evaluation
+  real optimizer run.
 
 Purpose:
 

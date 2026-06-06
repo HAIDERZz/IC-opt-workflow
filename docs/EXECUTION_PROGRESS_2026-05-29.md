@@ -10,9 +10,9 @@ This note preserves the implementation state for continuing Plan A after context
 - Baseline commit: `885e97f docs: capture workflow planning baseline`
 - Latest C-3 code commit before docs-only cleanup: `edb107f fix: harden preflight readiness gates`; docs cleanup continues through current HEAD
 - Active plan: `docs/superpowers/plans/2026-06-06-multi-testbench-candidate-evaluation.md`
-- Current scope: C-50 Multi-Testbench Candidate Evaluation
-- Current status: C-50 Task 3 Child Run Manifests And Aggregated Metric Manifest is complete, verified-only. Multi-testbench child result and metric manifests under `runs/real/<run_id>/testbenches/<id>/` can now be aggregated into the existing candidate-level `result_manifest.json` and `metrics/metric_result_manifest.json`; optional child refs preserve per-testbench diagnosis.
-- Next allowed action: start C-50 Task 4 Single-Candidate Real Multi-Testbench Smoke only after the user confirms the additional point-root/testbench inputs and real-tool execution.
+- Current scope: C-50 Multi-Testbench Candidate Evaluation complete
+- Current status: C-50 is complete, verified-only. Requirement intake, namespaced Maestro/ADE point-root import, child Spectre/OCEAN runs, aggregate manifests, and OpenBox multi-testbench optimizer integration are all exercised by real evidence.
+- Next allowed action: choose the next narrow landing task after C-50. Recommended next scope is productionizing the user-facing `opt_requirement.md` / multi-testbench guide and tightening final optimizer closeout/status reporting.
 - Execution method: `superpowers:subagent-driven-development`
 - Dependencies installed in active Python environment on 2026-05-29: `pytest`, `typer`, `pydantic`, `PyYAML`, `ruff`
 
@@ -98,6 +98,44 @@ Task 3 result:
   (`101 passed`),
   `python3 -m pytest tests/test_package.py tests/test_cli.py tests/test_validate.py`
   (`65 passed`), and targeted `ruff check`.
+
+Task 4 result:
+
+- User project `/home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb` provided real
+  multi-testbench evidence with `cg_nf`, `iip3`, and `p1db`.
+- Best observed candidate `real_068` has all child result manifests succeeded
+  and all child metric manifests succeeded.
+- The aggregate candidate-level metric manifest contains `BW`, `MAX_GAIN`,
+  `NF_3G`, `IIP3`, and `P1DB`.
+- The aggregate candidate-level result manifest preserves child references for
+  all three testbenches.
+
+Task 5 result:
+
+- OpenBox completed 100 real multi-testbench Spectre/OCEAN evaluations in
+  `/home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb`.
+- The final run had 10 batches of 10, `evaluation_count=100`, and no remaining
+  optimizer process.
+- Status counts from `reports/optimizer_evaluations.jsonl`:
+  `19 feasible`, `65 constraint_failed`, and `16 metric_check_failed`.
+- `check-optimizer-run`, `summarize-optimizer-run`,
+  `visualize-optimizer-run`, and `finalize-optimizer-run` were rerun after the
+  process finished so the final reports all reflect 100 evaluations.
+- Best observed is `real_068`: `F=26`, `W=1u`, `L=40n`, `VB_LO=310m`;
+  `BW=19171311625.11458 Hz`, `MAX_GAIN=4.242801858394763 dB`,
+  `NF_3G=11.81241967045868 dB`, `IIP3=3.206487765822459 dBm`,
+  `P1DB=-0.8997623115419788 dBm`; objective `-0.0503357919658288`.
+- Decision: `accept_best_observed`, confidence `medium`,
+  `global_optimum_claim=false`.
+
+C-50 closeout route audit:
+
+- Aligned with the active spec and top-level plan.
+- The completed real evidence is stronger than the original first-evidence
+  target: three testbenches and 100 optimizer evaluations instead of a
+  two-testbench single candidate.
+- No broad scheduler/framework rewrite, synthetic merged Spectre deck, PSF
+  parsing, formula rewrite, or `parallel_jobs` multiplication was introduced.
 
 Post-C-49 real smoke:
 

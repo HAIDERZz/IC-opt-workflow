@@ -76,11 +76,19 @@ Acceptance:
 
 ## Task 4: Single-Candidate Real Multi-Testbench Smoke
 
-- [ ] Use the existing Mixer CG/NF point-root and one additional user-provided
+- [x] Use the existing Mixer CG/NF point-root and one additional user-provided
       point-root.
-- [ ] Run one approved candidate through both Spectre/OCEAN child runs.
-- [ ] Produce one aggregated metric manifest.
-- [ ] Run supervisor checks on the aggregate.
+- [x] Run one approved candidate through both Spectre/OCEAN child runs.
+- [x] Produce one aggregated metric manifest.
+- [x] Run supervisor checks on the aggregate.
+
+Status: complete, verified-only. The user-provided multi-testbench Mixer
+project at `/home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb` ran real
+multi-testbench Spectre/OCEAN candidates with child runs for `cg_nf`, `iip3`,
+and `p1db`. The best observed candidate `real_068` has all three child result
+manifests succeeded, all three child metric manifests succeeded, and an
+aggregated candidate-level metric manifest containing `BW`, `MAX_GAIN`,
+`NF_3G`, `IIP3`, and `P1DB`.
 
 Acceptance:
 
@@ -90,11 +98,40 @@ Acceptance:
 
 ## Task 5: Optimizer Integration Gate
 
-- [ ] Route OpenBox/native TuRBO candidate observations through the
+- [x] Route OpenBox/native TuRBO candidate observations through the
       multi-testbench evaluator when the project has multiple testbenches.
-- [ ] Run a tiny real optimizer smoke only after Task 4 passes.
-- [ ] Keep `optimizer_cpu_threads`, `parallel_jobs`, and `threads_per_run`
+- [x] Run a tiny real optimizer smoke only after Task 4 passes.
+- [x] Keep `optimizer_cpu_threads`, `parallel_jobs`, and `threads_per_run`
       semantics separate in reports.
+
+Status: complete, verified-only. The OpenBox real optimizer route completed
+100 real multi-testbench evaluations in 10 batches of 10 for
+`/home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb`. Final reports were refreshed
+after the optimizer process finished:
+
+- `reports/optimizer_run_report.json`: `status=completed`,
+  `evaluation_count=100`.
+- `reports/optimizer_evaluations.jsonl`: 100 rows with
+  `19 feasible`, `65 constraint_failed`, and `16 metric_check_failed`.
+- `reports/optimizer_run_acceptance_report.json`: accepted.
+- `reports/optimizer_completion_report.json`: `accept_best_observed`,
+  `confidence=medium`, `global_optimum_claim=false`.
+- `reports/optimizer_finalize_report.json`: passed.
+- `reports/optimizer_insight_report.md`: regenerated from the final
+  100-evaluation state.
+
+Best observed:
+
+```text
+run_id: real_068
+F=26, W=1u, L=40n, VB_LO=310m
+BW=19171311625.11458 Hz
+MAX_GAIN=4.242801858394763 dB
+NF_3G=11.81241967045868 dB
+IIP3=3.206487765822459 dBm
+P1DB=-0.8997623115419788 dBm
+objective=-0.0503357919658288
+```
 
 Acceptance:
 
@@ -102,3 +139,11 @@ Acceptance:
   evaluation without hand-picked points.
 - Reports make clear that the result is best observed, not global optimum.
 - No broad scheduler/framework rewrite is added.
+
+## C-50 Closeout
+
+C-50 is complete, verified-only. The original first-evidence target was a
+single candidate with two testbenches; the final evidence is stronger: a real
+three-testbench Mixer OpenBox/Spectre/OCEAN optimizer run completed 100
+candidate evaluations without merging testbenches, parsing PSF, rewriting
+OCEAN formulas, or multiplying `parallel_jobs` per testbench.
