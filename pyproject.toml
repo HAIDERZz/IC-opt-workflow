@@ -27,6 +27,7 @@ sobol = [
 
 [project.scripts]
 hermes-workflow = "hermes_workflow.cli:app"
+ic-opt = "hermes_workflow.product_cli:app"
 
 [tool.setuptools.packages.find]
 where = ["src"]

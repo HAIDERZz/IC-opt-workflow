@@ -10,6 +10,43 @@ The workflow is file based. Do not describe machine-critical setup only in
 chat. Put the request in `opt_requirement.md`, optionally put human guidance in
 `constraints.md`, then let Hermes generate and check the contracts.
 
+## 0. Product Environment Model
+
+Use one product-level Python virtualenv for the `ic-auto-opt-workflow`
+installation and optimizer dependencies. Do not create a separate virtualenv
+inside every user project.
+
+From the repository root:
+
+```bash
+python3 -m venv .venv
+./.venv/bin/python -m pip install --upgrade pip setuptools wheel
+./.venv/bin/python -m pip install -r requirements-product.txt
+```
+
+Target product invocation:
+
+```bash
+ic-opt ~/spectre_opt_prj/<project_name> --real --cadence-cshrc /path/to/user_env.csh
+```
+
+Target supervisor-agent invocation:
+
+```text
+/ic-opt ~/spectre_opt_prj/<project_name> --real
+```
+
+`hermes-workflow optimize ... --real` is the lower-level implementation command
+behind that product entrypoint.
+
+Release packaging must make OpenBox, TuRBO, and report dependencies available
+from the product environment. A development-only path such as
+`/tmp/ic_auto_opt_openbox_spike/.venv` is not a valid production dependency.
+
+The Cadence/Spectre/OCEAN environment remains user/project supplied through a
+shell setup path such as `--cadence-cshrc /path/to/user_env.csh`; do not
+hardcode a Spectre version.
+
 ## 1. Create A User Project
 
 Recommended layout:
@@ -71,7 +108,7 @@ readiness: ready_for_first_run
 Preferred one-command route:
 
 ```bash
-./.venv/bin/hermes-workflow optimize ~/spectre_opt_prj/<project_name> \
+./.venv/bin/ic-opt ~/spectre_opt_prj/<project_name> \
   --real \
   --max-evals 100 \
   --batch-size 10 \
@@ -88,7 +125,7 @@ acceptance.
 To check the offline orchestration gates without launching Spectre/OCEAN/OpenBox:
 
 ```bash
-./.venv/bin/hermes-workflow optimize ~/spectre_opt_prj/<project_name> \
+./.venv/bin/ic-opt ~/spectre_opt_prj/<project_name> \
   --real \
   --dry-orchestration \
   --max-evals 100 \

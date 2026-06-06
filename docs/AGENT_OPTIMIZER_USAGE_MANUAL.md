@@ -84,23 +84,67 @@ Good examples:
 Do not put machine-critical formulas only in `constraints.md`. Formulas,
 variable ranges, and resource settings belong in `opt_requirement.md`.
 
-## 4. Give One Short Request To The Supervisor Agent
+## 4. Target Product Invocation
+
+The target product-shaped request is one short command:
+
+```text
+/ic-opt /home/zzchen/spectre_opt_prj/<project_name> --real
+```
+
+The shell-equivalent product command is:
+
+```text
+ic-opt /home/zzchen/spectre_opt_prj/<project_name> --real --cadence-cshrc /path/to/user_env.csh
+```
 
 The user-facing request should stay short. All machine-critical information
 belongs in `opt_requirement.md`.
 
-Use a request like this:
+`hermes-workflow optimize` remains the lower-level developer/admin command
+behind the product entrypoint:
 
-```text
-Run the IC optimizer workflow for /home/zzchen/spectre_opt_prj/<project_name>.
+```bash
+hermes-workflow optimize /home/zzchen/spectre_opt_prj/<project_name> \
+  --real \
+  --cadence-cshrc /path/to/user_env.csh
 ```
 
-The supervisor agent must then follow this manual and
-`docs/OPTIMIZER_PRODUCTION_QUICKSTART.md`. It should not ask the user to
-restate formulas, variables, testbench paths, Spectre resources, or optimizer
-settings that are already present in `opt_requirement.md`.
+The supervisor agent must not ask the user to restate formulas, variables,
+testbench paths, Spectre resources, or optimizer settings that are already
+present in `opt_requirement.md`.
 
-## 5. Agent Step 1: Intake And Readiness
+Do not validate the production UX by giving the supervisor a long prompt that
+explains the manual. The command and project files must carry the workflow.
+
+## 5. Product Environment Model
+
+Use one product-level Python virtualenv for `ic-auto-opt-workflow`, OpenBox,
+TuRBO, and report dependencies.
+
+From the repository root:
+
+```bash
+python3 -m venv .venv
+./.venv/bin/python -m pip install --upgrade pip setuptools wheel
+./.venv/bin/python -m pip install -r requirements-product.txt
+```
+
+Do not create a Python virtualenv inside each user project. User project
+directories are data and artifact directories only:
+
+```text
+~/spectre_opt_prj/<project_name>/
+```
+
+The Cadence/Spectre/OCEAN setup remains user/project supplied through a shell
+setup path or the user's shell environment. Do not hardcode a Spectre version in
+agent prompts, docs, or code.
+
+Development-only environments such as `/tmp/ic_auto_opt_openbox_spike/.venv`
+must not be part of the product workflow.
+
+## 6. Agent Step 1: Intake And Readiness
 
 The agent should enter the repo:
 
@@ -134,7 +178,7 @@ Typical user-side fixes:
 - metric routes point to unknown testbench ids;
 - OCEAN formula or constraint names do not match declared metrics.
 
-## 6. Agent Step 2: Preferred One-Command Flow
+## 7. Agent Step 2: Preferred One-Command Flow
 
 For production use, prefer the single orchestration command:
 
@@ -163,7 +207,7 @@ To test the offline gates only:
   --cadence-cshrc /path/to/user/cadence_env.csh
 ```
 
-## 7. Manual Fallback: Build The Approved Execution Package
+## 8. Manual Fallback: Build The Approved Execution Package
 
 Before any real optimizer execution, the supervisor agent must build and approve
 the file-contract package. Do not skip this gate.
@@ -185,7 +229,7 @@ the file-contract package. Do not skip this gate.
 come from the user environment or project configuration; do not hardcode a
 Spectre version in prompts, docs, or code.
 
-## 8. Manual Fallback: Run Optimizer
+## 9. Manual Fallback: Run Optimizer
 
 For OpenBox real optimization:
 
@@ -212,7 +256,7 @@ Status policy: after a long real optimizer starts, the execution agent should
 avoid per-batch polling. It should report start, unexpected failure, completion,
 and only low-frequency heartbeat status for long runs.
 
-## 9. Manual Fallback: Close Out The Run
+## 10. Manual Fallback: Close Out The Run
 
 If using `hermes-workflow optimize ... --real`, these reports are already
 generated. If running the manual fallback, after the optimizer run finishes the
@@ -247,7 +291,7 @@ Important: `decide-optimizer-run` must not present a `constraint_failed`,
 `metric_check_failed`, or `real_check_failed` candidate as the primary
 recommended run when any feasible candidate exists.
 
-## 10. User Decision Point
+## 11. User Decision Point
 
 The supervisor agent should ask for user confirmation before recording the final
 decision unless the user already gave explicit acceptance rules.
@@ -280,7 +324,7 @@ project readiness: pass
 readiness: ready_for_closeout_review
 ```
 
-## 11. What The User Reads
+## 12. What The User Reads
 
 Primary final report:
 
@@ -303,7 +347,7 @@ PROJECT_DIR/reports/optimizer_visuals/
 PROJECT_DIR/reports/openbox_advanced_visualization/
 ```
 
-## 12. How To Continue Optimization
+## 13. How To Continue Optimization
 
 Only continue if the decision report or the user asks for it.
 
@@ -330,7 +374,7 @@ Then rerun the closeout chain:
 Do not restart from scratch unless the user changes variables, formulas,
 constraints, objective, or Maestro point roots.
 
-## 13. How To Interpret Failures
+## 14. How To Interpret Failures
 
 `constraint_failed` means:
 
@@ -367,7 +411,7 @@ Few or zero feasible points usually means:
 - initial Maestro point roots and formulas do not match;
 - optimizer budget is too small for the space.
 
-## 14. Important Boundaries
+## 15. Important Boundaries
 
 The agent must keep these rules:
 
@@ -381,7 +425,7 @@ The agent must keep these rules:
 - Do not commit raw Cadence netlists, protected sidecars, PSF data, or full
   Cadence logs.
 
-## 15. Minimal Successful Session
+## 16. Minimal Successful Session
 
 A successful first production session looks like:
 

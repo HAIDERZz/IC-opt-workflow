@@ -4,12 +4,53 @@
 
 - Repository: `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow`
 - Branch: `plan-a-hermes-file-contract-mvp`
-- Current scope: C-55 Production Landing Acceptance complete
-- Current status: verified-only; C-55 records that the proven optimizer route is accepted for a first production trial. The real project `/home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb` passed `check-project-ready` with `readiness=ready_for_closeout_review`, three testbench netlist bundles, and final summary acceptance of `real_093`.
-- Active spec: `docs/PRODUCTION_LANDING_ACCEPTANCE_2026-06-07.md`
-- Active plan: `docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md`
-- Next required action: onboard the next real optimization project through `docs/OPTIMIZER_PRODUCTION_QUICKSTART.md`, or continue the existing Mixer project only if the user explicitly asks.
-- next_allowed_action: use docs/OPTIMIZER_PRODUCTION_QUICKSTART.md to onboard the next real optimization project, or continue /home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb only if the user explicitly asks. Add new features only when a real workflow exposes a concrete missing capability.
+- Current scope: C-58 Product Entrypoint And Unified Environment complete
+- Current status: verified-only. The repo `.venv` now installs the product route through `requirements-product.txt`; `ic-opt` is the product console entrypoint; dry orchestration and an unsandboxed real Mixer multi-testbench 100-eval acceptance passed from the repo `.venv`.
+- Active spec: `docs/superpowers/specs/2026-06-07-one-command-optimizer-flow-design.md`
+- Active plan: `docs/superpowers/plans/2026-06-07-product-entrypoint-unified-environment.md`
+- Next required action: after user confirmation, tighten the final one-line `/ic-opt` supervisor-agent invocation and/or user-level Cadence environment discovery. Do not add optimizer features or per-project virtualenvs.
+- next_allowed_action: After user confirmation, move to the next product-landing task: tighten the one-line /ic-opt supervisor-agent invocation and/or user-level Cadence environment discovery so users do not need long prompts. Keep the product route based on the existing ic-opt command and requirements-product.txt; do not add optimizer features or create per-project venvs.
+
+## C-58 Product Entrypoint And Unified Environment 2026-06-07
+
+C-58 implementation is complete, verified-only.
+
+Product environment evidence:
+
+- Added `requirements-product.txt` as the product-level installer for this repo,
+  the local OpenBox checkout, and visualization dependencies.
+- Added the `ic-opt` console entrypoint. `./.venv/bin/ic-opt --help` now shows
+  `Usage: ic-opt [OPTIONS] PROJECT_DIR`.
+- Verified repo `.venv` imports `openbox`, `hermes_workflow`, `lightgbm`,
+  `shap`, and `pyrfr`.
+- Targeted tests passed: `python -m pytest tests/test_product_cli.py
+  tests/test_optimizer_flow.py -q` (`5 passed`) and targeted ruff passed.
+
+Product-route evidence:
+
+- Dry orchestration passed at
+  `/tmp/ic_auto_opt_c58_dry_jCiZAA/Mixer_opt_muti_tb`, stopping before
+  `run-openbox-real`.
+- A sandboxed real attempt at
+  `/tmp/ic_auto_opt_c58_real_6Oz6Xf/Mixer_opt_muti_tb` failed because Spectre
+  could not create pipe/server socket under sandbox restrictions. This is now
+  recorded as an execution-environment warning: real Cadence/Spectre/OCEAN runs
+  must be unsandboxed.
+- The corrected unsandboxed acceptance at
+  `/tmp/ic_auto_opt_c58_real_unsandboxed_rj40MJ/Mixer_opt_muti_tb` completed 100
+  real multi-testbench OpenBox/Spectre/OCEAN evaluations from the repo `.venv`.
+  All optimizer flow gates passed, OpenBox advanced visualization was generated,
+  and the decision report recommended feasible `real_066`.
+
+Unsandboxed result summary:
+
+- Counts: `65 constraint_failed`, `19 feasible`, `16 metric_check_failed`.
+- Recommended: `real_066`.
+- Parameters: `F=26`, `L=40n`, `VB_LO=310m`, `W=1u`.
+- Metrics: `BW=19171311625.11458`, `MAX_GAIN=4.242801858394763`,
+  `NF_3G=11.81241967045868`, `IIP3=3.206487765822459`,
+  `P1DB=-0.8997623115419788`.
+- Decision: `accept_best_observed_or_continue`, `global_optimum_claim=false`.
 
 C-3 Task 6 final verification is complete. C-4 is confirmed as a contract-only first real-run package; it must not run Spectre, Virtuoso, subprocesses, or the optimizer loop. C-4 is now complete and reviewed. C-5 validates the execution agent's returned `result_manifest.json` and declared artifacts without running Spectre or parsing metrics. C-5.5 rehearsed the C-4/C-5 handoff with simulated execution-agent and Hermes-observer roles. After C-5.5, the project paused implementation to validate the real metric backend. Spectre + OCEAN is now confirmed as the backend route: standalone Spectre generates PSF, batch OCEAN opens the PSF and evaluates exact user/project-approved formulas, and Python only records OCEAN-produced scalar outputs and provenance. C-6 turned that route into deterministic file contracts and a Hermes validator without physical adapter wiring. C-7 added an explicit execution-side adapter and tool entry point while preserving the rule that Hermes workflow tooling still validates returned files after execution. C-8 records checked real metric results into optimizer ledger/state after `check-real-run` and `check-metric-results` pass, while preserving the contract-only boundary. C-9 prepares the next real-run package from strict ledger/state and deterministic optimizer initialization sequence, while still not running real tools or writing ledger/state. C-10 classifies failed/partial/pending real-run packages, writes explicit recovery decisions, prepares retry packages, exposes supervisor-facing recovery CLI commands, and blocks C-9 from advancing while unresolved real-run packages exist. C-10 final review fixes aligned unsafe artifact classification with the spec and hardened symlinked recovery decision reads.
 
@@ -259,6 +300,57 @@ Purpose:
 
 - Add the user-facing project entry route: `~/spectre_opt_prj/<project_name>/opt_requirement.md` plus optional `constraints.md`.
 - Parse only fixed Markdown headings with fenced YAML blocks; do not build a generic natural-language parser.
+
+## C-57/C-58 Product Entrypoint Checkpoint 2026-06-07
+
+C-57 one-command optimizer flow is complete and verified-only.
+
+Implementation:
+
+- Commit `e6ce269` added `hermes-workflow optimize PROJECT_DIR --real`.
+- Commit `4550ce8` recorded the C-57 docs/progress state.
+- The command wraps requirement intake, preparation, validation, readiness,
+  package/preflight/approval, optimizer task packaging, real OpenBox execution,
+  optimizer acceptance, completion, finalization, visualization, and decision
+  reporting.
+- The command stops before recording final user acceptance.
+
+Real drill:
+
+```text
+/tmp/ic_auto_opt_optimize_real_jPaNVI/Mixer_opt_muti_tb
+```
+
+- Fresh copy of the Mixer multi-testbench project.
+- 100 real OpenBox/Spectre/OCEAN evaluations completed.
+- `check-optimizer-run` accepted.
+- `reports/optimizer_flow_run_report.json` status: pass.
+- Status counts: `65 constraint_failed`, `19 feasible`,
+  `16 metric_check_failed`.
+- Recommended feasible candidate: `real_066`.
+- Parameters: `F=26`, `L=40n`, `VB_LO=310m`, `W=1u`.
+
+Productization gap:
+
+- Direct repo `.venv` invocation failed because OpenBox is not installed there.
+- The same route succeeded from the development OpenBox environment.
+- This must not ship as-is. C-58 must make one product-level environment carry
+  `ic-auto-opt-workflow`, OpenBox, TuRBO, and report dependencies.
+
+C-58 plan:
+
+```text
+docs/superpowers/plans/2026-06-07-product-entrypoint-unified-environment.md
+```
+
+Target:
+
+```text
+/ic-opt /path/to/project --real
+ic-opt /path/to/project --real
+```
+
+User project directories remain data-only. Do not create per-project virtualenvs.
 - Render the existing `config/*.yaml` contracts and safely import the full `maestro_point_root/netlist/` bundle into `netlists/exported/`.
 - Preserve approved OCEAN formula text exactly and reuse the existing `validate` and `prepare-netlist` routes.
 

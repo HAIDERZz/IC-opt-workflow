@@ -30,18 +30,27 @@ plan-a-hermes-file-contract-mvp
 
 ## Environment Rules
 
-### Project Development Venv
+### Product And Development Venv
 
-Use this for normal repository development, tests, docs checks, and contract-only
-Hermes commands:
+Use this for normal repository development, tests, docs checks, contract-only
+Hermes commands, and the product optimizer route after C-58:
 
 ```text
 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow/.venv
 ```
 
+Install from the repo root:
+
+```bash
+python3 -m venv .venv
+./.venv/bin/python -m pip install --upgrade pip setuptools wheel
+./.venv/bin/python -m pip install -r requirements-product.txt
+```
+
 Known use:
 
 ```bash
+.venv/bin/ic-opt PROJECT_DIR --real --max-evals 100 --batch-size 10 --parallel-jobs 10 --cadence-cshrc /home/zzchen/cadence_ic231_env.csh
 .venv/bin/hermes-workflow validate PROJECT_DIR
 .venv/bin/hermes-workflow package PROJECT_DIR
 .venv/bin/hermes-workflow package-optimizer-task PROJECT_DIR --backend openbox --max-evals 100 --cadence-cshrc /home/zzchen/cadence_ic231_env.csh --parallel
@@ -53,13 +62,19 @@ python3 -m pytest -q
 python3 -m ruff check src tests tools
 ```
 
-Do not assume this venv can run OpenBox. As of C-34, this venv did not import
-OpenBox. Installing OpenBox here may downgrade or conflict with the current
-numeric stack.
+Required import check:
 
-### OpenBox Production Execution Venv
+```bash
+.venv/bin/python -c "import openbox, hermes_workflow, lightgbm, shap, pyrfr; print('product optimizer env ok')"
+```
 
-Use this for OpenBox real optimizer execution:
+C-58 validated this venv with the product `ic-opt` command. Do not fall back to
+`/tmp/ic_auto_opt_openbox_spike/.venv` for product acceptance unless the task is
+explicitly investigating legacy evidence.
+
+### Legacy OpenBox Development Evidence Venv
+
+This older venv is retained only as evidence/debug history:
 
 ```text
 /tmp/ic_auto_opt_openbox_spike/.venv
@@ -116,7 +131,7 @@ inside the OpenBox venv first, then installing `pyrfr` without build isolation:
 PATH=/tmp/ic_auto_opt_openbox_spike/.venv/bin:$PATH /tmp/ic_auto_opt_openbox_spike/.venv/bin/python -m pip install --no-build-isolation pyrfr
 ```
 
-This is the accepted C-47 environment. If `pyrfr` is absent, C-47 still
+This was the accepted C-47 environment. If `pyrfr` is absent, C-47 still
 generates OpenBox official HTML/JSON and surrogate verification, but the
 manifest reports `generated_partial` with `parameter importance data was not
 generated`.
@@ -131,7 +146,10 @@ This checks the OpenBox venv, OpenBox/Hermes imports in the same Python
 environment, the `hermes-workflow` script in that venv, and the Cadence cshrc.
 It does not run Spectre, OCEAN, Virtuoso, or an optimizer loop.
 
-Use this venv by putting it first in `PATH`:
+Do not use this legacy venv as the production dependency path after C-58. If a
+real route works only from this venv, record it as a productization regression.
+
+Legacy use put it first in `PATH`:
 
 ```bash
 setenv PATH /tmp/ic_auto_opt_openbox_spike/.venv/bin:$PATH
@@ -191,7 +209,19 @@ setenv PATH /opt/eda/cadence/spectre_2510_125/bin:$PATH
 This is a tool-version compatibility requirement for that imported Maestro
 bundle, not a formula issue and not a reason to rewrite OCEAN expressions.
 
-Spectre/OCEAN/OpenBox real execution command shape:
+Preferred Spectre/OCEAN/OpenBox real execution command shape after C-58:
+
+```bash
+.venv/bin/ic-opt PROJECT_DIR --real --max-evals 100 --batch-size 10 --parallel-jobs 10 --cadence-cshrc /home/zzchen/cadence_ic231_env.csh
+```
+
+Lower-level implementation command:
+
+```bash
+.venv/bin/hermes-workflow optimize PROJECT_DIR --real --max-evals 100 --batch-size 10 --parallel-jobs 10 --cadence-cshrc /home/zzchen/cadence_ic231_env.csh
+```
+
+Legacy C-34 command shape:
 
 ```bash
 csh -fc 'source /home/zzchen/cadence_ic231_env.csh; setenv PATH /tmp/ic_auto_opt_openbox_spike/.venv/bin:$PATH; setenv MPLCONFIGDIR /tmp/ic_auto_opt_c34/mpl_cache; cd /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow; hermes-workflow run-openbox-real PROJECT_DIR --max-evals 100 --batch-size 10 --parallel-jobs 10 --cadence-cshrc /home/zzchen/cadence_ic231_env.csh'
@@ -372,7 +402,33 @@ optimizer state.
 
 ## OpenBox Real Run Command
 
-Use the generated task packet command. The C-34 accepted command was:
+Use the product entrypoint unless the task explicitly tests a lower-level
+command:
+
+```bash
+.venv/bin/ic-opt PROJECT_DIR --real --max-evals 100 --batch-size 10 --parallel-jobs 10 --cadence-cshrc /home/zzchen/cadence_ic231_env.csh
+```
+
+C-58 successful product-entrypoint acceptance:
+
+```text
+/tmp/ic_auto_opt_c58_real_unsandboxed_rj40MJ/Mixer_opt_muti_tb
+```
+
+Result:
+
+```text
+evaluations: 100
+feasible: 19
+constraint_failed: 65
+metric_check_failed: 16
+real_check_failed: 0
+recommended: real_066
+global_optimum_claim: false
+advanced_visualization: generated
+```
+
+The C-34 accepted legacy command was:
 
 ```bash
 csh -fc 'source /home/zzchen/cadence_ic231_env.csh; setenv PATH /tmp/ic_auto_opt_openbox_spike/.venv/bin:$PATH; setenv MPLCONFIGDIR /tmp/ic_auto_opt_c34/mpl_cache; cd /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow; hermes-workflow run-openbox-real /tmp/ic_auto_opt_c34_clean2/bridge_test_inv --max-evals 100 --batch-size 10 --parallel-jobs 10 --cadence-cshrc /home/zzchen/cadence_ic231_env.csh'
@@ -459,7 +515,7 @@ Fake run outputs must never override real evidence.
 
 | Symptom | Root Cause | Correct Fix |
 | --- | --- | --- |
-| `OpenBox is not installed` | Running OpenBox from project `.venv` instead of the OpenBox/Hermes venv | Use `/tmp/ic_auto_opt_openbox_spike/.venv` or build a stable OpenBox/Hermes execution venv |
+| `OpenBox is not installed` | Product `.venv` was not installed with `requirements-product.txt` | Install the repo product environment with `.venv/bin/python -m pip install -r requirements-product.txt`; do not switch product acceptance to `/tmp/ic_auto_opt_openbox_spike/.venv` |
 | `ModuleNotFoundError: pydantic` in OpenBox venv | OpenBox venv lacks Hermes workflow dependencies | Install `ic-auto-opt-workflow` editable into the OpenBox venv |
 | `ledger already contains candidate_id` | Reused stale optimizer workspace with old ledger/state | Rebuild a fresh workspace without old `ledger/`, `state/`, `reports/`, `runs/` |
 | `execution manifest is missing` | Fresh workspace skipped `hermes-workflow package` | Run `package` before `package-optimizer-task` |

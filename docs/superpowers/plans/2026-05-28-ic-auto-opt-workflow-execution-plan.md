@@ -23,7 +23,7 @@
 
 ## Current Implementation Node
 
-As of 2026-06-07, Plan A, Plan B, and Plan C through C-57 are complete, with
+As of 2026-06-07, Plan A, Plan B, and Plan C through C-58 are complete, with
 post-C-49 real Mixer OpenBox/Spectre/OCEAN evidence through 200 cumulative
 NF=12dB evaluations and C-50 real multi-testbench evidence through 100
 three-testbench evaluations. Post-C50/C-54 reporting now re-scores existing
@@ -64,6 +64,19 @@ visualization, and decision reporting. It writes
 acceptance. `--dry-orchestration` verifies the offline gates through
 `package-optimizer-task` and stops before real Spectre/OCEAN/OpenBox execution.
 
+C-58 productizes the route as `ic-opt PROJECT_DIR --real` from the repository
+product `.venv`. `requirements-product.txt` installs this repo, the local
+OpenBox checkout, and visualization dependencies into one product environment;
+user optimization projects remain data/artifact directories and must not create
+their own Python virtualenvs. A dry orchestration passed from `ic-opt`, and an
+unsandboxed real Mixer multi-testbench run at
+`/tmp/ic_auto_opt_c58_real_unsandboxed_rj40MJ/Mixer_opt_muti_tb` completed 100
+OpenBox/Spectre/OCEAN evaluations with `19 feasible`, `65 constraint_failed`,
+and `16 metric_check_failed`, generated OpenBox advanced visualization, and
+recommended feasible `real_066`. A sandboxed real attempt failed with Spectre
+pipe/socket errors, so real Cadence/Spectre/OCEAN acceptance must be run
+unsandboxed.
+
 The accepted route is no longer an abstract contract-only optimizer plan; it is
 a practice-first production handoff flow that has been exercised with real
 OpenBox, Spectre, and OCEAN runs. C-50 has addressed the real Mixer landing
@@ -73,7 +86,8 @@ testbenches such as CG/NF/BW, IIP3, and P1dB.
 Current production route:
 
 ```text
-supervisor agent
+user sends /ic-opt PROJECT_DIR --real or shell runs ic-opt PROJECT_DIR --real
+-> supervisor agent uses the short command and project files, not a long prompt
 -> Hermes workflow tooling validates/package contracts
 -> Hermes writes optimizer execution task packet
 -> execution agent follows the packet command exactly

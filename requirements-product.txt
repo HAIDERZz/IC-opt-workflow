@@ -1,0 +1,18 @@
+# Product-level optimizer environment.
+#
+# Usage from the ic-auto-opt-workflow repository root:
+#   python3 -m venv .venv
+#   ./.venv/bin/python -m pip install --upgrade pip setuptools wheel
+#   ./.venv/bin/python -m pip install -r requirements-product.txt
+#
+# User Spectre optimization projects stay data-only. Do not create a Python venv
+# inside each user project directory.
+
+-e .
+-e ../openbox_reference/open-box
+-r ../openbox_reference/open-box/requirements/main.txt
+
+swig==4.4.1
+pyrfr==0.9.0
+shap
+lightgbm

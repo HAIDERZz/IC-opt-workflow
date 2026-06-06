@@ -1,18 +1,18 @@
 {
   "schema_version": "1.0",
-  "current_scope": "C-57 One-Command Optimizer Flow complete",
-  "current_status": "C-57 is complete, verified-only. Commit e6ce269 implements the narrow one-command optimizer orchestration route from the C-56 design spec. New CLI command hermes-workflow optimize PROJECT_DIR --real wraps the proven sequence from requirement intake through package/preflight/approval, approved OpenBox real execution, optimizer acceptance, completion, finalization, visualization, and decision reporting. It writes reports/optimizer_flow_run_report.json and stops before recording final user acceptance. --dry-orchestration runs the offline gates and package-optimizer-task, then stops before real Spectre/OCEAN/OpenBox. No real-tool run, PSF parsing, OCEAN formula rewrite, synthetic testbench merge, optimizer backend change, or automatic user acceptance was added during implementation.",
+  "current_scope": "C-58 Product Entrypoint And Unified Environment complete",
+  "current_status": "C-58 is complete, verified-only. The repo product .venv now installs ic-auto-opt-workflow plus the local OpenBox checkout and visualization dependencies through requirements-product.txt. pyproject.toml exposes the product console command ic-opt. ./.venv/bin/ic-opt --help shows ic-opt [OPTIONS] PROJECT_DIR. Dry orchestration passed at /tmp/ic_auto_opt_c58_dry_jCiZAA/Mixer_opt_muti_tb and stopped before run-openbox-real. A first sandboxed real run failed because Spectre could not create pipe/server socket under sandbox restrictions; the unsandboxed product-entrypoint acceptance at /tmp/ic_auto_opt_c58_real_unsandboxed_rj40MJ/Mixer_opt_muti_tb completed 100 real multi-testbench OpenBox/Spectre/OCEAN evaluations from the repo .venv, passed all optimizer flow gates, generated OpenBox advanced visualization, and recommended feasible real_066 with F=26, L=40n, VB_LO=310m, W=1u. Counts: 19 feasible, 65 constraint_failed, 16 metric_check_failed. This proves the product route no longer depends on /tmp/ic_auto_opt_openbox_spike/.venv.",
   "review_status": "verified-only",
   "subagent_dispatch": "available",
   "active_spec": "docs/superpowers/specs/2026-06-07-one-command-optimizer-flow-design.md",
-  "active_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
+  "active_plan": "docs/superpowers/plans/2026-06-07-product-entrypoint-unified-environment.md",
   "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
   "progress_files": [
     "docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md",
     "docs/EXECUTION_PROGRESS_2026-05-29.md",
     "docs/COMPACT_RESUME_CHECKPOINT.md"
   ],
-  "next_allowed_action": "Use hermes-workflow optimize PROJECT_DIR --real on the next real optimization project or run --dry-orchestration on a prepared project to verify the offline gates. Add new features only when this one-command route exposes a concrete production gap; do not broaden into a workflow engine or slash wrapper until the CLI route is stable in real use.",
+  "next_allowed_action": "After user confirmation, move to the next product-landing task: tighten the one-line /ic-opt supervisor-agent invocation and/or user-level Cadence environment discovery so users do not need long prompts. Keep the product route based on the existing ic-opt command and requirements-product.txt; do not add optimizer features or create per-project venvs.",
   "forbidden_actions": [
     "install unpinned latest shap into the OpenBox venv",
     "run real tool commands without first checking docs/TOOLCHAIN_EXECUTION_REFERENCE.md",
@@ -22,6 +22,9 @@
     "multiply spectre.parallel_jobs per testbench",
     "hand-pick optimizer points instead of using OpenBox ask-and-tell",
     "replace optimizer backend again without an evidence-backed decision checkpoint",
+    "ship a product route that depends on /tmp/ic_auto_opt_openbox_spike/.venv",
+    "create a Python virtualenv inside each user optimization project",
+    "validate production UX with long natural-language prompts instead of /ic-opt or ic-opt",
     "run Virtuoso before explicit task confirmation",
     "run SSH before explicit task confirmation",
     "run Claude CLI as an execution agent",
@@ -43,13 +46,13 @@
     "git status --short"
   ],
   "route_audit": {
-    "active_spec": "docs/PRODUCTION_LANDING_ACCEPTANCE_2026-06-07.md",
-    "active_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
+    "active_spec": "docs/superpowers/specs/2026-06-07-one-command-optimizer-flow-design.md",
+    "active_plan": "docs/superpowers/plans/2026-06-07-product-entrypoint-unified-environment.md",
     "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
-    "alignment": "Aligned with the production landing route and C-56 one-command design spec. It wraps the already-proven command sequence without changing optimizer backend, formulas, tool adapters, or testbench aggregation.",
-    "drift": "No optimizer execution-route drift. The change does not rerun tools, parse PSF, rewrite OCEAN formulas, merge testbenches, replace OpenBox, add automatic user acceptance, or add a broad workflow engine."
+    "alignment": "Aligned with the production landing route and C-57 one-command design. C-58 did not change optimizer math, formulas, tool adapters, or multi-testbench aggregation; it productized the entrypoint and environment so the proven route can be invoked as ic-opt from the repo product venv.",
+    "drift": "No plan drift in product scope. One execution lesson was added: real Spectre/OCEAN acceptance must run unsandboxed because sandbox restrictions can block Cadence pipe/server socket creation and produce false all-failed runs. No PSF parsing, formula rewrite, Spectre-version hardcoding, algorithm replacement, per-project venv, or broad workflow engine was introduced."
   },
-  "latest_valid_commit": "e6ce269",
+  "latest_valid_commit": "4550ce8",
   "review_evidence": {
     "c47_plan": "docs/superpowers/plans/2026-06-05-openbox-advanced-visualization-artifact.md",
     "c47_tests": "Targeted tests passed: /home/zzchen/.venvs/openclaw/bin/python -m pytest tests/test_openbox_backend.py tests/test_optimizer_insights.py tests/test_optimizer_finalize.py",
@@ -91,6 +94,9 @@
     "agent_workflow_simulation_2026_06_07": "Completed verified-only supervisor/execution-agent role simulation on copied project /tmp/ic_auto_opt_agent_sim_149Fod/Mixer_opt_muti_tb. Supervisor agent Ohm and execution agent Peirce both avoided real-tool reruns, hand-picked points, formula rewrites, and PSF parsing. Both identified that no new execution is needed and that real_093 remains the accepted best observed result. Both independently flagged stale legacy optimizer_state/ledger artifacts as a future warning candidate.",
     "agent_full_e2e_real_optimizer_simulation_2026_06_07": "Completed verified-only full user -> supervisor -> execution -> real optimizer -> supervisor simulation on /tmp/ic_auto_opt_agent_e2e_g2qieZ/Mixer_opt_muti_tb_full. Supervisor agent Rawls first drifted by skipping package/preflight/approval; execution agent Pascal correctly stopped on missing execution_manifest. Rawls corrected the gate, Pascal ran the complete 100-evaluation OpenBox/Spectre/OCEAN multi-testbench flow with 19 feasible, 65 constraint_failed, 16 metric_check_failed, and 0 real_check_failed. Finalize/status chose best feasible real_066, while decide-optimizer-run recommended constraint_failed real_057, exposing a product issue. Simulation stopped for user review; no final acceptance was recorded.",
     "c56_optimizer_decision_handoff_hardening": "Implemented verified-only in commit df796f4. Added a regression test proving configured objective ranking can place a constraint_failed point first while the decision report must still recommend a feasible candidate. Fixed optimizer_decision candidate selection to prefer feasible configured candidates, otherwise feasible best_observed/top_feasible candidates, and never use a non-feasible point as the primary recommendation when feasible evidence exists. Real simulation project /tmp/ic_auto_opt_agent_e2e_g2qieZ/Mixer_opt_muti_tb_full was rechecked without Spectre/OCEAN rerun: decide-optimizer-run now recommends feasible real_066 instead of constraint_failed real_057. Production manuals now require package/preflight/approval, avoid hardcoded Spectre versions, and document low-frequency execution-agent status polling. One-command optimizer flow design recorded in docs/superpowers/specs/2026-06-07-one-command-optimizer-flow-design.md.",
-    "c57_one_command_optimizer_flow": "Implemented verified-only in commit e6ce269. Added hermes_workflow.optimizer_flow.optimize_project and CLI hermes-workflow optimize PROJECT_DIR --real. The flow runs check-requirement, prepare-from-requirement, validate, check-project-ready, package, prepare-netlist, dry-run, preflight-health, approve, package-optimizer-task, run-openbox-real, check-optimizer-run, summarize-optimizer-run, finalize-optimizer-run, visualize-optimizer-run, and decide-optimizer-run, then stops for user acceptance. It writes reports/optimizer_flow_run_report.json. --dry-orchestration verifies offline gates through package-optimizer-task and stops before run-openbox-real. Verification passed: tests/test_optimizer_flow.py plus adjacent CLI/readiness/decision/final-summary tests (46 passed), targeted ruff passed, and git diff --check passed."
+    "c57_one_command_optimizer_flow": "Implemented verified-only in commit e6ce269. Added hermes_workflow.optimizer_flow.optimize_project and CLI hermes-workflow optimize PROJECT_DIR --real. The flow runs check-requirement, prepare-from-requirement, validate, check-project-ready, package, prepare-netlist, dry-run, preflight-health, approve, package-optimizer-task, run-openbox-real, check-optimizer-run, summarize-optimizer-run, finalize-optimizer-run, visualize-optimizer-run, and decide-optimizer-run, then stops for user acceptance. It writes reports/optimizer_flow_run_report.json. --dry-orchestration verifies offline gates through package-optimizer-task and stops before run-openbox-real. Verification passed: tests/test_optimizer_flow.py plus adjacent CLI/readiness/decision/final-summary tests (46 passed), targeted ruff passed, and git diff --check passed.",
+    "c57_real_optimize_route_drill": "Fresh project /tmp/ic_auto_opt_optimize_real_jPaNVI/Mixer_opt_muti_tb completed hermes optimize real flow through the development OpenBox venv. It reached 100 real multi-testbench evaluations, check-optimizer-run accepted, reports/optimizer_flow_run_report.json status pass, recommended real_066, status_counts constraint_failed=65 feasible=19 metric_check_failed=16. The repo .venv invocation failed first because OpenBox was not installed there, proving C-58 must productize one install environment instead of relying on /tmp/ic_auto_opt_openbox_spike/.venv.",
+    "c58_product_entrypoint_unified_environment_plan": "docs/superpowers/plans/2026-06-07-product-entrypoint-unified-environment.md. Scope: one product-level Python environment for ic-auto-opt-workflow/OpenBox/TuRBO/report dependencies, ic-opt shell entrypoint, /ic-opt supervisor-agent command form, no per-project venvs, no long prompts as product UX, no hardcoded Spectre version.",
+    "c58_product_entrypoint_unified_environment": "Implemented verified-only. Added requirements-product.txt, product CLI module hermes_workflow.product_cli, and console script ic-opt. The repo .venv imports openbox/hermes_workflow/lightgbm/shap/pyrfr and ic-opt --help shows ic-opt [OPTIONS] PROJECT_DIR. Targeted tests passed: python -m pytest tests/test_product_cli.py tests/test_optimizer_flow.py -q (5 passed), targeted ruff passed. Dry orchestration passed at /tmp/ic_auto_opt_c58_dry_jCiZAA/Mixer_opt_muti_tb. A sandboxed real run failed because Spectre could not create pipe/server socket; the corrected unsandboxed run at /tmp/ic_auto_opt_c58_real_unsandboxed_rj40MJ/Mixer_opt_muti_tb completed 100 real multi-testbench OpenBox/Spectre/OCEAN evaluations from the repo .venv, passed all flow gates, generated OpenBox advanced visualization, and recommended feasible real_066. Counts: feasible=19, constraint_failed=65, metric_check_failed=16."
   }
 }

@@ -10,9 +10,9 @@ This note preserves the implementation state for continuing Plan A after context
 - Baseline commit: `885e97f docs: capture workflow planning baseline`
 - Latest C-3 code commit before docs-only cleanup: `edb107f fix: harden preflight readiness gates`; docs cleanup continues through current HEAD
 - Active plan: `docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md`
-- Current scope: C-55 Production Landing Acceptance complete
-- Current status: C-55 is complete, verified-only. The proven route is accepted for a first production trial. `/home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb` passed `check-project-ready` with `readiness=ready_for_closeout_review`, three testbench netlist bundles, and final summary acceptance of `real_093`.
-- Next allowed action: onboard the next real optimization project using `docs/OPTIMIZER_PRODUCTION_QUICKSTART.md`, or continue the existing Mixer project only on explicit user request. Add new features only when a real workflow exposes a concrete missing capability.
+- Current scope: C-58 Product Entrypoint And Unified Environment complete
+- Current status: C-58 productized the route with `requirements-product.txt` and the `ic-opt` console entrypoint. The repo `.venv` now carries OpenBox/report dependencies, dry orchestration passed, and an unsandboxed real Mixer multi-testbench 100-eval acceptance passed from the repo `.venv`.
+- Next allowed action: after user confirmation, tighten the final one-line `/ic-opt` supervisor-agent UX and/or user-level Cadence environment discovery. Do not add optimizer features or per-project virtualenvs.
 - Execution method: `superpowers:subagent-driven-development`
 - Dependencies installed in active Python environment on 2026-05-29: `pytest`, `typer`, `pydantic`, `PyYAML`, `ruff`
 
@@ -151,6 +151,81 @@ Status: complete, verified-only.
   not a global optimum certificate.
 - No Spectre/OCEAN rerun, PSF parsing, formula rewrite, or synthetic
   multi-testbench merge was introduced.
+
+## C-57/C-58 Product Entrypoint Checkpoint 2026-06-07
+
+C-57 implementation:
+
+- Commit `e6ce269`: added `hermes-workflow optimize PROJECT_DIR --real`.
+- Commit `4550ce8`: recorded C-57 one-command flow docs/progress.
+- The command wraps the proven route from requirement intake through decision
+  reporting and stops before final user acceptance.
+
+Fresh real drill:
+
+- Project copy: `/tmp/ic_auto_opt_optimize_real_jPaNVI/Mixer_opt_muti_tb`.
+- Result: 100 real multi-testbench OpenBox/Spectre/OCEAN evaluations.
+- Acceptance: `check-optimizer-run` accepted.
+- Status counts: `65 constraint_failed`, `19 feasible`,
+  `16 metric_check_failed`.
+- Recommended feasible candidate: `real_066`.
+- Parameters: `F=26`, `L=40n`, `VB_LO=310m`, `W=1u`.
+
+Product gap:
+
+- `./.venv/bin/hermes-workflow optimize ... --real` failed because OpenBox was
+  not installed in the repo `.venv`.
+- Invoking the same route from the development OpenBox environment succeeded.
+- This is not an acceptable release shape; C-58 must provide one product
+  environment for `ic-auto-opt-workflow`, OpenBox, TuRBO, and report
+  dependencies.
+
+C-58 plan:
+
+```text
+docs/superpowers/plans/2026-06-07-product-entrypoint-unified-environment.md
+```
+
+Target UX:
+
+```text
+/ic-opt /path/to/project --real
+ic-opt /path/to/project --real
+```
+
+## C-58 Product Entrypoint Completion 2026-06-07
+
+C-58 is complete, verified-only.
+
+Implementation:
+
+- Added `requirements-product.txt` for one product-level environment.
+- Added the `ic-opt` product console script, backed by the existing optimizer
+  flow instead of a new workflow engine.
+- Kept `hermes-workflow optimize` as the lower-level implementation command.
+
+Verification:
+
+- Repo `.venv` imports `openbox`, `hermes_workflow`, `lightgbm`, `shap`, and
+  `pyrfr`.
+- `./.venv/bin/ic-opt --help` shows `ic-opt [OPTIONS] PROJECT_DIR`.
+- Targeted tests passed: `tests/test_product_cli.py` and
+  `tests/test_optimizer_flow.py` (`5 passed`); targeted ruff passed.
+- Dry orchestration passed at
+  `/tmp/ic_auto_opt_c58_dry_jCiZAA/Mixer_opt_muti_tb`.
+- Unsandboxed real product acceptance passed at
+  `/tmp/ic_auto_opt_c58_real_unsandboxed_rj40MJ/Mixer_opt_muti_tb` with 100
+  evaluations, `65 constraint_failed`, `19 feasible`, `16 metric_check_failed`,
+  and recommended feasible `real_066`.
+
+Execution note:
+
+- A sandboxed real attempt failed with Spectre `cannot create pipe` and
+  `can't create server socket`. Future real Cadence/Spectre/OCEAN acceptance
+  must run unsandboxed; otherwise the failure can be a sandbox artifact rather
+  than a project/tool-flow bug.
+
+User project directories remain data-only; no per-project Python virtualenvs.
 
 Post-C-49 real smoke:
 

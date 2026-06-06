@@ -1,7 +1,7 @@
 # Compact Resume Checkpoint
 
 Date: 2026-05-28
-Last updated: 2026-06-06
+Last updated: 2026-06-07
 
 This checkpoint preserves the planning state for continuing after context compaction.
 
@@ -22,12 +22,35 @@ Current execution state:
 
 - Latest production acceptance note:
   `docs/PRODUCTION_LANDING_ACCEPTANCE_2026-06-07.md`.
-- Current scope: C-55 Production Landing Acceptance complete.
-- Current status: C-55 is complete, verified-only. The project is accepted for
-  a first production trial. Latest multi-testbench evidence:
-  `/home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb` passed
-  `check-project-ready` with `readiness=ready_for_closeout_review`, three
-  testbench netlist bundles, and final summary acceptance of `real_093`.
+- Current scope: C-58 Product Entrypoint And Unified Environment complete.
+- Current status: C-58 productized the optimizer route. The repo `.venv` now
+  installs `ic-auto-opt-workflow`, the local OpenBox checkout, and visualization
+  dependencies through `requirements-product.txt`; `ic-opt` is the product
+  console entrypoint; dry orchestration and an unsandboxed 100-eval real Mixer
+  multi-testbench acceptance passed from the repo `.venv`.
+- C-57 real one-command drill:
+  `/tmp/ic_auto_opt_optimize_real_jPaNVI/Mixer_opt_muti_tb` completed 100 real
+  multi-testbench OpenBox/Spectre/OCEAN evaluations through the optimize route.
+  `check-optimizer-run` accepted; `optimizer_flow_run_report.json` status is
+  pass; counts are `65 constraint_failed`, `19 feasible`,
+  `16 metric_check_failed`; recommended feasible candidate is `real_066`
+  with `F=26`, `L=40n`, `VB_LO=310m`, `W=1u`.
+- C-58 plan:
+  `docs/superpowers/plans/2026-06-07-product-entrypoint-unified-environment.md`.
+- Product target: one product-level Python environment for
+  `ic-auto-opt-workflow`, OpenBox, TuRBO, and report dependencies; no
+  per-project virtualenvs. User-facing entry should be `/ic-opt PROJECT --real`
+  for agent sessions and `ic-opt PROJECT --real` for shell sessions. Do not use
+  long natural-language prompts to compensate for missing command behavior.
+- C-58 product-entrypoint evidence:
+  `/tmp/ic_auto_opt_c58_real_unsandboxed_rj40MJ/Mixer_opt_muti_tb` completed
+  100 real multi-testbench OpenBox/Spectre/OCEAN evaluations through
+  `./.venv/bin/ic-opt`, passed all optimizer flow gates, generated OpenBox
+  advanced visualization, and recommended feasible `real_066` with
+  `F=26`, `L=40n`, `VB_LO=310m`, `W=1u`.
+- C-58 execution warning: a sandboxed real attempt failed with Spectre
+  `cannot create pipe` / `can't create server socket`. Future real
+  Cadence/Spectre/OCEAN acceptance must be unsandboxed.
 - Key real evidence: `/tmp/ic_auto_opt_real_flow_t77ky7/bridge_test_inv`
   completed 100 real OpenBox/Spectre/OCEAN evaluations with `43 feasible`,
   `51 constraint_failed`, `6 metric_check_failed`, `0 real_check_failed`, best
@@ -39,7 +62,7 @@ Current execution state:
   not put a generic natural-language parser inside Hermes.
 - Other remaining landing gaps should now be handled only when the next real
   project exposes a concrete need. Do not add speculative optimizer framework
-  layers after C-55.
+  layers after C-55/C-57.
 - Do not start broad optimizer framework work, hand-pick optimizer points,
   replace the OpenBox route, parse PSF, rewrite OCEAN formulas, or rerun
   Spectre/OCEAN solely for report formatting.
@@ -55,7 +78,7 @@ Current execution state:
   mistakes such as `W` being overwritten by `L`. Import evidence: 69 netlist
   files copied, 1 safe symlink materialized, and template variables `F`, `W`,
   `L`, and `VB_LO` approved. No Spectre/OCEAN run was launched.
-- current_scope: C-55 Production Landing Acceptance complete.
+- current_scope: C-58 Product Entrypoint And Unified Environment complete.
 - C-50 files: `docs/superpowers/specs/2026-06-06-multi-testbench-candidate-evaluation-design.md`
   and `docs/superpowers/plans/2026-06-06-multi-testbench-candidate-evaluation.md`.
 - C-49 verification: targeted tests passed with `88 passed`; full suite passed
@@ -64,10 +87,11 @@ Current execution state:
   rewrite; no Maestro/ADE netlist flattening; no optimizer execution behavior
   change. The only schema extension was accepting `optimizer.algorithm: openbox`
   to match the existing OpenBox backend route.
-- next_allowed_action: onboard the next real optimization project using
-  `docs/OPTIMIZER_PRODUCTION_QUICKSTART.md`, or continue the existing Mixer
-  project only if the user explicitly asks. Add new features only when a real
-  workflow exposes a concrete missing capability.
+- next_allowed_action: after user confirmation, tighten the final one-line
+  `/ic-opt` supervisor-agent UX and/or user-level Cadence environment discovery.
+  Do not create per-project venvs, rely on `/tmp/ic_auto_opt_openbox_spike/.venv`,
+  hardcode Spectre versions, change algorithms, or introduce broad workflow
+  layers.
 - Post-C-49 real Mixer smoke: `real_002` used `F=26`, `W=1u`, `L=40n`,
   `VB_LO=310m`, ran Spectre 25.1, ran batch OCEAN with approved formulas
   unchanged, passed `check-real-run`, and passed `check-metric-results`.
@@ -1281,4 +1305,31 @@ C-57 One-Command Optimizer Flow Completion:
 
 ```text
 请继续 IC auto optimization workflow。先阅读 AGENTS.md、docs/CURRENT_TASK_STATE.json、docs/TOOLCHAIN_EXECUTION_REFERENCE.md、docs/OPTIMIZER_PRODUCTION_QUICKSTART.md、docs/AGENT_OPTIMIZER_USAGE_MANUAL.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-57 One-Command Optimizer Flow 已完成 verified-only，commit e6ce269。现在首选生产入口是 ./.venv/bin/hermes-workflow optimize PROJECT_DIR --real --max-evals N --batch-size B --parallel-jobs P --cadence-cshrc /path/to/user/cadence_env.csh。该命令包装 requirement intake、prepare、validate、readiness、package、prepare-netlist、dry-run、preflight-health、approve、package-optimizer-task、run-openbox-real、check/summarize/finalize/visualize/decide closeout，并写 reports/optimizer_flow_run_report.json；它不会自动记录用户最终接受。--dry-orchestration 会跑离线 gates 到 package-optimizer-task，然后停在 run-openbox-real 前。下一步优先用 optimize --real onboarding 下一个真实项目，或先用 --dry-orchestration 验证 offline gates。不要为了报告格式重跑真实工具，不要解析 PSF，不要重写 OCEAN 公式，不要硬编码 Spectre 版本，不要自动接受结果，不要提交 raw input.scs/ade_e.scs/PSF/raw/full Cadence logs/docs/OCEAN_DOC_*/docs/toolchain_evidence/，不要新增宽泛 workflow 框架或 slash wrapper，除非真实使用暴露明确需求。
+```
+
+C-58 Product Entrypoint And Unified Environment Planning:
+
+- Status: planned.
+- Plan: `docs/superpowers/plans/2026-06-07-product-entrypoint-unified-environment.md`.
+- Real C-57 route drill: `/tmp/ic_auto_opt_optimize_real_jPaNVI/Mixer_opt_muti_tb`
+  completed 100 real multi-testbench evaluations through the optimize route
+  with `19 feasible`, `65 constraint_failed`, `16 metric_check_failed`, and
+  recommended feasible `real_066`.
+- Product gap: repo `.venv` lacks OpenBox; the successful drill used the
+  development OpenBox venv. This must be fixed by product packaging, not hidden
+  in prompts or per-project venvs.
+- Product target: `/ic-opt PROJECT_DIR --real` for supervisor-agent sessions
+  and `ic-opt PROJECT_DIR --real` for shell sessions.
+- Environment target: one product-level Python venv for `ic-auto-opt-workflow`,
+  OpenBox, TuRBO, and report dependencies. User project directories remain
+  data-only.
+- next_allowed_action: implement C-58 narrowly. Do not change optimizer
+  algorithms, parse PSF, rewrite OCEAN formulas, create per-project venvs,
+  hardcode Spectre versions, rely on `/tmp/ic_auto_opt_openbox_spike/.venv`, or
+  use long prompts as the product UX.
+
+## Latest Resume Prompt
+
+```text
+请继续 IC auto optimization workflow。先阅读 AGENTS.md、docs/CURRENT_TASK_STATE.json、docs/TOOLCHAIN_EXECUTION_REFERENCE.md、docs/OPTIMIZER_PRODUCTION_QUICKSTART.md、docs/AGENT_OPTIMIZER_USAGE_MANUAL.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-57 One-Command Optimizer Flow 已完成 verified-only，commit e6ce269；docs commit 4550ce8 记录了该路线。真实 drill `/tmp/ic_auto_opt_optimize_real_jPaNVI/Mixer_opt_muti_tb` 通过 optimize route 完成 100 个真实 multi-testbench OpenBox/Spectre/OCEAN evaluations，`check-optimizer-run` accepted，推荐 feasible `real_066`，counts=`65 constraint_failed/19 feasible/16 metric_check_failed`。但是 repo `.venv` 直接运行失败，因为 OpenBox 不在产品 venv 中；成功路径依赖 `/tmp/ic_auto_opt_openbox_spike/.venv`，这不能作为发布形态。当前进入 C-58：按 `docs/superpowers/plans/2026-06-07-product-entrypoint-unified-environment.md` 实现一个产品级单 venv 环境和入口，目标是 `/ic-opt PROJECT_DIR --real`（agent-facing）与 `ic-opt PROJECT_DIR --real`（shell-facing）。不要创建每项目 venv，不要依赖 /tmp OpenBox venv，不要用长 prompt 伪装产品 UX，不要硬编码 Spectre 版本，不要改变优化算法，不要解析 PSF，不要重写 OCEAN 公式，不要新增宽泛 workflow 框架。
 ```
