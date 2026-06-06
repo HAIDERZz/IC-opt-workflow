@@ -1539,3 +1539,12 @@ Post-C50 Configured Objective Ranking:
 - Configured ranking result: `84` computable samples, best `real_093`, feasible, objective `-0.7085522728550304`, parameters `F=20`, `W=1.4u`, `L=30n`, `VB_LO=310m`.
 - Verification: optimizer insight/closeout/status/OpenBox backend tests passed (`36 passed`) and targeted ruff passed.
 - current_scope: Post-C50 Configured Objective Ranking complete.
+
+Post-C50 Bottleneck Weighted Score Plot:
+
+- Status: complete, verified-only.
+- `optimizer_insight_report` now writes `bottleneck_weighted_score_summary` and `reports/optimizer_visuals/bottleneck_weighted_score.svg`.
+- Plot semantics: x = weighted-sum score, y = bottleneck `min(z_i)`, iso-lines = `0.7*bottleneck + 0.3*weighted`.
+- Real project `/home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb` refreshed the report without Spectre/OCEAN rerun; SVG contains all `84` computable points and highlights feasible `real_093`.
+- Verification: optimizer insight/closeout/status/OpenBox backend tests passed (`37 passed`) and targeted ruff passed.
+- current_scope: Post-C50 Bottleneck Weighted Score Plot complete.

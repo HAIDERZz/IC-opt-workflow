@@ -2146,3 +2146,17 @@ Post-C50 Configured Objective Ranking:
 - Boundary: reporting-only code change plus user-approved project FoM update; no Spectre/OCEAN rerun, no OCEAN formula rewrite, no PSF parsing, no candidate generation change.
 - current_scope: Post-C50 Configured Objective Ranking complete.
 - next_allowed_action: inspect the refreshed Mixer multi-testbench optimizer report and decide whether real_093 should be accepted under the normalized FoM, whether to continue optimization from the existing run, or whether to adjust the normalized FoM/constraints. Do not rerun real tools solely for report formatting.
+
+Post-C50 Bottleneck Weighted Score Plot:
+
+- Status: complete, verified-only.
+- Code: `src/hermes_workflow/optimizer_insights.py`.
+- Behavior: `optimizer_insight_report` now writes `bottleneck_weighted_score_summary` and `reports/optimizer_visuals/bottleneck_weighted_score.svg`.
+- Plot definition: x-axis is weighted-sum score, y-axis is bottleneck `min(z_i)` score, and iso-score lines show `0.7*bottleneck + 0.3*weighted`.
+- The plot includes all computable points, colors by candidate status, and highlights the best run.
+- Real project refresh: `/home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb` regenerated the report without rerunning Spectre/OCEAN. The SVG has `84` plotted points; best remains feasible `real_093` with combined score `0.7085522728550304`.
+- Verification: `/home/zzchen/.venvs/openclaw/bin/python -m pytest tests/test_optimizer_insights.py tests/test_optimizer_finalize.py tests/test_optimizer_completion.py tests/test_optimizer_status.py tests/test_openbox_backend.py -q` passed (`37 passed`); targeted ruff passed.
+- Boundary: reporting-only code change; no Spectre/OCEAN rerun, no OCEAN formula rewrite, no PSF parsing, no candidate generation change.
+- current_scope: Post-C50 Bottleneck Weighted Score Plot complete.
+- next_allowed_action: inspect the refreshed Mixer multi-testbench optimizer report and `bottleneck_weighted_score.svg`, then decide whether real_093 should be accepted under the normalized FoM, whether to continue optimization from the existing run, or whether to adjust the normalized FoM/constraints. Do not rerun real tools solely for report formatting.
+- next_allowed_action exact: inspect the refreshed Mixer multi-testbench optimizer report and bottleneck_weighted_score.svg, then decide whether real_093 should be accepted under the normalized FoM, whether to continue optimization from the existing run, or whether to adjust the normalized FoM/constraints. Do not rerun real tools solely for report formatting.

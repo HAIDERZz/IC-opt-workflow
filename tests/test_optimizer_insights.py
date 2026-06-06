@@ -35,6 +35,9 @@ def test_generate_optimizer_insight_report_writes_json_markdown_and_svgs(
     assert "objective" in payload["observed_relationships"]["FN"]
     assert payload["plots"] == {
         "all_evaluable_fom": "reports/optimizer_visuals/all_evaluable_fom.svg",
+        "bottleneck_weighted_score": (
+            "reports/optimizer_visuals/bottleneck_weighted_score.svg"
+        ),
         "constraint_margins": "reports/optimizer_visuals/constraint_margins.svg",
         "convergence": "reports/optimizer_visuals/convergence.svg",
         "feasible_convergence": "reports/optimizer_visuals/feasible_convergence.svg",
@@ -251,6 +254,60 @@ objective:
     markdown = report.markdown_path.read_text(encoding="utf-8")
     assert "Source: `configured_objective`" in markdown
     assert "Configured Objective Ranking" in markdown
+
+
+def test_generate_optimizer_insight_report_writes_bottleneck_weighted_plot(
+    tmp_path: Path,
+) -> None:
+    rows = [
+        _trace_row(
+            evaluation_index=1,
+            run_id="real_001",
+            status="constraint_failed",
+            objective=10.0,
+        ),
+        _trace_row(
+            evaluation_index=2,
+            run_id="real_002",
+            status="feasible",
+            objective=1.0,
+        ),
+    ]
+    rows[0]["metrics"] = {
+        "BW": 19e9 * (10**0.025),
+        "MAX_GAIN": 4.25,
+        "NF_3G": 11.95,
+        "IIP3": 0.25,
+        "P1DB": -1.75,
+    }
+    rows[1]["metrics"] = {
+        "BW": 19e9 * (10**0.05),
+        "MAX_GAIN": 4.5,
+        "NF_3G": 11.9,
+        "IIP3": 0.5,
+        "P1DB": -1.5,
+    }
+    project_dir = _write_accepted_optimizer_project(tmp_path, rows=rows)
+
+    report = generate_optimizer_insight_report(project_dir)
+
+    payload = json.loads(report.report_path.read_text(encoding="utf-8"))
+    summary = payload["bottleneck_weighted_score_summary"]
+    assert summary["sample_count"] == 2
+    assert summary["best_run_id"] == "real_002"
+    assert summary["series"][0]["weighted_score"] == pytest.approx(0.5)
+    assert summary["series"][0]["bottleneck_score"] == pytest.approx(0.5)
+    assert summary["series"][0]["combined_score"] == pytest.approx(0.5)
+    assert payload["plots"]["bottleneck_weighted_score"] == (
+        "reports/optimizer_visuals/bottleneck_weighted_score.svg"
+    )
+    svg = (
+        project_dir / payload["plots"]["bottleneck_weighted_score"]
+    ).read_text(encoding="utf-8")
+    assert "Normalized Margin Bottleneck Plot" in svg
+    assert "real_002" in svg
+    markdown = report.markdown_path.read_text(encoding="utf-8")
+    assert "Normalized Margin Bottleneck Plot" in markdown
 
 
 def test_visualize_optimizer_run_cli_writes_report(tmp_path: Path) -> None:

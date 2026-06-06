@@ -18,6 +18,9 @@ REPORT_RELATIVE = Path("reports/optimizer_insight_report.json")
 MARKDOWN_RELATIVE = Path("reports/optimizer_insight_report.md")
 VISUALS_DIR_RELATIVE = Path("reports/optimizer_visuals")
 ALL_EVALUABLE_FOM_RELATIVE = VISUALS_DIR_RELATIVE / "all_evaluable_fom.svg"
+BOTTLENECK_WEIGHTED_SCORE_RELATIVE = (
+    VISUALS_DIR_RELATIVE / "bottleneck_weighted_score.svg"
+)
 CONVERGENCE_RELATIVE = VISUALS_DIR_RELATIVE / "convergence.svg"
 FEASIBLE_CONVERGENCE_RELATIVE = VISUALS_DIR_RELATIVE / "feasible_convergence.svg"
 STATUS_DISTRIBUTION_RELATIVE = VISUALS_DIR_RELATIVE / "status_distribution.svg"
@@ -34,6 +37,7 @@ class OptimizerInsightReport:
     plots: dict[str, str]
     all_evaluable_fom_summary: dict[str, Any]
     configured_objective_ranking: dict[str, Any]
+    bottleneck_weighted_score_summary: dict[str, Any]
     ic_metric_summary: dict[str, Any]
     top_feasible_candidates: list[dict[str, Any]]
     constraint_margin_summary: dict[str, Any]
@@ -73,6 +77,7 @@ def generate_optimizer_insight_report(project_dir: str | Path) -> OptimizerInsig
 
     plot_paths = {
         "all_evaluable_fom": ALL_EVALUABLE_FOM_RELATIVE.as_posix(),
+        "bottleneck_weighted_score": BOTTLENECK_WEIGHTED_SCORE_RELATIVE.as_posix(),
         "convergence": CONVERGENCE_RELATIVE.as_posix(),
         "feasible_convergence": FEASIBLE_CONVERGENCE_RELATIVE.as_posix(),
         "parameter_objective_scatter": PARAMETER_OBJECTIVE_RELATIVE.as_posix(),
@@ -85,6 +90,7 @@ def generate_optimizer_insight_report(project_dir: str | Path) -> OptimizerInsig
         _string_value(metric_contract.get("objective_expression")),
     )
     configured_ranking = _configured_objective_ranking(traces, all_evaluable_fom)
+    bottleneck_weighted = _bottleneck_weighted_score_summary(traces)
     top_feasible = _top_feasible_candidates(traces)
     constraint_margins = _constraint_margin_summary(traces, metric_contract)
     ic_summary = _ic_metric_summary(top_feasible, traces)
@@ -100,6 +106,7 @@ def generate_optimizer_insight_report(project_dir: str | Path) -> OptimizerInsig
         plots=plot_paths,
         all_evaluable_fom_summary=all_evaluable_fom,
         configured_objective_ranking=configured_ranking,
+        bottleneck_weighted_score_summary=bottleneck_weighted,
         ic_metric_summary=ic_summary,
         top_feasible_candidates=top_feasible,
         constraint_margin_summary=constraint_margins,
@@ -124,6 +131,10 @@ def _write_outputs(
     visuals_dir.mkdir(parents=True, exist_ok=True)
     (project_root / ALL_EVALUABLE_FOM_RELATIVE).write_text(
         _all_evaluable_fom_svg(report.all_evaluable_fom_summary),
+        encoding="utf-8",
+    )
+    (project_root / BOTTLENECK_WEIGHTED_SCORE_RELATIVE).write_text(
+        _bottleneck_weighted_score_svg(report.bottleneck_weighted_score_summary),
         encoding="utf-8",
     )
     (project_root / CONVERGENCE_RELATIVE).write_text(
@@ -551,6 +562,77 @@ def _configured_objective_ranking(
     }
 
 
+def _bottleneck_weighted_score_summary(traces: list[dict[str, Any]]) -> dict[str, Any]:
+    series: list[dict[str, Any]] = []
+    for row_index, row in enumerate(traces):
+        scores = _normalized_mixer_metric_scores(
+            _dict_value(row.get("metrics"), default={})
+        )
+        if scores is None:
+            continue
+        weighted_score = (
+            0.15 * scores["BW"]
+            + 0.10 * scores["MAX_GAIN"]
+            + 0.25 * scores["NF_3G"]
+            + 0.30 * scores["IIP3"]
+            + 0.20 * scores["P1DB"]
+        )
+        bottleneck_score = min(scores.values())
+        combined_score = 0.7 * bottleneck_score + 0.3 * weighted_score
+        evaluation_index = _int_value(row.get("evaluation_index")) or row_index + 1
+        series.append(
+            {
+                "evaluation_index": evaluation_index,
+                "run_id": _string_value(row.get("run_id")),
+                "status": _string_value(row.get("status")),
+                "weighted_score": weighted_score,
+                "bottleneck_score": bottleneck_score,
+                "combined_score": combined_score,
+                "combined_objective": -combined_score,
+                "component_scores": scores,
+            }
+        )
+    best = max(series, key=lambda point: point["combined_score"]) if series else {}
+    return {
+        "source": "normalized_margin_components",
+        "sample_count": len(series),
+        "best_run_id": best.get("run_id"),
+        "best_evaluation_index": best.get("evaluation_index"),
+        "best_combined_score": best.get("combined_score"),
+        "best_combined_objective": best.get("combined_objective"),
+        "series": series,
+        "formula": "score = 0.7*bottleneck + 0.3*weighted",
+        "weights": {
+            "BW": 0.15,
+            "MAX_GAIN": 0.10,
+            "NF_3G": 0.25,
+            "IIP3": 0.30,
+            "P1DB": 0.20,
+        },
+    }
+
+
+def _normalized_mixer_metric_scores(metrics: dict[str, Any]) -> dict[str, float] | None:
+    bw = _parse_number(metrics.get("BW"))
+    max_gain = _parse_number(metrics.get("MAX_GAIN"))
+    nf_3g = _parse_number(metrics.get("NF_3G"))
+    iip3 = _parse_number(metrics.get("IIP3"))
+    p1db = _parse_number(metrics.get("P1DB"))
+    if None in {bw, max_gain, nf_3g, iip3, p1db} or bw is None or bw <= 0:
+        return None
+    return {
+        "BW": _clamp01(10 * (math.log(bw / 19e9) / math.log(10)) / 0.5),
+        "MAX_GAIN": _clamp01((max_gain - 4) / 0.5),
+        "NF_3G": _clamp01((12 - nf_3g) / 0.1),
+        "IIP3": _clamp01(iip3 / 0.5),
+        "P1DB": _clamp01((p1db + 2) / 0.5),
+    }
+
+
+def _clamp01(value: float) -> float:
+    return max(0.0, min(1.0, value))
+
+
 def _all_evaluable_fom_svg(summary: dict[str, Any]) -> str:
     rows = [
         (
@@ -567,6 +649,90 @@ def _all_evaluable_fom_svg(summary: dict[str, Any]) -> str:
         series=[("FoM/objective", rows, "#5a6ff0")],
         x_label="evaluation",
         y_label="FoM objective (all evaluable samples)",
+    )
+
+
+def _bottleneck_weighted_score_svg(summary: dict[str, Any]) -> str:
+    points = [
+        point
+        for point in summary.get("series", [])
+        if isinstance(point, dict)
+        and _finite_float(point.get("weighted_score")) is not None
+        and _finite_float(point.get("bottleneck_score")) is not None
+    ]
+    if not points:
+        return _empty_svg(
+            "Normalized Margin Bottleneck Plot",
+            "No complete BW/MAX_GAIN/NF_3G/IIP3/P1DB score points",
+        )
+    width = 820
+    height = 520
+    margin = 76
+    plot_width = width - margin * 2
+    plot_height = height - margin * 2
+    parts = [
+        _svg_header(width, height),
+        _svg_text(24, 34, "Normalized Margin Bottleneck Plot", 18),
+        _svg_rect(margin, margin, plot_width, plot_height, "#ffffff", "#d0d4dc"),
+    ]
+    for tick in [0.0, 0.25, 0.5, 0.75, 1.0]:
+        x1, y1 = _scale_point(tick, 0.0, 0.0, 1.0, 0.0, 1.0, margin, margin, plot_width, plot_height)
+        x2, y2 = _scale_point(tick, 1.0, 0.0, 1.0, 0.0, 1.0, margin, margin, plot_width, plot_height)
+        parts.append(f'<line x1="{x1:.2f}" y1="{y1:.2f}" x2="{x2:.2f}" y2="{y2:.2f}" stroke="#e3e6ec" stroke-width="1"/>')
+        x3, y3 = _scale_point(0.0, tick, 0.0, 1.0, 0.0, 1.0, margin, margin, plot_width, plot_height)
+        x4, y4 = _scale_point(1.0, tick, 0.0, 1.0, 0.0, 1.0, margin, margin, plot_width, plot_height)
+        parts.append(f'<line x1="{x3:.2f}" y1="{y3:.2f}" x2="{x4:.2f}" y2="{y4:.2f}" stroke="#e3e6ec" stroke-width="1"/>')
+    for score, color in [(0.2, "#5a6ff0"), (0.4, "#e08b2d"), (0.6, "#2f9e44"), (0.8, "#d64545")]:
+        line = _score_line_segment(score)
+        if line is None:
+            continue
+        (x_start, y_start), (x_end, y_end) = line
+        sx1, sy1 = _scale_point(x_start, y_start, 0.0, 1.0, 0.0, 1.0, margin, margin, plot_width, plot_height)
+        sx2, sy2 = _scale_point(x_end, y_end, 0.0, 1.0, 0.0, 1.0, margin, margin, plot_width, plot_height)
+        parts.append(f'<line x1="{sx1:.2f}" y1="{sy1:.2f}" x2="{sx2:.2f}" y2="{sy2:.2f}" stroke="{color}" stroke-width="1.5" opacity="0.75"/>')
+        parts.append(_svg_text(sx2 + 6, sy2 + 4, f"score={score:.1f}", 11))
+    best_run_id = _string_value(summary.get("best_run_id"))
+    color_by_status = {
+        "feasible": "#2f9e44",
+        "constraint_failed": "#e08b2d",
+        "metric_check_failed": "#d64545",
+        "real_check_failed": "#6b7280",
+    }
+    for point in points:
+        weighted_score = float(point["weighted_score"])
+        bottleneck_score = float(point["bottleneck_score"])
+        sx, sy = _scale_point(weighted_score, bottleneck_score, 0.0, 1.0, 0.0, 1.0, margin, margin, plot_width, plot_height)
+        run_id = _string_value(point.get("run_id"))
+        color = color_by_status.get(_string_value(point.get("status")), "#5a6ff0")
+        radius = 6 if run_id == best_run_id else 3.5
+        stroke = "#111827" if run_id == best_run_id else "none"
+        parts.append(f'<circle cx="{sx:.2f}" cy="{sy:.2f}" r="{radius}" fill="{color}" stroke="{stroke}" stroke-width="1.5"><title>{html.escape(run_id)} score={float(point["combined_score"]):.4g}</title></circle>')
+        if run_id == best_run_id:
+            parts.append(_svg_text(sx + 8, sy - 8, f"best {run_id}", 12))
+    parts.append(_svg_text(width / 2, height - 24, "Weighted-sum score", 12, anchor="middle"))
+    parts.append(_svg_text(18, height / 2, "Bottleneck score min(z_i)", 12))
+    legend_items = [
+        ("feasible", "#2f9e44"),
+        ("constraint_failed", "#e08b2d"),
+        ("metric_check_failed", "#d64545"),
+        ("real_check_failed", "#6b7280"),
+    ]
+    for index, (label, color) in enumerate(legend_items):
+        y = 56 + index * 18
+        parts.append(_svg_rect(width - 210, y - 10, 12, 12, color, "none"))
+        parts.append(_svg_text(width - 192, y, label, 11))
+    parts.append("</svg>")
+    return "\n".join(parts)
+
+
+def _score_line_segment(score: float) -> tuple[tuple[float, float], tuple[float, float]] | None:
+    x_min = max(0.0, (score - 0.7) / 0.3)
+    x_max = min(1.0, score / 0.3)
+    if x_min > x_max:
+        return None
+    return (
+        (x_min, (score - 0.3 * x_min) / 0.7),
+        (x_max, (score - 0.3 * x_max) / 0.7),
     )
 
 
@@ -862,6 +1028,18 @@ def _markdown_report(report: OptimizerInsightReport) -> str:
             )
     else:
         lines.append("- No configured objective candidates.")
+    bottleneck = report.bottleneck_weighted_score_summary
+    lines.extend(
+        [
+            "",
+            "## Normalized Margin Bottleneck Plot",
+            "",
+            f"- Sample count: `{bottleneck['sample_count']}`",
+            f"- Best run: `{bottleneck['best_run_id'] or 'n/a'}`",
+            f"- Best score: `{_format_scientific(_finite_float(bottleneck.get('best_combined_score')))}`",
+            f"- Plot: `{report.plots['bottleneck_weighted_score']}`",
+        ]
+    )
     lines.extend(
         [
             "",

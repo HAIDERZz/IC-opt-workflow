@@ -1163,3 +1163,21 @@ Post-C50 Configured Objective Ranking Completion:
 ```text
 请继续 IC auto optimization workflow。先阅读 AGENTS.md、docs/CURRENT_TASK_STATE.json、docs/TOOLCHAIN_EXECUTION_REFERENCE.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-50 Multi-Testbench Candidate Evaluation 已完成；Post-C50 Objective Safe Math / All-Evaluable FoM Plot 已完成；Post-C50 Configured Objective Ranking 也已完成 verified-only。optimizer_insight_report 现在保留原 best_observed，同时新增 configured_objective_ranking，按当前 config/metrics.yaml objective.expression 离线重评分和排序。真实项目 /home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb 已将 normalized FoM 公式写入 config/metrics.yaml 和 opt_requirement.multi_testbench.md，validate/check-requirement/visualize-optimizer-run 通过，没有重跑 Spectre/OCEAN。当前 configured ranking 使用 84 个可计算样本，选择 feasible real_093：F=20、W=1.4u、L=30n、VB_LO=310m、objective=-0.7085522728550304。下一步由用户决定是否接受 real_093、是否继续从已有 run 做 continuation、或调整 FoM/constraints。不要为了报告格式重跑真实工具，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence logs、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
 ```
+
+Post-C50 Bottleneck Weighted Score Plot Completion:
+
+- Status: complete, verified-only.
+- `optimizer_insight_report` now includes `bottleneck_weighted_score_summary` and `reports/optimizer_visuals/bottleneck_weighted_score.svg`.
+- Plot semantics: x = weighted-sum score, y = bottleneck `min(z_i)`, iso-lines = `0.7*bottleneck + 0.3*weighted`.
+- All computable points are plotted with candidate-status colors and best-run highlight.
+- Real project `/home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb` regenerated the report without Spectre/OCEAN rerun.
+- Real plot evidence: `reports/optimizer_visuals/bottleneck_weighted_score.svg` has 84 plotted circles; best run is feasible `real_093`, combined score `0.7085522728550304`.
+- Verification: optimizer insight/closeout/status/OpenBox backend tests passed (`37 passed`) and targeted ruff passed.
+- current_scope: Post-C50 Bottleneck Weighted Score Plot complete.
+- next_allowed_action: inspect the refreshed Mixer multi-testbench optimizer report and `bottleneck_weighted_score.svg`, then decide whether real_093 should be accepted under the normalized FoM, whether to continue optimization from the existing run, or whether to adjust the normalized FoM/constraints. Do not rerun real tools solely for report formatting.
+
+## Latest Resume Prompt
+
+```text
+请继续 IC auto optimization workflow。先阅读 AGENTS.md、docs/CURRENT_TASK_STATE.json、docs/TOOLCHAIN_EXECUTION_REFERENCE.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-50 Multi-Testbench Candidate Evaluation 已完成；Post-C50 Objective Safe Math / All-Evaluable FoM Plot 已完成；Post-C50 Configured Objective Ranking 已完成；Post-C50 Bottleneck Weighted Score Plot 也已完成 verified-only。optimizer_insight_report 现在有 configured_objective_ranking、all_evaluable_fom_summary、bottleneck_weighted_score_summary，以及 reports/optimizer_visuals/bottleneck_weighted_score.svg。该图 x=weighted-sum score，y=bottleneck min(z_i)，等值线为 0.7*bottleneck+0.3*weighted，画出所有可计算点并按 status 着色。真实项目 /home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb 已刷新报告，没有重跑 Spectre/OCEAN；SVG 有 84 个点，best feasible real_093，combined_score=0.7085522728550304。下一步由用户决定是否接受 real_093、是否 continuation、或调整 FoM/constraints。不要为了报告格式重跑真实工具，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence logs、docs/OCEAN_DOC_*、docs/toolchain_evidence/。
+```
