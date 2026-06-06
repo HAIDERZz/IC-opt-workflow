@@ -49,7 +49,7 @@
     "alignment": "Aligned. C-50 completed the spec route: named testbench intake, preserved per-testbench Maestro/ADE netlist bundles, child Spectre/OCEAN runs, aggregate candidate-level manifests, and OpenBox observations through the multi-testbench evaluator.",
     "drift": "No execution-route drift. The real evidence exceeded the first-evidence target by completing a three-testbench 100-evaluation optimizer run, but it did not merge testbenches into a synthetic deck, parse PSF, rewrite formulas, change approved formulas, multiply parallel_jobs per testbench, or replace the OpenBox route."
   },
-  "latest_valid_commit": "33c165f",
+  "latest_valid_commit": "439e1df",
   "review_evidence": {
     "c47_plan": "docs/superpowers/plans/2026-06-05-openbox-advanced-visualization-artifact.md",
     "c47_tests": "Targeted tests passed: /home/zzchen/.venvs/openclaw/bin/python -m pytest tests/test_openbox_backend.py tests/test_optimizer_insights.py tests/test_optimizer_finalize.py",
