@@ -1598,3 +1598,15 @@ C-54 Production Landing MVP:
 - Real project `/home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb` passed with `readiness=ready_for_closeout_review`, 3 testbench netlist bundles, and accepted `real_093`.
 - Verification: project readiness/intake/validate/final-report tests passed (`53 passed`), targeted ruff passed, cadence check passed, and `git diff --check` passed.
 - current_scope: C-54 Production Landing MVP complete.
+
+C-56 Optimizer Decision Handoff Hardening:
+
+- Status: complete, verified-only.
+- Commit: `df796f4 fix: harden optimizer decision handoff`.
+- Fixed the production issue exposed by the full agent E2E simulation: `decide-optimizer-run` no longer uses a non-feasible configured-objective best candidate as the primary recommendation when feasible candidates exist.
+- The decision path now prefers feasible configured candidates, otherwise feasible stored best-observed/top-feasible candidates, and records warnings for ignored non-feasible configured-best points.
+- Real simulation recheck on `/tmp/ic_auto_opt_agent_e2e_g2qieZ/Mixer_opt_muti_tb_full` regenerated only the decision report and now recommends feasible `real_066` instead of constraint-failed `real_057`.
+- Production docs now require the package/preflight/approval gate before real execution, use the user/project Cadence environment setup instead of hardcoded Spectre-version wording, and document low-frequency execution-agent status checks.
+- Added design-only spec `docs/superpowers/specs/2026-06-07-one-command-optimizer-flow-design.md` for a future thin one-command optimizer orchestration route.
+- Verification: `python3 -m pytest tests/test_optimizer_decision.py -q` passed (`3 passed`); adjacent optimizer closeout/report/status tests passed (`31 passed`); targeted ruff and `git diff --check` passed.
+- current_scope: C-56 Optimizer Decision Handoff Hardening complete.

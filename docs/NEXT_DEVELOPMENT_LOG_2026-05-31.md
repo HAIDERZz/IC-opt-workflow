@@ -2257,3 +2257,19 @@ C-54 Production Landing MVP:
 - current_scope: C-54 Production Landing MVP complete.
 - next_allowed_action: use docs/OPTIMIZER_PRODUCTION_QUICKSTART.md and hermes-workflow check-project-ready to onboard the next real optimization project, or decide whether to run continuation on /home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb from existing artifacts. Do not add new optimizer features before a real user project needs them.
 - next_allowed_action exact: use docs/OPTIMIZER_PRODUCTION_QUICKSTART.md and hermes-workflow check-project-ready to onboard the next real optimization project, or decide whether to run continuation on /home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb from existing artifacts. Do not add new optimizer features before a real user project needs them.
+
+C-56 Optimizer Decision Handoff Hardening:
+
+- Status: complete, verified-only.
+- Commit: `df796f4 fix: harden optimizer decision handoff`.
+- Root cause fixed: `decide-optimizer-run` previously trusted `configured_objective_ranking.best_candidate` even when that candidate was `constraint_failed`, so the full agent E2E simulation could recommend `real_057` instead of the feasible best-observed `real_066`.
+- Code: `src/hermes_workflow/optimizer_decision.py` now applies a feasible-candidate gate. Configured-objective ranking remains diagnostic, but a non-feasible configured best is not used as the primary recommendation when feasible evidence exists.
+- Test: `tests/test_optimizer_decision.py` now covers configured-objective-first-but-constraint-failed fallback to a feasible candidate.
+- Real simulation recheck: `/tmp/ic_auto_opt_agent_e2e_g2qieZ/Mixer_opt_muti_tb_full` reran `decide-optimizer-run` only; no Spectre/OCEAN rerun. Result: recommended feasible `real_066`, action `accept_best_observed_or_continue`.
+- Docs: `docs/AGENT_OPTIMIZER_USAGE_MANUAL.md` and `docs/OPTIMIZER_PRODUCTION_QUICKSTART.md` now require package/preflight/approval before real execution, avoid hardcoded Spectre-version instructions, and document low-frequency execution-agent status polling.
+- Design checkpoint: `docs/superpowers/specs/2026-06-07-one-command-optimizer-flow-design.md` records the future thin `hermes-workflow optimize PROJECT_DIR --real` route. It is design-only; no new orchestration command was implemented in C-56.
+- Verification: decision tests passed (`3 passed`), adjacent optimizer decision/report/closeout/status tests passed (`31 passed`), targeted ruff passed, `git diff --check` passed, and `docs/CURRENT_TASK_STATE.json` parsed as JSON.
+- Boundary: no real-tool rerun, no PSF parsing, no OCEAN formula rewrite, no optimizer backend change, no synthetic testbench merge, no workflow-engine expansion.
+- current_scope: C-56 Optimizer Decision Handoff Hardening complete.
+- next_allowed_action: either implement the narrow one-command optimizer orchestration from the C-56 design spec, or use the hardened manuals to onboard the next real optimization project. Keep future work focused on reducing user-agent chatter while preserving package/preflight/approval and feasible-candidate decision safety.
+- next_allowed_action exact: Either implement the narrow one-command optimizer orchestration from docs/superpowers/specs/2026-06-07-one-command-optimizer-flow-design.md, or use the hardened manuals to onboard the next real optimization project. Do not add broad workflow layers; keep future work focused on reducing user-agent chatter while preserving package/preflight/approval and feasible-candidate decision safety.

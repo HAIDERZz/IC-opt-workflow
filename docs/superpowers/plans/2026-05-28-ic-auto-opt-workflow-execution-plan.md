@@ -23,7 +23,7 @@
 
 ## Current Implementation Node
 
-As of 2026-06-07, Plan A, Plan B, and Plan C through C-55 are complete, with
+As of 2026-06-07, Plan A, Plan B, and Plan C through C-56 are complete, with
 post-C-49 real Mixer OpenBox/Spectre/OCEAN evidence through 200 cumulative
 NF=12dB evaluations and C-50 real multi-testbench evidence through 100
 three-testbench evaluations. Post-C50/C-54 reporting now re-scores existing
@@ -42,6 +42,18 @@ multi-testbench project passed `check-project-ready` with
 `readiness=ready_for_closeout_review` and final summary acceptance of
 `real_093`. The accepted boundary is first production trial readiness, not a
 claim of global optimizer completeness.
+
+C-56 hardens the production handoff after the full user -> supervisor agent ->
+execution agent -> real optimizer simulation. It fixes `decide-optimizer-run`
+so a non-feasible configured-objective best point cannot become the primary
+recommended run when feasible candidates exist. The simulation project
+`/tmp/ic_auto_opt_agent_e2e_g2qieZ/Mixer_opt_muti_tb_full` now recommends
+feasible `real_066` instead of constraint-failed `real_057` without rerunning
+Spectre/OCEAN. The production manuals now require package/preflight/approval
+before execution, avoid hardcoded Spectre-version wording, and document
+low-frequency execution-agent status polling. A design-only future route for
+`hermes-workflow optimize PROJECT_DIR --real` is recorded in
+`docs/superpowers/specs/2026-06-07-one-command-optimizer-flow-design.md`.
 
 The accepted route is no longer an abstract contract-only optimizer plan; it is
 a practice-first production handoff flow that has been exercised with real
@@ -143,6 +155,12 @@ Completed optimizer milestones since C-26:
   readiness plus final summary availability without running real tools. The
   real Mixer multi-testbench project passed with
   `readiness=ready_for_closeout_review`.
+- C-56 hardened agent handoff and decision safety. Production usage is now
+  explicitly short-request/file-driven, package/preflight/approval is required
+  before execution, real-tool environment setup comes from user/project config
+  rather than hardcoded Spectre versions, execution-agent status checks should
+  be low-frequency, and `decide-optimizer-run` must recommend a feasible point
+  when feasible evidence exists.
 
 Current code-level entry points:
 
@@ -165,9 +183,10 @@ optimizer framework rewrite. The next production step should convert the proven
 C-49/C-50 route into clearer user-facing operation: requirement template/README
 tightening, multi-testbench guide, formula/variable/resource approval
 checkpoint, and final optimizer closeout/status reporting polish. After C-55,
-the preferred next step is to onboard another real project using
-`docs/OPTIMIZER_PRODUCTION_QUICKSTART.md`; new features should be added only
-when that real workflow exposes a specific missing capability.
+the preferred next step is either the narrow one-command optimizer
+orchestration from the C-56 design spec, or onboarding another real project
+using `docs/OPTIMIZER_PRODUCTION_QUICKSTART.md`; new features should be added
+only when that real workflow exposes a specific missing capability.
 
 ## Current Route Alignment
 

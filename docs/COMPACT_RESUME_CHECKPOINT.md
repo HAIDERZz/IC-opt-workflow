@@ -1244,3 +1244,21 @@ C-54 Production Landing MVP Completion:
 ```text
 请继续 IC auto optimization workflow。先阅读 AGENTS.md、docs/CURRENT_TASK_STATE.json、docs/TOOLCHAIN_EXECUTION_REFERENCE.md、docs/OPTIMIZER_PRODUCTION_QUICKSTART.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-54 Production Landing MVP 已完成 verified-only。当前项目已有生产 Quickstart、check-project-ready CLI、multi-testbench真实优化闭环、decision/supervisor-decision/final-summary/readiness 报告。真实项目 /home/zzchen/spectre_opt_prj/Mixer_opt_muti_tb readiness=ready_for_closeout_review，final summary 接受 real_093：F=20、W=1.4u、L=30n、VB_LO=310m；global_optimum_claim=false；bottleneck=BW。下一步优先用 Quickstart 和 check-project-ready onboarding 下一个真实优化项目，或按用户要求从现有 artifacts continuation/调整 FoM/constraints。不要为了报告格式重跑真实工具，不要解析 PSF，不要重写 OCEAN 公式，不要提交 raw input.scs、ade_e.scs、PSF/raw、完整 Cadence logs、docs/OCEAN_DOC_*、docs/toolchain_evidence/，不要新增 optimizer 功能除非真实项目需要。
 ```
+
+C-56 Optimizer Decision Handoff Hardening Completion:
+
+- Status: complete, verified-only.
+- Commit: `df796f4 fix: harden optimizer decision handoff`.
+- Fixed `decide-optimizer-run` primary recommendation safety: configured-objective ranking can still show a non-feasible high-scoring point, but the primary recommendation must be feasible when feasible candidates exist.
+- Full E2E simulation recheck: `/tmp/ic_auto_opt_agent_e2e_g2qieZ/Mixer_opt_muti_tb_full` reran `decide-optimizer-run` without Spectre/OCEAN rerun and now recommends feasible `real_066`, not constraint-failed `real_057`.
+- Production manuals now encode the package/preflight/approval gate before execution, user/project Cadence environment setup instead of hardcoded Spectre-version wording, low-frequency execution-agent status polling, and short-request/file-driven usage.
+- Design-only future route: `docs/superpowers/specs/2026-06-07-one-command-optimizer-flow-design.md` for a thin `hermes-workflow optimize PROJECT_DIR --real` orchestration command. It is not implemented yet.
+- Verification: `tests/test_optimizer_decision.py` passed (`3 passed`), adjacent optimizer decision/report/closeout/status tests passed (`31 passed`), targeted ruff passed, `git diff --check` passed, and `CURRENT_TASK_STATE.json` parsed.
+- current_scope: C-56 Optimizer Decision Handoff Hardening complete.
+- next_allowed_action: implement the narrow one-command optimizer orchestration, or use the hardened manuals to onboard the next real optimization project. Avoid broad workflow expansion; preserve package/preflight/approval, feasible-candidate decision safety, and file-driven short-request UX.
+
+## Latest Resume Prompt
+
+```text
+请继续 IC auto optimization workflow。先阅读 AGENTS.md、docs/CURRENT_TASK_STATE.json、docs/TOOLCHAIN_EXECUTION_REFERENCE.md、docs/OPTIMIZER_PRODUCTION_QUICKSTART.md、docs/AGENT_OPTIMIZER_USAGE_MANUAL.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-56 Optimizer Decision Handoff Hardening 已完成 verified-only，commit df796f4。decide-optimizer-run 已修复：当存在 feasible candidate 时，不允许 constraint_failed/metric_check_failed/real_check_failed 点成为 primary recommended run；真实模拟项目 /tmp/ic_auto_opt_agent_e2e_g2qieZ/Mixer_opt_muti_tb_full 离线重跑 decision report 后推荐 feasible real_066，而不是 constraint_failed real_057。生产手册已收紧为短请求 + opt_requirement.md 文件驱动，并明确 package/preflight/approval gate、用户/project Cadence env setup、低频 execution-agent status policy。新增 design-only spec docs/superpowers/specs/2026-06-07-one-command-optimizer-flow-design.md，下一步可以实现窄 scoped 的 hermes-workflow optimize PROJECT_DIR --real 编排命令，或用现有 hardened manuals onboarding 下一个真实项目。不要为了报告格式重跑真实工具，不要解析 PSF，不要重写 OCEAN 公式，不要硬编码 Spectre 版本，不要提交 raw input.scs/ade_e.scs/PSF/raw/full Cadence logs/docs/OCEAN_DOC_*/docs/toolchain_evidence/，不要新增宽泛 workflow 框架。
+```
