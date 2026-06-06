@@ -68,8 +68,37 @@ readiness: ready_for_first_run
 
 ## 4. Run The Optimizer
 
-Before a real run, the supervisor must build and approve the execution package.
-Do not jump directly from readiness to real execution.
+Preferred one-command route:
+
+```bash
+./.venv/bin/hermes-workflow optimize ~/spectre_opt_prj/<project_name> \
+  --real \
+  --max-evals 100 \
+  --batch-size 10 \
+  --parallel-jobs 10 \
+  --cadence-cshrc /path/to/user/cadence_env.csh
+```
+
+This wraps intake, preparation, validation, readiness, package, netlist
+preparation, dry run, preflight health, approval, optimizer task packaging, real
+OpenBox execution, optimizer acceptance, completion, finalization,
+visualization, and decision reporting. It stops before recording user
+acceptance.
+
+To check the offline orchestration gates without launching Spectre/OCEAN/OpenBox:
+
+```bash
+./.venv/bin/hermes-workflow optimize ~/spectre_opt_prj/<project_name> \
+  --real \
+  --dry-orchestration \
+  --max-evals 100 \
+  --batch-size 10 \
+  --parallel-jobs 10 \
+  --cadence-cshrc /path/to/user/cadence_env.csh
+```
+
+Manual equivalent: before a real run, the supervisor must build and approve the
+execution package. Do not jump directly from readiness to real execution.
 
 ```bash
 ./.venv/bin/hermes-workflow package ~/spectre_opt_prj/<project_name>
@@ -88,7 +117,7 @@ Before a real run, read `docs/TOOLCHAIN_EXECUTION_REFERENCE.md` and use the
 user/project Cadence/OpenBox environment. The environment setup path must come
 from the user project or user shell setup; do not hardcode a Spectre version.
 
-Example OpenBox run:
+Manual OpenBox run:
 
 ```bash
 ./.venv/bin/hermes-workflow run-openbox-real ~/spectre_opt_prj/<project_name> \
@@ -109,7 +138,8 @@ and only low-frequency heartbeat status for long runs. Do not poll every batch.
 
 ## 5. Close Out The Run
 
-Use the report chain:
+If using `hermes-workflow optimize ... --real`, the closeout reports are already
+generated. If running the manual route, use the report chain:
 
 ```bash
 ./.venv/bin/hermes-workflow check-optimizer-run ~/spectre_opt_prj/<project_name>

@@ -1,7 +1,7 @@
 # One-Command Optimizer Flow Design
 
 Date: 2026-06-07
-Status: Design spec, not implemented
+Status: Implemented as C-57 narrow MVP
 
 ## Purpose
 
@@ -16,14 +16,18 @@ Target user interaction:
 Run the IC optimizer workflow for /home/zzchen/spectre_opt_prj/<project_name>.
 ```
 
-Future CLI shape:
+Implemented CLI shape:
 
 ```bash
-./.venv/bin/hermes-workflow optimize PROJECT_DIR --real
+./.venv/bin/hermes-workflow optimize PROJECT_DIR --real \
+  --max-evals 100 \
+  --batch-size 10 \
+  --parallel-jobs 10 \
+  --cadence-cshrc /path/to/user/cadence_env.csh
 ```
 
-The CLI command is intentionally future work. This spec records the route before
-implementation so the product does not drift into another broad framework.
+The CLI command is a thin orchestration layer. It records
+`reports/optimizer_flow_run_report.json` and stops before final user acceptance.
 
 ## Required Inputs
 
@@ -96,10 +100,10 @@ All recommendations remain `best observed`, not a global optimum certificate.
 
 ## Future Implementation Tasks
 
-1. Add `hermes-workflow optimize PROJECT_DIR --real` as a thin orchestration
+1. Done in C-57: add `hermes-workflow optimize PROJECT_DIR --real` as a thin orchestration
    command over the existing commands.
-2. Add a generated `optimizer_flow_run_report.json` recording each subcommand,
+2. Done in C-57: add a generated `optimizer_flow_run_report.json` recording each subcommand,
    exit status, and key output paths.
-3. Add a `--dry-orchestration` mode that verifies the sequence without launching
+3. Done in C-57: add a `--dry-orchestration` mode that verifies the sequence without launching
    real Spectre/OCEAN/OpenBox.
-4. Add a short slash-command wrapper only after the CLI route is stable.
+4. Future: add a short slash-command wrapper only after the CLI route is stable.

@@ -134,7 +134,36 @@ Typical user-side fixes:
 - metric routes point to unknown testbench ids;
 - OCEAN formula or constraint names do not match declared metrics.
 
-## 6. Agent Step 2: Build The Approved Execution Package
+## 6. Agent Step 2: Preferred One-Command Flow
+
+For production use, prefer the single orchestration command:
+
+```bash
+./.venv/bin/hermes-workflow optimize PROJECT_DIR \
+  --real \
+  --max-evals 100 \
+  --batch-size 10 \
+  --parallel-jobs 10 \
+  --cadence-cshrc /path/to/user/cadence_env.csh
+```
+
+This command performs the approved package/preflight/approval gate, launches the
+real OpenBox optimizer, runs the closeout report chain, and then stops for user
+acceptance. It does not record final user acceptance automatically.
+
+To test the offline gates only:
+
+```bash
+./.venv/bin/hermes-workflow optimize PROJECT_DIR \
+  --real \
+  --dry-orchestration \
+  --max-evals 100 \
+  --batch-size 10 \
+  --parallel-jobs 10 \
+  --cadence-cshrc /path/to/user/cadence_env.csh
+```
+
+## 7. Manual Fallback: Build The Approved Execution Package
 
 Before any real optimizer execution, the supervisor agent must build and approve
 the file-contract package. Do not skip this gate.
@@ -156,7 +185,7 @@ the file-contract package. Do not skip this gate.
 come from the user environment or project configuration; do not hardcode a
 Spectre version in prompts, docs, or code.
 
-## 7. Agent Step 3: Run Optimizer
+## 8. Manual Fallback: Run Optimizer
 
 For OpenBox real optimization:
 
@@ -183,9 +212,11 @@ Status policy: after a long real optimizer starts, the execution agent should
 avoid per-batch polling. It should report start, unexpected failure, completion,
 and only low-frequency heartbeat status for long runs.
 
-## 8. Agent Step 4: Close Out The Run
+## 9. Manual Fallback: Close Out The Run
 
-After the optimizer run finishes, the agent should run:
+If using `hermes-workflow optimize ... --real`, these reports are already
+generated. If running the manual fallback, after the optimizer run finishes the
+agent should run:
 
 ```bash
 ./.venv/bin/hermes-workflow check-optimizer-run PROJECT_DIR
@@ -216,7 +247,7 @@ Important: `decide-optimizer-run` must not present a `constraint_failed`,
 `metric_check_failed`, or `real_check_failed` candidate as the primary
 recommended run when any feasible candidate exists.
 
-## 9. User Decision Point
+## 10. User Decision Point
 
 The supervisor agent should ask for user confirmation before recording the final
 decision unless the user already gave explicit acceptance rules.
@@ -249,7 +280,7 @@ project readiness: pass
 readiness: ready_for_closeout_review
 ```
 
-## 10. What The User Reads
+## 11. What The User Reads
 
 Primary final report:
 
@@ -272,7 +303,7 @@ PROJECT_DIR/reports/optimizer_visuals/
 PROJECT_DIR/reports/openbox_advanced_visualization/
 ```
 
-## 11. How To Continue Optimization
+## 12. How To Continue Optimization
 
 Only continue if the decision report or the user asks for it.
 
@@ -299,7 +330,7 @@ Then rerun the closeout chain:
 Do not restart from scratch unless the user changes variables, formulas,
 constraints, objective, or Maestro point roots.
 
-## 12. How To Interpret Failures
+## 13. How To Interpret Failures
 
 `constraint_failed` means:
 
@@ -336,7 +367,7 @@ Few or zero feasible points usually means:
 - initial Maestro point roots and formulas do not match;
 - optimizer budget is too small for the space.
 
-## 13. Important Boundaries
+## 14. Important Boundaries
 
 The agent must keep these rules:
 
@@ -350,21 +381,18 @@ The agent must keep these rules:
 - Do not commit raw Cadence netlists, protected sidecars, PSF data, or full
   Cadence logs.
 
-## 14. Minimal Successful Session
+## 15. Minimal Successful Session
 
 A successful first production session looks like:
 
 ```text
 1. User creates PROJECT_DIR and writes opt_requirement.md.
-2. Agent runs intake/readiness commands.
-3. readiness=ready_for_first_run.
-4. Supervisor builds package/preflight/approval/optimizer task package.
-5. Execution agent runs run-openbox-real from the approved task package.
-6. Supervisor runs closeout report chain.
-7. Supervisor reports best observed feasible result and bottleneck.
-8. User accepts or asks to continue.
-9. Supervisor records decision and writes optimizer_final_summary.md.
-10. readiness=ready_for_closeout_review.
+2. Agent runs `hermes-workflow optimize PROJECT_DIR --real ...`.
+3. Hermes writes `reports/optimizer_flow_run_report.json` and closeout reports.
+4. Supervisor reports best observed feasible result and bottleneck.
+5. User accepts or asks to continue.
+6. Supervisor records decision and writes optimizer_final_summary.md.
+7. readiness=ready_for_closeout_review.
 ```
 
 At that point, the user can use the accepted candidate as the current optimized

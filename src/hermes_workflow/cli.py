@@ -24,6 +24,7 @@ from hermes_workflow.optimizer_acceptance import check_optimizer_run
 from hermes_workflow.optimizer_completion import summarize_optimizer_run
 from hermes_workflow.optimizer_decision import generate_optimizer_decision_report
 from hermes_workflow.optimizer_final_summary import generate_optimizer_final_summary
+from hermes_workflow.optimizer_flow import optimize_project
 from hermes_workflow.optimizer_finalize import finalize_optimizer_run
 from hermes_workflow.optimizer_insights import generate_optimizer_insight_report
 from hermes_workflow.optimizer_suggestion import suggest_candidate_request
@@ -959,6 +960,77 @@ def optimizer_status_command(
 
     for issue in summary.issues:
         typer.echo(issue)
+    raise typer.Exit(code=1)
+
+
+@app.command("optimize")
+def optimize_command(
+    project_dir: Annotated[
+        Path,
+        typer.Argument(help="Project directory containing opt_requirement.md."),
+    ],
+    real: Annotated[
+        bool,
+        typer.Option("--real", help="Run the approved real optimizer route."),
+    ] = False,
+    dry_orchestration: Annotated[
+        bool,
+        typer.Option(
+            "--dry-orchestration",
+            help="Run all offline orchestration gates and stop before real tools.",
+        ),
+    ] = False,
+    max_evals: Annotated[
+        int,
+        typer.Option("--max-evals", min=1, help="OpenBox real evaluation budget."),
+    ] = 100,
+    batch_size: Annotated[
+        int | None,
+        typer.Option("--batch-size", min=1, help="OpenBox suggestion batch size."),
+    ] = None,
+    parallel_jobs: Annotated[
+        int | None,
+        typer.Option(
+            "--parallel-jobs",
+            min=1,
+            help="Maximum concurrently launched Spectre runs.",
+        ),
+    ] = None,
+    cadence_cshrc: Annotated[
+        Path,
+        typer.Option(
+            "--cadence-cshrc",
+            help="User/project Cadence cshrc sourced before real execution.",
+        ),
+    ] = ...,
+) -> None:
+    try:
+        report = optimize_project(
+            project_dir,
+            real=real,
+            dry_orchestration=dry_orchestration,
+            max_evals=max_evals,
+            batch_size=batch_size,
+            parallel_jobs=parallel_jobs,
+            cadence_cshrc=cadence_cshrc,
+        )
+    except (OSError, RuntimeError, ValueError) as exc:
+        _exit_with_error(exc)
+    if report.status == "pass":
+        typer.echo("optimizer flow completed")
+        typer.echo(f"report: {report.report_path.relative_to(project_dir)}")
+        if report.stopped_before is not None:
+            typer.echo(f"stopped before: {report.stopped_before}")
+        if report.recommended_run_id is not None:
+            typer.echo(f"recommended: {report.recommended_run_id}")
+        if report.user_decision_required:
+            typer.echo("user decision required: true")
+        return
+
+    typer.echo("optimizer flow failed")
+    for issue in report.issues:
+        typer.echo(issue)
+    typer.echo("report: reports/optimizer_flow_run_report.json")
     raise typer.Exit(code=1)
 
 
