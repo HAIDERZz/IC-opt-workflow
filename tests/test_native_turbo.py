@@ -17,6 +17,7 @@ from hermes_workflow.native_turbo import (
     NativeTurboRunner,
     NativeTurboRunResult,
     _default_batch_turbo_factory,
+    _run_default_adapter,
     evaluate_candidate_objective,
     evaluate_real_candidate,
     load_native_turbo_contract,
@@ -28,6 +29,7 @@ from hermes_workflow.native_turbo import (
 )
 from hermes_workflow.package import create_project_from_template
 from hermes_workflow.real_run import prepare_explicit_candidate_real_run
+from hermes_workflow.requirement_intake import prepare_from_requirement
 from hermes_workflow.schemas import (
     ConstraintOp,
     ConstraintSpec,
@@ -49,6 +51,7 @@ from tests.real_run_smoke_helpers import (
     write_fake_metric_result_manifest,
     write_fake_result_manifest,
 )
+from tests.test_requirement_intake import _copy_multi_testbench_requirement_project
 
 
 class _FakeTurbo:
@@ -775,6 +778,60 @@ def test_real_batch_evaluator_caps_parallel_adapter_calls(tmp_path: Path) -> Non
         .read_text(encoding="utf-8")
         .splitlines()
     ] == ["real_001", "real_002", "real_003", "real_004"]
+
+
+def test_default_adapter_runs_and_aggregates_multi_testbench_children(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    project_dir = _copy_multi_testbench_requirement_project(tmp_path)
+    assert prepare_from_requirement(project_dir).status == "pass"
+    calls: list[tuple[str, str | None]] = []
+    aggregate_calls: list[str] = []
+
+    def fake_run_spectre_ocean_adapter(
+        project: Path,
+        *,
+        run_id: str | None,
+        testbench_id: str | None,
+    ):
+        assert project == project_dir
+        calls.append((str(run_id), testbench_id))
+        return type(
+            "Result",
+            (),
+            {
+                "status": "succeeded",
+                "issues": [],
+            },
+        )()
+
+    def fake_aggregate(project: Path, *, run_id: str):
+        assert project == project_dir
+        aggregate_calls.append(run_id)
+        return object()
+
+    import hermes_workflow.execution_adapters.spectre_ocean as adapter_module
+    import hermes_workflow.multi_testbench_aggregation as aggregation_module
+
+    monkeypatch.setattr(
+        adapter_module,
+        "run_spectre_ocean_adapter",
+        fake_run_spectre_ocean_adapter,
+    )
+    monkeypatch.setattr(
+        aggregation_module,
+        "aggregate_multi_testbench_run",
+        fake_aggregate,
+    )
+
+    _run_default_adapter(project_dir, run_id="real_007", cadence_cshrc=None)
+
+    assert calls == [
+        ("real_007", "cg_nf"),
+        ("real_007", "iip3"),
+    ]
+    assert aggregate_calls == ["real_007"]
 
 
 def test_real_candidate_evaluator_classifies_written_metric_failure(
