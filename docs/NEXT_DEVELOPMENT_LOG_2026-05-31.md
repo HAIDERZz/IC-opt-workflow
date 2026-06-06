@@ -2273,3 +2273,19 @@ C-56 Optimizer Decision Handoff Hardening:
 - current_scope: C-56 Optimizer Decision Handoff Hardening complete.
 - next_allowed_action: either implement the narrow one-command optimizer orchestration from the C-56 design spec, or use the hardened manuals to onboard the next real optimization project. Keep future work focused on reducing user-agent chatter while preserving package/preflight/approval and feasible-candidate decision safety.
 - next_allowed_action exact: Either implement the narrow one-command optimizer orchestration from docs/superpowers/specs/2026-06-07-one-command-optimizer-flow-design.md, or use the hardened manuals to onboard the next real optimization project. Do not add broad workflow layers; keep future work focused on reducing user-agent chatter while preserving package/preflight/approval and feasible-candidate decision safety.
+
+C-57 One-Command Optimizer Flow:
+
+- Status: complete, verified-only.
+- Commit: `e6ce269 feat: add optimizer one-command flow`.
+- Code: `src/hermes_workflow/optimizer_flow.py`; CLI: `hermes-workflow optimize PROJECT_DIR --real`.
+- Behavior: wraps the proven production route in one thin orchestration command: requirement intake, project preparation, validation, readiness, package, netlist preparation, dry run, preflight health, approval, optimizer task packaging, real OpenBox execution, optimizer acceptance, completion, finalization, visualization, and decision reporting.
+- Report: writes `reports/optimizer_flow_run_report.json` with each step status, key detail, mode, and user-decision boundary.
+- Dry mode: `--dry-orchestration` runs the offline gates through `package-optimizer-task` and stops before `run-openbox-real`, so agents can verify the sequence without launching Spectre/OCEAN/OpenBox.
+- User boundary: the command stops before recording final user acceptance. The supervisor still reports the decision and waits for user approval before `record-optimizer-decision` / `write-optimizer-final-summary`.
+- Docs: `docs/OPTIMIZER_PRODUCTION_QUICKSTART.md` and `docs/AGENT_OPTIMIZER_USAGE_MANUAL.md` now make the one-command route the preferred production entry and keep the manual command chain as fallback.
+- Verification: TDD red/green on `tests/test_optimizer_flow.py`; adjacent CLI/readiness/decision/final-summary tests passed (`46 passed`); targeted ruff passed; `git diff --check` passed.
+- Boundary: no real-tool run during implementation, no PSF parsing, no OCEAN formula rewrite, no optimizer backend change, no synthetic testbench merge, no automatic user acceptance, and no slash wrapper yet.
+- current_scope: C-57 One-Command Optimizer Flow complete.
+- next_allowed_action: use `hermes-workflow optimize PROJECT_DIR --real` on the next real optimization project, or run `--dry-orchestration` on a prepared project to verify offline gates first. Add new features only when this one-command route exposes a concrete production gap.
+- next_allowed_action exact: Use hermes-workflow optimize PROJECT_DIR --real on the next real optimization project or run --dry-orchestration on a prepared project to verify the offline gates. Add new features only when this one-command route exposes a concrete production gap; do not broaden into a workflow engine or slash wrapper until the CLI route is stable in real use.

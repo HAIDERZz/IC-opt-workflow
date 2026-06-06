@@ -23,7 +23,7 @@
 
 ## Current Implementation Node
 
-As of 2026-06-07, Plan A, Plan B, and Plan C through C-56 are complete, with
+As of 2026-06-07, Plan A, Plan B, and Plan C through C-57 are complete, with
 post-C-49 real Mixer OpenBox/Spectre/OCEAN evidence through 200 cumulative
 NF=12dB evaluations and C-50 real multi-testbench evidence through 100
 three-testbench evaluations. Post-C50/C-54 reporting now re-scores existing
@@ -54,6 +54,15 @@ before execution, avoid hardcoded Spectre-version wording, and document
 low-frequency execution-agent status polling. A design-only future route for
 `hermes-workflow optimize PROJECT_DIR --real` is recorded in
 `docs/superpowers/specs/2026-06-07-one-command-optimizer-flow-design.md`.
+
+C-57 implements that one-command route as
+`hermes-workflow optimize PROJECT_DIR --real`. The command wraps the proven
+production sequence from requirement intake through package/preflight/approval,
+approved OpenBox real execution, optimizer acceptance/completion/finalization,
+visualization, and decision reporting. It writes
+`reports/optimizer_flow_run_report.json` and stops before final user
+acceptance. `--dry-orchestration` verifies the offline gates through
+`package-optimizer-task` and stops before real Spectre/OCEAN/OpenBox execution.
 
 The accepted route is no longer an abstract contract-only optimizer plan; it is
 a practice-first production handoff flow that has been exercised with real
@@ -161,9 +170,14 @@ Completed optimizer milestones since C-26:
   rather than hardcoded Spectre versions, execution-agent status checks should
   be low-frequency, and `decide-optimizer-run` must recommend a feasible point
   when feasible evidence exists.
+- C-57 added the thin `hermes-workflow optimize PROJECT_DIR --real`
+  orchestration command plus `reports/optimizer_flow_run_report.json`. The
+  command reduces supervisor-agent prompt complexity while preserving the
+  existing deterministic gates and stopping before user acceptance.
 
 Current code-level entry points:
 
+- `hermes-workflow optimize PROJECT_DIR --real --max-evals N --batch-size B --parallel-jobs P --cadence-cshrc CADENCE_CSHRC`
 - `hermes-workflow package-optimizer-task PROJECT_DIR --backend openbox --max-evals N --cadence-cshrc CADENCE_CSHRC --parallel`
 - `hermes-workflow package-optimizer-task PROJECT_DIR --backend openbox --continuation --additional-evals N --cadence-cshrc CADENCE_CSHRC --parallel`
 - `hermes-workflow run-openbox-real PROJECT_DIR --max-evals N --batch-size B --parallel-jobs P --cadence-cshrc CADENCE_CSHRC`
@@ -182,11 +196,11 @@ The next work should stay narrow and practice-first. Do not start a broad
 optimizer framework rewrite. The next production step should convert the proven
 C-49/C-50 route into clearer user-facing operation: requirement template/README
 tightening, multi-testbench guide, formula/variable/resource approval
-checkpoint, and final optimizer closeout/status reporting polish. After C-55,
-the preferred next step is either the narrow one-command optimizer
-orchestration from the C-56 design spec, or onboarding another real project
-using `docs/OPTIMIZER_PRODUCTION_QUICKSTART.md`; new features should be added
-only when that real workflow exposes a specific missing capability.
+checkpoint, and final optimizer closeout/status reporting polish. After C-57,
+the preferred next step is to use `hermes-workflow optimize PROJECT_DIR --real`
+on the next real project, or to run `--dry-orchestration` first on a prepared
+project. New features should be added only when that real workflow exposes a
+specific missing capability.
 
 ## Current Route Alignment
 

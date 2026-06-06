@@ -1262,3 +1262,23 @@ C-56 Optimizer Decision Handoff Hardening Completion:
 ```text
 请继续 IC auto optimization workflow。先阅读 AGENTS.md、docs/CURRENT_TASK_STATE.json、docs/TOOLCHAIN_EXECUTION_REFERENCE.md、docs/OPTIMIZER_PRODUCTION_QUICKSTART.md、docs/AGENT_OPTIMIZER_USAGE_MANUAL.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-56 Optimizer Decision Handoff Hardening 已完成 verified-only，commit df796f4。decide-optimizer-run 已修复：当存在 feasible candidate 时，不允许 constraint_failed/metric_check_failed/real_check_failed 点成为 primary recommended run；真实模拟项目 /tmp/ic_auto_opt_agent_e2e_g2qieZ/Mixer_opt_muti_tb_full 离线重跑 decision report 后推荐 feasible real_066，而不是 constraint_failed real_057。生产手册已收紧为短请求 + opt_requirement.md 文件驱动，并明确 package/preflight/approval gate、用户/project Cadence env setup、低频 execution-agent status policy。新增 design-only spec docs/superpowers/specs/2026-06-07-one-command-optimizer-flow-design.md，下一步可以实现窄 scoped 的 hermes-workflow optimize PROJECT_DIR --real 编排命令，或用现有 hardened manuals onboarding 下一个真实项目。不要为了报告格式重跑真实工具，不要解析 PSF，不要重写 OCEAN 公式，不要硬编码 Spectre 版本，不要提交 raw input.scs/ade_e.scs/PSF/raw/full Cadence logs/docs/OCEAN_DOC_*/docs/toolchain_evidence/，不要新增宽泛 workflow 框架。
 ```
+
+C-57 One-Command Optimizer Flow Completion:
+
+- Status: complete, verified-only.
+- Commit: `e6ce269 feat: add optimizer one-command flow`.
+- Implemented `hermes-workflow optimize PROJECT_DIR --real` as a thin orchestration command over the proven production route.
+- The flow sequence is: `check-requirement`, `prepare-from-requirement`, `validate`, `check-project-ready`, `package`, `prepare-netlist`, `dry-run`, `preflight-health`, `approve`, `package-optimizer-task`, `run-openbox-real`, `check-optimizer-run`, `summarize-optimizer-run`, `finalize-optimizer-run`, `visualize-optimizer-run`, `decide-optimizer-run`.
+- The command writes `reports/optimizer_flow_run_report.json` and stops before final user acceptance.
+- `--dry-orchestration` verifies offline gates through `package-optimizer-task` and stops before `run-openbox-real`.
+- Docs now make `optimize --real` the preferred production entry while keeping the manual chain as fallback.
+- Verification: `tests/test_optimizer_flow.py` passed (`3 passed`), adjacent CLI/readiness/decision/final-summary tests passed (`46 passed`), targeted ruff passed, and `git diff --check` passed.
+- Boundary: no real-tool run during implementation, no PSF parsing, no OCEAN formula rewrite, no backend change, no testbench merge, no automatic user acceptance, no slash wrapper yet.
+- current_scope: C-57 One-Command Optimizer Flow complete.
+- next_allowed_action: use `hermes-workflow optimize PROJECT_DIR --real` on the next real optimization project, or run `--dry-orchestration` on a prepared project to verify offline gates first. Add new features only when this route exposes a concrete production gap.
+
+## Latest Resume Prompt
+
+```text
+请继续 IC auto optimization workflow。先阅读 AGENTS.md、docs/CURRENT_TASK_STATE.json、docs/TOOLCHAIN_EXECUTION_REFERENCE.md、docs/OPTIMIZER_PRODUCTION_QUICKSTART.md、docs/AGENT_OPTIMIZER_USAGE_MANUAL.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-57 One-Command Optimizer Flow 已完成 verified-only，commit e6ce269。现在首选生产入口是 ./.venv/bin/hermes-workflow optimize PROJECT_DIR --real --max-evals N --batch-size B --parallel-jobs P --cadence-cshrc /path/to/user/cadence_env.csh。该命令包装 requirement intake、prepare、validate、readiness、package、prepare-netlist、dry-run、preflight-health、approve、package-optimizer-task、run-openbox-real、check/summarize/finalize/visualize/decide closeout，并写 reports/optimizer_flow_run_report.json；它不会自动记录用户最终接受。--dry-orchestration 会跑离线 gates 到 package-optimizer-task，然后停在 run-openbox-real 前。下一步优先用 optimize --real onboarding 下一个真实项目，或先用 --dry-orchestration 验证 offline gates。不要为了报告格式重跑真实工具，不要解析 PSF，不要重写 OCEAN 公式，不要硬编码 Spectre 版本，不要自动接受结果，不要提交 raw input.scs/ade_e.scs/PSF/raw/full Cadence logs/docs/OCEAN_DOC_*/docs/toolchain_evidence/，不要新增宽泛 workflow 框架或 slash wrapper，除非真实使用暴露明确需求。
+```

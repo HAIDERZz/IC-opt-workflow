@@ -1610,3 +1610,15 @@ C-56 Optimizer Decision Handoff Hardening:
 - Added design-only spec `docs/superpowers/specs/2026-06-07-one-command-optimizer-flow-design.md` for a future thin one-command optimizer orchestration route.
 - Verification: `python3 -m pytest tests/test_optimizer_decision.py -q` passed (`3 passed`); adjacent optimizer closeout/report/status tests passed (`31 passed`); targeted ruff and `git diff --check` passed.
 - current_scope: C-56 Optimizer Decision Handoff Hardening complete.
+
+C-57 One-Command Optimizer Flow:
+
+- Status: complete, verified-only.
+- Commit: `e6ce269 feat: add optimizer one-command flow`.
+- Added `hermes_workflow.optimizer_flow.optimize_project` and CLI command `hermes-workflow optimize PROJECT_DIR --real`.
+- The command wraps the existing proven production command sequence and writes `reports/optimizer_flow_run_report.json`.
+- `--dry-orchestration` runs all offline gates through `package-optimizer-task` and stops before real Spectre/OCEAN/OpenBox execution.
+- Full real mode runs real OpenBox execution and the closeout report chain through `decide-optimizer-run`, then stops for user acceptance. It does not auto-record the final user decision.
+- Production quickstart and agent usage manual now prefer the one-command route and keep manual commands as fallback.
+- Verification: `tests/test_optimizer_flow.py` passed (`3 passed`); adjacent CLI/readiness/decision/final-summary tests passed (`46 passed`); targeted ruff passed; `git diff --check` passed.
+- current_scope: C-57 One-Command Optimizer Flow complete.
