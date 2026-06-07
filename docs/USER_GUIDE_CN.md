@@ -1,4 +1,4 @@
-# IC Auto Opt Workflow v0.1 使用说明
+# IC Auto Opt Workflow v0.1.1 使用说明
 
 这份说明面向集成电路方向用户，假设你会使用 Linux 和 Cadence，但不要求你熟悉
 Python 工程。
@@ -31,7 +31,7 @@ Python 工程。
 只需要给工具本身建一个 Python 环境，不要在每个优化项目里建 venv。
 
 ```bash
-cd /path/to/ic-auto-opt-workflow-v0.1
+cd /path/to/IC-opt-workflow
 python3.11 -m venv .venv
 ./.venv/bin/python -m pip install --upgrade pip
 ./.venv/bin/python -m pip install -r requirements-product.txt
@@ -200,7 +200,7 @@ Agent 不应该：
 - 在用户没要求时改变并行资源
 - 把失败点当作主推荐点
 
-## 11. 当前 v0.1 边界
+## 11. 当前 v0.1.1 边界
 
 - 已经支持 shell 自动化的完整真实流程。
 - Claude/OpenCode runtime adapter 是产品化方向的一部分，但不同 agent runtime 的

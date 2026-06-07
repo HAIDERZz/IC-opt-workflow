@@ -1,80 +1,75 @@
-# IC Auto Opt Workflow v0.1
+# IC Auto Opt Workflow v0.1.1
 
-IC Auto Opt Workflow is a file-driven optimization workflow for Cadence
-Spectre/OCEAN-based analog/RF circuit design. It turns a structured
-`opt_requirement.md` project into reproducible optimizer runs, real Spectre
-simulations, OCEAN metric extraction, and supervisor-friendly reports.
+IC Auto Opt Workflow helps analog/RF IC designers run repeatable Spectre/OCEAN
+optimization from a project folder.
 
-The v0.1 product goal is practical:
+You write the design variables, metric formulas, constraints, and optimizer
+settings in `opt_requirement.md`. The tool then prepares YAML configs, imports
+Maestro/ADE exported netlists, runs OpenBox optimization, launches Spectre,
+extracts metrics with OCEAN, and writes reports that are easy for a human or an
+AI agent to read.
 
-```text
-Prepare PROJECT_DIR -> run ic-opt PROJECT_DIR --real -> read reports
-```
-
-For supported agent runtimes, the same flow can be started from a short
-`/ic-opt PROJECT_DIR --real` request. The deterministic core is still the
-`ic-opt` command, so users can run it directly without depending on chat.
-
-## What v0.1 Can Do
-
-- Parse a structured `opt_requirement.md` into project YAML configs.
-- Import one or more Maestro/ADE point roots as native Spectre netlist bundles.
-- Run OpenBox batch optimization over discrete/quantized design variables.
-- Launch real Spectre simulations and OCEAN metric extraction.
-- Support multi-testbench candidate evaluation, for example CG/NF, IIP3, and
-  P1dB testbenches for one mixer candidate.
-- Generate optimizer decision reports, insight reports, FoM plots, and OpenBox
-  advanced visualization artifacts.
-- Continue an existing optimizer run with additional evaluations.
-- Install starter runtime assets for Claude and OpenCode style agent workflows.
-
-## Current Boundaries
-
-- This project does not replace Cadence Virtuoso, Spectre, or OCEAN.
-- Users must provide valid Maestro/ADE exported point roots.
-- Users must provide a working Cadence shell setup file such as
-  `PROJECT_DIR/cadence_env.csh`.
-- The optimizer reports the best observed feasible point. It does not claim a
-  mathematical global optimum.
-- No license is selected in this package yet. Keep the GitHub repository private
-  or add a real `LICENSE` before public release.
-
-## Repository Layout
-
-```text
-src/hermes_workflow/        Python package and CLI implementation
-agent_runtime/              Runtime adapter assets, currently OpenCode
-claude_skills/              Claude /ic-opt skill asset
-examples/                   User-facing requirement examples
-docs/                       Product docs and operating manuals
-tests/                      Regression tests
-tools/                      Small development checks
-requirements-product.txt    Product Python dependencies
-pyproject.toml              Python package metadata and console scripts
-```
-
-## Install
-
-Create one product-level Python environment. Do not create a virtualenv inside
-each optimization project.
+The main command is:
 
 ```bash
-cd /path/to/ic-auto-opt-workflow-v0.1
+ic-opt /path/to/project --real
+```
+
+The same command can also be called by an AI agent. The agent should operate the
+tool and explain the reports; the deterministic optimization work is done by the
+CLI.
+
+## What This Tool Does
+
+- Converts a structured `opt_requirement.md` into project `config/*.yaml`.
+- Imports one or more Maestro/ADE point roots as Spectre netlist bundles.
+- Runs OpenBox over discrete or quantized IC design variables.
+- Runs real Spectre simulations and OCEAN metric extraction.
+- Supports multi-testbench evaluation, for example one Mixer candidate measured
+  by CG/NF, IIP3, and P1dB testbenches.
+- Generates decision reports, insight reports, FoM plots, and OpenBox HTML/JSON
+  visualization artifacts.
+- Supports continuing an existing run, for example adding 40 more evaluations
+  after the first 100.
+- Provides starter runtime assets for agent workflows such as Claude and
+  OpenCode.
+
+## What This Tool Does Not Provide
+
+- It does not include Cadence Virtuoso, Spectre, OCEAN, PDK files, or licenses.
+- It does not replace your Maestro/ADE setup. You still need a known-good
+  Maestro/ADE point root for each testbench.
+- It reports the best observed feasible point. It does not prove a mathematical
+  global optimum.
+- No open-source license has been selected yet. Keep the repository private or
+  add a real `LICENSE` before public reuse or redistribution.
+
+## Quick Start
+
+### 1. Install The Tool Once
+
+Create one Python environment for the tool itself. Do not create a virtualenv
+inside every optimization project.
+
+```bash
+git clone git@github.com:HAIDERZz/IC-opt-workflow.git
+cd IC-opt-workflow
+
 python3.11 -m venv .venv
 ./.venv/bin/python -m pip install --upgrade pip
 ./.venv/bin/python -m pip install -r requirements-product.txt
 ./.venv/bin/python -m pip install -e .
 ```
 
-Check the command:
+Check that the command is available:
 
 ```bash
 ./.venv/bin/ic-opt --help
 ```
 
-## Prepare A Project
+### 2. Prepare One Optimization Project
 
-Create a user project directory:
+Create a project folder for your circuit:
 
 ```bash
 mkdir -p ~/spectre_opt_prj/my_mixer_opt
@@ -84,36 +79,46 @@ Put these files in it:
 
 ```text
 ~/spectre_opt_prj/my_mixer_opt/
-  opt_requirement.md
-  constraints.md                 # optional but recommended
-  cadence_env.csh                # user/project Cadence environment setup
+  opt_requirement.md      # required
+  constraints.md          # optional, recommended for human/agent guidance
+  cadence_env.csh         # recommended Cadence setup file
 ```
 
-Use the examples in:
+The Cadence setup file should be the environment you normally use to run
+Spectre/OCEAN. The tool should not hard-code a specific Spectre version.
+
+Example requirement files are in:
 
 ```text
 examples/spectre_maestro_project/
 ```
 
-For multi-testbench projects, `opt_requirement.md` should list each Maestro
-point root and route each metric to the correct testbench.
+For multi-testbench optimization, `opt_requirement.md` should list each
+Maestro/ADE point root and map each metric to the correct testbench.
 
-## Doctor Check
+### 3. Run A Doctor Check
 
-Before launching real tools, run a lightweight project/environment check:
+Before launching real simulations, run:
 
 ```bash
 ./.venv/bin/ic-opt ~/spectre_opt_prj/my_mixer_opt --doctor
 ```
 
-This parses `opt_requirement.md`, checks the Cadence environment path, verifies
-the product/OpenBox Python environment, prepares config/netlist bundles, checks
-project readiness, and reports whether continuation artifacts exist. It does not
-launch Spectre/OCEAN and does not generate optimizer candidates.
+The doctor check verifies the requirement file, Cadence setup path, Python
+toolchain, generated configs, imported netlist bundles, and continuation
+artifacts. It does not launch Spectre/OCEAN.
 
-## Run
+If your Cadence setup file is somewhere else:
 
-Offline gate check without launching Spectre/OCEAN:
+```bash
+./.venv/bin/ic-opt ~/spectre_opt_prj/my_mixer_opt \
+  --doctor \
+  --cadence-cshrc /path/to/cadence_env.csh
+```
+
+### 4. Run A Dry Gate
+
+This checks the workflow without launching Spectre/OCEAN:
 
 ```bash
 ./.venv/bin/ic-opt ~/spectre_opt_prj/my_mixer_opt \
@@ -123,7 +128,7 @@ Offline gate check without launching Spectre/OCEAN:
   --batch-size 10
 ```
 
-Real optimization:
+### 5. Run Real Optimization
 
 ```bash
 ./.venv/bin/ic-opt ~/spectre_opt_prj/my_mixer_opt \
@@ -132,7 +137,7 @@ Real optimization:
   --batch-size 10
 ```
 
-If your project does not contain `cadence_env.csh`, pass it explicitly:
+For a project without `cadence_env.csh`:
 
 ```bash
 ./.venv/bin/ic-opt ~/spectre_opt_prj/my_mixer_opt \
@@ -140,80 +145,117 @@ If your project does not contain `cadence_env.csh`, pass it explicitly:
   --cadence-cshrc /path/to/cadence_env.csh
 ```
 
-Continuation after a completed run:
+Run real Spectre/OCEAN outside restricted sandboxes. The process needs access to
+your Cadence tools, license server, project files, and simulation directories.
+
+### 6. Continue An Existing Run
+
+After reviewing the first result, you can add more evaluations:
 
 ```bash
-./.venv/bin/ic-opt ~/spectre_opt_prj/my_mixer_opt \
-  --continue 40
+./.venv/bin/ic-opt ~/spectre_opt_prj/my_mixer_opt --continue 40
 ```
 
-Do not add `--parallel-jobs` during continuation unless you intentionally want
-to change resources. When prior optimizer history exists, continuation inherits
-that history's resource settings; otherwise it uses `config/spectre.yaml`. This
-keeps optimizer evidence comparable across batches.
+When prior optimizer history exists, continuation inherits that history's
+resource settings. Do not add `--parallel-jobs` unless you intentionally want to
+change resources; mixed resource settings make optimizer evidence harder to
+compare and can be rejected by the acceptance audit.
 
-## Read Results
+## Read The Results
 
-Important reports:
+Start with:
 
 ```text
-reports/optimizer_flow_run_report.json
 reports/optimizer_decision_report.md
 reports/optimizer_insight_report.md
 reports/optimizer_final_summary.md
 ```
 
-Useful visual artifacts:
+Useful machine-readable reports:
+
+```text
+reports/optimizer_flow_run_report.json
+reports/optimizer_run_acceptance_report.json
+reports/optimizer_evaluations.jsonl
+```
+
+Useful visual outputs:
 
 ```text
 reports/optimizer_visuals/
 reports/openbox_advanced_visualization/
 ```
 
-## Agent Runtime Use
+Important wording:
 
-After installing runtime adapter assets, a user can ask a supported agent
-runtime with a short request:
+- `best observed` means the best point found in the completed evaluations.
+- `feasible` means the point passed the configured constraints.
+- `constraint_failed` usually means the circuit simulated but did not meet the
+  design requirements.
+- `metric_check_failed` usually means the OCEAN formula did not return a valid
+  scalar for that candidate.
+
+## Using It With An AI Agent
+
+The preferred user interaction is short:
 
 ```text
-/ic-opt /path/to/project --real
+/ic-opt ~/spectre_opt_prj/my_mixer_opt --real
 ```
 
-The expected role model is:
+The project requirements should live in files, not in a long chat message. The
+agent should:
+
+- read the project files,
+- run `ic-opt`,
+- wait for completion,
+- read the reports,
+- explain the recommended point, feasible count, failure categories, and whether
+  continuation is worth doing.
+
+The agent should not rewrite OCEAN formulas, parse PSF directly, hand-pick
+optimizer points, or change resource settings unless the user explicitly asks.
+
+## Repository Layout
 
 ```text
-user -> current runtime supervisor agent -> same-runtime execution subagent
-```
-
-The deterministic workflow still runs through Hermes file contracts and the
-`ic-opt`/`hermes-workflow` commands. The agent should not rewrite formulas,
-parse PSF directly, hand-pick optimizer points, or change resource settings
-unless the user explicitly asks.
-
-See:
-
-```text
-docs/AGENT_USER_QUICKSTART_CN.md
-docs/AGENT_OPTIMIZER_USAGE_MANUAL.md
-docs/AGENT_INTEGRATION_STATUS.md
+src/hermes_workflow/        Python package and CLI implementation
+vendor/open-box/            vendored OpenBox backend used by the product env
+agent_runtime/              starter runtime assets for agent workflows
+claude_skills/              Claude skill asset
+examples/                   requirement examples for users
+docs/                       detailed manuals and project notes
+tests/                      regression tests
+tools/                      development helper scripts
+requirements-product.txt    product Python dependencies
+pyproject.toml              package metadata and console scripts
 ```
 
 ## More Documentation
 
+- `docs/USER_GUIDE_CN.md`: beginner-friendly Chinese user guide.
 - `docs/OPTIMIZER_PRODUCTION_QUICKSTART.md`: product quickstart.
-- `docs/TOOLCHAIN_EXECUTION_REFERENCE.md`: known-good real tool execution rules.
+- `docs/TOOLCHAIN_EXECUTION_REFERENCE.md`: known-good tool execution rules.
 - `examples/spectre_maestro_project/OPT_REQUIREMENT_README.md`: requirement file
   format.
-- `docs/USER_GUIDE_CN.md`: beginner-friendly Chinese usage guide.
+- `docs/AGENT_USER_QUICKSTART_CN.md`: short agent usage guide.
 - `docs/GITHUB_PUBLISH_GUIDE.md`: first GitHub publication checklist.
-- `CONTRIBUTING.md`: contributor setup and boundaries.
+
+## Version
+
+Current release: `v0.1.1`.
+
+This release has been clean-installed from GitHub and validated on a real
+multi-testbench Mixer optimization flow:
+
+```text
+100 real evaluations
+-> user-style continuation by 40 more evaluations
+-> 140 accepted cumulative evaluations
+```
 
 ## License
 
-No license has been selected for this v0.1 snapshot. See
-`LICENSE_NOT_SELECTED.md`. Until a real `LICENSE` file is added, do not treat
-this repository as open source for reuse or redistribution.
-
-## Release Notes
-
-See `RELEASE_NOTES_v0.1.md`.
+No license has been selected for this snapshot. See `LICENSE_NOT_SELECTED.md`.
+Until a real `LICENSE` file is added, do not treat this repository as open source
+for reuse or redistribution.
