@@ -139,6 +139,27 @@ class ContinuationAdvisor:
         assert observations
 
 
+class ExhaustingContinuationAdvisor:
+    def __init__(self) -> None:
+        self.updated_batches = 0
+        self.updated_observations: list[object] = []
+        self.calls = 0
+
+    def get_suggestions(self, batch_size: int) -> list[dict[str, float]]:
+        self.calls += 1
+        if self.calls == 1:
+            return [
+                {"FN": 10, "WN": 2.4, "FP": 11, "WP": 2.6},
+                {"FN": 2, "WN": 0.2, "FP": 3, "WP": 0.4},
+            ][:batch_size]
+        return [{"FN": 2, "WN": 0.2, "FP": 3, "WP": 0.4}][:batch_size]
+
+    def update_observations(self, observations: list[object]) -> None:
+        self.updated_batches += 1
+        self.updated_observations.extend(observations)
+        assert observations
+
+
 class SequentialAdvisor:
     def __init__(self, *, start: int = 0) -> None:
         self.index = start
@@ -433,6 +454,70 @@ def test_openbox_fake_continuation_warm_starts_and_writes_cumulative_artifacts(
     }
 
 
+def test_openbox_fake_continuation_stops_after_partial_unique_batch(
+    tmp_path: Path,
+) -> None:
+    project_dir = create_approved_real_project(tmp_path)
+    run_openbox_fake_optimization(
+        project_dir,
+        max_evals=2,
+        batch_size=2,
+        advisor_factory=lambda _space, _seed: FakeAdvisor(),
+    )
+    advisor = ExhaustingContinuationAdvisor()
+
+    result = run_openbox_fake_optimization(
+        project_dir,
+        additional_evals=2,
+        batch_size=2,
+        continue_from_existing=True,
+        advisor_factory=lambda _space, _seed: advisor,
+    )
+
+    report = json.loads((project_dir / REPORT_RELATIVE).read_text())
+    rows = [
+        json.loads(line)
+        for line in (project_dir / EVALUATIONS_RELATIVE).read_text().splitlines()
+    ]
+
+    assert result.evaluation_count == 3
+    assert advisor.updated_batches == 2
+    assert len(rows) == 3
+    assert rows[-1]["run_id"] == "fake_003"
+    continuation = report["openbox"]["continuation"]
+    assert continuation["completed_early"] is True
+    assert continuation["actual_additional_evals"] == 1
+    assert continuation["unfilled_evals"] == 1
+    assert "unique candidate" in continuation["completed_early_reason"]
+
+
+def test_openbox_fake_continuation_caps_model_replay_observations(
+    tmp_path: Path,
+) -> None:
+    project_dir = create_approved_real_project(tmp_path)
+    run_openbox_fake_optimization(
+        project_dir,
+        max_evals=45,
+        batch_size=5,
+        advisor_factory=lambda _space, _seed: SequentialAdvisor(),
+    )
+    advisor = SequentialAdvisor(start=45)
+
+    result = run_openbox_fake_optimization(
+        project_dir,
+        additional_evals=1,
+        batch_size=1,
+        continue_from_existing=True,
+        advisor_factory=lambda _space, _seed: advisor,
+    )
+
+    report = json.loads((project_dir / REPORT_RELATIVE).read_text())
+
+    assert result.evaluation_count == 46
+    assert len(advisor.updated_observations) == 41
+    assert report["openbox"]["continuation"]["model_replay_evaluation_count"] == 40
+
+
 def test_openbox_fake_runner_requires_openbox_when_no_advisor_is_injected(
     tmp_path: Path,
     monkeypatch,
@@ -705,3 +790,68 @@ def test_continue_openbox_real_cli_uses_additional_evals(
 
     assert result.exit_code == 0, result.output
     assert "openbox real continuation completed: 7 cumulative evaluations" in result.output
+
+
+def test_continue_openbox_real_cli_uses_safe_defaults_and_repairs_package(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    import hermes_workflow.cli as cli_module
+
+    project_dir = create_approved_real_project(tmp_path)
+    manifest_path = project_dir / "execution_package" / "execution_manifest.json"
+    manifest_path.unlink()
+    build_calls: list[Path] = []
+
+    def fake_build_execution_package(path: Path) -> object:
+        build_calls.append(path)
+        return object()
+
+    def fake_runner(
+        project_dir: Path,
+        *,
+        max_evals: int | None,
+        additional_evals: int | None,
+        continue_from_existing: bool,
+        batch_size: int | None,
+        parallel_jobs: int | None,
+        cadence_cshrc: Path | None,
+        surrogate_type: str | None,
+        acq_type: str | None,
+        acq_optimizer_type: str | None,
+    ) -> object:
+        assert max_evals is None
+        assert additional_evals == 40
+        assert continue_from_existing is True
+        assert surrogate_type == "prf"
+        assert acq_type == "eic"
+        assert acq_optimizer_type == "local_random"
+        return type(
+            "Result",
+            (),
+            {
+                "evaluation_count": 108,
+                "report_path": project_dir / REPORT_RELATIVE,
+                "evaluations_path": project_dir / EVALUATIONS_RELATIVE,
+            },
+        )()
+
+    monkeypatch.setattr(
+        cli_module,
+        "build_execution_package",
+        fake_build_execution_package,
+    )
+    monkeypatch.setattr(cli_module, "run_openbox_real_optimization", fake_runner)
+    result = CliRunner().invoke(
+        app,
+        [
+            "continue-openbox-real",
+            str(project_dir),
+            "--additional-evals",
+            "40",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert build_calls == [project_dir]
+    assert "openbox real continuation completed: 108 cumulative evaluations" in result.output

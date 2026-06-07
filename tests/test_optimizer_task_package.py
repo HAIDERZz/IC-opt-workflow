@@ -182,11 +182,10 @@ def test_build_optimizer_execution_task_package_writes_openbox_continuation(
         "50",
         "--batch-size",
         "10",
-        "--parallel-jobs",
-        "10",
         "--cadence-cshrc",
         "/home/zzchen/cadence_ic231_env.csh",
     ]
+    assert "--parallel-jobs" not in manifest_payload["command"]
     assert [
         "hermes-workflow",
         "finalize-optimizer-run",

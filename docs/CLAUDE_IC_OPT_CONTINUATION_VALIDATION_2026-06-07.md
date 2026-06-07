@@ -83,7 +83,7 @@ hermes-workflow continue-openbox-real \
 This proves the agent did not merely stay in a chat loop; it attempted the real
 continuation command.
 
-## Continuation Result
+## Original Continuation Result
 
 The continuation did not append evaluations.
 
@@ -106,29 +106,66 @@ the requested 10 per batch could be produced after 300 deduplication attempts.
 
 The current best candidate remained `real_066`.
 
+## Hardening Verification
+
+The exposed continuation issue has a narrow code fix:
+
+- `continue-openbox-real` accepts partial unique batches instead of failing only
+  because OpenBox could not fill the full requested batch.
+- OpenBox continuation model replay is capped at 40 prior traces. The full
+  optimizer ledger is still preserved for reports and duplicate detection.
+- `continue-openbox-real` repairs a missing base
+  `execution_package/execution_manifest.json` before running.
+- Generated continuation task packages no longer hardcode `--parallel-jobs`;
+  they inherit `config/spectre.yaml` unless the user explicitly requests a
+  resource change.
+
+Targeted tests passed:
+
+```text
+tests/test_openbox_backend.py
+tests/test_optimizer_task_package.py
+tests/test_product_cli.py
+tests/test_optimizer_completion.py
+tests/test_optimizer_finalize.py
+tests/test_optimizer_status.py
+tests/test_optimizer_decision.py
+```
+
+Real repair validation on the same project reached:
+
+```text
+reports/optimizer_evaluations.jsonl: 140 rows
+optimizer_run_report.evaluation_count: 140
+optimizer_run_report.openbox.continuation.model_replay_evaluation_count: 40
+status_counts: constraint_failed=95, feasible=29, metric_check_failed=16
+best candidate: real_066
+```
+
+Important caveat: during manual repair validation, the first 100 evaluations
+used the project `parallel_jobs=12`, while a manual repair command used
+`--parallel-jobs 10`. `check-optimizer-run` correctly rejected that mixed
+resource history as `Spectre setting drift detected: parallel_jobs`. The
+product fix is therefore not to loosen acceptance, but to ensure generated
+continuation commands inherit project resources by default.
+
 ## Interpretation
 
-The validation result is mixed:
+The validation result is now split:
 
 - Initial one-line Claude `/ic-opt ... --real` real optimization: passed.
 - Follow-up natural continuation request parsing: passed.
-- Follow-up continuation execution to +40 evaluations: failed.
+- The original follow-up continuation execution exposed a real product bug.
+- The continuation hardening fix is implemented and directly validated to
+  reach 140 cumulative evaluations, with the resource-inheritance caveat above.
 
-The failure is not a Spectre/OCEAN tool failure and not an OCEAN formula issue.
-It is a product continuation strategy issue: the continuation command can fail
-when OpenBox cannot fill the requested `batch_size` with unique candidates
-after a prior 100-evaluation run.
+The original failure was not a Spectre/OCEAN tool failure and not an OCEAN
+formula issue. It was a product continuation strategy issue: OpenBox could fail
+when it could not fill the requested `batch_size` with unique candidates after
+a prior 100-evaluation run.
 
-## Required Next Product Fix
+## Next Product Drill
 
-Before claiming post-result continuation is product-ready, add a narrow
-continuation hardening task:
-
-- make continuation resilient when the full requested batch cannot be filled;
-- either auto-shrink the candidate batch, continue with a partial unique batch,
-  or fail before launching with a concise report that tells the supervisor what
-  action is needed;
-- keep the behavior file-driven and short-request driven;
-- do not add fake-run ladders, new optimizer frameworks, PSF parsing, OCEAN
-  formula rewrites, or hand-picked optimizer points.
-
+Run a clean runtime-agent continuation drill using the generated continuation
+task package, with no manual `--parallel-jobs` override. The acceptance checker
+should continue to reject mixed-resource ledgers.

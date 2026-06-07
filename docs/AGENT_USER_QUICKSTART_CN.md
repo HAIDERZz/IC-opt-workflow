@@ -256,9 +256,10 @@ PROJECT_DIR/reports/openbox_advanced_visualization/
 - 你想改搜索范围、FoM 或约束。
 
 当前边界：C-66 已验证 Claude 能把“请再进行40个点的优化”这种短句转成
-continuation 命令，但当 OpenBox 在已有 100 个点后无法凑满一批新的唯一候选时，
-追加流程还需要产品硬化。也就是说，第一次 `/ic-opt PROJECT_DIR --real` 已经能跑
-真实完整流程；结果之后的自动追加优化还不能说完全产品化。
+continuation 命令；后续也已经做了窄修复，使 OpenBox 在已有 100 个点后凑不满
+完整唯一候选批次时可以使用部分批次继续。续跑时 agent 不应随手覆盖
+`parallel_jobs`，应默认继承项目 `config/spectre.yaml` 里的资源设置，除非用户明确
+要求改变资源。
 
 ## 一句原则
 

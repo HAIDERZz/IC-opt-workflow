@@ -116,8 +116,12 @@ docs/CLAUDE_IC_OPT_CONTINUATION_VALIDATION_2026-06-07.md
 proved that a fresh Claude `/ic-opt PROJECT --real` run can complete 100 real
 OpenBox/Spectre/OCEAN evaluations and that the follow-up short request
 `请再进行40个点的优化` is routed to `continue-openbox-real --additional-evals
-40`. The continuation did not append evaluations because OpenBox could not fill
-the requested unique candidate batch after the prior 100-evaluation run.
+40`. That follow-up exposed a real OpenBox unique-batch exhaustion issue after
+the prior 100-evaluation run. The code now hardens continuation with partial
+unique batches and capped model replay, and generated continuation task
+packages inherit project Spectre resources instead of hardcoding
+`--parallel-jobs`. A clean runtime drill should revalidate this route without
+manual resource overrides.
 
 ## Not Yet Fully Proven
 

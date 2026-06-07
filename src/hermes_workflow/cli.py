@@ -68,6 +68,10 @@ from hermes_workflow.validate import validate_project_files
 
 app = typer.Typer(help="Hermes file-contract workflow tools.")
 
+CONTINUATION_SURROGATE_TYPE = "prf"
+CONTINUATION_ACQ_TYPE = "eic"
+CONTINUATION_ACQ_OPTIMIZER_TYPE = "local_random"
+
 
 def _version_callback(value: bool) -> None:
     if value:
@@ -1266,6 +1270,7 @@ def continue_openbox_real_command(
     ] = None,
 ) -> None:
     try:
+        _ensure_base_execution_manifest(project_dir)
         result = run_openbox_real_optimization(
             project_dir,
             max_evals=None,
@@ -1274,9 +1279,11 @@ def continue_openbox_real_command(
             batch_size=batch_size,
             parallel_jobs=parallel_jobs,
             cadence_cshrc=cadence_cshrc,
-            surrogate_type=surrogate_type,
-            acq_type=acq_type,
-            acq_optimizer_type=acq_optimizer_type,
+            surrogate_type=surrogate_type or CONTINUATION_SURROGATE_TYPE,
+            acq_type=acq_type or CONTINUATION_ACQ_TYPE,
+            acq_optimizer_type=(
+                acq_optimizer_type or CONTINUATION_ACQ_OPTIMIZER_TYPE
+            ),
         )
     except (OSError, RuntimeError, ValueError) as exc:
         _exit_with_error(exc)
@@ -1288,6 +1295,12 @@ def continue_openbox_real_command(
         typer.echo(f"report: {result.report_path.relative_to(project_dir)}")
     if result.evaluations_path is not None:
         typer.echo(f"evaluations: {result.evaluations_path.relative_to(project_dir)}")
+
+
+def _ensure_base_execution_manifest(project_dir: Path) -> None:
+    manifest_path = project_dir / "execution_package" / "execution_manifest.json"
+    if not manifest_path.exists():
+        build_execution_package(project_dir)
 
 
 @app.command("record-real-result")

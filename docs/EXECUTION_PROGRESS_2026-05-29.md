@@ -10,20 +10,21 @@ This note preserves the implementation state for continuing Plan A after context
 - Baseline commit: `885e97f docs: capture workflow planning baseline`
 - Latest C-3 code commit before docs-only cleanup: `edb107f fix: harden preflight readiness gates`; docs cleanup continues through current HEAD
 - Active plan: `docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md`
-- Current scope: C-66 Claude `/ic-opt` continuation validation complete
-- current_scope: C-66 Claude `/ic-opt` continuation validation complete
-- current_scope_exact: C-66 Claude /ic-opt real continuation validation complete
+- Current scope: C-66 OpenBox continuation hardening
+- current_scope: C-66 OpenBox continuation hardening
+- current_scope_exact: C-66 OpenBox continuation hardening and resource-inheritance fix
 - Current status: The first short Claude `/ic-opt ... --real` real validation
   on a fresh Mixer multi-testbench project completed 100 real
   OpenBox/Spectre/OCEAN evaluations and recommended feasible `real_066`. The
-  follow-up short user request `请再进行40个点的优化` was correctly routed to
-  `hermes-workflow continue-openbox-real --additional-evals 40`, but the
-  continuation did not append evaluations because OpenBox could not fill the
-  requested unique batch of 10 candidates after the prior 100-evaluation run.
-- Next allowed action: implement a narrow continuation hardening fix for
-  exhausted or low-diversity unique-candidate generation, then rerun the same
-  Claude continuation validation. Do not add broad optimizer features or
-  per-project virtualenvs.
+  follow-up short user request `请再进行40个点的优化` correctly routed to
+  `continue-openbox-real` and exposed a real OpenBox continuation issue. The
+  narrow fix now allows partial unique batches, caps continuation model replay
+  at 40 prior traces, repairs missing base execution manifests, and prevents
+  generated continuation task packages from overriding project
+  `spectre.parallel_jobs`.
+- Next allowed action: finish verification, sync docs, and commit the narrow
+  continuation hardening. Then run a clean runtime-agent continuation drill
+  using generated continuation package resource inheritance.
 - Execution method: `superpowers:subagent-driven-development`
 - Dependencies installed in active Python environment on 2026-05-29: `pytest`, `typer`, `pydantic`, `PyYAML`, `ruff`
 
@@ -75,14 +76,21 @@ Current truth:
 Validated:
   one-line Claude /ic-opt real optimization
   short follow-up continuation intent routing
+  narrow continuation hardening in code/tests
+  real repair path reached 140 cumulative evaluations
 
-Not yet product-ready:
-  continuation execution after a prior 100-evaluation run when OpenBox cannot
-  fill a full unique candidate batch
+Product rule after hardening:
+  generated continuation task packages must inherit project Spectre resources
+  and must not hardcode parallel_jobs unless the user explicitly requests a
+  resource change
 ```
 
 No optimizer backend change, OCEAN formula rewrite, Spectre setup change, PSF
-parsing, fake-run ladder, or hand-picked point selection occurred.
+parsing, fake-run ladder, or hand-picked point selection occurred. The manual
+repair command did use `parallel_jobs=10` against a project initially run with
+`parallel_jobs=12`; `check-optimizer-run` correctly rejected the mixed-resource
+ledger, which is why continuation packages now omit `--parallel-jobs` by
+default.
 
 ## Current C-64 Checkpoint 2026-06-07
 

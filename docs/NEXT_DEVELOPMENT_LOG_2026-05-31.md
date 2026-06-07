@@ -4,37 +4,51 @@
 
 - Repository: `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow`
 - Branch: `plan-a-hermes-file-contract-mvp`
-- Current scope: C-66 Claude `/ic-opt` continuation validation complete
-- current_scope: C-66 Claude `/ic-opt` continuation validation complete
-- current_scope_exact: C-66 Claude /ic-opt real continuation validation complete
-- Current status: verified-only. A fresh Claude `/ic-opt` real validation
-  project at `/tmp/ic_auto_opt_c66_claude_real_e2e/Mixer_opt_muti_tb` started
-  with only `opt_requirement.md` and `cadence_env.csh`. The first short command
-  completed 100 real OpenBox/Spectre/OCEAN multi-testbench evaluations and
-  recommended feasible `real_066`. The follow-up short user request
-  `请再进行40个点的优化` was correctly mapped to
-  `hermes-workflow continue-openbox-real --additional-evals 40`, but the
-  continuation did not append new evaluations because OpenBox could not fill a
-  unique batch of 10 candidates after the prior 100-evaluation run.
+- Current scope: C-66 OpenBox continuation hardening
+- current_scope: C-66 OpenBox continuation hardening
+- current_scope_exact: C-66 OpenBox continuation hardening and resource-inheritance fix
+- Current status: verified-only. The Claude `/ic-opt` follow-up route
+  correctly mapped `请再进行40个点的优化` to `continue-openbox-real`; that real
+  route exposed OpenBox unique-batch exhaustion after a 100-evaluation run.
+  The narrow hardening is now implemented: continuation can complete partial
+  unique batches, model replay is capped at 40 prior traces while the full
+  ledger remains available for reports/dedupe, missing base execution manifests
+  are repaired, and generated continuation task packages inherit project
+  Spectre resources instead of hardcoding `--parallel-jobs`.
 - Active evidence: `docs/CLAUDE_IC_OPT_CONTINUATION_VALIDATION_2026-06-07.md`
 - Active plan: `docs/superpowers/plans/2026-06-07-runtime-native-agent-adapters.md`
-- Next required action: Implement a narrow continuation hardening fix for
-  exhausted or low-diversity unique-candidate generation, then rerun the same
-  Claude follow-up validation. Do not add broad optimizer framework work or
-  fake-run ladders.
-- next_allowed_action: Implement a narrow continuation hardening fix for
-  exhausted or low-diversity unique-candidate generation, then rerun the same
-  Claude follow-up validation. Do not add broad optimizer framework work or
-  fake-run ladders.
-- next_allowed_action_exact_json: Implement the narrow continuation hardening exposed by C-66: make continue-openbox-real handle exhausted/low-diversity unique candidate generation by shrinking/partial batching or failing early with a concise supervisor report, then rerun the same Claude follow-up validation. Do not add broad optimizer framework work or fake-run ladders.
-- next_allowed_action_exact: Add continuation hardening so `continue-openbox-real`
-  can shrink/partial-batch or fail early with a concise supervisor report when
-  OpenBox cannot fill the requested unique candidate batch, then revalidate
-  `/ic-opt PROJECT --real` followed by `请再进行40个点的优化`.
+- Next required action: finish verification, sync docs, and commit the narrow
+  continuation hardening. The next real product drill should use a generated
+  continuation task package without `--parallel-jobs` override so resources are
+  inherited from `config/spectre.yaml`.
+- next_allowed_action: Run the final verification suite for the C-66 continuation hardening, update progress/manual docs, and commit the narrow fix. After that, the next product task should be a clean runtime-agent continuation drill using the generated task package without parallel_jobs override.
+- next_allowed_action_exact_json: Complete C-66 continuation hardening verification and commit. Do not add broad optimizer framework work, fake-run ladders, or manual resource overrides.
+- next_allowed_action_exact: Commit the narrow continuation hardening, then use
+  generated package continuation commands that inherit project resources.
 
 ## C-66 Claude `/ic-opt` Continuation Validation 2026-06-07
 
 C-66 is complete, verified-only.
+
+Follow-up hardening status:
+
+- Implemented partial unique-batch continuation so an exhausted OpenBox
+  candidate request can still append available unique candidates instead of
+  failing only because the full batch could not be filled.
+- Capped OpenBox continuation model replay to 40 prior traces. The full
+  `optimizer_evaluations.jsonl` ledger is still preserved and used for reports
+  and duplicate detection.
+- `continue-openbox-real` now repairs a missing base
+  `execution_package/execution_manifest.json` before running.
+- Generated continuation task packages no longer hardcode
+  `--parallel-jobs`; they inherit `config/spectre.yaml` unless the user
+  explicitly requests a resource change.
+- Real repair validation on
+  `/tmp/ic_auto_opt_c66_claude_real_e2e/Mixer_opt_muti_tb` reached 140
+  cumulative evaluations. The manual repair command used `parallel_jobs=10`
+  while the initial run used project `parallel_jobs=12`; `check-optimizer-run`
+  correctly rejected that mixed-resource ledger, so the clean product route is
+  to use the generated continuation command without resource override.
 
 Evidence note:
 

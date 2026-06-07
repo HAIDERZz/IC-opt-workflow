@@ -175,6 +175,18 @@ audit work:
 ./.venv/bin/hermes-workflow optimize ~/spectre_opt_prj/<project_name> --real
 ```
 
+For continuation after a completed run, keep resources inherited from the
+project config unless the user explicitly asks for a resource change:
+
+```bash
+./.venv/bin/hermes-workflow continue-openbox-real ~/spectre_opt_prj/<project_name> \
+  --additional-evals 40 \
+  --batch-size 10
+```
+
+Do not copy `--parallel-jobs` from the first run into continuation commands by
+habit; mixed `parallel_jobs` histories are rejected by the acceptance checker.
+
 ## Read Results
 
 Primary reports:

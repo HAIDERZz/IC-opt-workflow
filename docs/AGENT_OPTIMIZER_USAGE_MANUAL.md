@@ -419,9 +419,13 @@ Example:
 ./.venv/bin/hermes-workflow continue-openbox-real PROJECT_DIR \
   --additional-evals 100 \
   --batch-size 10 \
-  --parallel-jobs 10 \
   --cadence-cshrc /path/to/user/cadence_env.csh
 ```
+
+Do not add `--parallel-jobs` during continuation unless the user explicitly
+asks to change resources. Continuation should inherit the project's
+`config/spectre.yaml` settings so one optimizer history does not mix different
+parallel execution limits.
 
 Then rerun the closeout chain:
 

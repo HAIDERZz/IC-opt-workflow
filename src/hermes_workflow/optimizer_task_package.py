@@ -215,7 +215,8 @@ def _command(
             command = ["hermes-workflow", "run-openbox-real", str(project_dir)]
             command.extend(["--max-evals", str(max_evals)])
         command.extend(["--batch-size", str(batch_size)])
-        command.extend(["--parallel-jobs", str(parallel_jobs)])
+        if not continuation:
+            command.extend(["--parallel-jobs", str(parallel_jobs)])
         command.extend(["--cadence-cshrc", str(cadence_cshrc)])
         return command
 

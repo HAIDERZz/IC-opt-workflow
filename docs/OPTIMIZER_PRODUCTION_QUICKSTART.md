@@ -222,6 +222,20 @@ Resource meanings:
 - `spectre.threads_per_run`: Spectre `+mt` threads per individual simulation.
 - `optimizer.optimizer_cpu_threads`: Python/OpenBox-side optimizer math threads.
 
+Continuation should inherit the project resource settings unless the user
+explicitly asks to change them:
+
+```bash
+./.venv/bin/hermes-workflow continue-openbox-real ~/spectre_opt_prj/<project_name> \
+  --additional-evals 40 \
+  --batch-size 10 \
+  --cadence-cshrc /path/to/user/cadence_env.csh
+```
+
+Do not add `--parallel-jobs` to continuation commands by habit. Mixed
+`parallel_jobs` histories are rejected because they make optimizer evidence less
+comparable.
+
 Execution-agent status policy: report start, unexpected failure, completion,
 and only low-frequency heartbeat status for long runs. Do not poll every batch.
 

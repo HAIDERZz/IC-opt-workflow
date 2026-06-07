@@ -23,7 +23,7 @@
 
 ## Current Implementation Node
 
-As of 2026-06-07, Plan A, Plan B, and Plan C through C-64 are complete, with
+As of 2026-06-07, Plan A, Plan B, and Plan C through C-66 are complete, with
 post-C-49 real Mixer OpenBox/Spectre/OCEAN evidence through 200 cumulative
 NF=12dB evaluations and C-50 real multi-testbench evidence through 100
 three-testbench evaluations. Post-C50/C-54 reporting now re-scores existing
@@ -35,6 +35,15 @@ quickstart and `check-project-ready` readiness command. The workflow is now
 usable as a first production landing MVP; the next active scope should be driven
 by the next real user project or continuation need rather than broad framework
 work.
+
+C-65 added runtime-native Claude/OpenCode adapter assets and clarified that the
+final product route is current-runtime supervisor agent to same-runtime
+execution subagent. C-66 verified Claude `/ic-opt` can run a fresh real project
+and route a short follow-up continuation request; the resulting OpenBox
+continuation issue has been hardened with partial unique batches, capped model
+replay, and continuation package resource inheritance. The next clean product
+drill should validate continuation through generated runtime-agent packages
+without manual resource overrides.
 
 C-55 records the production landing acceptance note at
 `docs/PRODUCTION_LANDING_ACCEPTANCE_2026-06-07.md`. The real Mixer

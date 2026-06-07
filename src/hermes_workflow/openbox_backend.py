@@ -4,7 +4,7 @@ import json
 import math
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import asdict, dataclass, fields
+from dataclasses import asdict, dataclass, fields, replace
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, Callable
@@ -47,6 +47,7 @@ OPENBOX_ADVANCED_VISUALIZATION_MANIFEST_RELATIVE = Path(
 OPENBOX_ADVANCED_VISUALIZATION_LOGGING_RELATIVE = Path(
     "reports/openbox_advanced_visualization"
 )
+OPENBOX_CONTINUATION_MODEL_REPLAY_LIMIT = 40
 
 AdvisorFactory = Callable[[object, int], object]
 BatchEvaluator = Callable[[list[NativeTurboBatchCandidate]], list[NativeTurboObservation]]
@@ -87,6 +88,9 @@ class OpenBoxBatchRunSettings:
     continuation_enabled: bool = False
     prior_evaluation_count: int = 0
     additional_evals: int | None = None
+    model_replay_evaluation_count: int = 0
+    completed_early: bool = False
+    completed_early_reason: str | None = None
 
 
 @dataclass(frozen=True)
@@ -107,6 +111,8 @@ class OpenBoxPreparedSuggestion:
 class OpenBoxBatchResult:
     candidates: list[OpenBoxPreparedSuggestion]
     duplicate_replacements: int
+    exhausted: bool = False
+    exhaustion_reason: str | None = None
 
 
 def run_openbox_fake_optimization(
@@ -275,6 +281,32 @@ def write_openbox_reports(
         for trace in result.traces:
             handle.write(json.dumps(asdict(trace), sort_keys=True) + "\n")
     batch_ids = [trace.batch_id for trace in result.traces if trace.batch_id]
+    continuation = {
+        "enabled": settings.continuation_enabled,
+        "prior_evaluation_count": settings.prior_evaluation_count,
+        "additional_evals": settings.additional_evals,
+        "target_total_evals": settings.max_evals,
+    }
+    if (
+        settings.continuation_enabled
+        and settings.model_replay_evaluation_count != settings.prior_evaluation_count
+    ):
+        continuation["model_replay_evaluation_count"] = (
+            settings.model_replay_evaluation_count
+        )
+    if settings.completed_early:
+        continuation.update(
+            {
+                "completed_early": True,
+                "completed_early_reason": settings.completed_early_reason,
+                "actual_additional_evals": max(
+                    result.evaluation_count - settings.prior_evaluation_count,
+                    0,
+                ),
+                "unfilled_evals": max(settings.max_evals - result.evaluation_count, 0),
+            }
+        )
+
     payload = {
         "schema_version": "1.0",
         "status": "completed",
@@ -302,12 +334,7 @@ def write_openbox_reports(
             "threads_per_run": settings.threads_per_run,
             "optimizer_cpu_threads": settings.optimizer_cpu_threads,
             "duplicate_replacements": duplicate_replacements,
-            "continuation": {
-                "enabled": settings.continuation_enabled,
-                "prior_evaluation_count": settings.prior_evaluation_count,
-                "additional_evals": settings.additional_evals,
-                "target_total_evals": settings.max_evals,
-            },
+            "continuation": continuation,
             "advanced_visualization": advanced_visualization
             or {
                 "status": "not_generated",
@@ -427,11 +454,13 @@ def _run_openbox_batches(
             surrogate_type=surrogate_type,
             acq_type=acq_type,
             acq_optimizer_type=acq_optimizer_type,
-        )
+    )
     traces: list[NativeTurboEvaluationTrace] = list(prior_traces or [])
     prior_count = len(traces)
+    model_replay_traces = _prior_traces_for_model_replay(traces)
     seen_keys: set[tuple[tuple[str, str], ...]] = _seen_keys_from_traces(traces)
     duplicate_replacements = 0
+    early_stop_reason: str | None = None
     batch_index = _max_batch_index(traces)
     run_offset = (
         _next_run_offset(project_dir, "real")
@@ -449,8 +478,9 @@ def _run_openbox_batches(
         continuation_enabled=prior_count > 0,
         prior_evaluation_count=prior_count,
         additional_evals=continuation_additional_evals,
+        model_replay_evaluation_count=len(model_replay_traces),
     )
-    if traces:
+    if model_replay_traces:
         with optimizer_cpu_thread_limits(
             optimizer_cpu_threads,
             set_environment=True,
@@ -465,7 +495,7 @@ def _run_openbox_batches(
                         config=config_builder(trace.parameters),
                         observation_factory=observation_factory,
                     )
-                    for trace in traces
+                    for trace in model_replay_traces
                 ],
             )
 
@@ -491,6 +521,9 @@ def _run_openbox_batches(
                 ),
             )
         duplicate_replacements += batch.duplicate_replacements
+        if not batch.candidates:
+            early_stop_reason = batch.exhaustion_reason
+            break
         observations = evaluator(
             [
                 NativeTurboBatchCandidate(
@@ -549,6 +582,9 @@ def _run_openbox_batches(
             settings=settings,
             duplicate_replacements=duplicate_replacements,
         )
+        if batch.exhausted and len(traces) < max_evals:
+            early_stop_reason = batch.exhaustion_reason
+            break
 
     result = NativeTurboRunResult(
         evaluation_count=len(traces),
@@ -568,7 +604,11 @@ def _run_openbox_batches(
     report_path, evaluations_path = write_openbox_reports(
         project_dir,
         result,
-        settings=settings,
+        settings=replace(
+            settings,
+            completed_early=early_stop_reason is not None,
+            completed_early_reason=early_stop_reason,
+        ),
         duplicate_replacements=duplicate_replacements,
         advanced_visualization=advanced_visualization,
     )
@@ -744,6 +784,27 @@ def _seen_keys_from_traces(
     traces: list[NativeTurboEvaluationTrace],
 ) -> set[tuple[tuple[str, str], ...]]:
     return {tuple(sorted(trace.parameters.items())) for trace in traces}
+
+
+def _prior_traces_for_model_replay(
+    traces: list[NativeTurboEvaluationTrace],
+    *,
+    limit: int = OPENBOX_CONTINUATION_MODEL_REPLAY_LIMIT,
+) -> list[NativeTurboEvaluationTrace]:
+    if len(traces) <= limit:
+        return traces
+
+    selected_by_index: dict[int, NativeTurboEvaluationTrace] = {}
+    best_trace = _best_trace(traces)
+    if best_trace is not None:
+        selected_by_index[best_trace.evaluation_index] = best_trace
+
+    for trace in reversed(traces):
+        if len(selected_by_index) >= limit:
+            break
+        selected_by_index.setdefault(trace.evaluation_index, trace)
+
+    return sorted(selected_by_index.values(), key=lambda trace: trace.evaluation_index)
 
 
 def _max_batch_index(traces: list[NativeTurboEvaluationTrace]) -> int:
@@ -947,9 +1008,20 @@ def _prepare_unique_batch(
             if len(candidates) == batch_size:
                 break
     if len(candidates) != batch_size:
-        raise ValueError(
-            "OpenBox duplicate replacement exhausted: "
+        reason = (
+            "OpenBox unique candidate batch exhausted: "
             f"requested={batch_size} prepared={len(candidates)} attempts={attempts}"
+        )
+        if candidates:
+            candidates = [
+                replace(candidate, batch_size=len(candidates))
+                for candidate in candidates
+            ]
+        return OpenBoxBatchResult(
+            candidates=candidates,
+            duplicate_replacements=duplicate_replacements,
+            exhausted=True,
+            exhaustion_reason=reason,
         )
     return OpenBoxBatchResult(
         candidates=candidates,
