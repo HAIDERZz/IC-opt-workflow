@@ -9,13 +9,19 @@ The implemented shell product command is:
 ic-opt /path/to/project --real
 ```
 
+The implemented Claude CLI skill entrypoint, after installing the included
+skill, is:
+
+```text
+/ic-opt /path/to/project --real
+```
+
 The project has been exercised on a real multi-testbench Mixer optimization
 flow with OpenBox, Spectre, OCEAN, and post-run visualization/reporting.
 
-Important agent-integration boundary: a real `/ic-opt` slash command and
-automatic supervisor-agent to execution-agent dispatch are not implemented yet.
-The current product is a working optimization automation core plus file
-contracts and manuals that can support agent orchestration. See
+Important agent-integration boundary: the Claude CLI `/ic-opt` skill now maps
+the short agent command to the shell automation core. Automatic supervisor-agent
+to execution-agent dispatch is not implemented yet. See
 `docs/AGENT_INTEGRATION_STATUS.md` before describing this as a completed
 two-agent product.
 
@@ -56,6 +62,19 @@ Expected entrypoints:
 ```bash
 ./.venv/bin/ic-opt --help
 ./.venv/bin/hermes-workflow --help
+```
+
+For Claude CLI `/ic-opt` support, install the included skill once:
+
+```bash
+mkdir -p ~/.claude/skills
+ln -sfn "$PWD/claude_skills/ic-opt" ~/.claude/skills/ic-opt
+```
+
+Then use the short agent command:
+
+```text
+/ic-opt /path/to/project --real
 ```
 
 ## Cadence Environment

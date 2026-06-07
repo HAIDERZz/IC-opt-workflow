@@ -1,18 +1,18 @@
 {
   "schema_version": "1.0",
-  "current_scope": "C-62 Agent Integration Reality Audit complete",
-  "current_status": "C-62 is complete, verified-only. The implemented product route is a shell automation core: ic-opt PROJECT_DIR --real, backed by hermes-workflow optimize and the existing file contracts/task packages. A real agent-runtime slash command /ic-opt and automatic supervisor-agent to execution-agent dispatch are not implemented yet. Documentation was synchronized so README, product quickstart, agent usage manual, release checklist, AGENTS.md, progress files, top-level plan, and docs/PROJECT_STATUS_AND_ARCHITECTURE_CN.md no longer describe the current state as a completed two-agent product.",
+  "current_scope": "C-63 Claude /ic-opt Real Landing complete",
+  "current_status": "C-63 is complete, verified-only. The implemented product route now has two proven layers: the shell automation core ic-opt PROJECT_DIR --real, and the first Claude CLI slash-skill entrypoint /ic-opt PROJECT_DIR --real after installing claude_skills/ic-opt. A fresh Mixer multi-testbench project started with only opt_requirement.md and cadence_env.csh, then Claude CLI ran /ic-opt PROJECT --real through 100 real OpenBox/Spectre/OCEAN evaluations and recommended feasible real_051. Automatic supervisor-agent to execution-agent dispatch is still not implemented.",
   "review_status": "verified-only",
   "subagent_dispatch": "available",
   "active_spec": "docs/superpowers/specs/2026-06-07-one-command-optimizer-flow-design.md",
-  "active_plan": "docs/superpowers/plans/2026-06-07-agent-integration-reality-audit.md",
+  "active_plan": "docs/superpowers/plans/2026-06-07-claude-ic-opt-real-landing.md",
   "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
   "progress_files": [
     "docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md",
     "docs/EXECUTION_PROGRESS_2026-05-29.md",
     "docs/COMPACT_RESUME_CHECKPOINT.md"
   ],
-  "next_allowed_action": "After user confirmation, choose and implement the first real agent-facing integration proof: either a slash-command/plugin wrapper that maps /ic-opt PROJECT_DIR --real to the repo ic-opt command and shows an observable supervisor-agent to execution-agent handoff, or explicitly decide the product is a single-agent CLI operator. Do not add optimizer math/features until this product boundary is resolved.",
+  "next_allowed_action": "After user confirmation, decide the C-64 product boundary: either accept single-agent Claude slash skill plus deterministic shell automation core as the first product target, or implement an observable supervisor-agent to independent execution-agent handoff. Do not add optimizer math/features until this product boundary is resolved.",
   "forbidden_actions": [
     "install unpinned latest shap into the OpenBox venv",
     "run real tool commands without first checking docs/TOOLCHAIN_EXECUTION_REFERENCE.md",
@@ -24,7 +24,7 @@
     "replace optimizer backend again without an evidence-backed decision checkpoint",
     "ship a product route that depends on /tmp/ic_auto_opt_openbox_spike/.venv",
     "create a Python virtualenv inside each user optimization project",
-    "claim /ic-opt slash-command support before a real agent-runtime wrapper exists",
+    "claim Codex or non-Claude /ic-opt slash-command support before a real runtime wrapper exists",
     "claim automatic supervisor-agent to execution-agent dispatch before an observable handoff drill passes",
     "validate production UX with long natural-language prompts instead of the implemented ic-opt shell command or future /ic-opt slash command",
     "run Virtuoso before explicit task confirmation",
@@ -49,12 +49,12 @@
   ],
   "route_audit": {
     "active_spec": "docs/superpowers/specs/2026-06-07-one-command-optimizer-flow-design.md",
-    "active_plan": "docs/superpowers/plans/2026-06-07-agent-integration-reality-audit.md",
+    "active_plan": "docs/superpowers/plans/2026-06-07-claude-ic-opt-real-landing.md",
     "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
-    "alignment": "Aligned with the top-level role model after correcting the product boundary: Hermes workflow tooling is implemented, while the final agent-facing slash command and automatic supervisor/execution dispatch remain future work.",
-    "drift": "A documentation/product-status drift was found: C-58 through C-61 wording sometimes treated /ic-opt and two-agent dispatch as current product behavior. C-62 corrects that drift without changing optimizer behavior, real-tool contracts, OCEAN formulas, Spectre setup, or environment policy."
+    "alignment": "Aligned with the top-level role model after C-63: Hermes workflow tooling and the product shell core are implemented, Claude CLI can now trigger them through /ic-opt, and automatic independent execution-agent dispatch remains future work.",
+    "drift": "C-62 corrected the prior documentation/product-status drift. C-63 reduced the slash-command gap for Claude CLI only. No optimizer behavior, real-tool contracts, OCEAN formulas, Spectre setup, or environment policy changed."
   },
-  "latest_valid_commit": "618984f",
+  "latest_valid_commit": "21fe675",
   "review_evidence": {
     "c47_plan": "docs/superpowers/plans/2026-06-05-openbox-advanced-visualization-artifact.md",
     "c47_tests": "Targeted tests passed: /home/zzchen/.venvs/openclaw/bin/python -m pytest tests/test_openbox_backend.py tests/test_optimizer_insights.py tests/test_optimizer_finalize.py",
@@ -103,6 +103,7 @@
     "c59_product_one_line_cadence_env_discovery": "Implemented verified-only. Added user-supplied Cadence cshrc anchor discovery to ic-opt only: explicit --cadence-cshrc, PROJECT_DIR/cadence_env.csh, IC_OPT_CADENCE_CSHRC, then ~/.ic-opt/cadence_env.csh. ic-opt does not infer .bashrc/.zshrc and does not hardcode Spectre versions. Lower-level hermes-workflow optimize remains explicit. Product CLI tests passed (5 passed), targeted ruff passed, ic-opt --help no longer marks --cadence-cshrc as required, and one-line dry orchestration passed at /tmp/ic_auto_opt_c59_dry_5J81NM/Mixer_opt_muti_tb with PROJECT_DIR/cadence_env.csh and no --cadence-cshrc flag.",
     "c60_product_one_line_real_acceptance": "Completed verified-only. Fresh workspace /tmp/ic_auto_opt_c60_one_line_real_PpguO7/Mixer_opt_muti_tb copied only opt_requirement.md and PROJECT_DIR/cadence_env.csh, then ran ./.venv/bin/ic-opt PROJECT --real --max-evals 100 --batch-size 10 --parallel-jobs 10 without --cadence-cshrc. Flow status pass, evaluation_count=100, status_counts constraint_failed=68 feasible=16 metric_check_failed=16, recommended_action=accept_best_observed_or_continue, recommended_run_id=real_051, global_optimum_claim=false, OpenBox advanced visualization generated.",
     "c61_product_release_polish": "Completed verified-only. Replaced the stale contract-only README with a product-facing README, added docs/PRODUCT_RELEASE_CHECKLIST.md, and pinned requirements-product.txt visualization dependencies to shap==0.49.1 and lightgbm==4.6.0 matching the C-60 product environment. No optimizer behavior or real-tool contracts changed.",
-    "c62_agent_integration_reality_audit": "Completed verified-only. Added docs/AGENT_INTEGRATION_STATUS.md and docs/PROJECT_STATUS_AND_ARCHITECTURE_CN.md, then synchronized README, product quickstart, agent usage manual, release checklist, AGENTS.md, progress files, and top-level plan to state the real boundary: ic-opt PROJECT_DIR --real is implemented shell automation; /ic-opt slash command and automatic supervisor-agent to execution-agent dispatch are not yet implemented."
+    "c62_agent_integration_reality_audit": "Completed verified-only. Added docs/AGENT_INTEGRATION_STATUS.md and docs/PROJECT_STATUS_AND_ARCHITECTURE_CN.md, then synchronized README, product quickstart, agent usage manual, release checklist, AGENTS.md, progress files, and top-level plan to state the real boundary: ic-opt PROJECT_DIR --real is implemented shell automation; /ic-opt slash command and automatic supervisor-agent to execution-agent dispatch are not yet implemented.",
+    "c63_claude_ic_opt_real_landing": "Completed verified-only. Added claude_skills/ic-opt/SKILL.md and claude_skills/README.md, installed the skill locally under ~/.claude/skills/ic-opt for validation, then ran claude -p --dangerously-skip-permissions \"/ic-opt /tmp/ic_auto_opt_claude_landing_JjIiNj/Mixer_opt_muti_tb --real\" on a fresh project containing only opt_requirement.md and cadence_env.csh. Claude CLI completed the product automation core with 100 real OpenBox/Spectre/OCEAN evaluations, status_counts feasible=16 constraint_failed=68 metric_check_failed=16, and recommended feasible real_051. Evidence: docs/CLAUDE_IC_OPT_REAL_LANDING_2026-06-07.md. Boundary: this proves the first Claude CLI slash-skill entrypoint, not automatic supervisor-agent to independent execution-agent dispatch."
   }
 }

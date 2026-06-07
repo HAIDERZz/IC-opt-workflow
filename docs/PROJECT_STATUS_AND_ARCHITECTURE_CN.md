@@ -6,25 +6,30 @@
 
 ## 0. 结论先说清楚
 
-当前项目已经跑通的是一个产品级 shell 自动化核心，不是完整的两
-agent 产品。[E1][E2][E3]
+当前项目已经跑通的是一个产品级 shell 自动化核心，以及第一个 Claude CLI
+slash skill 入口；它仍然不是完整的两 agent 产品。[E1][E2][E3][E19]
 
-当前可用入口是 `ic-opt PROJECT_DIR --real`，它是 Python console script，
-不是 Codex/Claude 等 agent runtime 内真正注册的 `/ic-opt` slash command。
-[E1][E2]
+当前可用 shell 入口是 `ic-opt PROJECT_DIR --real`，它是 Python console
+script。[E1][E3]
+
+当前可用 Claude CLI agent 入口是安装 `claude_skills/ic-opt` 后的
+`/ic-opt PROJECT_DIR --real`；C-63 已经用 fresh Mixer multi-testbench 项目
+真实跑通。[E19]
 
 当前 `ic-opt` 会生成执行包和 optimizer 执行任务包，但它随后在同一个
 Python 流程里调用真实 OpenBox/Spectre/OCEAN 优化后端；它没有自动派发一
 个独立执行 agent。[E3][E4]
 
 因此，如果用户说“运行 `ic-opt` 之后 agent 接入在哪里”，准确答案是：
-目前 agent 接入只停留在文档化角色、任务包合同和人工/主管 agent 可操作
-CLI 的层级，还没有变成真实自动 supervisor-agent -> execution-agent
-dispatch。[E2][E4]
+C-63 之前只停留在文档化角色、任务包合同和人工/主管 agent 可操作 CLI 的
+层级；C-63 之后，Claude CLI 可以通过 `/ic-opt` skill 触发该自动化核心。
+但它仍然没有变成真实自动 supervisor-agent -> execution-agent dispatch。
+[E2][E4][E19]
 
 这不是小缺口，而是产品落地边界缺口；C-62 已经把这个边界写入
-`docs/AGENT_INTEGRATION_STATUS.md`，并同步 README、quickstart、manual、
-release checklist、AGENTS、进度文件和顶层 plan。[E2][E5]
+`docs/AGENT_INTEGRATION_STATUS.md`，C-63 则把第一个 Claude `/ic-opt`
+入口真实落地，并记录在 `docs/CLAUDE_IC_OPT_REAL_LANDING_2026-06-07.md`。
+[E2][E5][E19]
 
 ## 1. 项目原始目标
 
@@ -36,9 +41,9 @@ Virtuoso/Spectre/OCEAN/OpenBox 执行。[E6]
 这个角色模型仍然是目标架构，且 `AGENTS.md` 明确禁止把 Hermes 说成一个
 agent；Hermes 在本项目中是 workflow tooling。[E7]
 
-当前实现最成熟的部分是 Hermes workflow tooling 和 shell 自动化核心；
-最不成熟、尚未完成的部分是 agent runtime 集成和自动双 agent handoff。
-[E2][E3][E6]
+当前实现最成熟的部分是 Hermes workflow tooling、shell 自动化核心和
+Claude CLI skill 入口；尚未完成的部分是自动双 agent handoff，以及非 Claude
+agent runtime 的入口适配。[E2][E3][E6][E19]
 
 ## 2. 当前 `ic-opt` 到底是什么
 
@@ -209,16 +214,17 @@ repo/product-level `.venv`，用户项目目录只是数据和 artifacts 目录�
 
 ## 7. 当前项目确实缺失的部分
 
-项目缺少真实 `/ic-opt` slash command wrapper。[E2]
+Claude CLI 的 `/ic-opt` slash skill wrapper 已经完成并真实跑通；Codex 或其它
+agent runtime 的对应入口还没有实现。[E19]
 
 项目缺少自动 supervisor-agent -> execution-agent dispatch。[E2][E4]
 
-项目缺少一个真实 drill：用户只输入 `/ic-opt PROJECT --real`，supervisor agent
-接收后准备/批准/派发，execution agent 运行任务包，supervisor agent 审计并
-向用户汇报。[E2]
+项目仍缺少一个真实双 agent drill：用户只输入 `/ic-opt PROJECT --real`，
+supervisor agent 接收后准备/批准/派发，独立 execution agent 运行任务包，
+supervisor agent 审计并向用户汇报。[E2]
 
-项目缺少把“agent 产品入口”打包成类似 veriflow-cc 的使用体验；当前 README
-只能描述 shell CLI 和目标 agent boundary，不能声称最终 UX 已完成。[E2][E5]
+项目已经把 Claude CLI 的“agent 产品入口”推进到类似 veriflow-cc 的短命令
+体验，但还缺少 clean-machine 安装验证和非 Claude runtime 入口适配。[E19]
 
 项目缺少决定：最终产品到底坚持两个 agent，还是接受“单 agent + 自动化 CLI”
 作为产品形态。[E2]
@@ -235,11 +241,15 @@ C-57 到 C-61 把 Hermes tooling 的 shell 自动化链条做到了可真实运�
 C-62 修正的是计划叙述偏差：不能因为 shell 自动化链条跑通，就把它说成
 两-agent产品已经落地。[E2][E5]
 
-当前实现与顶层 plan 的偏差点不是 optimizer 内核，而是 agent runtime/handoff
-层没有完成。[E2][E4][E6]
+C-63 完成了第一个 Claude CLI `/ic-opt` slash skill 入口，并用 fresh
+multi-testbench Mixer 项目真实跑完 100 evaluations。[E19]
 
-下一步如果继续按原始产品目标推进，就应该实现最小 agent-facing integration：
-真实 `/ic-opt` wrapper 加 observable supervisor/execution handoff drill。[E2]
+当前实现与顶层 plan 的剩余偏差点不是 optimizer 内核，也不是 Claude CLI
+短入口，而是自动独立 execution-agent handoff 层没有完成。[E2][E4][E6][E19]
+
+下一步如果继续按原始两-agent目标推进，就应该实现 observable
+supervisor/execution handoff drill；如果接受 single-agent slash skill +
+deterministic shell automation core，则应把这个边界写成产品定位。[E2][E19]
 
 ## 9. 现在用户实际该怎么理解这个项目
 
@@ -254,29 +264,28 @@ cd /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow
 准备、合同验证、package/preflight/approval、OpenBox/Spectre/OCEAN 真实优化、
 artifact 验收、可视化和 decision report。[E3][E4][E9]
 
-如果用户现在让一个主管 agent 使用它，主管 agent 实际上是在操作这个 CLI，
-而不是触发已经实现的 `/ic-opt` slash command 产品。[E2][E3]
+如果用户现在让 Claude CLI 使用它，安装 `claude_skills/ic-opt` 后可以直接
+输入：
+
+```text
+/ic-opt /path/to/project --real
+```
+
+Claude 会触发该 skill，并由 skill 调用 shell 自动化核心。[E19]
 
 如果最终产品要满足“The less user needs to talk to agent, the better”，那么
-下一步必须减少人类 prompt，并把短命令入口和 agent handoff 固化到真实 agent
-runtime，而不是继续靠长 prompt 约束 agent 行为。[E2][E7]
+Claude CLI 路径已经达到短命令入口；下一步要么把这个定位固定为 single-agent
+入口，要么继续实现独立 execution-agent handoff。[E2][E7][E19]
 
 ## 10. 下一步必须怎么做
 
 下一步不应该继续添加 optimizer 新功能，除非它是阻塞产品入口的 bug。[E2]
 
-下一步应该定义并实现 C-63：真实 agent-facing `/ic-opt` integration proof。
-[E2]
+下一步应该定义 C-64：产品边界决策与独立执行 agent handoff。如果坚持
+two-agent，就实现真实 supervisor -> execution-agent 派发；如果接受
+single-agent slash skill，就把产品定位、安装方式和验收 checklist 固化。[E2][E19]
 
-C-63 的验收标准应该是：用户只输入 `/ic-opt PROJECT_DIR --real`，supervisor
-agent 不需要长 prompt，不手动复述手册，能够触发 repo `ic-opt` 或等价 wrapper。
-[E2]
-
-C-63 的第二个验收标准应该是：supervisor/execution-agent 边界必须可观察；如果
-当前 runtime 暂时不能派发 execution agent，就必须诚实记录产品形态转为
-single-agent CLI operator，而不是继续假装两-agent已经完成。[E2][E4]
-
-C-63 不应改变 optimizer math、OCEAN formulas、Spectre version、OpenBox route、
+C-64 不应改变 optimizer math、OCEAN formulas、Spectre version、OpenBox route、
 multi-testbench aggregation 或 per-project venv policy。[E7]
 
 ## Evidence Index
@@ -286,8 +295,9 @@ E1. `pyproject.toml` `[project.scripts]` registers `ic-opt =
 "hermes_workflow.cli:app"`.
 
 E2. `docs/AGENT_INTEGRATION_STATUS.md` states the implemented shell CLI,
-unimplemented `/ic-opt` slash command, and unimplemented automatic
-supervisor-agent to execution-agent dispatch.
+implemented Claude CLI `/ic-opt` skill route, missing non-Claude runtime
+adapters, and unimplemented automatic supervisor-agent to execution-agent
+dispatch.
 
 E3. `src/hermes_workflow/product_cli.py` defines `ic-opt` behavior:
 Cadence cshrc discovery and call into `optimize_project()`.
@@ -343,3 +353,11 @@ and `Global optimum claim: false`.
 E18. `docs/PRODUCT_RELEASE_CHECKLIST.md` records the product `.venv` setup and
 states it validates the shell automation core, not the completed two-agent
 product.
+
+E19. `docs/CLAUDE_IC_OPT_REAL_LANDING_2026-06-07.md` records the C-63 Claude
+CLI slash-skill landing. The fresh project
+`/tmp/ic_auto_opt_claude_landing_JjIiNj/Mixer_opt_muti_tb` started with only
+`opt_requirement.md` and `cadence_env.csh`; after installing
+`claude_skills/ic-opt`, `claude -p --dangerously-skip-permissions "/ic-opt
+PROJECT --real"` completed 100 real evaluations and recommended feasible
+`real_051`.

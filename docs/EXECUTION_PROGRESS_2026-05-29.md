@@ -10,13 +10,58 @@ This note preserves the implementation state for continuing Plan A after context
 - Baseline commit: `885e97f docs: capture workflow planning baseline`
 - Latest C-3 code commit before docs-only cleanup: `edb107f fix: harden preflight readiness gates`; docs cleanup continues through current HEAD
 - Active plan: `docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md`
-- Current scope: C-62 Agent Integration Reality Audit complete
-- Current status: The implemented route is `ic-opt PROJECT_DIR --real` as a shell automation core. A real `/ic-opt` slash command and automatic supervisor-agent to execution-agent dispatch are not implemented yet. The project docs now say this explicitly instead of treating the target two-agent shape as current behavior. The detailed Chinese explanation is `docs/PROJECT_STATUS_AND_ARCHITECTURE_CN.md`.
-- Next allowed action: after user confirmation, choose the first real agent-facing integration proof: implement a slash-command/plugin wrapper plus observable supervisor/execution handoff, or explicitly decide the product is a single-agent CLI operator. Do not add optimizer features or per-project virtualenvs before resolving this boundary.
+- Current scope: C-63 Claude /ic-opt Real Landing complete
+- Current status: The implemented route is now `ic-opt PROJECT_DIR --real` as a shell automation core plus the first Claude CLI slash-skill entrypoint `/ic-opt PROJECT_DIR --real` after installing `claude_skills/ic-opt`. The C-63 fresh Mixer multi-testbench landing drill completed 100 real OpenBox/Spectre/OCEAN evaluations through Claude CLI and recommended feasible `real_051`. Automatic supervisor-agent to independent execution-agent dispatch is still not implemented.
+- Next allowed action: after user confirmation, decide C-64 product boundary: either accept single-agent Claude slash skill plus deterministic shell automation core as the first product target, or implement an observable supervisor-agent to independent execution-agent handoff. Do not add optimizer features or per-project virtualenvs before resolving this boundary.
 - Execution method: `superpowers:subagent-driven-development`
 - Dependencies installed in active Python environment on 2026-05-29: `pytest`, `typer`, `pydantic`, `PyYAML`, `ruff`
 
-## Current C-62 Checkpoint 2026-06-07
+## Current C-63 Checkpoint 2026-06-07
+
+C-63 is a real Claude CLI slash-skill landing checkpoint.
+
+Implemented today:
+
+- Added `claude_skills/ic-opt/SKILL.md`.
+- Added `claude_skills/README.md`.
+- Linked the skill locally under `~/.claude/skills/ic-opt` for validation.
+- Added `docs/CLAUDE_IC_OPT_REAL_LANDING_2026-06-07.md`.
+- Added `docs/superpowers/plans/2026-06-07-claude-ic-opt-real-landing.md`.
+- Synchronized product-facing docs to state that Claude CLI `/ic-opt` is now
+  implemented, while automatic supervisor-agent to independent execution-agent
+  dispatch remains future work.
+
+Real evidence:
+
+```text
+Project: /tmp/ic_auto_opt_claude_landing_JjIiNj/Mixer_opt_muti_tb
+Initial files: opt_requirement.md, cadence_env.csh
+Command: claude -p --dangerously-skip-permissions "/ic-opt PROJECT --real"
+Evaluations: 100
+Counts: 16 feasible, 68 constraint_failed, 16 metric_check_failed
+Recommended: feasible real_051
+Global optimum claim: false
+```
+
+Current truth:
+
+```text
+Implemented:
+  ic-opt PROJECT_DIR --real
+  Claude CLI /ic-opt PROJECT_DIR --real after installing claude_skills/ic-opt
+  hermes-workflow optimize PROJECT_DIR --real
+  file contracts, task package, real optimizer reports
+
+Not implemented:
+  automatic supervisor-agent -> independent execution-agent dispatch
+  Codex or non-Claude /ic-opt runtime adapters
+  clean-machine installer for the Claude skill
+```
+
+No optimizer code, simulator behavior, OCEAN formula, Spectre setup, or
+multi-testbench contract changed.
+
+## C-62 Checkpoint 2026-06-07
 
 C-62 is a docs/status correction checkpoint.
 
@@ -212,15 +257,16 @@ C-58 plan:
 docs/superpowers/plans/2026-06-07-product-entrypoint-unified-environment.md
 ```
 
-Historical C-58 target UX, superseded by C-62 boundary clarification:
+Historical C-58 target UX, superseded by C-63 boundary clarification:
 
 ```text
-target future agent entry: /ic-opt /path/to/project --real
 implemented shell entry: ic-opt /path/to/project --real
+implemented Claude CLI entry after skill install: /ic-opt /path/to/project --real
 ```
 
-C-62 clarification: the shell entry is implemented; the real `/ic-opt` slash
-command and automatic supervisor-agent to execution-agent dispatch are not.
+C-63 clarification: the shell entry and Claude CLI slash-skill entry are
+implemented; automatic supervisor-agent to independent execution-agent dispatch
+is not.
 See `docs/AGENT_INTEGRATION_STATUS.md` and
 `docs/PROJECT_STATUS_AND_ARCHITECTURE_CN.md`.
 

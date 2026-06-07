@@ -9,6 +9,18 @@ implemented agent boundary, read `docs/AGENT_INTEGRATION_STATUS.md`; for the
 detailed Chinese status explanation, read
 `docs/PROJECT_STATUS_AND_ARCHITECTURE_CN.md`.
 
+For Claude CLI, install the included skill from `claude_skills/ic-opt` to enable
+the short agent command:
+
+```bash
+mkdir -p ~/.claude/skills
+ln -sfn "$PWD/claude_skills/ic-opt" ~/.claude/skills/ic-opt
+```
+
+```text
+/ic-opt PROJECT_DIR --real
+```
+
 The workflow is file based. Do not describe machine-critical setup only in
 chat. Put the request in `opt_requirement.md`, optionally put human guidance in
 `constraints.md`, then let Hermes generate and check the contracts.
@@ -33,16 +45,16 @@ Implemented shell product invocation:
 ic-opt ~/spectre_opt_prj/<project_name> --real
 ```
 
-Target supervisor-agent invocation, not yet implemented as a real slash command:
+Claude CLI supervisor-agent invocation after installing `claude_skills/ic-opt`:
 
 ```text
 /ic-opt ~/spectre_opt_prj/<project_name> --real
 ```
 
-The current project does not yet provide a Codex/Claude slash-command wrapper
-or automatic supervisor-agent to execution-agent dispatch. `ic-opt` is the
-implemented automation command. `hermes-workflow optimize ... --real` is the
-lower-level implementation command behind it.
+The Claude slash skill delegates to the implemented automation command.
+Automatic supervisor-agent to execution-agent dispatch is not implemented yet.
+`hermes-workflow optimize ... --real` is the lower-level implementation command
+behind it.
 
 Release packaging must make OpenBox, TuRBO, and report dependencies available
 from the product environment. A development-only path such as

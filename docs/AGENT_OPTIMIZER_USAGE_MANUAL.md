@@ -9,8 +9,9 @@ Virtuoso/Maestro/Spectre circuit.
 Current implementation boundary:
 
 - Implemented: shell command `ic-opt PROJECT_DIR --real`.
+- Implemented for Claude CLI after skill installation:
+  `/ic-opt PROJECT_DIR --real`.
 - Implemented: Hermes workflow task packages and execution-agent instructions.
-- Not implemented: a real `/ic-opt` slash command in an agent runtime.
 - Not implemented: automatic supervisor-agent to execution-agent dispatch.
 
 Read `docs/AGENT_INTEGRATION_STATUS.md` before claiming the two-agent product
@@ -104,22 +105,14 @@ The implemented product command is the shell CLI:
 ic-opt /home/zzchen/spectre_opt_prj/<project_name> --real
 ```
 
-The target product-shaped agent request is still:
+The implemented Claude CLI product-shaped agent request is:
 
 ```text
 /ic-opt /home/zzchen/spectre_opt_prj/<project_name> --real
 ```
 
-but `/ic-opt` is not yet implemented as a real slash command. Do not tell users
-that it is available until an agent runtime wrapper exists and has passed a real
-handoff drill.
-
-The current supervisor-agent request should be:
-
-```text
-Run the ic-auto-opt workflow on /home/zzchen/spectre_opt_prj/<project_name>
-using the implemented ic-opt command, then report optimizer_decision_report.md.
-```
+after installing the included skill from `claude_skills/ic-opt`. Automatic
+execution-agent dispatch is still not implemented.
 
 The user-facing request should stay short. All machine-critical information
 belongs in `opt_requirement.md`.
@@ -154,9 +147,11 @@ The supervisor agent must not ask the user to restate formulas, variables,
 testbench paths, Spectre resources, or optimizer settings that are already
 present in `opt_requirement.md`.
 
-Do not validate the future slash-command UX by giving the supervisor a long
-prompt that explains the manual. The command and project files must carry the
-workflow, and the slash-command wrapper still needs to be implemented.
+Do not validate product UX by giving the supervisor a long prompt that explains
+the manual. For Claude CLI, install `claude_skills/ic-opt` and use the short
+`/ic-opt PROJECT_DIR --real` command. For other agent runtimes, a runtime
+adapter still needs to be implemented before claiming the same slash-command
+support there.
 
 ## 5. Product Environment Model
 
@@ -484,6 +479,7 @@ A successful first production session looks like:
 At that point, the user can use the accepted candidate as the current optimized
 design point, while remembering it is not a mathematical global optimum proof.
 
-This is not yet proof of the final two-agent product. The final product still
-needs a real `/ic-opt` entrypoint and an observable supervisor-agent to
-execution-agent handoff.
+This is proof of the current single-agent Claude slash-skill path after
+installing `claude_skills/ic-opt`. It is not yet proof of the final two-agent
+product. The final two-agent product still needs an observable
+supervisor-agent to independent execution-agent handoff.

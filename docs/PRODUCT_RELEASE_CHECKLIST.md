@@ -4,9 +4,11 @@ Use this checklist before treating `ic-auto-opt-workflow` as ready for another
 user or another clean machine.
 
 Important boundary: this checklist validates the implemented shell automation
-core, not the final two-agent product. The implemented entrypoint is
-`ic-opt PROJECT_DIR --real`. A real `/ic-opt` slash command and automatic
-supervisor-agent to execution-agent dispatch are still pending. See
+core and the first Claude CLI slash-skill entrypoint, not the final two-agent
+product. The implemented shell entrypoint is `ic-opt PROJECT_DIR --real`; the
+Claude skill entrypoint is `/ic-opt PROJECT_DIR --real` after installing
+`claude_skills/ic-opt`. Automatic supervisor-agent to execution-agent dispatch
+is still pending. See
 `docs/AGENT_INTEGRATION_STATUS.md` before describing a release as a completed
 two-agent product.
 
@@ -32,6 +34,13 @@ Expected scripts:
 ```
 
 Do not use `/tmp/ic_auto_opt_openbox_spike/.venv` as a product dependency.
+
+For Claude CLI slash entrypoint acceptance, install:
+
+```bash
+mkdir -p ~/.claude/skills
+ln -sfn "$PWD/claude_skills/ic-opt" ~/.claude/skills/ic-opt
+```
 
 ## 2. User Project Contract
 

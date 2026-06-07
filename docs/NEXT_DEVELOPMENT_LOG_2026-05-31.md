@@ -4,12 +4,56 @@
 
 - Repository: `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow`
 - Branch: `plan-a-hermes-file-contract-mvp`
-- Current scope: C-62 Agent Integration Reality Audit complete
-- Current status: verified-only. The implemented product route is the shell automation core `ic-opt PROJECT_DIR --real`, backed by `hermes-workflow optimize` and Hermes file contracts. A real `/ic-opt` slash command and automatic supervisor-agent to execution-agent dispatch are not implemented yet. Documentation has been synchronized to make that boundary explicit, including the detailed Chinese explanation `docs/PROJECT_STATUS_AND_ARCHITECTURE_CN.md`.
+- Current scope: C-63 Claude /ic-opt Real Landing complete
+- Current status: verified-only. The implemented product route now has two proven layers: the shell automation core `ic-opt PROJECT_DIR --real`, and the first Claude CLI slash-skill entrypoint `/ic-opt PROJECT_DIR --real` after installing `claude_skills/ic-opt`. A fresh Mixer multi-testbench project started with only `opt_requirement.md` and `cadence_env.csh`, then Claude CLI completed 100 real OpenBox/Spectre/OCEAN evaluations through the short `/ic-opt PROJECT --real` command and recommended feasible `real_051`. Automatic supervisor-agent to independent execution-agent dispatch is still not implemented.
 - Active spec: `docs/superpowers/specs/2026-06-07-one-command-optimizer-flow-design.md`
-- Active plan: `docs/superpowers/plans/2026-06-07-agent-integration-reality-audit.md`
-- Next required action: After user confirmation, choose and implement the first real agent-facing integration proof: a slash-command/plugin wrapper that maps `/ic-opt PROJECT_DIR --real` to the repo `ic-opt` command and proves an observable supervisor-agent to execution-agent handoff, or explicitly decide the product is a single-agent CLI operator.
-- next_allowed_action: After user confirmation, choose and implement the first real agent-facing integration proof: either a slash-command/plugin wrapper that maps /ic-opt PROJECT_DIR --real to the repo ic-opt command and shows an observable supervisor-agent to execution-agent handoff, or explicitly decide the product is a single-agent CLI operator. Do not add optimizer math/features until this product boundary is resolved.
+- Active plan: `docs/superpowers/plans/2026-06-07-claude-ic-opt-real-landing.md`
+- Next required action: After user confirmation, decide the C-64 product boundary: either accept single-agent Claude slash skill plus deterministic shell automation core as the first product target, or implement an observable supervisor-agent to independent execution-agent handoff. Do not add optimizer math/features until this product boundary is resolved.
+- next_allowed_action: After user confirmation, decide the C-64 product boundary: either accept single-agent Claude slash skill plus deterministic shell automation core as the first product target, or implement an observable supervisor-agent to independent execution-agent handoff. Do not add optimizer math/features until this product boundary is resolved.
+
+## C-63 Claude `/ic-opt` Real Landing 2026-06-07
+
+C-63 is complete, verified-only.
+
+Goal:
+
+- Prove the first real agent-facing short command with Claude CLI:
+  `/ic-opt PROJECT_DIR --real`.
+- Do it on a fresh project without copying generated `config/`, `netlists/`,
+  `runs/`, `reports/`, `ledger/`, or `state/` artifacts.
+- Do not run fake optimizer flows.
+
+Implementation:
+
+- Added `claude_skills/ic-opt/SKILL.md`.
+- Added `claude_skills/README.md`.
+- Installed the skill locally for validation by linking
+  `claude_skills/ic-opt` to `~/.claude/skills/ic-opt`.
+
+Real evidence:
+
+- Evidence note:
+  `docs/CLAUDE_IC_OPT_REAL_LANDING_2026-06-07.md`.
+- Fresh project:
+  `/tmp/ic_auto_opt_claude_landing_JjIiNj/Mixer_opt_muti_tb`.
+- Initial project files: `opt_requirement.md` and `cadence_env.csh`.
+- First Claude attempt returned `Unknown command: /ic-opt`, proving the slash
+  skill was not installed before C-63.
+- Final command:
+  `claude -p --dangerously-skip-permissions "/ic-opt /tmp/ic_auto_opt_claude_landing_JjIiNj/Mixer_opt_muti_tb --real"`.
+- Result: 100 real evaluations; `16 feasible`, `68 constraint_failed`,
+  `16 metric_check_failed`; recommended feasible `real_051`; no global optimum
+  claim.
+
+Route audit:
+
+- Aligned with the product landing goal: one short user command in Claude CLI
+  can now trigger the implemented `ic-opt` automation core.
+- No optimizer math, OpenBox strategy, OCEAN formula, Spectre setup,
+  multi-testbench aggregation, or product environment contract changed.
+- Remaining boundary: this is not automatic supervisor-agent to independent
+  execution-agent dispatch. The Claude skill currently runs the deterministic
+  shell automation core from the supervisor-agent session.
 
 ## C-62 Agent Integration Reality Audit 2026-06-07
 
@@ -19,8 +63,10 @@ Root cause:
 
 - The project has implemented `ic-opt PROJECT_DIR --real` as a shell product
   CLI, plus `hermes-workflow optimize` and execution task-package contracts.
-- The project has not implemented a real `/ic-opt` slash command in an agent
-  runtime or automatic supervisor-agent to execution-agent dispatch.
+- At the C-62 checkpoint, the project had not implemented a real `/ic-opt`
+  slash command in an agent runtime or automatic supervisor-agent to
+  execution-agent dispatch. C-63 later implemented the Claude CLI slash-skill
+  route only; automatic independent execution-agent dispatch remains missing.
 - Recent product docs blurred the target two-agent shape with the implemented
   shell automation core.
 
