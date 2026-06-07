@@ -107,6 +107,18 @@ Claude CLI process and then closed out by the supervisor-side flow. This is
 valuable acceptance evidence, but after C-65 it is classified as a
 development/acceptance route rather than the default product target.
 
+C-66 Claude continuation validation:
+
+```text
+docs/CLAUDE_IC_OPT_CONTINUATION_VALIDATION_2026-06-07.md
+```
+
+proved that a fresh Claude `/ic-opt PROJECT --real` run can complete 100 real
+OpenBox/Spectre/OCEAN evaluations and that the follow-up short request
+`请再进行40个点的优化` is routed to `continue-openbox-real --additional-evals
+40`. The continuation did not append evaluations because OpenBox could not fill
+the requested unique candidate batch after the prior 100-evaluation run.
+
 ## Not Yet Fully Proven
 
 Still requiring a live runtime drill before claiming full support:
@@ -117,6 +129,8 @@ Still requiring a live runtime drill before claiming full support:
 - Codex/OpenClaw/HermesAgent adapters.
 - Packaged release installer beyond the repo-local
   `install-runtime-adapter` command.
+- Product-ready continuation after a prior run when OpenBox cannot fill the
+  requested unique candidate batch.
 - Automatic final user acceptance.
 
 ## User Boundary

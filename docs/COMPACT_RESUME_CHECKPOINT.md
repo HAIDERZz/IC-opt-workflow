@@ -22,15 +22,23 @@ Current execution state:
 
 - Latest production acceptance note:
   `docs/PRODUCTION_LANDING_ACCEPTANCE_2026-06-07.md`.
-- Current scope: C-65 Runtime-native agent adapters complete.
-- Current status: shell `ic-opt PROJECT_DIR --real` remains the deterministic
-  automation core, while product agent UX is now defined as
-  `/ic-opt PROJECT_DIR --real` in the active runtime. The active runtime's
-  supervisor agent should run the Hermes preparation gate, delegate real
-  execution to that same runtime's native subagent/task mechanism, then run
-  closeout and report. C-64 `--execution-agent claude` subprocess handoff is
-  preserved as development/acceptance evidence, not the C-65 default product
-  route.
+- Current scope: C-66 Claude `/ic-opt` continuation validation complete.
+- current_scope: C-66 Claude `/ic-opt` continuation validation complete.
+- current_scope_exact: C-66 Claude /ic-opt real continuation validation complete.
+- Current status: the first short Claude `/ic-opt ... --real` real validation
+  on fresh project `/tmp/ic_auto_opt_c66_claude_real_e2e/Mixer_opt_muti_tb`
+  completed 100 real OpenBox/Spectre/OCEAN multi-testbench evaluations and
+  recommended feasible `real_066`. The follow-up short user request
+  `请再进行40个点的优化` was correctly routed to
+  `hermes-workflow continue-openbox-real --additional-evals 40`, but the
+  continuation did not append evaluations because OpenBox could not fill a
+  unique batch of 10 candidates after the prior 100-evaluation run.
+- C-66 evidence:
+  `docs/CLAUDE_IC_OPT_CONTINUATION_VALIDATION_2026-06-07.md`.
+- Next product fix: harden continuation when OpenBox cannot fill the requested
+  unique candidate batch. Prefer shrinking/partial batching or a concise
+  fail-early supervisor report, then rerun the same Claude follow-up
+  validation. Do not add broad optimizer framework work or fake-run ladders.
 - Canonical agent boundary doc:
   `docs/AGENT_INTEGRATION_STATUS.md`.
 - Detailed Chinese project status and architecture explanation:
@@ -45,6 +53,16 @@ Current execution state:
   `cadence_env.csh` passed Claude and OpenCode `/ic-opt PROJECT --real
   --dry-orchestration --max-evals 1`; both stopped before `run-openbox-real`
   with no real-tool launch and no C-64 subprocess handoff.
+- C-66 continuation validation evidence:
+  `docs/CLAUDE_IC_OPT_CONTINUATION_VALIDATION_2026-06-07.md`.
+  Fresh project `/tmp/ic_auto_opt_c66_claude_real_e2e/Mixer_opt_muti_tb`
+  started with only `opt_requirement.md` and `cadence_env.csh`. The first
+  Claude `/ic-opt ... --real --max-evals 100 --batch-size 10 --parallel-jobs
+  10` completed 100 real OpenBox/Spectre/OCEAN evaluations and recommended
+  feasible `real_066`. The follow-up short request `请再进行40个点的优化`
+  correctly launched `continue-openbox-real --additional-evals 40`, but no
+  evaluations were appended because OpenBox could not fill the requested unique
+  batch of 10 candidates after the prior run.
 - C-64 Claude subprocess handoff evidence:
   `docs/CLAUDE_EXECUTION_AGENT_HANDOFF_2026-06-07.md`.
   Fresh project `/tmp/ic_auto_opt_c64_handoff_zX9JrO/Mixer_opt_muti_tb`

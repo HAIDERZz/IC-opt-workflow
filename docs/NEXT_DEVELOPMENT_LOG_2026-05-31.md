@@ -4,27 +4,87 @@
 
 - Repository: `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow`
 - Branch: `plan-a-hermes-file-contract-mvp`
-- Current scope: C-64 Observable Claude execution-agent handoff complete
-- Current status: verified-only. The Claude CLI `/ic-opt` route now appends
-  `--execution-agent claude` by default and `ic-opt` dispatches an independent
-  Claude CLI execution-agent process after `package-optimizer-task`. A fresh
-  Mixer multi-testbench project started with only `opt_requirement.md` and
-  `cadence_env.csh`, then the one-line Claude command completed the observable
-  handoff plus 100 real OpenBox/Spectre/OCEAN evaluations and recommended
-  feasible `real_051`. Shell `ic-opt` remains `direct` by default.
-- Active spec: `docs/superpowers/specs/2026-06-07-observable-execution-agent-handoff-design.md`
-- Active plan: `docs/superpowers/plans/2026-06-07-observable-execution-agent-handoff.md`
-- Next required action: After user confirmation, choose the next
-  product-landing task: one more fresh real Claude `/ic-opt` handoff acceptance
-  on a user-prepared project, clean-machine Claude skill/install check, or
-  release/readiness pass. Do not add optimizer math/features unless a real
-  product run exposes a concrete need.
-- next_allowed_action: After user confirmation, choose the next
-  product-landing task: one more fresh real Claude `/ic-opt` handoff acceptance
-  on a user-prepared project, clean-machine Claude skill/install check, or
-  release/readiness pass. Do not add optimizer math/features unless a real
-  product run exposes a concrete need.
-- next_allowed_action_exact: After user confirmation, choose the next product-landing task: either run one more fresh real Claude /ic-opt handoff acceptance on a user-prepared project, add a clean-machine Claude skill/install check, or prepare a release/readiness pass. Do not add optimizer math/features unless a real product run exposes a concrete need.
+- Current scope: C-66 Claude `/ic-opt` continuation validation complete
+- current_scope: C-66 Claude `/ic-opt` continuation validation complete
+- current_scope_exact: C-66 Claude /ic-opt real continuation validation complete
+- Current status: verified-only. A fresh Claude `/ic-opt` real validation
+  project at `/tmp/ic_auto_opt_c66_claude_real_e2e/Mixer_opt_muti_tb` started
+  with only `opt_requirement.md` and `cadence_env.csh`. The first short command
+  completed 100 real OpenBox/Spectre/OCEAN multi-testbench evaluations and
+  recommended feasible `real_066`. The follow-up short user request
+  `请再进行40个点的优化` was correctly mapped to
+  `hermes-workflow continue-openbox-real --additional-evals 40`, but the
+  continuation did not append new evaluations because OpenBox could not fill a
+  unique batch of 10 candidates after the prior 100-evaluation run.
+- Active evidence: `docs/CLAUDE_IC_OPT_CONTINUATION_VALIDATION_2026-06-07.md`
+- Active plan: `docs/superpowers/plans/2026-06-07-runtime-native-agent-adapters.md`
+- Next required action: Implement a narrow continuation hardening fix for
+  exhausted or low-diversity unique-candidate generation, then rerun the same
+  Claude follow-up validation. Do not add broad optimizer framework work or
+  fake-run ladders.
+- next_allowed_action: Implement a narrow continuation hardening fix for
+  exhausted or low-diversity unique-candidate generation, then rerun the same
+  Claude follow-up validation. Do not add broad optimizer framework work or
+  fake-run ladders.
+- next_allowed_action_exact_json: Implement the narrow continuation hardening exposed by C-66: make continue-openbox-real handle exhausted/low-diversity unique candidate generation by shrinking/partial batching or failing early with a concise supervisor report, then rerun the same Claude follow-up validation. Do not add broad optimizer framework work or fake-run ladders.
+- next_allowed_action_exact: Add continuation hardening so `continue-openbox-real`
+  can shrink/partial-batch or fail early with a concise supervisor report when
+  OpenBox cannot fill the requested unique candidate batch, then revalidate
+  `/ic-opt PROJECT --real` followed by `请再进行40个点的优化`.
+
+## C-66 Claude `/ic-opt` Continuation Validation 2026-06-07
+
+C-66 is complete, verified-only.
+
+Evidence note:
+
+```text
+docs/CLAUDE_IC_OPT_CONTINUATION_VALIDATION_2026-06-07.md
+```
+
+First command:
+
+```text
+/ic-opt /tmp/ic_auto_opt_c66_claude_real_e2e/Mixer_opt_muti_tb --real --max-evals 100 --batch-size 10 --parallel-jobs 10
+```
+
+Result:
+
+- Fresh project started with only `opt_requirement.md` and `cadence_env.csh`.
+- Claude `/ic-opt` completed 100 real OpenBox/Spectre/OCEAN multi-testbench
+  evaluations.
+- The decision report recommended feasible `real_066`.
+- Recommended parameters: `F=26`, `L=40n`, `VB_LO=310m`, `W=1u`.
+- The report kept `global_optimum_claim=false`.
+
+Follow-up command:
+
+```text
+请再进行40个点的优化
+```
+
+Observed behavior:
+
+- Claude correctly routed the short follow-up request to
+  `hermes-workflow continue-openbox-real --additional-evals 40`.
+- The continuation did not append evaluations.
+- `reports/optimizer_evaluations.jsonl` remained at 100 rows.
+- Claude reported that OpenBox could not generate a full unique batch of 10
+  candidates after the prior 100-evaluation run.
+
+Conclusion:
+
+- Initial one-line real optimization is product-validated.
+- Follow-up natural continuation request parsing is validated.
+- Continuation execution is not product-ready until the OpenBox unique-batch
+  failure path is hardened.
+
+Route audit:
+
+- No fake optimizer run was used.
+- No PSF parsing, OCEAN formula rewrite, Spectre setup change, optimizer
+  backend change, or hand-picked point selection was introduced.
+- The failure is a concrete product continuation issue exposed by real use.
 
 ## C-64 Observable Claude Execution-Agent Handoff 2026-06-07
 

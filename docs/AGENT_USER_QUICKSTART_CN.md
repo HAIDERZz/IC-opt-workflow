@@ -255,6 +255,11 @@ PROJECT_DIR/reports/openbox_advanced_visualization/
 - 你想继续追加更多 evaluations；
 - 你想改搜索范围、FoM 或约束。
 
+当前边界：C-66 已验证 Claude 能把“请再进行40个点的优化”这种短句转成
+continuation 命令，但当 OpenBox 在已有 100 个点后无法凑满一批新的唯一候选时，
+追加流程还需要产品硬化。也就是说，第一次 `/ic-opt PROJECT_DIR --real` 已经能跑
+真实完整流程；结果之后的自动追加优化还不能说完全产品化。
+
 ## 一句原则
 
 用户少说话，文件多承载。
