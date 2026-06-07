@@ -236,7 +236,11 @@ def _check_project_ready(
         _add(checks, issues, "project_ready", "fail", str(exc))
         return
     if getattr(result, "status", None) == "pass":
-        readiness = getattr(result, "readiness", "ready")
+        readiness = (
+            "ready_for_continuation_or_closeout_review"
+            if _has_optimizer_history(project_root)
+            else getattr(result, "readiness", "ready")
+        )
         _add(checks, issues, "project_ready", "pass", str(readiness))
         for warning in getattr(result, "warnings", []):
             warnings.append(str(warning))
@@ -251,16 +255,11 @@ def _check_continuation_artifacts(
     issues: list[str],
     warnings: list[str],
 ) -> None:
-    optimizer_paths = [
-        project_root / OPTIMIZER_REPORT_RELATIVE,
-        project_root / EVALUATIONS_RELATIVE,
-    ]
     state_paths = [
         project_root / LEDGER_PATH,
         project_root / OPTIMIZER_STATE_PATH,
     ]
-    any_optimizer_history = any(path.exists() for path in optimizer_paths)
-    if not any_optimizer_history:
+    if not _has_optimizer_history(project_root):
         detail = "no optimizer history yet; continuation is not expected before first run"
         checks.append(ProductDoctorCheck("continuation_artifacts", "warning", detail))
         warnings.append(detail)
@@ -283,6 +282,14 @@ def _check_continuation_artifacts(
         "pass",
         "optimizer history and continuation state are present",
     )
+
+
+def _has_optimizer_history(project_root: Path) -> bool:
+    optimizer_paths = [
+        project_root / OPTIMIZER_REPORT_RELATIVE,
+        project_root / EVALUATIONS_RELATIVE,
+    ]
+    return any(path.exists() for path in optimizer_paths)
 
 
 def _report(
