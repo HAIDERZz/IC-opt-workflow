@@ -36,7 +36,7 @@ in `PROJECT_DIR/opt_requirement.md`, and optional human guidance belongs in
 Parse `$ARGUMENTS` as:
 
 ```text
-PROJECT_DIR --real [optional ic-opt flags]
+PROJECT_DIR (--real | --continue M | --doctor) [optional ic-opt flags]
 ```
 
 If `PROJECT_DIR` is empty, stop and ask for:
@@ -45,7 +45,13 @@ If `PROJECT_DIR` is empty, stop and ask for:
 /ic-opt PROJECT_DIR --real
 ```
 
-If flags do not include `--real`, append `--real`.
+If flags do not include `--real`, `--continue M`, or `--doctor`, append `--real`.
+Use `--continue M` when the user asks to add M more optimizer evaluations to an
+existing run. Do not translate this into a user-facing `hermes-workflow`
+command.
+Use `--doctor` when the user asks to check whether the project/environment is
+ready. Doctor mode must stop after the product command returns; do not dispatch
+an execution subagent.
 
 Do not append `--execution-agent claude`. The historical C-64 subprocess route
 is a development/acceptance fallback, not the C-65 product default.
@@ -65,22 +71,37 @@ else
 fi
 ```
 
-## Supervisor Gate
+## Doctor Or Supervisor Gate
 
-Run the deterministic supervisor preparation gate:
+If flags include `--doctor`, run:
+
+```bash
+cd "$REPO"
+"$REPO/.venv/bin/ic-opt" "$PROJECT_DIR" --doctor
+```
+
+Report the doctor result and stop. Do not append `--dry-orchestration` and do
+not dispatch the execution subagent for doctor mode.
+
+Otherwise, run the deterministic supervisor preparation gate:
 
 ```bash
 cd "$REPO"
 "$REPO/.venv/bin/ic-opt" "$PROJECT_DIR" $FLAGS --dry-orchestration
 ```
 
-This reads `opt_requirement.md`, generates YAML/config, imports Maestro point
-roots, validates contracts, packages/preflights/approves the run, and writes:
+For a first run, this reads `opt_requirement.md`, generates YAML/config,
+imports Maestro point roots, validates contracts, packages/preflights/approves
+the run, and writes:
 
 ```text
 PROJECT_DIR/execution_package/OPTIMIZER_EXECUTION_TASK.md
 PROJECT_DIR/execution_package/optimizer_execution_manifest.json
 ```
+
+For continuation, this writes a continuation execution task that adds only the
+requested additional evaluations while preserving the existing optimizer
+history.
 
 If the user explicitly included `--dry-orchestration`, stop here and report the
 supervisor gate result. Do not dispatch the execution subagent for a dry

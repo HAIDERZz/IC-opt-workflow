@@ -415,10 +415,8 @@ Only continue if the decision report or the user asks for it.
 Example:
 
 ```bash
-./.venv/bin/hermes-workflow continue-openbox-real PROJECT_DIR \
-  --additional-evals 100 \
-  --batch-size 10 \
-  --cadence-cshrc /path/to/user/cadence_env.csh
+./.venv/bin/ic-opt PROJECT_DIR \
+  --continue 100
 ```
 
 Do not add `--parallel-jobs` during continuation unless the user explicitly
@@ -426,15 +424,9 @@ asks to change resources. Continuation should inherit the project's
 `config/spectre.yaml` settings so one optimizer history does not mix different
 parallel execution limits.
 
-Then rerun the closeout chain:
-
-```bash
-./.venv/bin/hermes-workflow check-optimizer-run PROJECT_DIR
-./.venv/bin/hermes-workflow summarize-optimizer-run PROJECT_DIR
-./.venv/bin/hermes-workflow finalize-optimizer-run PROJECT_DIR
-./.venv/bin/hermes-workflow visualize-optimizer-run PROJECT_DIR
-./.venv/bin/hermes-workflow decide-optimizer-run PROJECT_DIR
-```
+`ic-opt PROJECT_DIR --continue M` reruns the optimizer closeout chain and
+refreshes the decision and insight reports. The lower-level
+`hermes-workflow continue-openbox-real` command is for debug only.
 
 Do not restart from scratch unless the user changes variables, formulas,
 constraints, objective, or Maestro point roots.

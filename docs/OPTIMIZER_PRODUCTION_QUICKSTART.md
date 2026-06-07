@@ -140,6 +140,16 @@ project readiness: pass
 readiness: ready_for_first_run
 ```
 
+Product-level doctor check:
+
+```bash
+./.venv/bin/ic-opt ~/spectre_opt_prj/<project_name> --doctor
+```
+
+Doctor parses the requirement, checks the Cadence cshrc path, checks the
+OpenBox/Hermes Python environment, prepares config/netlist bundles, and writes
+`reports/ic_opt_doctor_report.json`. It does not launch Spectre/OCEAN.
+
 ## 4. Run The Optimizer
 
 Preferred one-command route:
@@ -221,14 +231,13 @@ Resource meanings:
 - `spectre.threads_per_run`: Spectre `+mt` threads per individual simulation.
 - `optimizer.optimizer_cpu_threads`: Python/OpenBox-side optimizer math threads.
 
-Continuation should inherit the project resource settings unless the user
-explicitly asks to change them:
+Continuation should inherit the already accepted optimizer-history resource
+settings when history exists, falling back to the project config only for the
+first run. Change resources only when the user explicitly asks to do so:
 
 ```bash
-./.venv/bin/hermes-workflow continue-openbox-real ~/spectre_opt_prj/<project_name> \
-  --additional-evals 40 \
-  --batch-size 10 \
-  --cadence-cshrc /path/to/user/cadence_env.csh
+./.venv/bin/ic-opt ~/spectre_opt_prj/<project_name> \
+  --continue 40
 ```
 
 Do not add `--parallel-jobs` to continuation commands by habit. Mixed

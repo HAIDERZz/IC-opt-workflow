@@ -41,6 +41,15 @@ as evidence that the optimizer contract is broken.
 
 ## Standard Product Command
 
+Lightweight doctor check:
+
+```bash
+./.venv/bin/ic-opt PROJECT_DIR --doctor
+```
+
+The doctor command writes `reports/ic_opt_doctor_report.json` and does not run
+Spectre/OCEAN.
+
 ```bash
 ./.venv/bin/ic-opt PROJECT_DIR --real --max-evals 100 --batch-size 10
 ```
@@ -60,15 +69,17 @@ Optional explicit environment:
 Continuation should inherit project resource settings:
 
 ```bash
-./.venv/bin/hermes-workflow continue-openbox-real PROJECT_DIR \
-  --additional-evals 40 \
-  --batch-size 10 \
-  --cadence-cshrc /path/to/cadence_env.csh
+./.venv/bin/ic-opt PROJECT_DIR \
+  --continue 40
 ```
 
 Do not add `--parallel-jobs` during continuation unless the user intentionally
 requests a resource change. Mixed resource histories are rejected by acceptance
 checks because they are harder to compare.
+
+`hermes-workflow continue-openbox-real` remains available as an internal debug
+command, but user-facing and agent-facing workflows should use `ic-opt
+PROJECT_DIR --continue M`.
 
 ## Closeout Reports
 

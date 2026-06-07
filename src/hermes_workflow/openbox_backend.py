@@ -189,11 +189,8 @@ def run_openbox_real_optimization(
     project_root = Path(project_dir)
     bundle = assert_valid_project(project_root)
     selected_batch_size = batch_size or bundle.optimizer.optimizer.batch_size
-    selected_parallel_jobs = parallel_jobs or bundle.spectre.spectre.parallel_jobs
     if selected_batch_size < 1:
         raise ValueError("batch_size must be >= 1")
-    if selected_parallel_jobs < 1:
-        raise ValueError("parallel_jobs must be >= 1")
 
     contract = load_native_turbo_contract(project_root)
     seed = (
@@ -206,6 +203,15 @@ def run_openbox_real_optimization(
         execution_mode=REAL_EXECUTION_MODE,
         enabled=continue_from_existing,
     )
+    selected_parallel_jobs = _select_continuation_int_setting(
+        name="parallel_jobs",
+        explicit_value=parallel_jobs,
+        config_value=bundle.spectre.spectre.parallel_jobs,
+        prior_traces=prior_traces,
+        continue_from_existing=continue_from_existing,
+    )
+    if selected_parallel_jobs < 1:
+        raise ValueError("parallel_jobs must be >= 1")
     selected_max_evals = _select_target_evaluation_count(
         max_evals=max_evals,
         additional_evals=additional_evals,
@@ -385,6 +391,33 @@ def _load_continuation_traces(
     if not traces:
         raise ValueError("OpenBox continuation requires at least one prior trace")
     return traces
+
+
+def _select_continuation_int_setting(
+    *,
+    name: str,
+    explicit_value: int | None,
+    config_value: int,
+    prior_traces: list[NativeTurboEvaluationTrace],
+    continue_from_existing: bool,
+) -> int:
+    if explicit_value is not None:
+        return explicit_value
+    if continue_from_existing and prior_traces:
+        values = {
+            value
+            for value in (getattr(trace, name) for trace in prior_traces)
+            if value is not None
+        }
+        if len(values) == 1:
+            return values.pop()
+        if len(values) > 1:
+            ordered = ", ".join(str(value) for value in sorted(values))
+            raise ValueError(
+                f"cannot infer continuation {name} because prior optimizer "
+                f"history has mixed {name} values: {ordered}"
+            )
+    return config_value
 
 
 def _trace_from_payload(payload: dict[str, Any]) -> NativeTurboEvaluationTrace:

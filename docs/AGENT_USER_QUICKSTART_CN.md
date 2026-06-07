@@ -9,7 +9,14 @@
 你希望最终这样使用：
 
 ```text
+/ic-opt ~/spectre_opt_prj/项目名 --doctor
 /ic-opt ~/spectre_opt_prj/项目名 --real
+```
+
+如果看完报告后想在已有 N 个点基础上继续追加 M 个点：
+
+```text
+/ic-opt ~/spectre_opt_prj/项目名 --continue M
 ```
 
 然后 agent 自动完成：
@@ -26,7 +33,9 @@
 ### 1. Shell 自动化入口
 
 ```bash
+ic-opt PROJECT_DIR --doctor
 ic-opt PROJECT_DIR --real
+ic-opt PROJECT_DIR --continue 40
 ```
 
 这是自动化脚本入口。它可以自己跑完整流程，适合调试和命令行用户。
@@ -34,7 +43,9 @@ ic-opt PROJECT_DIR --real
 ### 2. Agent 产品入口
 
 ```text
+/ic-opt PROJECT_DIR --doctor
 /ic-opt PROJECT_DIR --real
+/ic-opt PROJECT_DIR --continue 40
 ```
 
 这是 agent 入口。当前 agent CLI 的主会话是 supervisor agent，它应该调用同
@@ -174,6 +185,12 @@ testbench。项目会保留每个 testbench 的原生 Maestro/ADE 文件结构�
 
 ```text
 /ic-opt ~/spectre_opt_prj/项目名 --real
+```
+
+如果报告建议继续优化，或者你想追加更多点数，再发一句：
+
+```text
+/ic-opt ~/spectre_opt_prj/项目名 --continue 40
 ```
 
 正常情况下，agent 会：

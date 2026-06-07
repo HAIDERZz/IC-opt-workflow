@@ -1,7 +1,8 @@
 # Runtime-Native Agent Adapters
 
-These assets make `/ic-opt PROJECT_DIR --real` work inside a specific agent CLI
-without requiring that CLI to launch another CLI as the execution agent.
+These assets make `/ic-opt PROJECT_DIR --doctor`, `/ic-opt PROJECT_DIR --real`,
+and `/ic-opt PROJECT_DIR --continue M` work inside a specific agent CLI without
+requiring that CLI to launch another CLI as the execution agent.
 
 The product model is:
 
@@ -9,9 +10,10 @@ The product model is:
 User -> current runtime supervisor agent -> same-runtime execution subagent
 ```
 
-The shell command `ic-opt PROJECT_DIR --real` remains the deterministic
-automation core for direct operator/debug use. Runtime adapters wrap that core
-with the active CLI's own subagent mechanism.
+The shell commands `ic-opt PROJECT_DIR --doctor`, `ic-opt PROJECT_DIR --real`,
+and `ic-opt PROJECT_DIR --continue M` remain the deterministic automation core
+for direct operator/debug use. Runtime adapters wrap that core with the active
+CLI's own subagent mechanism.
 
 ## Claude
 
@@ -24,7 +26,9 @@ Install:
 Then use in Claude:
 
 ```text
+/ic-opt PROJECT_DIR --doctor
 /ic-opt PROJECT_DIR --real
+/ic-opt PROJECT_DIR --continue 40
 ```
 
 ## OpenCode

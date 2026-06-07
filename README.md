@@ -98,6 +98,19 @@ examples/spectre_maestro_project/
 For multi-testbench projects, `opt_requirement.md` should list each Maestro
 point root and route each metric to the correct testbench.
 
+## Doctor Check
+
+Before launching real tools, run a lightweight project/environment check:
+
+```bash
+./.venv/bin/ic-opt ~/spectre_opt_prj/my_mixer_opt --doctor
+```
+
+This parses `opt_requirement.md`, checks the Cadence environment path, verifies
+the product/OpenBox Python environment, prepares config/netlist bundles, checks
+project readiness, and reports whether continuation artifacts exist. It does not
+launch Spectre/OCEAN and does not generate optimizer candidates.
+
 ## Run
 
 Offline gate check without launching Spectre/OCEAN:
@@ -130,15 +143,14 @@ If your project does not contain `cadence_env.csh`, pass it explicitly:
 Continuation after a completed run:
 
 ```bash
-./.venv/bin/hermes-workflow continue-openbox-real ~/spectre_opt_prj/my_mixer_opt \
-  --additional-evals 40 \
-  --batch-size 10 \
-  --cadence-cshrc ~/spectre_opt_prj/my_mixer_opt/cadence_env.csh
+./.venv/bin/ic-opt ~/spectre_opt_prj/my_mixer_opt \
+  --continue 40
 ```
 
 Do not add `--parallel-jobs` during continuation unless you intentionally want
-to change resources. The continuation path should inherit the project
-`config/spectre.yaml` settings so all optimizer evidence remains comparable.
+to change resources. When prior optimizer history exists, continuation inherits
+that history's resource settings; otherwise it uses `config/spectre.yaml`. This
+keeps optimizer evidence comparable across batches.
 
 ## Read Results
 

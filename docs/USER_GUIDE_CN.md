@@ -69,7 +69,19 @@ constraints.md
 `cadence_env.csh` 是你自己能 source 后运行 Spectre/OCEAN 的环境设置文件。
 不要在需求里写死 Spectre 版本。
 
-## 4. 写 opt_requirement.md
+## 4. 先做 doctor 体检
+
+正式跑真实工具之前，建议先执行：
+
+```bash
+./.venv/bin/ic-opt ~/spectre_opt_prj/Mixer_opt --doctor
+```
+
+它会检查 `opt_requirement.md`、Cadence 环境文件、OpenBox/Hermes Python
+环境、config/netlist 准备情况和 continuation 所需历史文件。它不会启动
+Spectre/OCEAN，也不会生成优化候选点。
+
+## 5. 写 opt_requirement.md
 
 参考：
 
@@ -97,7 +109,7 @@ iip3: 计算 IIP3
 p1db: 计算 P1dB
 ```
 
-## 5. 先做离线检查
+## 6. 先做离线检查
 
 这个命令不会启动 Spectre/OCEAN：
 
@@ -111,7 +123,7 @@ p1db: 计算 P1dB
 
 如果这里失败，通常是 `opt_requirement.md`、路径、格式或环境文件位置有问题。
 
-## 6. 跑真实优化
+## 7. 跑真实优化
 
 ```bash
 ./.venv/bin/ic-opt ~/spectre_opt_prj/Mixer_opt \
@@ -131,7 +143,7 @@ p1db: 计算 P1dB
 真实运行必须能访问 Cadence license 和系统进程服务。不要在限制 sandbox 里运行
 真实 Spectre/OCEAN。
 
-## 7. 查看结果
+## 8. 查看结果
 
 优先看：
 
@@ -150,20 +162,18 @@ accept_best_observed_or_continue
 意思是当前有一个 best observed feasible 点，但不是全局最优证明。你可以接受，也
 可以继续增加点数。
 
-## 8. 继续追加优化
+## 9. 继续追加优化
 
 ```bash
-./.venv/bin/hermes-workflow continue-openbox-real ~/spectre_opt_prj/Mixer_opt \
-  --additional-evals 40 \
-  --batch-size 10 \
-  --cadence-cshrc ~/spectre_opt_prj/Mixer_opt/cadence_env.csh
+./.venv/bin/ic-opt ~/spectre_opt_prj/Mixer_opt \
+  --continue 40
 ```
 
-续跑时默认继承项目里的 `config/spectre.yaml` 资源设置。不要习惯性加
-`--parallel-jobs`，除非你明确想改变资源；混用不同并行设置会让验收器拒绝这份
-优化历史。
+续跑时如果已有优化历史，默认继承历史里已经验收过的资源设置；如果没有历史，
+才使用项目里的 `config/spectre.yaml`。不要习惯性加 `--parallel-jobs`，除非你
+明确想改变资源；混用不同并行设置会让验收器拒绝这份优化历史。
 
-## 9. 和 Agent 配合使用
+## 10. 和 Agent 配合使用
 
 最终推荐的用户交互是短指令：
 
@@ -190,7 +200,7 @@ Agent 不应该：
 - 在用户没要求时改变并行资源
 - 把失败点当作主推荐点
 
-## 10. 当前 v0.1 边界
+## 11. 当前 v0.1 边界
 
 - 已经支持 shell 自动化的完整真实流程。
 - Claude/OpenCode runtime adapter 是产品化方向的一部分，但不同 agent runtime 的

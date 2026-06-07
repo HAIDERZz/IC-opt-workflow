@@ -7,18 +7,26 @@ This document describes the v0.1 public release boundary for agent use.
 The deterministic automation core is:
 
 ```bash
+ic-opt PROJECT_DIR --doctor
 ic-opt PROJECT_DIR --real
+ic-opt PROJECT_DIR --continue M
 ```
 
-The command reads `PROJECT_DIR/opt_requirement.md`, prepares the project,
-runs the approved optimizer flow, and writes reports under `PROJECT_DIR/reports/`.
+The doctor command runs a lightweight project/environment check and writes
+`reports/ic_opt_doctor_report.json`. The real command reads
+`PROJECT_DIR/opt_requirement.md`, prepares the project, runs the approved
+optimizer flow, and writes reports under `PROJECT_DIR/reports/`.
+The continuation command adds M more real evaluations to an existing optimizer
+history and refreshes the decision/insight reports.
 
 ## Intended Agent Model
 
 For an agent runtime that supports commands or skills, the user-facing shape is:
 
 ```text
+/ic-opt PROJECT_DIR --doctor
 /ic-opt PROJECT_DIR --real
+/ic-opt PROJECT_DIR --continue M
 ```
 
 The intended role model is:
