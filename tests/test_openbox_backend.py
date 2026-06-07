@@ -869,7 +869,7 @@ def test_continue_openbox_real_cli_uses_safe_defaults_and_repairs_package(
         assert max_evals is None
         assert additional_evals == 40
         assert continue_from_existing is True
-        assert surrogate_type == "prf"
+        assert surrogate_type == "gp"
         assert acq_type == "eic"
         assert acq_optimizer_type == "local_random"
         return type(

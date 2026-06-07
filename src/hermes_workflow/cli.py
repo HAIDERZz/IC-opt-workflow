@@ -68,7 +68,7 @@ from hermes_workflow.validate import validate_project_files
 
 app = typer.Typer(help="Hermes file-contract workflow tools.")
 
-CONTINUATION_SURROGATE_TYPE = "prf"
+CONTINUATION_SURROGATE_TYPE = "gp"
 CONTINUATION_ACQ_TYPE = "eic"
 CONTINUATION_ACQ_OPTIMIZER_TYPE = "local_random"
 

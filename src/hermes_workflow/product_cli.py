@@ -24,7 +24,7 @@ from hermes_workflow.product_doctor import (
 CADENCE_CSHRC_ENV_VAR = "IC_OPT_CADENCE_CSHRC"
 PROJECT_CADENCE_CSHRC = Path("cadence_env.csh")
 USER_CADENCE_CSHRC = Path("~/.ic-opt/cadence_env.csh")
-CONTINUATION_SURROGATE_TYPE = "prf"
+CONTINUATION_SURROGATE_TYPE = "gp"
 CONTINUATION_ACQ_TYPE = "eic"
 CONTINUATION_ACQ_OPTIMIZER_TYPE = "local_random"
 

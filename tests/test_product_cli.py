@@ -313,7 +313,7 @@ def test_ic_opt_continue_runs_openbox_continuation_and_closeout(
             "batch_size": 10,
             "parallel_jobs": 4,
             "cadence_cshrc": cadence_cshrc,
-            "surrogate_type": "prf",
+            "surrogate_type": "gp",
             "acq_type": "eic",
             "acq_optimizer_type": "local_random",
         },

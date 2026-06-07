@@ -968,7 +968,7 @@ def _create_advisor(
             num_constraints=num_constraints,
             initial_trials=max(2 * len(variables.variables), 1),
             init_strategy="sobol",
-            surrogate_type=surrogate_type or "auto",
+            surrogate_type=surrogate_type or "gp",
             acq_type=acq_type or "auto",
             acq_optimizer_type=acq_optimizer_type or "auto",
             task_id="hermes_openbox_real",
