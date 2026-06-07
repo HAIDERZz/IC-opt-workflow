@@ -93,6 +93,13 @@ def main(
             ),
         ),
     ] = None,
+    execution_agent: Annotated[
+        str,
+        typer.Option(
+            "--execution-agent",
+            help="Execution mode: direct or claude.",
+        ),
+    ] = "direct",
 ) -> None:
     try:
         resolved_cadence_cshrc = _resolve_cadence_cshrc(project_dir, cadence_cshrc)
@@ -104,6 +111,7 @@ def main(
             batch_size=batch_size,
             parallel_jobs=parallel_jobs,
             cadence_cshrc=resolved_cadence_cshrc,
+            execution_agent=execution_agent,
         )
     except (OSError, RuntimeError, ValueError) as exc:
         _exit_with_error(exc)

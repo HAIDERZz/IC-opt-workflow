@@ -22,16 +22,27 @@ Current execution state:
 
 - Latest production acceptance note:
   `docs/PRODUCTION_LANDING_ACCEPTANCE_2026-06-07.md`.
-- Current scope: C-63 Claude /ic-opt Real Landing complete.
-- Current status: the implemented product route now has two proven layers:
-  the shell automation core `ic-opt PROJECT_DIR --real`, and the first Claude
-  CLI slash-skill entrypoint `/ic-opt PROJECT_DIR --real` after installing
-  `claude_skills/ic-opt`. Automatic supervisor-agent to independent
-  execution-agent dispatch is still not implemented.
+- Current scope: C-64 Observable Claude execution-agent handoff complete.
+- Current status: the implemented product route now has three proven Claude
+  layers: shell `ic-opt PROJECT_DIR --real`, Claude CLI `/ic-opt PROJECT_DIR
+  --real` after installing `claude_skills/ic-opt`, and observable supervisor
+  Claude to independent Claude CLI execution-agent handoff through
+  `--execution-agent claude`.
 - Canonical agent boundary doc:
   `docs/AGENT_INTEGRATION_STATUS.md`.
 - Detailed Chinese project status and architecture explanation:
   `docs/PROJECT_STATUS_AND_ARCHITECTURE_CN.md`.
+- C-64 Claude execution-agent handoff evidence:
+  `docs/CLAUDE_EXECUTION_AGENT_HANDOFF_2026-06-07.md`.
+  Fresh project `/tmp/ic_auto_opt_c64_handoff_zX9JrO/Mixer_opt_muti_tb`
+  started with only `opt_requirement.md` and `cadence_env.csh`. The command
+  `claude -p --dangerously-skip-permissions "/ic-opt PROJECT --real"`
+  completed an observable handoff at `package-optimizer-task`, wrote
+  `reports/execution_agent_handoff_report.json` with `status=pass`,
+  `execution_agent=claude`, `returncode=0`, then completed 100 real
+  OpenBox/Spectre/OCEAN evaluations with `16 feasible`,
+  `68 constraint_failed`, and `16 metric_check_failed`, then recommended
+  feasible `real_051` with `global_optimum_claim=false`.
 - C-63 Claude CLI slash-skill evidence:
   `docs/CLAUDE_IC_OPT_REAL_LANDING_2026-06-07.md`.
   Fresh project `/tmp/ic_auto_opt_claude_landing_JjIiNj/Mixer_opt_muti_tb`
@@ -48,16 +59,19 @@ Current execution state:
   pass; counts are `65 constraint_failed`, `19 feasible`,
   `16 metric_check_failed`; recommended feasible candidate is `real_066`
   with `F=26`, `L=40n`, `VB_LO=310m`, `W=1u`.
+- C-64 plan:
+  `docs/superpowers/plans/2026-06-07-observable-execution-agent-handoff.md`.
 - C-63 plan:
   `docs/superpowers/plans/2026-06-07-claude-ic-opt-real-landing.md`.
 - Product target: one product-level Python environment for
   `ic-auto-opt-workflow`, OpenBox, TuRBO, and report dependencies; no
   per-project virtualenvs. The implemented shell entry is
   `ic-opt PROJECT --real`; the implemented Claude CLI entry is
-  `/ic-opt PROJECT --real` after installing `claude_skills/ic-opt`. The final
-  independent supervisor-agent to execution-agent dispatch still needs a real
-  wrapper/handoff implementation and drill. Do not use long natural-language
-  prompts to compensate for missing command behavior.
+  `/ic-opt PROJECT --real` after installing `claude_skills/ic-opt`; the Claude
+  runtime now has an observable independent execution-agent handoff mode.
+  Codex/non-Claude runtime adapters and clean-machine skill installer remain
+  future work. Do not use long natural-language prompts to compensate for
+  missing command behavior.
 - C-59 product-entrypoint evidence:
   `/tmp/ic_auto_opt_c59_dry_5J81NM/Mixer_opt_muti_tb` passed one-line dry
   orchestration from `./.venv/bin/ic-opt` with `PROJECT_DIR/cadence_env.csh`
@@ -114,7 +128,7 @@ Current execution state:
   mistakes such as `W` being overwritten by `L`. Import evidence: 69 netlist
   files copied, 1 safe symlink materialized, and template variables `F`, `W`,
   `L`, and `VB_LO` approved. No Spectre/OCEAN run was launched.
-- current_scope: C-63 Claude /ic-opt Real Landing complete.
+- current_scope: C-64 Observable Claude execution-agent handoff complete.
 - C-50 files: `docs/superpowers/specs/2026-06-06-multi-testbench-candidate-evaluation-design.md`
   and `docs/superpowers/plans/2026-06-06-multi-testbench-candidate-evaluation.md`.
 - C-49 verification: targeted tests passed with `88 passed`; full suite passed
@@ -123,12 +137,12 @@ Current execution state:
   rewrite; no Maestro/ADE netlist flattening; no optimizer execution behavior
   change. The only schema extension was accepting `optimizer.algorithm: openbox`
   to match the existing OpenBox backend route.
-- next_allowed_action: after user confirmation, decide the C-64 product
-  boundary: either accept single-agent Claude slash skill plus deterministic
-  shell automation core as the first product target, or implement an observable
-  supervisor-agent to independent execution-agent handoff. Do not create
-  per-project venvs, rely on `/tmp/ic_auto_opt_openbox_spike/.venv`, hardcode
-  Spectre versions, change algorithms, or introduce broad workflow layers.
+- next_allowed_action: after user confirmation, choose the next
+  product-landing task: one more fresh real Claude `/ic-opt` handoff
+  acceptance, clean-machine Claude skill/install check, or release/readiness
+  pass. Do not create per-project venvs, rely on
+  `/tmp/ic_auto_opt_openbox_spike/.venv`, hardcode Spectre versions, change
+  algorithms, or introduce broad workflow layers.
 - Post-C-49 real Mixer smoke: `real_002` used `F=26`, `W=1u`, `L=40n`,
   `VB_LO=310m`, ran Spectre 25.1, ran batch OCEAN with approved formulas
   unchanged, passed `check-real-run`, and passed `check-metric-results`.
@@ -1383,5 +1397,5 @@ unimplemented.
 ## Latest Resume Prompt
 
 ```text
-请继续 IC auto optimization workflow。先阅读 AGENTS.md、docs/CURRENT_TASK_STATE.json、docs/AGENT_INTEGRATION_STATUS.md、docs/PROJECT_STATUS_AND_ARCHITECTURE_CN.md、docs/CLAUDE_IC_OPT_REAL_LANDING_2026-06-07.md、docs/OPTIMIZER_PRODUCTION_QUICKSTART.md、docs/AGENT_OPTIMIZER_USAGE_MANUAL.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-63 Claude /ic-opt Real Landing 已完成 verified-only：新增 claude_skills/ic-opt/SKILL.md，安装到 ~/.claude/skills/ic-opt 后，用 fresh project /tmp/ic_auto_opt_claude_landing_JjIiNj/Mixer_opt_muti_tb（初始只有 opt_requirement.md 和 cadence_env.csh）运行 claude -p --dangerously-skip-permissions "/ic-opt PROJECT --real"，完成 100 个真实 OpenBox/Spectre/OCEAN evaluations，counts=16 feasible/68 constraint_failed/16 metric_check_failed，推荐 feasible real_051，global_optimum_claim=false。当前已实现：shell ic-opt PROJECT_DIR --real；Claude CLI /ic-opt PROJECT_DIR --real。当前未实现：自动 supervisor-agent 到独立 execution-agent dispatch，Codex/非 Claude runtime 的 /ic-opt 适配，clean-machine skill installer。下一步只做 C-64 产品边界决策：接受 single-agent Claude slash skill + deterministic shell automation core 作为首个产品目标，或实现 observable supervisor -> independent execution-agent handoff。不要继续添加 optimizer math/features，不要 fake run，不要手选点，不要解析 PSF，不要重写 OCEAN 公式，不要硬编码 Spectre 版本，不要创建每项目 venv。
+请继续 IC auto optimization workflow。先阅读 AGENTS.md、docs/CURRENT_TASK_STATE.json、docs/AGENT_INTEGRATION_STATUS.md、docs/PROJECT_STATUS_AND_ARCHITECTURE_CN.md、docs/CLAUDE_EXECUTION_AGENT_HANDOFF_2026-06-07.md、docs/OPTIMIZER_PRODUCTION_QUICKSTART.md、docs/AGENT_OPTIMIZER_USAGE_MANUAL.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-64 Observable Claude execution-agent handoff 已完成 verified-only：Claude /ic-opt skill 现在默认追加 --execution-agent claude；shell ic-opt 默认仍为 direct；optimizer flow 在 package-optimizer-task 后派发独立 Claude CLI execution-agent process，记录 reports/execution_agent_handoff_report.json 和 transcript，然后 supervisor-side closeout 继续执行。fresh project /tmp/ic_auto_opt_c64_handoff_zX9JrO/Mixer_opt_muti_tb 初始只有 opt_requirement.md 和 cadence_env.csh，运行 claude -p --dangerously-skip-permissions "/ic-opt PROJECT --real" 后 handoff status=pass、returncode=0，并完成 100 个真实 OpenBox/Spectre/OCEAN evaluations，counts=16 feasible/68 constraint_failed/16 metric_check_failed，推荐 feasible real_051，global_optimum_claim=false。当前已实现：shell ic-opt PROJECT_DIR --real；Claude CLI /ic-opt PROJECT_DIR --real；Claude runtime 的 observable supervisor -> independent execution-agent handoff。当前未实现：Codex/非 Claude runtime 的 /ic-opt 适配，clean-machine Claude skill installer，自动最终用户接受。下一步只做产品落地收窄任务：可选 fresh real handoff acceptance、clean-machine install check、release/readiness pass。不要添加 optimizer math/features，除非真实产品运行暴露具体需求；不要 fake run、手选点、解析 PSF、重写 OCEAN 公式、硬编码 Spectre 版本或创建每项目 venv。
 ```

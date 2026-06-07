@@ -7,6 +7,9 @@ from typing import Any, Callable
 
 from hermes_workflow.approvals import decide_first_real_run
 from hermes_workflow.dry_run import run_dry_run
+from hermes_workflow.execution_agent_handoff import (
+    dispatch_execution_agent as dispatch_execution_agent_process,
+)
 from hermes_workflow.health import write_preflight_health
 from hermes_workflow.netlists import prepare_netlist
 from hermes_workflow.openbox_backend import run_openbox_real_optimization
@@ -44,11 +47,13 @@ class OptimizerFlowReport:
     max_evals: int
     batch_size: int | None
     parallel_jobs: int | None
+    execution_agent: str
     steps: list[OptimizerFlowStep]
     user_decision_required: bool
     recommended_run_id: str | None = None
     recommended_action: str | None = None
     stopped_before: str | None = None
+    handoff_report_path: Path | None = None
     issues: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     report_path: Path | None = None
@@ -90,7 +95,9 @@ def optimize_project(
     batch_size: int | None = None,
     parallel_jobs: int | None = None,
     backend: str = "openbox",
+    execution_agent: str = "direct",
     services: OptimizerFlowServices | None = None,
+    dispatch_execution_agent: Callable[..., Any] = dispatch_execution_agent_process,
 ) -> OptimizerFlowReport:
     project_root = Path(project_dir)
     service = services or OptimizerFlowServices()
@@ -100,6 +107,7 @@ def optimize_project(
     recommended_run_id: str | None = None
     recommended_action: str | None = None
     stopped_before: str | None = None
+    handoff_report_path: Path | None = None
     user_decision_required = False
 
     try:
@@ -108,6 +116,7 @@ def optimize_project(
             cadence_cshrc=cadence_cshrc,
             max_evals=max_evals,
             backend=backend,
+            execution_agent=execution_agent,
         )
         _run_step(
             steps,
@@ -189,26 +198,40 @@ def optimize_project(
                     max_evals=max_evals,
                     batch_size=batch_size,
                     parallel_jobs=parallel_jobs,
+                    execution_agent=execution_agent,
                     steps=steps,
                     user_decision_required=False,
                     stopped_before=stopped_before,
+                    handoff_report_path=handoff_report_path,
                     issues=issues,
                     warnings=warnings,
                 ),
             )
 
-        _run_step(
-            steps,
-            "run-openbox-real",
-            lambda: service.run_openbox_real_optimization(
-                project_root,
-                max_evals=max_evals,
-                batch_size=batch_size,
-                parallel_jobs=parallel_jobs,
-                cadence_cshrc=cadence_cshrc,
-            ),
-            _expect_success,
-        )
+        if execution_agent == "direct":
+            _run_step(
+                steps,
+                "run-openbox-real",
+                lambda: service.run_openbox_real_optimization(
+                    project_root,
+                    max_evals=max_evals,
+                    batch_size=batch_size,
+                    parallel_jobs=parallel_jobs,
+                    cadence_cshrc=cadence_cshrc,
+                ),
+                _expect_success,
+            )
+        else:
+            handoff = _run_step(
+                steps,
+                "execution-agent-handoff",
+                lambda: dispatch_execution_agent(
+                    project_root,
+                    execution_agent=execution_agent,
+                ),
+                lambda result: _expect_status(result, "pass"),
+            )
+            handoff_report_path = getattr(handoff, "report_path", None)
         _run_step(
             steps,
             "check-optimizer-run",
@@ -253,9 +276,11 @@ def optimize_project(
             max_evals=max_evals,
             batch_size=batch_size,
             parallel_jobs=parallel_jobs,
+            execution_agent=execution_agent,
             steps=steps,
             user_decision_required=False,
             stopped_before=stopped_before,
+            handoff_report_path=handoff_report_path,
             issues=issues,
             warnings=warnings,
         )
@@ -273,11 +298,13 @@ def optimize_project(
             max_evals=max_evals,
             batch_size=batch_size,
             parallel_jobs=parallel_jobs,
+            execution_agent=execution_agent,
             steps=steps,
             user_decision_required=user_decision_required,
             recommended_run_id=recommended_run_id,
             recommended_action=recommended_action,
             stopped_before=stopped_before,
+            handoff_report_path=handoff_report_path,
             issues=issues,
             warnings=warnings,
         ),
@@ -290,11 +317,14 @@ def _validate_options(
     cadence_cshrc: Path | None,
     max_evals: int,
     backend: str,
+    execution_agent: str,
 ) -> None:
     if not real:
         raise ValueError("optimize requires --real; fake optimize is not supported")
     if backend != "openbox":
         raise ValueError("optimize currently supports backend=openbox only")
+    if execution_agent not in {"direct", "claude"}:
+        raise ValueError("execution_agent must be direct or claude")
     if max_evals < 1:
         raise ValueError("max_evals must be >= 1")
     if cadence_cshrc is None:
@@ -390,11 +420,13 @@ def _report(
     max_evals: int,
     batch_size: int | None,
     parallel_jobs: int | None,
+    execution_agent: str,
     steps: list[OptimizerFlowStep],
     user_decision_required: bool,
     recommended_run_id: str | None = None,
     recommended_action: str | None = None,
     stopped_before: str | None = None,
+    handoff_report_path: Path | None = None,
     issues: list[str],
     warnings: list[str],
 ) -> OptimizerFlowReport:
@@ -407,11 +439,13 @@ def _report(
         max_evals=max_evals,
         batch_size=batch_size,
         parallel_jobs=parallel_jobs,
+        execution_agent=execution_agent,
         steps=list(steps),
         user_decision_required=user_decision_required,
         recommended_run_id=recommended_run_id,
         recommended_action=recommended_action,
         stopped_before=stopped_before,
+        handoff_report_path=handoff_report_path,
         issues=list(issues),
         warnings=list(warnings),
         report_path=project_root / REPORT_RELATIVE,

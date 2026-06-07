@@ -23,7 +23,7 @@
 
 ## Current Implementation Node
 
-As of 2026-06-07, Plan A, Plan B, and Plan C through C-63 are complete, with
+As of 2026-06-07, Plan A, Plan B, and Plan C through C-64 are complete, with
 post-C-49 real Mixer OpenBox/Spectre/OCEAN evidence through 200 cumulative
 NF=12dB evaluations and C-50 real multi-testbench evidence through 100
 three-testbench evaluations. Post-C50/C-54 reporting now re-scores existing
@@ -111,10 +111,21 @@ project `/tmp/ic_auto_opt_claude_landing_JjIiNj/Mixer_opt_muti_tb` started
 with only `opt_requirement.md` and `cadence_env.csh`; Claude CLI then completed
 100 real OpenBox/Spectre/OCEAN evaluations and recommended feasible `real_051`
 with `global_optimum_claim=false`. This proves a short Claude agent-facing
-entrypoint to the automation core, but it still does not prove automatic
-supervisor-agent to independent execution-agent dispatch. Do not describe the
-current repository as a completed two-agent product until an observable
-supervisor/execution-agent handoff drill passes.
+entrypoint to the automation core.
+
+C-64 implements and validates observable Claude supervisor-agent to independent
+Claude CLI execution-agent handoff. The Claude `/ic-opt` skill appends
+`--execution-agent claude` by default; `optimizer_flow` dispatches an
+independent Claude CLI execution-agent process after `package-optimizer-task`,
+captures `reports/execution_agent_handoff_report.json` and transcript, then
+resumes supervisor-side closeout. The fresh project
+`/tmp/ic_auto_opt_c64_handoff_zX9JrO/Mixer_opt_muti_tb` started with only
+`opt_requirement.md` and `cadence_env.csh`; `claude -p
+--dangerously-skip-permissions "/ic-opt PROJECT --real"` completed the handoff,
+100 real OpenBox/Spectre/OCEAN evaluations, and recommended feasible
+`real_051` with `global_optimum_claim=false`. This proves the Claude runtime
+two-agent handoff route; Codex/non-Claude runtime adapters and clean-machine
+skill installer remain future work.
 
 The accepted route is no longer an abstract contract-only optimizer plan; it is
 a practice-first production handoff flow that has been exercised with real
@@ -131,8 +142,8 @@ user supplies a Cadence env anchor once
 -> supervisor agent must use the short command and project files, not a long prompt
 -> Hermes workflow tooling validates/package contracts
 -> Hermes writes optimizer execution task packet
--> current Claude skill runs the automation core from the supervisor-agent session
--> future two-agent product, if retained, must make execution agent follow the packet command exactly
+-> Claude /ic-opt dispatches an independent Claude CLI execution-agent process
+-> execution agent follows the generated optimizer task package command exactly
 -> OpenBox/native TuRBO generates candidates, not hand-picked points
 -> Spectre runs with approved precision/thread settings
 -> OCEAN computes approved metrics

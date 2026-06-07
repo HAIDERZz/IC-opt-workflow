@@ -11,8 +11,11 @@ Current implementation boundary:
 - Implemented: shell command `ic-opt PROJECT_DIR --real`.
 - Implemented for Claude CLI after skill installation:
   `/ic-opt PROJECT_DIR --real`.
+- Implemented for Claude CLI: observable supervisor-agent to independent Claude
+  CLI execution-agent handoff through `--execution-agent claude`.
 - Implemented: Hermes workflow task packages and execution-agent instructions.
-- Not implemented: automatic supervisor-agent to execution-agent dispatch.
+- Not implemented: Codex/non-Claude slash-command adapters and clean-machine
+  Claude skill installer.
 
 Read `docs/AGENT_INTEGRATION_STATUS.md` before claiming the two-agent product
 itself is complete. Read `docs/PROJECT_STATUS_AND_ARCHITECTURE_CN.md` for the
@@ -112,7 +115,8 @@ The implemented Claude CLI product-shaped agent request is:
 ```
 
 after installing the included skill from `claude_skills/ic-opt`. Automatic
-execution-agent dispatch is still not implemented.
+execution-agent dispatch is enabled for the Claude route by default through
+`--execution-agent claude`.
 
 The user-facing request should stay short. All machine-critical information
 belongs in `opt_requirement.md`.
@@ -229,9 +233,25 @@ command:
 
 This command performs the approved package/preflight/approval gate, launches the
 real OpenBox optimizer, runs the closeout report chain, and then stops for user
-acceptance. It does not record final user acceptance automatically. In this
-current form, the supervisor agent is operating the automation core directly;
-automatic execution-agent dispatch is not yet implemented.
+acceptance. It does not record final user acceptance automatically.
+
+For shell/operator use, `ic-opt` defaults to direct execution:
+
+```bash
+./.venv/bin/ic-opt PROJECT_DIR \
+  --real \
+  --execution-agent direct \
+  --max-evals 100 \
+  --batch-size 10 \
+  --parallel-jobs 10
+```
+
+For Claude supervisor-agent use, `/ic-opt` appends
+`--execution-agent claude` by default. That route prepares and approves the
+package, dispatches an independent Claude CLI execution-agent process for the
+generated optimizer task package, captures
+`reports/execution_agent_handoff_report.json`, then resumes supervisor-side
+closeout.
 
 To test the offline gates only:
 
@@ -464,22 +484,25 @@ The agent must keep these rules:
 
 ## 16. Minimal Successful Session
 
-A successful first production session looks like:
+A successful Claude production session looks like:
 
 ```text
 1. User creates PROJECT_DIR and writes opt_requirement.md.
-2. Supervisor agent runs `ic-opt PROJECT_DIR --real ...`.
-3. Hermes writes `reports/optimizer_flow_run_report.json` and closeout reports.
-4. Supervisor reports best observed feasible result and bottleneck.
-5. User accepts or asks to continue.
-6. Supervisor records decision and writes optimizer_final_summary.md.
-7. readiness=ready_for_closeout_review.
+2. User sends `/ic-opt PROJECT_DIR --real` to Claude CLI.
+3. Supervisor-side flow prepares/preflights/approves the package.
+4. Independent Claude CLI execution agent runs the generated optimizer task.
+5. Supervisor-side flow writes `optimizer_flow_run_report.json`, handoff
+   report, and closeout reports.
+6. Supervisor reports best observed feasible result and bottleneck.
+7. User accepts or asks to continue.
+8. Supervisor records decision and writes optimizer_final_summary.md.
+9. readiness=ready_for_closeout_review.
 ```
 
 At that point, the user can use the accepted candidate as the current optimized
 design point, while remembering it is not a mathematical global optimum proof.
 
-This is proof of the current single-agent Claude slash-skill path after
-installing `claude_skills/ic-opt`. It is not yet proof of the final two-agent
-product. The final two-agent product still needs an observable
-supervisor-agent to independent execution-agent handoff.
+This is proof of the current Claude slash-skill plus independent Claude
+execution-agent handoff path after installing `claude_skills/ic-opt`.
+Non-Claude runtimes still need their own adapters before claiming equivalent
+support.

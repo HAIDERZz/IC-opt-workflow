@@ -6,30 +6,34 @@
 
 ## 0. 结论先说清楚
 
-当前项目已经跑通的是一个产品级 shell 自动化核心，以及第一个 Claude CLI
-slash skill 入口；它仍然不是完整的两 agent 产品。[E1][E2][E3][E19]
+当前项目已经跑通的是一个产品级 shell 自动化核心、第一个 Claude CLI
+slash skill 入口，以及 Claude runtime 下可观察的 supervisor-agent ->
+independent execution-agent handoff。[E1][E2][E3][E19][E20]
 
 当前可用 shell 入口是 `ic-opt PROJECT_DIR --real`，它是 Python console
 script。[E1][E3]
 
 当前可用 Claude CLI agent 入口是安装 `claude_skills/ic-opt` 后的
 `/ic-opt PROJECT_DIR --real`；C-63 已经用 fresh Mixer multi-testbench 项目
-真实跑通。[E19]
+真实跑通，C-64 进一步证明该入口默认会派发独立 Claude CLI execution-agent
+process。[E19][E20]
 
-当前 `ic-opt` 会生成执行包和 optimizer 执行任务包，但它随后在同一个
-Python 流程里调用真实 OpenBox/Spectre/OCEAN 优化后端；它没有自动派发一
-个独立执行 agent。[E3][E4]
+当前 `ic-opt` 有两种执行模式：shell 默认的 `--execution-agent direct`
+会在同一个 Python 流程里调用真实 OpenBox/Spectre/OCEAN 优化后端；
+Claude `/ic-opt` 默认追加 `--execution-agent claude`，会在
+`package-optimizer-task` 之后派发一个独立 Claude CLI execution-agent
+process，然后由 supervisor-side flow 继续审计和汇报。[E3][E4][E20]
 
 因此，如果用户说“运行 `ic-opt` 之后 agent 接入在哪里”，准确答案是：
 C-63 之前只停留在文档化角色、任务包合同和人工/主管 agent 可操作 CLI 的
-层级；C-63 之后，Claude CLI 可以通过 `/ic-opt` skill 触发该自动化核心。
-但它仍然没有变成真实自动 supervisor-agent -> execution-agent dispatch。
-[E2][E4][E19]
+层级；C-63 之后，Claude CLI 可以通过 `/ic-opt` skill 触发该自动化核心；
+C-64 之后，Claude CLI 路径已经能观察到 supervisor -> independent
+execution-agent handoff。[E2][E4][E19][E20]
 
-这不是小缺口，而是产品落地边界缺口；C-62 已经把这个边界写入
-`docs/AGENT_INTEGRATION_STATUS.md`，C-63 则把第一个 Claude `/ic-opt`
-入口真实落地，并记录在 `docs/CLAUDE_IC_OPT_REAL_LANDING_2026-06-07.md`。
-[E2][E5][E19]
+当前仍然不是“任意 agent runtime 都支持”的产品。C-62 把边界写入
+`docs/AGENT_INTEGRATION_STATUS.md`，C-63 把第一个 Claude `/ic-opt`
+入口真实落地，C-64 把 Claude runtime 的独立 execution-agent handoff
+真实落地。[E2][E5][E19][E20]
 
 ## 1. 项目原始目标
 
@@ -41,9 +45,10 @@ Virtuoso/Spectre/OCEAN/OpenBox 执行。[E6]
 这个角色模型仍然是目标架构，且 `AGENTS.md` 明确禁止把 Hermes 说成一个
 agent；Hermes 在本项目中是 workflow tooling。[E7]
 
-当前实现最成熟的部分是 Hermes workflow tooling、shell 自动化核心和
-Claude CLI skill 入口；尚未完成的部分是自动双 agent handoff，以及非 Claude
-agent runtime 的入口适配。[E2][E3][E6][E19]
+当前实现最成熟的部分是 Hermes workflow tooling、shell 自动化核心、
+Claude CLI skill 入口，以及 Claude runtime 的独立 execution-agent
+handoff；尚未完成的部分是 Codex/非 Claude agent runtime 的入口适配和
+clean-machine skill installer。[E2][E3][E6][E19][E20]
 
 ## 2. 当前 `ic-opt` 到底是什么
 
@@ -217,17 +222,15 @@ repo/product-level `.venv`，用户项目目录只是数据和 artifacts 目录�
 Claude CLI 的 `/ic-opt` slash skill wrapper 已经完成并真实跑通；Codex 或其它
 agent runtime 的对应入口还没有实现。[E19]
 
-项目缺少自动 supervisor-agent -> execution-agent dispatch。[E2][E4]
-
-项目仍缺少一个真实双 agent drill：用户只输入 `/ic-opt PROJECT --real`，
-supervisor agent 接收后准备/批准/派发，独立 execution agent 运行任务包，
-supervisor agent 审计并向用户汇报。[E2]
+Claude runtime 的自动 supervisor-agent -> independent execution-agent
+dispatch 已经完成一次真实 drill。[E20]
 
 项目已经把 Claude CLI 的“agent 产品入口”推进到类似 veriflow-cc 的短命令
-体验，但还缺少 clean-machine 安装验证和非 Claude runtime 入口适配。[E19]
+体验，并且 C-64 已经证明这个短命令会派发独立 execution-agent；但还缺少
+clean-machine 安装验证和非 Claude runtime 入口适配。[E19][E20]
 
-项目缺少决定：最终产品到底坚持两个 agent，还是接受“单 agent + 自动化 CLI”
-作为产品形态。[E2]
+项目仍缺少决定：首个公开版本是否只承诺 Claude runtime，还是继续实现
+Codex/其它 agent runtime 的等价入口。[E2][E20]
 
 ## 8. 和顶层 plan 的对应关系
 
@@ -244,12 +247,13 @@ C-62 修正的是计划叙述偏差：不能因为 shell 自动化链条跑通�
 C-63 完成了第一个 Claude CLI `/ic-opt` slash skill 入口，并用 fresh
 multi-testbench Mixer 项目真实跑完 100 evaluations。[E19]
 
-当前实现与顶层 plan 的剩余偏差点不是 optimizer 内核，也不是 Claude CLI
-短入口，而是自动独立 execution-agent handoff 层没有完成。[E2][E4][E6][E19]
+C-64 完成了 Claude runtime 的 observable supervisor -> independent
+execution-agent handoff，并用 fresh multi-testbench Mixer 项目真实跑完
+100 evaluations。[E20]
 
-下一步如果继续按原始两-agent目标推进，就应该实现 observable
-supervisor/execution handoff drill；如果接受 single-agent slash skill +
-deterministic shell automation core，则应把这个边界写成产品定位。[E2][E19]
+当前实现与顶层 plan 的剩余偏差点不是 optimizer 内核，也不是 Claude CLI
+短入口，也不是 Claude 的 execution-agent handoff，而是非 Claude runtime
+覆盖和 clean-machine 安装验证。[E2][E6][E19][E20]
 
 ## 9. 现在用户实际该怎么理解这个项目
 
@@ -271,22 +275,27 @@ artifact 验收、可视化和 decision report。[E3][E4][E9]
 /ic-opt /path/to/project --real
 ```
 
-Claude 会触发该 skill，并由 skill 调用 shell 自动化核心。[E19]
+Claude 会触发该 skill，并由 skill 调用 shell 自动化核心；默认情况下它会
+追加 `--execution-agent claude`，在 `package-optimizer-task` 后派发独立
+Claude CLI execution-agent process。[E19][E20]
 
 如果最终产品要满足“The less user needs to talk to agent, the better”，那么
-Claude CLI 路径已经达到短命令入口；下一步要么把这个定位固定为 single-agent
-入口，要么继续实现独立 execution-agent handoff。[E2][E7][E19]
+Claude CLI 路径已经达到短命令入口，并且已经完成独立 execution-agent
+handoff；下一步应收窄到 release/install/readiness，或在明确选择其它 runtime
+后实现对应 adapter。[E2][E7][E19][E20]
 
 ## 10. 下一步必须怎么做
 
 下一步不应该继续添加 optimizer 新功能，除非它是阻塞产品入口的 bug。[E2]
 
-下一步应该定义 C-64：产品边界决策与独立执行 agent handoff。如果坚持
-two-agent，就实现真实 supervisor -> execution-agent 派发；如果接受
-single-agent slash skill，就把产品定位、安装方式和验收 checklist 固化。[E2][E19]
+下一步不应该再定义新的 optimizer 功能路线，而应该围绕产品落地收窄：
+可以做 fresh real Claude handoff 复验、clean-machine Claude skill/install
+check、release/readiness pass，或在用户明确选择 Codex/其它 runtime 时实现
+对应 adapter。[E2][E19][E20]
 
-C-64 不应改变 optimizer math、OCEAN formulas、Spectre version、OpenBox route、
-multi-testbench aggregation 或 per-project venv policy。[E7]
+后续 product-landing 工作不应改变 optimizer math、OCEAN formulas、Spectre
+version、OpenBox route、multi-testbench aggregation 或 per-project venv
+policy，除非真实产品运行暴露具体问题。[E7]
 
 ## Evidence Index
 
@@ -295,16 +304,15 @@ E1. `pyproject.toml` `[project.scripts]` registers `ic-opt =
 "hermes_workflow.cli:app"`.
 
 E2. `docs/AGENT_INTEGRATION_STATUS.md` states the implemented shell CLI,
-implemented Claude CLI `/ic-opt` skill route, missing non-Claude runtime
-adapters, and unimplemented automatic supervisor-agent to execution-agent
-dispatch.
+implemented Claude CLI `/ic-opt` skill route, implemented Claude execution-agent
+handoff, missing non-Claude runtime adapters, and clean-machine installer gap.
 
 E3. `src/hermes_workflow/product_cli.py` defines `ic-opt` behavior:
 Cadence cshrc discovery and call into `optimize_project()`.
 
 E4. `src/hermes_workflow/optimizer_flow.py` defines `optimize_project()` and
-its ordered steps, including `package-optimizer-task` followed by direct
-`run_openbox_real_optimization()`.
+its ordered steps. Direct mode runs `run-openbox-real`; Claude mode replaces
+that step with `execution-agent-handoff`, then resumes supervisor-side closeout.
 
 E5. `docs/superpowers/plans/2026-06-07-agent-integration-reality-audit.md`
 records the C-62 correction.
@@ -361,3 +369,12 @@ CLI slash-skill landing. The fresh project
 `claude_skills/ic-opt`, `claude -p --dangerously-skip-permissions "/ic-opt
 PROJECT --real"` completed 100 real evaluations and recommended feasible
 `real_051`.
+
+E20. `docs/CLAUDE_EXECUTION_AGENT_HANDOFF_2026-06-07.md` records the C-64
+Claude execution-agent handoff drill. The fresh project
+`/tmp/ic_auto_opt_c64_handoff_zX9JrO/Mixer_opt_muti_tb` started with only
+`opt_requirement.md` and `cadence_env.csh`; `claude -p
+--dangerously-skip-permissions "/ic-opt PROJECT --real"` wrote
+`reports/execution_agent_handoff_report.json` with `status=pass`,
+`execution_agent=claude`, `returncode=0`, completed 100 real evaluations, and
+recommended feasible `real_051`.

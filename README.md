@@ -20,13 +20,14 @@ The project has been exercised on a real multi-testbench Mixer optimization
 flow with OpenBox, Spectre, OCEAN, and post-run visualization/reporting.
 
 Important agent-integration boundary: the Claude CLI `/ic-opt` skill now maps
-the short agent command to the shell automation core. Automatic supervisor-agent
-to execution-agent dispatch is not implemented yet. See
-`docs/AGENT_INTEGRATION_STATUS.md` before describing this as a completed
-two-agent product.
+the short agent command to the shell automation core and, by default, dispatches
+an independent Claude CLI execution-agent process for the real optimizer task.
+This Claude runtime handoff is real-tool validated. Codex and other non-Claude
+agent runtimes still need their own adapters. See
+`docs/AGENT_INTEGRATION_STATUS.md` before describing runtime support.
 
 For the detailed Chinese explanation of what the automation does, what evidence
-proves it, and where the two-agent integration is still missing, read
+proves it, and which runtime adapters are still missing, read
 `docs/PROJECT_STATUS_AND_ARCHITECTURE_CN.md`.
 
 ## What This Project Does
@@ -75,6 +76,13 @@ Then use the short agent command:
 
 ```text
 /ic-opt /path/to/project --real
+```
+
+By default this Claude skill uses the observable execution-agent handoff route.
+For direct shell/operator debugging, use:
+
+```bash
+ic-opt /path/to/project --real --execution-agent direct
 ```
 
 ## Cadence Environment
@@ -194,13 +202,25 @@ project-local `cadence_env.csh` and ran:
 It completed 100 real OpenBox/Spectre/OCEAN evaluations, generated OpenBox
 advanced visualization, and recommended a feasible best-observed candidate.
 
+C-64 Claude handoff acceptance used a fresh Mixer multi-testbench project with
+only `opt_requirement.md` and `cadence_env.csh`, then ran:
+
+```bash
+claude -p --dangerously-skip-permissions "/ic-opt PROJECT --real"
+```
+
+The `/ic-opt` skill appended `--execution-agent claude`; the flow wrote
+`reports/execution_agent_handoff_report.json` with `status=pass`,
+`execution_agent=claude`, `returncode=0`, completed 100 real evaluations, and
+recommended feasible `real_051`.
+
 ## Documentation
 
 - `docs/OPTIMIZER_PRODUCTION_QUICKSTART.md`: shortest production workflow.
 - `docs/AGENT_OPTIMIZER_USAGE_MANUAL.md`: supervisor/execution-agent operating
   manual.
 - `docs/AGENT_INTEGRATION_STATUS.md`: current implemented agent boundary and
-  missing two-agent product work.
+  remaining runtime-specific adapter work.
 - `docs/PROJECT_STATUS_AND_ARCHITECTURE_CN.md`: detailed Chinese status and
   architecture explanation with evidence references.
 - `src/hermes_workflow/templates/spectre_maestro_project/OPT_REQUIREMENT_README.md`:

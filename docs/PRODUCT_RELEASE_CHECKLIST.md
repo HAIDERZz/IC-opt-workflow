@@ -4,13 +4,13 @@ Use this checklist before treating `ic-auto-opt-workflow` as ready for another
 user or another clean machine.
 
 Important boundary: this checklist validates the implemented shell automation
-core and the first Claude CLI slash-skill entrypoint, not the final two-agent
-product. The implemented shell entrypoint is `ic-opt PROJECT_DIR --real`; the
-Claude skill entrypoint is `/ic-opt PROJECT_DIR --real` after installing
-`claude_skills/ic-opt`. Automatic supervisor-agent to execution-agent dispatch
-is still pending. See
-`docs/AGENT_INTEGRATION_STATUS.md` before describing a release as a completed
-two-agent product.
+core, the Claude CLI slash-skill entrypoint, and the Claude runtime
+supervisor-agent to independent execution-agent handoff. The implemented shell
+entrypoint is `ic-opt PROJECT_DIR --real`; the Claude skill entrypoint is
+`/ic-opt PROJECT_DIR --real` after installing `claude_skills/ic-opt`, and it
+defaults to `--execution-agent claude`. Codex/non-Claude runtimes still need
+their own adapters. See `docs/AGENT_INTEGRATION_STATUS.md` before describing
+runtime support.
 
 For the detailed Chinese status explanation, read
 `docs/PROJECT_STATUS_AND_ARCHITECTURE_CN.md`.
@@ -110,6 +110,8 @@ The real product route is:
 Acceptance requires:
 
 - `reports/optimizer_flow_run_report.json` has `status=pass`.
+- For Claude `/ic-opt` acceptance, `reports/execution_agent_handoff_report.json`
+  has `status=pass`, `execution_agent=claude`, and `returncode=0`.
 - `reports/optimizer_run_report.json` has `evaluation_count=max_evals`.
 - `reports/optimizer_decision_report.md` recommends a feasible candidate when
   feasible evidence exists.

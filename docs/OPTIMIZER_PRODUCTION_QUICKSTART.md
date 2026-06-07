@@ -51,10 +51,11 @@ Claude CLI supervisor-agent invocation after installing `claude_skills/ic-opt`:
 /ic-opt ~/spectre_opt_prj/<project_name> --real
 ```
 
-The Claude slash skill delegates to the implemented automation command.
-Automatic supervisor-agent to execution-agent dispatch is not implemented yet.
+The Claude slash skill delegates to the implemented automation command and, by
+default, uses `--execution-agent claude` so the real optimizer task is run by an
+independent Claude CLI execution-agent process after `package-optimizer-task`.
 `hermes-workflow optimize ... --real` is the lower-level implementation command
-behind it.
+behind it. Non-Claude agent runtimes still need their own adapters.
 
 Release packaging must make OpenBox, TuRBO, and report dependencies available
 from the product environment. A development-only path such as
@@ -148,11 +149,26 @@ Preferred one-command route:
   --parallel-jobs 10
 ```
 
+Shell/operator default is direct execution. Claude `/ic-opt` appends
+`--execution-agent claude` by default. To force the same handoff route from the
+shell for acceptance/debugging:
+
+```bash
+./.venv/bin/ic-opt ~/spectre_opt_prj/<project_name> \
+  --real \
+  --execution-agent claude \
+  --max-evals 100 \
+  --batch-size 10 \
+  --parallel-jobs 10
+```
+
 This wraps intake, preparation, validation, readiness, package, netlist
 preparation, dry run, preflight health, approval, optimizer task packaging, real
 OpenBox execution, optimizer acceptance, completion, finalization,
 visualization, and decision reporting. It stops before recording user
-acceptance.
+acceptance. In `--execution-agent claude` mode, the real OpenBox execution step
+is performed by the independent execution-agent process and the supervisor-side
+flow resumes for closeout.
 
 To check the offline orchestration gates without launching Spectre/OCEAN/OpenBox:
 

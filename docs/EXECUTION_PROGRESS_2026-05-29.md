@@ -10,13 +10,69 @@ This note preserves the implementation state for continuing Plan A after context
 - Baseline commit: `885e97f docs: capture workflow planning baseline`
 - Latest C-3 code commit before docs-only cleanup: `edb107f fix: harden preflight readiness gates`; docs cleanup continues through current HEAD
 - Active plan: `docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md`
-- Current scope: C-63 Claude /ic-opt Real Landing complete
-- Current status: The implemented route is now `ic-opt PROJECT_DIR --real` as a shell automation core plus the first Claude CLI slash-skill entrypoint `/ic-opt PROJECT_DIR --real` after installing `claude_skills/ic-opt`. The C-63 fresh Mixer multi-testbench landing drill completed 100 real OpenBox/Spectre/OCEAN evaluations through Claude CLI and recommended feasible `real_051`. Automatic supervisor-agent to independent execution-agent dispatch is still not implemented.
-- Next allowed action: after user confirmation, decide C-64 product boundary: either accept single-agent Claude slash skill plus deterministic shell automation core as the first product target, or implement an observable supervisor-agent to independent execution-agent handoff. Do not add optimizer features or per-project virtualenvs before resolving this boundary.
+- Current scope: C-64 Observable Claude execution-agent handoff complete
+- Current status: The implemented route now has three proven layers for Claude
+  CLI: shell `ic-opt PROJECT_DIR --real`, Claude `/ic-opt PROJECT_DIR --real`,
+  and observable supervisor-agent to independent Claude CLI execution-agent
+  handoff via `--execution-agent claude`. The C-64 fresh Mixer
+  multi-testbench drill completed 100 real OpenBox/Spectre/OCEAN evaluations
+  through the handoff and recommended feasible `real_051`.
+- Next allowed action: after user confirmation, choose the next
+  product-landing task: one more fresh real Claude `/ic-opt` handoff
+  acceptance, clean-machine Claude skill/install check, or release/readiness
+  pass. Do not add optimizer features or per-project virtualenvs unless a real
+  product run exposes a concrete need.
 - Execution method: `superpowers:subagent-driven-development`
 - Dependencies installed in active Python environment on 2026-05-29: `pytest`, `typer`, `pydantic`, `PyYAML`, `ruff`
 
-## Current C-63 Checkpoint 2026-06-07
+## Current C-64 Checkpoint 2026-06-07
+
+C-64 is an observable Claude execution-agent handoff checkpoint.
+
+Implemented today:
+
+- Added `src/hermes_workflow/execution_agent_handoff.py`.
+- Added `--execution-agent direct|claude` to `ic-opt` and lower-level
+  `hermes-workflow optimize`.
+- Kept shell `ic-opt` default behavior as `direct`.
+- Updated `claude_skills/ic-opt/SKILL.md` so Claude `/ic-opt` appends
+  `--execution-agent claude` by default.
+- Added `docs/CLAUDE_EXECUTION_AGENT_HANDOFF_2026-06-07.md`.
+- Added C-64 design spec and implementation plan.
+
+Real evidence:
+
+```text
+Project: /tmp/ic_auto_opt_c64_handoff_zX9JrO/Mixer_opt_muti_tb
+Initial files: opt_requirement.md, cadence_env.csh
+Command: claude -p --dangerously-skip-permissions "/ic-opt PROJECT --real"
+Handoff: reports/execution_agent_handoff_report.json status=pass, execution_agent=claude, returncode=0
+Evaluations: 100
+Counts: 16 feasible, 68 constraint_failed, 16 metric_check_failed
+Recommended: feasible real_051
+Global optimum claim: false
+```
+
+Current truth:
+
+```text
+Implemented:
+  ic-opt PROJECT_DIR --real
+  Claude CLI /ic-opt PROJECT_DIR --real after installing claude_skills/ic-opt
+  Claude CLI observable supervisor -> independent execution-agent handoff
+  hermes-workflow optimize PROJECT_DIR --real --execution-agent direct|claude
+  file contracts, task package, real optimizer reports
+
+Not implemented:
+  Codex or non-Claude /ic-opt runtime adapters
+  clean-machine installer for the Claude skill
+  automatic final user acceptance
+```
+
+No optimizer code, simulator behavior, OCEAN formula, Spectre setup, OpenBox
+strategy, product environment policy, or multi-testbench contract changed.
+
+## C-63 Checkpoint 2026-06-07
 
 C-63 is a real Claude CLI slash-skill landing checkpoint.
 

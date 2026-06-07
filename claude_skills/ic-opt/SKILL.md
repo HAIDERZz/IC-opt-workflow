@@ -47,6 +47,16 @@ If `PROJECT_DIR` is empty, fail with a short message asking for:
 
 If `FLAGS` does not contain `--real`, append `--real`.
 
+If `FLAGS` does not contain `--execution-agent`, append:
+
+```text
+--execution-agent claude
+```
+
+This is the product landing path: the supervisor skill must dispatch an
+independent Claude CLI execution-agent process through `ic-opt`, not run the
+optimizer entirely inside the supervisor process.
+
 ## Locate The Workflow Repo
 
 Use the first path that contains executable `.venv/bin/ic-opt`:
@@ -75,7 +85,8 @@ cd "$REPO"
 
 This command owns markdown intake, YAML generation, Maestro point-root import,
 contract validation, package/preflight/approval, real OpenBox/Spectre/OCEAN
-optimization, artifact checks, visualization, and decision reporting.
+optimization through the execution-agent handoff, artifact checks,
+visualization, and decision reporting.
 
 ## Report
 
@@ -84,6 +95,7 @@ After the command exits successfully, read:
 ```text
 PROJECT_DIR/reports/optimizer_decision_report.md
 PROJECT_DIR/reports/optimizer_flow_run_report.json
+PROJECT_DIR/reports/execution_agent_handoff_report.json
 ```
 
 Report only:
@@ -94,6 +106,7 @@ Report only:
 - recommended parameters and metrics;
 - global optimum claim;
 - warnings or user decision required;
+- execution-agent handoff status;
 - report paths.
 
 If the command fails, report the failed flow step and the relevant report path.

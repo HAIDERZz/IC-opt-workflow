@@ -1003,6 +1003,13 @@ def optimize_command(
             help="User/project Cadence cshrc sourced before real execution.",
         ),
     ] = ...,
+    execution_agent: Annotated[
+        str,
+        typer.Option(
+            "--execution-agent",
+            help="Execution mode: direct or claude.",
+        ),
+    ] = "direct",
 ) -> None:
     try:
         report = optimize_project(
@@ -1013,6 +1020,7 @@ def optimize_command(
             batch_size=batch_size,
             parallel_jobs=parallel_jobs,
             cadence_cshrc=cadence_cshrc,
+            execution_agent=execution_agent,
         )
     except (OSError, RuntimeError, ValueError) as exc:
         _exit_with_error(exc)

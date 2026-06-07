@@ -18,12 +18,14 @@ Then a Claude CLI or Claude Code session can run:
 /ic-opt PROJECT_DIR --real
 ```
 
-The skill delegates to the implemented product shell command:
+The skill delegates to the implemented product shell command and appends
+`--execution-agent claude` by default:
 
 ```bash
-./.venv/bin/ic-opt PROJECT_DIR --real
+./.venv/bin/ic-opt PROJECT_DIR --real --execution-agent claude
 ```
 
-The current skill proves a first agent-facing slash entrypoint. It does not yet
-prove automatic supervisor-agent to execution-agent dispatch; the skill runs
-the product automation core from the supervisor agent session.
+The current skill proves the Claude runtime slash entrypoint plus observable
+supervisor-agent to independent Claude CLI execution-agent handoff. Shell
+`ic-opt` remains `--execution-agent direct` by default for operator/debug use.
+Codex and other non-Claude runtimes still need their own adapters.

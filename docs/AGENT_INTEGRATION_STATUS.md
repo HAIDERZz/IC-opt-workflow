@@ -14,6 +14,8 @@ Implemented and real-tool validated:
 - Shell/product CLI: `ic-opt PROJECT_DIR --real`.
 - Claude CLI skill entrypoint, when installed:
   `/ic-opt PROJECT_DIR --real`.
+- Observable Claude supervisor-agent to independent Claude CLI execution-agent
+  handoff through `--execution-agent claude`.
 - Lower-level CLI: `hermes-workflow optimize PROJECT_DIR --real`.
 - File-based user input through `opt_requirement.md` plus optional
   `constraints.md`.
@@ -59,19 +61,42 @@ claude -p --dangerously-skip-permissions "/ic-opt PROJECT --real"
 after installing `claude_skills/ic-opt` into `~/.claude/skills/ic-opt`, completed
 100 real evaluations, and recommended feasible `real_051`.
 
+C-64 Claude execution-agent handoff evidence:
+
+```text
+docs/CLAUDE_EXECUTION_AGENT_HANDOFF_2026-06-07.md
+```
+
+Fresh project:
+
+```text
+/tmp/ic_auto_opt_c64_handoff_zX9JrO/Mixer_opt_muti_tb
+```
+
+ran through Claude CLI:
+
+```bash
+claude -p --dangerously-skip-permissions "/ic-opt PROJECT --real"
+```
+
+The `/ic-opt` skill appended `--execution-agent claude`, the supervisor-side
+flow launched an independent Claude CLI execution-agent process after
+`package-optimizer-task`, `reports/execution_agent_handoff_report.json` recorded
+`status=pass`, `execution_agent=claude`, `returncode=0`, and the real optimizer
+flow completed 100 evaluations with feasible `real_051` recommended.
+
 ## Not Yet Implemented
 
 Not implemented:
 
-- Automatic supervisor-agent to execution-agent dispatch.
 - A real slash command named `/ic-opt` in Codex or other non-Claude agent
   runtimes.
 - A packaged installer that installs the Claude skill on a clean machine.
-- A production handoff runner that proves the supervisor agent calls an
-  execution agent rather than simply running the full CLI itself.
+- Automatic final user acceptance.
 
-Therefore the current project is a working shell automation core plus a first
-Claude CLI slash-skill entrypoint. It is not yet the final two-agent product.
+Therefore the current project is a working shell automation core plus a
+validated Claude CLI slash-skill and Claude execution-agent handoff route. It
+is not yet a runtime-agnostic two-agent product.
 
 ## Current User Interaction
 
@@ -89,13 +114,15 @@ cd /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow
 ./.venv/bin/ic-opt PROJECT_DIR --real
 ```
 
-This proves the first agent-facing slash entrypoint. It still means the
-supervisor agent is operating a CLI automation engine. It does not prove a
-separate execution-agent handoff by itself.
+By default, the skill passes `--execution-agent claude`, so the supervisor
+agent prepares the package and the shell automation core dispatches an
+independent Claude CLI execution-agent process for the real optimizer task.
+The shell command remains available with `--execution-agent direct` for direct
+operator/debug use.
 
 ## Target User Interaction
 
-Target two-agent interaction, if the product keeps the two-agent architecture:
+Target two-agent interaction:
 
 ```text
 User -> supervisor agent:
@@ -110,19 +137,19 @@ runs approved real OpenBox/Spectre/OCEAN work from the generated package and
 returns artifacts, without asking the user for formulas or hand-picking points.
 ```
 
-The less the user needs to talk to the agent, the better.
+The less the user needs to talk to the agent, the better. C-64 proves this
+target for Claude CLI. Other runtimes still need their own adapters or skill
+installation path.
 
 ## Required Next Product Work
 
-Next product work should be C-64 or equivalent:
+Next product work should stay release-focused:
 
-1. Decide whether the first public product target is single-agent slash skill
-   plus deterministic shell automation, or two-agent supervisor/execution
-   dispatch.
-2. If two-agent remains required, define exactly how the supervisor invokes an
-   execution agent, or explicitly
-   decide that the product is a single-agent CLI operator instead.
-3. Run a real end-to-end drill where the user gives only the short command and
-   the supervisor/execution-agent boundary is observable.
+1. Run one more fresh real Claude `/ic-opt` handoff acceptance if the user wants
+   repeated product evidence.
+2. Add a clean-machine Claude skill/install check before public release.
+3. Implement Codex or other runtime adapters only when that runtime is selected
+   as a product target.
 
-Do not claim the two-agent product is complete until that drill passes.
+Do not claim Codex or non-Claude two-agent support until a runtime-specific
+handoff drill passes.

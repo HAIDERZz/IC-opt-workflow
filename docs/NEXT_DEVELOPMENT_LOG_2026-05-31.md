@@ -4,12 +4,78 @@
 
 - Repository: `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow`
 - Branch: `plan-a-hermes-file-contract-mvp`
-- Current scope: C-63 Claude /ic-opt Real Landing complete
-- Current status: verified-only. The implemented product route now has two proven layers: the shell automation core `ic-opt PROJECT_DIR --real`, and the first Claude CLI slash-skill entrypoint `/ic-opt PROJECT_DIR --real` after installing `claude_skills/ic-opt`. A fresh Mixer multi-testbench project started with only `opt_requirement.md` and `cadence_env.csh`, then Claude CLI completed 100 real OpenBox/Spectre/OCEAN evaluations through the short `/ic-opt PROJECT --real` command and recommended feasible `real_051`. Automatic supervisor-agent to independent execution-agent dispatch is still not implemented.
-- Active spec: `docs/superpowers/specs/2026-06-07-one-command-optimizer-flow-design.md`
-- Active plan: `docs/superpowers/plans/2026-06-07-claude-ic-opt-real-landing.md`
-- Next required action: After user confirmation, decide the C-64 product boundary: either accept single-agent Claude slash skill plus deterministic shell automation core as the first product target, or implement an observable supervisor-agent to independent execution-agent handoff. Do not add optimizer math/features until this product boundary is resolved.
-- next_allowed_action: After user confirmation, decide the C-64 product boundary: either accept single-agent Claude slash skill plus deterministic shell automation core as the first product target, or implement an observable supervisor-agent to independent execution-agent handoff. Do not add optimizer math/features until this product boundary is resolved.
+- Current scope: C-64 Observable Claude execution-agent handoff complete
+- Current status: verified-only. The Claude CLI `/ic-opt` route now appends
+  `--execution-agent claude` by default and `ic-opt` dispatches an independent
+  Claude CLI execution-agent process after `package-optimizer-task`. A fresh
+  Mixer multi-testbench project started with only `opt_requirement.md` and
+  `cadence_env.csh`, then the one-line Claude command completed the observable
+  handoff plus 100 real OpenBox/Spectre/OCEAN evaluations and recommended
+  feasible `real_051`. Shell `ic-opt` remains `direct` by default.
+- Active spec: `docs/superpowers/specs/2026-06-07-observable-execution-agent-handoff-design.md`
+- Active plan: `docs/superpowers/plans/2026-06-07-observable-execution-agent-handoff.md`
+- Next required action: After user confirmation, choose the next
+  product-landing task: one more fresh real Claude `/ic-opt` handoff acceptance
+  on a user-prepared project, clean-machine Claude skill/install check, or
+  release/readiness pass. Do not add optimizer math/features unless a real
+  product run exposes a concrete need.
+- next_allowed_action: After user confirmation, choose the next
+  product-landing task: one more fresh real Claude `/ic-opt` handoff acceptance
+  on a user-prepared project, clean-machine Claude skill/install check, or
+  release/readiness pass. Do not add optimizer math/features unless a real
+  product run exposes a concrete need.
+- next_allowed_action_exact: After user confirmation, choose the next product-landing task: either run one more fresh real Claude /ic-opt handoff acceptance on a user-prepared project, add a clean-machine Claude skill/install check, or prepare a release/readiness pass. Do not add optimizer math/features unless a real product run exposes a concrete need.
+
+## C-64 Observable Claude Execution-Agent Handoff 2026-06-07
+
+C-64 is complete, verified-only.
+
+Goal:
+
+- Preserve shell `ic-opt PROJECT_DIR --real` as a direct automation command.
+- Make the Claude CLI `/ic-opt PROJECT_DIR --real` route prove an observable
+  supervisor-agent to independent execution-agent handoff.
+- Keep the handoff at the existing `package-optimizer-task` boundary.
+
+Implementation:
+
+- Added `src/hermes_workflow/execution_agent_handoff.py`.
+- Added `--execution-agent direct|claude` to `ic-opt` and lower-level
+  `hermes-workflow optimize`.
+- `direct` remains the default shell behavior.
+- In `claude` mode, `optimizer_flow` replaces only `run-openbox-real` with
+  `execution-agent-handoff`, then resumes supervisor-side closeout:
+  `check-optimizer-run`, `summarize-optimizer-run`,
+  `finalize-optimizer-run`, `visualize-optimizer-run`, and
+  `decide-optimizer-run`.
+- Updated `claude_skills/ic-opt/SKILL.md` so `/ic-opt` appends
+  `--execution-agent claude` unless the user already passed an execution-agent
+  flag.
+
+Real evidence:
+
+- Evidence note:
+  `docs/CLAUDE_EXECUTION_AGENT_HANDOFF_2026-06-07.md`.
+- Fresh project:
+  `/tmp/ic_auto_opt_c64_handoff_zX9JrO/Mixer_opt_muti_tb`.
+- Initial project files: `opt_requirement.md` and `cadence_env.csh`.
+- Command:
+  `claude -p --dangerously-skip-permissions "/ic-opt PROJECT --real"`.
+- Handoff report:
+  `reports/execution_agent_handoff_report.json`, `status=pass`,
+  `execution_agent=claude`, `returncode=0`.
+- Flow result: 100 real evaluations; `16 feasible`, `68 constraint_failed`,
+  `16 metric_check_failed`; recommended feasible `real_051`; no global optimum
+  claim.
+
+Route audit:
+
+- Aligned with the locked supervisor/Hermes/execution-agent role model for the
+  Claude runtime.
+- No optimizer math, OpenBox strategy, OCEAN formula, Spectre setup,
+  multi-testbench aggregation, or product environment contract changed.
+- Remaining boundary: Codex/non-Claude slash adapters and clean-machine Claude
+  skill installer are still not implemented.
 
 ## C-63 Claude `/ic-opt` Real Landing 2026-06-07
 
