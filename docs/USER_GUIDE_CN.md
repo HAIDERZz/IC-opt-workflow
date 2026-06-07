@@ -35,7 +35,23 @@ git clone https://github.com/HAIDERZz/IC-opt-workflow.git
 cd IC-opt-workflow
 python3 --version  # 需要 Python 3.11 或更新版本
 python3 -m venv .venv
+```
+
+然后根据你当前使用的 shell，选择一种激活方式：
+
+```bash
+# bash / zsh
 source .venv/bin/activate
+```
+
+```csh
+# csh / tcsh，这在 EDA 服务器上很常见
+source .venv/bin/activate.csh
+```
+
+激活后继续安装依赖：
+
+```bash
 python -m pip install --upgrade pip
 python -m pip install swig
 swig -version
@@ -52,18 +68,32 @@ OpenBox 安装时可能会编译 `pyrfr`，这个步骤需要系统里能找到 
 `swig -version`：只有这个命令在同一个 shell 里能运行，后续安装才有机会通过。
 
 如果你已经 `pip install swig`，但仍然看到 `command 'swig' failed`，通常是因为没有
-激活 `.venv`，导致 `.venv/bin/swig` 没有进入 `PATH`。先运行：
+激活 `.venv`，导致 `.venv/bin/swig` 没有进入 `PATH`。先根据 shell 选择正确命令：
 
 ```bash
+# bash / zsh
 source .venv/bin/activate
 swig -version
+```
+
+```csh
+# csh / tcsh
+source .venv/bin/activate.csh
+swig -version
+```
+
+如果你在运行 `source .venv/bin/activate` 时看到 `Badly placed ()'s.`，说明当前 shell
+是 csh/tcsh，但你用了 bash 版激活脚本。改用：
+
+```csh
+source .venv/bin/activate.csh
 ```
 
 如果你不想激活 shell，也可以这样显式带上路径：
 
 ```bash
-PATH="$PWD/.venv/bin:$PATH" ./.venv/bin/python -m pip install -r requirements-product.txt
-PATH="$PWD/.venv/bin:$PATH" ./.venv/bin/python -m pip install -e .
+env PATH="$PWD/.venv/bin:$PATH" ./.venv/bin/python -m pip install -r requirements-product.txt
+env PATH="$PWD/.venv/bin:$PATH" ./.venv/bin/python -m pip install -e .
 ```
 
 如果 `swig -version` 仍然不成功，就需要让管理员安装系统依赖：

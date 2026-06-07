@@ -60,7 +60,23 @@ cd IC-opt-workflow
 
 python3 --version  # must be Python 3.11 or newer
 python3 -m venv .venv
+```
+
+Activate the environment with the command that matches your shell:
+
+```bash
+# bash / zsh
 source .venv/bin/activate
+```
+
+```csh
+# csh / tcsh, common on EDA servers
+source .venv/bin/activate.csh
+```
+
+Then install dependencies:
+
+```bash
 python -m pip install --upgrade pip
 python -m pip install swig
 swig -version
@@ -80,15 +96,22 @@ If you installed `swig` into `.venv` but still see `command 'swig' failed`, the
 virtual environment is probably not on `PATH`. Run:
 
 ```bash
+# bash / zsh
 source .venv/bin/activate
+swig -version
+```
+
+```csh
+# csh / tcsh
+source .venv/bin/activate.csh
 swig -version
 ```
 
 or, without shell activation:
 
 ```bash
-PATH="$PWD/.venv/bin:$PATH" ./.venv/bin/python -m pip install -r requirements-product.txt
-PATH="$PWD/.venv/bin:$PATH" ./.venv/bin/python -m pip install -e .
+env PATH="$PWD/.venv/bin:$PATH" ./.venv/bin/python -m pip install -r requirements-product.txt
+env PATH="$PWD/.venv/bin:$PATH" ./.venv/bin/python -m pip install -e .
 ```
 
 If `swig -version` still does not work on your server, ask your administrator to
