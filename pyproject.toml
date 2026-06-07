@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ic-auto-opt-workflow"
+version = "0.1.0"
+description = "Hermes file-contract workflow for IC auto optimization"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=1.24",
+    "pydantic>=2.7",
+    "PyYAML>=6.0",
+    "typer>=0.12",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.5",
+    "scipy>=1.10",
+]
+sobol = [
+    "scipy>=1.10",
+]
+
+[project.scripts]
+hermes-workflow = "hermes_workflow.cli:app"
+ic-opt = "hermes_workflow.product_cli:app"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+hermes_workflow = [
+    "templates/spectre_maestro_project/*.md",
+    "templates/spectre_maestro_project/config/*.yaml",
+    "templates/spectre_maestro_project/**/.gitkeep",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"

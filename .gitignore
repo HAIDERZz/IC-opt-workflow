@@ -1,0 +1,50 @@
+# Python environments and local packaging
+.venv/
+venv/
+env/
+*.egg-info/
+build/
+dist/
+
+# Python caches and test/lint caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Local editor and OS files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# User/project Cadence environment anchors
+cadence_env.csh
+*.local.csh
+
+# Generated optimizer project artifacts
+runs/
+reports/
+ledger/
+state/
+execution_package/
+config/
+netlists/
+*.log
+*.out
+
+# Cadence/Spectre/OCEAN heavy or proprietary artifacts
+psf/
+psf*/
+*.raw
+*.psf
+*.ocn.log
+input.scs
+
+# Internal development evidence that must be sanitized before publication
+docs/OCEAN_DOC_*
+docs/toolchain_evidence/

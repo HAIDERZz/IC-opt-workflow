@@ -1,0 +1,349 @@
+from __future__ import annotations
+
+import json
+import shlex
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from pathlib import Path
+
+from hermes_workflow.native_turbo import (
+    EVALUATIONS_RELATIVE as NATIVE_TURBO_EVALUATIONS_RELATIVE,
+)
+from hermes_workflow.native_turbo import (
+    REPORT_RELATIVE as NATIVE_TURBO_REPORT_RELATIVE,
+)
+from hermes_workflow.optimizer_artifacts import (
+    EVALUATIONS_RELATIVE as OPTIMIZER_EVALUATIONS_RELATIVE,
+)
+from hermes_workflow.optimizer_artifacts import REPORT_RELATIVE as OPTIMIZER_REPORT_RELATIVE
+from hermes_workflow.real_result_record import LEDGER_PATH, OPTIMIZER_STATE_PATH
+from hermes_workflow.validate import assert_valid_project
+
+
+TASK_FILE_NAME = "OPTIMIZER_EXECUTION_TASK.md"
+MANIFEST_FILE_NAME = "optimizer_execution_manifest.json"
+NATIVE_TURBO_BACKEND = "native_turbo"
+OPENBOX_BACKEND = "openbox"
+DEFAULT_OPENBOX_EXECUTION_VENV = ".venv"
+NATIVE_TURBO_REQUIRED_RETURNED_ARTIFACTS = [
+    str(NATIVE_TURBO_REPORT_RELATIVE),
+    str(NATIVE_TURBO_EVALUATIONS_RELATIVE),
+    OPTIMIZER_STATE_PATH,
+    LEDGER_PATH,
+]
+OPENBOX_REQUIRED_RETURNED_ARTIFACTS = [
+    str(OPTIMIZER_REPORT_RELATIVE),
+    str(OPTIMIZER_EVALUATIONS_RELATIVE),
+    OPTIMIZER_STATE_PATH,
+    LEDGER_PATH,
+]
+SUPERVISOR_CLOSEOUT_ARTIFACTS = [
+    "reports/optimizer_run_acceptance_report.json",
+    "reports/optimizer_completion_report.json",
+    "reports/optimizer_finalize_report.json",
+    "reports/optimizer_insight_report.json",
+    "reports/optimizer_insight_report.md",
+    "reports/optimizer_visuals/*.svg",
+]
+
+
+@dataclass(frozen=True)
+class OptimizerExecutionTaskPackage:
+    task_path: Path
+    manifest_path: Path
+    payload: dict
+
+
+def build_optimizer_execution_task_package(
+    project_dir: Path,
+    *,
+    max_evals: int | None,
+    additional_evals: int | None = None,
+    cadence_cshrc: Path,
+    parallel: bool = True,
+    optimizer_backend: str = NATIVE_TURBO_BACKEND,
+    continuation: bool = False,
+    created_at_utc: str | None = None,
+) -> OptimizerExecutionTaskPackage:
+    project_dir = Path(project_dir).resolve()
+    cadence_cshrc = Path(cadence_cshrc).expanduser().resolve()
+    backend = _normalize_backend(optimizer_backend)
+    _validate_budget(
+        backend=backend,
+        max_evals=max_evals,
+        additional_evals=additional_evals,
+        continuation=continuation,
+    )
+    bundle = assert_valid_project(project_dir)
+    execution_dir = project_dir / "execution_package"
+    execution_dir.mkdir(parents=True, exist_ok=True)
+
+    spectre = bundle.spectre.spectre
+    batch_size = bundle.optimizer.optimizer.batch_size if parallel else 1
+    parallel_jobs = spectre.parallel_jobs if parallel else 1
+    command = _command(
+        project_dir,
+        max_evals,
+        additional_evals,
+        cadence_cshrc,
+        parallel,
+        backend=backend,
+        batch_size=batch_size,
+        parallel_jobs=parallel_jobs,
+        continuation=continuation,
+    )
+    spectre_settings = {
+        "preset": spectre.preset.value,
+        "threads_per_run": spectre.threads_per_run,
+        "parallel_jobs": spectre.parallel_jobs,
+        "output_format": spectre.output_format,
+        "timeout_s": spectre.timeout_s,
+    }
+    audit_commands = [
+        ["hermes-workflow", "check-optimizer-run", str(project_dir)],
+        ["hermes-workflow", "summarize-optimizer-run", str(project_dir)],
+        ["hermes-workflow", "finalize-optimizer-run", str(project_dir)],
+        ["hermes-workflow", "optimizer-status", str(project_dir)],
+    ]
+    payload = {
+        "schema_version": "1.0",
+        "backend": backend,
+        "created_at_utc": created_at_utc or _created_at_utc(),
+        "project_name": bundle.project_config.project.name,
+        "project_dir": str(project_dir),
+        "command": command,
+        "audit_commands": audit_commands,
+        "max_evals": max_evals,
+        "additional_evals": additional_evals,
+        "continuation": continuation,
+        "parallel": parallel,
+        "batch_size": batch_size,
+        "parallel_jobs": parallel_jobs,
+        "cadence_cshrc": str(cadence_cshrc),
+        "spectre_settings": spectre_settings,
+        "required_returned_artifacts": _required_returned_artifacts(backend),
+        "toolchain_check_command": _toolchain_check_command(backend, cadence_cshrc),
+    }
+
+    task_path = execution_dir / TASK_FILE_NAME
+    manifest_path = execution_dir / MANIFEST_FILE_NAME
+    task_path.write_text(_render_task(payload), encoding="utf-8")
+    manifest_path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return OptimizerExecutionTaskPackage(
+        task_path=task_path,
+        manifest_path=manifest_path,
+        payload=payload,
+    )
+
+
+def _created_at_utc() -> str:
+    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _normalize_backend(backend: str) -> str:
+    normalized = backend.strip().replace("-", "_")
+    if normalized not in {NATIVE_TURBO_BACKEND, OPENBOX_BACKEND}:
+        raise ValueError("optimizer_backend must be native_turbo or openbox")
+    return normalized
+
+
+def _validate_budget(
+    *,
+    backend: str,
+    max_evals: int | None,
+    additional_evals: int | None,
+    continuation: bool,
+) -> None:
+    if continuation and backend != OPENBOX_BACKEND:
+        raise ValueError("continuation is only supported for the openbox backend")
+    if continuation:
+        if additional_evals is None:
+            raise ValueError("additional_evals is required for continuation")
+        if additional_evals < 1:
+            raise ValueError("additional_evals must be >= 1")
+        return
+    if max_evals is None:
+        raise ValueError("max_evals is required")
+    if max_evals < 1:
+        raise ValueError("max_evals must be >= 1")
+    if additional_evals is not None:
+        raise ValueError("additional_evals is only valid for continuation")
+
+
+def _required_returned_artifacts(backend: str) -> list[str]:
+    base: list[str]
+    if backend == OPENBOX_BACKEND:
+        base = list(OPENBOX_REQUIRED_RETURNED_ARTIFACTS)
+    else:
+        base = list(NATIVE_TURBO_REQUIRED_RETURNED_ARTIFACTS)
+    return base + list(SUPERVISOR_CLOSEOUT_ARTIFACTS)
+
+
+def _toolchain_check_command(backend: str, cadence_cshrc: Path) -> list[str] | None:
+    if backend != OPENBOX_BACKEND:
+        return None
+    return [
+        "hermes-workflow",
+        "check-toolchain-env",
+        "--openbox-venv",
+        DEFAULT_OPENBOX_EXECUTION_VENV,
+        "--cadence-cshrc",
+        str(cadence_cshrc),
+    ]
+
+
+def _command(
+    project_dir: Path,
+    max_evals: int | None,
+    additional_evals: int | None,
+    cadence_cshrc: Path,
+    parallel: bool,
+    *,
+    backend: str,
+    batch_size: int,
+    parallel_jobs: int,
+    continuation: bool,
+) -> list[str]:
+    if backend == OPENBOX_BACKEND:
+        if continuation:
+            command = ["hermes-workflow", "continue-openbox-real", str(project_dir)]
+            command.extend(["--additional-evals", str(additional_evals)])
+        else:
+            command = ["hermes-workflow", "run-openbox-real", str(project_dir)]
+            command.extend(["--max-evals", str(max_evals)])
+        command.extend(["--batch-size", str(batch_size)])
+        if not continuation:
+            command.extend(["--parallel-jobs", str(parallel_jobs)])
+        command.extend(["--cadence-cshrc", str(cadence_cshrc)])
+        return command
+
+    command = ["hermes-workflow", "run-native-turbo", str(project_dir)]
+    command.append("--parallel" if parallel else "--sequential")
+    command.extend(["--max-evals", str(max_evals)])
+    command.extend(["--cadence-cshrc", str(cadence_cshrc)])
+    return command
+
+
+def _render_task(payload: dict) -> str:
+    command = shlex.join(payload["command"])
+    audit_commands = "\n".join(
+        f"```bash\n{shlex.join(audit_command)}\n```"
+        for audit_command in payload["audit_commands"]
+    )
+    settings = payload["spectre_settings"]
+    artifacts = "\n".join(
+        f"- `{artifact}`" for artifact in payload["required_returned_artifacts"]
+    )
+    required_behavior = _required_behavior(payload)
+    continuation_note = _continuation_note(payload)
+    toolchain_gate = _toolchain_gate(payload)
+    execution_environment = _execution_environment(payload)
+    return f"""# Optimizer Execution Agent Task
+
+Project: `{payload["project_name"]}`
+Project directory: `{payload["project_dir"]}`
+Created at UTC: `{payload["created_at_utc"]}`
+{toolchain_gate}
+{execution_environment}
+
+## Command
+
+```bash
+{command}
+```
+
+## Audit Commands
+
+Run these after optimizer execution:
+
+{audit_commands}
+
+## Required Behavior
+
+{required_behavior}
+{continuation_note}
+- Preserve native Maestro/ADE exported netlist structure.
+- Command exit status alone is not acceptance evidence.
+- Manifest-level audit is required for any real-tool run.
+
+## Spectre/OCEAN Settings Audit
+
+- `preset`: `{settings["preset"]}`
+- `threads_per_run`: `{settings["threads_per_run"]}`
+- `parallel_jobs`: `{settings["parallel_jobs"]}`
+- `output_format`: `{settings["output_format"]}`
+- `timeout_s`: `{settings["timeout_s"]}`
+
+## Required Returned Artifacts
+
+{artifacts}
+
+## Forbidden Actions
+
+- Do not hand-pick candidate points.
+- Do not parse PSF in Python.
+- Do not rewrite OCEAN formulas.
+- Do not change approved metric formulas.
+- Do not flatten or replace the native Maestro/ADE netlist layout.
+- Do not commit raw Cadence artifacts.
+"""
+
+
+def _required_behavior(payload: dict) -> str:
+    backend = payload["backend"]
+    if backend == OPENBOX_BACKEND:
+        command_name = (
+            "continue-openbox-real" if payload.get("continuation") else "run-openbox-real"
+        )
+        return "\n".join(
+            [
+                f"- Use OpenBox ask-and-tell through `{command_name}`.",
+                "- OpenBox must be installed and importable in the execution environment.",
+                "- If OpenBox is unavailable, report a dependency blocker.",
+                "- Do not silently fall back to TuRBO or manually choose candidates.",
+            ]
+        )
+    return "- Use native `Turbo1.optimize()` through `run-native-turbo`."
+
+
+def _continuation_note(payload: dict) -> str:
+    if not payload.get("continuation"):
+        return ""
+    return (
+        "- This is a continuation task: load existing accepted optimizer traces "
+        "and evaluate only the requested additional candidates.\n"
+    )
+
+
+def _toolchain_gate(payload: dict) -> str:
+    command = payload.get("toolchain_check_command")
+    if not command:
+        return ""
+    return f"""
+## Toolchain Gate
+
+Run this before OpenBox real execution:
+
+```bash
+{shlex.join(command)}
+```
+"""
+
+
+def _execution_environment(payload: dict) -> str:
+    if payload["backend"] != OPENBOX_BACKEND:
+        return ""
+    return f"""
+## Execution Environment
+
+- Source Cadence cshrc before the optimizer command:
+  `{payload["cadence_cshrc"]}`.
+- Put the OpenBox execution venv first in `PATH`:
+  `{DEFAULT_OPENBOX_EXECUTION_VENV}`.
+- Set `MPLCONFIGDIR` to a writable `/tmp` directory.
+- Run real OpenBox/Spectre/OCEAN execution through a non-sandbox or escalated
+  command path.
+"""
