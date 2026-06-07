@@ -53,6 +53,7 @@ source .venv/bin/activate.csh
 
 ```bash
 python -m pip install --upgrade pip setuptools wheel
+python -m pip show wheel
 python -m pip install swig
 swig -version
 python -m pip install --no-build-isolation pyrfr==0.9.0
@@ -71,6 +72,16 @@ OpenBox 安装时可能会编译 `pyrfr`，这个步骤需要系统里能找到 
 `pyrfr`，再安装完整 requirements。否则 `pyrfr` 的隔离构建环境可能能找到
 `.venv/bin/swig`，但这个 Python 包装器会报 `ModuleNotFoundError: No module named
 'swig'`。
+
+如果 `python -m pip install --no-build-isolation pyrfr==0.9.0` 报
+`invalid command 'bdist_wheel'`，说明当前激活的 `.venv` 里没有可用的 `wheel` 包。
+在同一个 `.venv` 里重新运行：
+
+```bash
+python -m pip install --upgrade pip setuptools wheel
+python -m pip show wheel
+python -m pip install --no-build-isolation pyrfr==0.9.0
+```
 
 如果你已经 `pip install swig`，但仍然看到 `command 'swig' failed`，通常是因为没有
 激活 `.venv`，导致 `.venv/bin/swig` 没有进入 `PATH`。先根据 shell 选择正确命令：

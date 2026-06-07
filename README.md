@@ -78,6 +78,7 @@ Then install dependencies:
 
 ```bash
 python -m pip install --upgrade pip setuptools wheel
+python -m pip show wheel
 python -m pip install swig
 swig -version
 python -m pip install --no-build-isolation pyrfr==0.9.0
@@ -96,6 +97,16 @@ If you use the PyPI `swig` package, install `pyrfr` before the full requirements
 with `--no-build-isolation`. Without that flag, `pyrfr`'s isolated build
 environment can call `.venv/bin/swig` but fail with `ModuleNotFoundError: No
 module named 'swig'`.
+
+If `python -m pip install --no-build-isolation pyrfr==0.9.0` fails with
+`invalid command 'bdist_wheel'`, the active environment is missing the `wheel`
+package. Run this again in the active `.venv`, then retry the `pyrfr` command:
+
+```bash
+python -m pip install --upgrade pip setuptools wheel
+python -m pip show wheel
+python -m pip install --no-build-isolation pyrfr==0.9.0
+```
 
 If you installed `swig` into `.venv` but still see `command 'swig' failed`, the
 virtual environment is probably not on `PATH`. Run:
