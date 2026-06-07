@@ -163,8 +163,7 @@ Do not commit or publish:
 Before pushing the source package to GitHub:
 
 - confirm the target repository and visibility;
-- keep the repository private while `LICENSE_NOT_SELECTED.md` is the only
-  license file;
+- confirm `LICENSE` is present and matches the intended release policy;
 - run the sensitive-path scan from `docs/GITHUB_PUBLISH_GUIDE.md`;
 - confirm `.gitignore` excludes generated optimizer project artifacts;
 - keep `tests/` in the source repository for developer verification;

@@ -11,7 +11,8 @@ Current intended repository:
 HAIDERZz/IC-opt-workflow
 ```
 
-The repository can stay private until a real license is selected.
+The repository is released under the MIT License. Keep proprietary Cadence,
+PDK, and project artifacts out of the source repository.
 
 ## What To Publish
 
@@ -30,7 +31,7 @@ vendor/
 tests/
 tools/
 RELEASE_NOTES_v0.1.md
-LICENSE_NOT_SELECTED.md
+LICENSE
 ```
 
 `tests/` is intentionally kept in the GitHub source repository so other
@@ -114,6 +115,4 @@ Then create a GitHub release from tag `v0.1.0` and use
 
 ## License Status
 
-No open-source license is selected yet. Keep the repository private or clearly
-communicate that external reuse is not granted until a real `LICENSE` file is
-added.
+The project uses the MIT License. See `LICENSE`.

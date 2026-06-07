@@ -39,7 +39,7 @@ Run focused tests for the area you changed. For broad packaging changes, run:
 - Do not replace the file-contract workflow with ad hoc chat-only behavior.
 - Keep new features narrow, real-flow oriented, and backed by tests.
 
-## License Status
+## License
 
-No project license is selected yet. Until a real `LICENSE` file is added,
-external reuse rights are not granted by this repository.
+By contributing, you agree that your contributions are provided under the
+project's MIT License. See `LICENSE`.

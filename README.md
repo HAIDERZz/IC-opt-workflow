@@ -1,4 +1,4 @@
-# IC Auto Opt Workflow v0.1.1
+# IC Auto Opt Workflow v0.1.2
 
 IC Auto Opt Workflow helps analog/RF IC designers run repeatable Spectre/OCEAN
 optimization from a project folder.
@@ -41,8 +41,8 @@ CLI.
   Maestro/ADE point root for each testbench.
 - It reports the best observed feasible point. It does not prove a mathematical
   global optimum.
-- No open-source license has been selected yet. Keep the repository private or
-  add a real `LICENSE` before public reuse or redistribution.
+- The workflow can automate Cadence tool usage, but it does not grant access to
+  Cadence software, PDKs, or simulator licenses.
 
 ## Quick Start
 
@@ -243,7 +243,7 @@ pyproject.toml              package metadata and console scripts
 
 ## Version
 
-Current release: `v0.1.1`.
+Current release: `v0.1.2`.
 
 This release has been clean-installed from GitHub and validated on a real
 multi-testbench Mixer optimization flow:
@@ -256,6 +256,4 @@ multi-testbench Mixer optimization flow:
 
 ## License
 
-No license has been selected for this snapshot. See `LICENSE_NOT_SELECTED.md`.
-Until a real `LICENSE` file is added, do not treat this repository as open source
-for reuse or redistribution.
+This project is released under the MIT License. See `LICENSE`.

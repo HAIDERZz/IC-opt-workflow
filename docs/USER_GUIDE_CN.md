@@ -1,4 +1,4 @@
-# IC Auto Opt Workflow v0.1.1 使用说明
+# IC Auto Opt Workflow v0.1.2 使用说明
 
 这份说明面向集成电路方向用户，假设你会使用 Linux 和 Cadence，但不要求你熟悉
 Python 工程。
@@ -200,10 +200,10 @@ Agent 不应该：
 - 在用户没要求时改变并行资源
 - 把失败点当作主推荐点
 
-## 11. 当前 v0.1.1 边界
+## 11. 当前 v0.1.2 边界
 
 - 已经支持 shell 自动化的完整真实流程。
 - Claude/OpenCode runtime adapter 是产品化方向的一部分，但不同 agent runtime 的
   原生 subagent 行为仍需要继续实测。
 - 结果是 best observed，不是全局最优证明。
-- 发布到 GitHub 前还需要选择开源许可证。
+- 项目使用 MIT License 发布；Cadence、PDK 和仿真 license 不包含在本项目内。
