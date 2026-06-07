@@ -77,11 +77,11 @@ source .venv/bin/activate.csh
 Then install dependencies:
 
 ```bash
-python -m pip install --upgrade pip
+python -m pip install --upgrade pip setuptools wheel
 python -m pip install swig
 swig -version
+python -m pip install --no-build-isolation pyrfr==0.9.0
 python -m pip install -r requirements-product.txt
-python -m pip install -e .
 ```
 
 If your server's `python3` is older than 3.11, use whatever Python 3.11+ command
@@ -91,6 +91,11 @@ OpenBox may build `pyrfr` during installation. That build needs a `swig`
 command and a C/C++ compiler. The `python -m pip install swig` step above is the
 lowest-friction user-space path. The important check is `swig -version`: do not
 continue until that command works in the same shell where you run `pip`.
+
+If you use the PyPI `swig` package, install `pyrfr` before the full requirements
+with `--no-build-isolation`. Without that flag, `pyrfr`'s isolated build
+environment can call `.venv/bin/swig` but fail with `ModuleNotFoundError: No
+module named 'swig'`.
 
 If you installed `swig` into `.venv` but still see `command 'swig' failed`, the
 virtual environment is probably not on `PATH`. Run:
@@ -111,7 +116,6 @@ or, without shell activation:
 
 ```bash
 env PATH="$PWD/.venv/bin:$PATH" ./.venv/bin/python -m pip install -r requirements-product.txt
-env PATH="$PWD/.venv/bin:$PATH" ./.venv/bin/python -m pip install -e .
 ```
 
 If `swig -version` still does not work on your server, ask your administrator to

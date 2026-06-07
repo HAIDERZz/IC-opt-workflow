@@ -52,11 +52,11 @@ source .venv/bin/activate.csh
 激活后继续安装依赖：
 
 ```bash
-python -m pip install --upgrade pip
+python -m pip install --upgrade pip setuptools wheel
 python -m pip install swig
 swig -version
+python -m pip install --no-build-isolation pyrfr==0.9.0
 python -m pip install -r requirements-product.txt
-python -m pip install -e .
 ```
 
 如果服务器上的 `python3` 不是 3.11 或更新版本，就使用管理员提供的 Python 3.11+
@@ -66,6 +66,11 @@ python -m pip install -e .
 OpenBox 安装时可能会编译 `pyrfr`，这个步骤需要系统里能找到 `swig` 命令和 C/C++
 编译器。上面的 `python -m pip install swig` 是最轻量的用户目录安装方式。关键检查是
 `swig -version`：只有这个命令在同一个 shell 里能运行，后续安装才有机会通过。
+
+如果你使用的是 PyPI 安装的 `swig`，需要先用 `--no-build-isolation` 单独安装
+`pyrfr`，再安装完整 requirements。否则 `pyrfr` 的隔离构建环境可能能找到
+`.venv/bin/swig`，但这个 Python 包装器会报 `ModuleNotFoundError: No module named
+'swig'`。
 
 如果你已经 `pip install swig`，但仍然看到 `command 'swig' failed`，通常是因为没有
 激活 `.venv`，导致 `.venv/bin/swig` 没有进入 `PATH`。先根据 shell 选择正确命令：
@@ -93,7 +98,6 @@ source .venv/bin/activate.csh
 
 ```bash
 env PATH="$PWD/.venv/bin:$PATH" ./.venv/bin/python -m pip install -r requirements-product.txt
-env PATH="$PWD/.venv/bin:$PATH" ./.venv/bin/python -m pip install -e .
 ```
 
 如果 `swig -version` 仍然不成功，就需要让管理员安装系统依赖：
