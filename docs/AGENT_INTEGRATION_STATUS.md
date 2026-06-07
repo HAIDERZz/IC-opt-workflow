@@ -4,18 +4,30 @@ Date: 2026-06-07
 
 This document fixes the current product-status boundary.
 
-For the detailed Chinese explanation of the implemented automation path and the
-remaining agent-product gap, read `docs/PROJECT_STATUS_AND_ARCHITECTURE_CN.md`.
+## Product Model After C-65
 
-## Current Implemented State
+The target user interaction is:
+
+```text
+User -> current agent CLI supervisor -> same-runtime execution subagent
+```
+
+Examples:
+
+- In Claude, the current Claude conversation is the supervisor and should use a
+  Claude-native subagent/task for execution.
+- In OpenCode, the current OpenCode primary agent is the supervisor and should
+  use an OpenCode subagent for execution.
+
+The product should not require OpenCode/Codex/HermesAgent to launch `claude -p`
+as the execution agent. Cross-CLI execution can remain a development fallback,
+but it is not the default landing shape.
+
+## Implemented Core
 
 Implemented and real-tool validated:
 
 - Shell/product CLI: `ic-opt PROJECT_DIR --real`.
-- Claude CLI skill entrypoint, when installed:
-  `/ic-opt PROJECT_DIR --real`.
-- Observable Claude supervisor-agent to independent Claude CLI execution-agent
-  handoff through `--execution-agent claude`.
 - Lower-level CLI: `hermes-workflow optimize PROJECT_DIR --real`.
 - File-based user input through `opt_requirement.md` plus optional
   `constraints.md`.
@@ -25,7 +37,42 @@ Implemented and real-tool validated:
 - Multi-testbench candidate evaluation and metric aggregation.
 - Optimizer decision, insight, visualization, and final-summary reports.
 
-C-60 real evidence:
+The shell route is deterministic automation. It is useful for operators,
+debugging, and as the core that runtime-native agents wrap.
+
+## Runtime Adapter Assets
+
+Implemented by C-65:
+
+- Claude adapter source: `claude_skills/ic-opt/`.
+- OpenCode adapter source:
+  - `agent_runtime/opencode/command/ic-opt.md`;
+  - `agent_runtime/opencode/agents/ic-opt-execution.md`.
+- Installer/check commands:
+
+```bash
+./.venv/bin/hermes-workflow install-runtime-adapter claude
+./.venv/bin/hermes-workflow install-runtime-adapter opencode
+./.venv/bin/hermes-workflow runtime-adapter-status
+```
+
+After installing an adapter, the intended user command is:
+
+```text
+/ic-opt PROJECT_DIR --real
+```
+
+The adapter instructs the current runtime supervisor to:
+
+1. run the supervisor preparation gate with `--dry-orchestration`;
+2. dispatch the runtime-native execution subagent to run the generated
+   `OPTIMIZER_EXECUTION_TASK.md`;
+3. run supervisor closeout;
+4. report the decision.
+
+## Real Evidence
+
+C-60 real shell evidence:
 
 ```text
 /tmp/ic_auto_opt_c60_one_line_real_PpguO7/Mixer_opt_muti_tb
@@ -40,116 +87,54 @@ ran:
 without `--cadence-cshrc`, completed 100 real evaluations, and recommended
 feasible `real_051`.
 
-C-63 Claude CLI slash-skill evidence:
+C-63 Claude slash-skill evidence:
 
 ```text
 docs/CLAUDE_IC_OPT_REAL_LANDING_2026-06-07.md
 ```
 
-Fresh project:
+proved a short Claude `/ic-opt PROJECT --real` entrypoint could run the real
+automation core on a fresh project and recommend feasible `real_051`.
 
-```text
-/tmp/ic_auto_opt_claude_landing_JjIiNj/Mixer_opt_muti_tb
-```
-
-ran through Claude CLI:
-
-```bash
-claude -p --dangerously-skip-permissions "/ic-opt PROJECT --real"
-```
-
-after installing `claude_skills/ic-opt` into `~/.claude/skills/ic-opt`, completed
-100 real evaluations, and recommended feasible `real_051`.
-
-C-64 Claude execution-agent handoff evidence:
+C-64 Claude subprocess handoff evidence:
 
 ```text
 docs/CLAUDE_EXECUTION_AGENT_HANDOFF_2026-06-07.md
 ```
 
-Fresh project:
+proved that the generated optimizer package can be executed by an independent
+Claude CLI process and then closed out by the supervisor-side flow. This is
+valuable acceptance evidence, but after C-65 it is classified as a
+development/acceptance route rather than the default product target.
 
-```text
-/tmp/ic_auto_opt_c64_handoff_zX9JrO/Mixer_opt_muti_tb
-```
+## Not Yet Fully Proven
 
-ran through Claude CLI:
+Still requiring a live runtime drill before claiming full support:
 
-```bash
-claude -p --dangerously-skip-permissions "/ic-opt PROJECT --real"
-```
-
-The `/ic-opt` skill appended `--execution-agent claude`, the supervisor-side
-flow launched an independent Claude CLI execution-agent process after
-`package-optimizer-task`, `reports/execution_agent_handoff_report.json` recorded
-`status=pass`, `execution_agent=claude`, `returncode=0`, and the real optimizer
-flow completed 100 evaluations with feasible `real_051` recommended.
-
-## Not Yet Implemented
-
-Not implemented:
-
-- A real slash command named `/ic-opt` in Codex or other non-Claude agent
-  runtimes.
-- A packaged installer that installs the Claude skill on a clean machine.
+- Claude native subagent/task execution of the C-65 skill in the target user's
+  actual Claude environment.
+- OpenCode native subagent execution of the C-65 command/agent assets.
+- Codex/OpenClaw/HermesAgent adapters.
+- Packaged release installer beyond the repo-local
+  `install-runtime-adapter` command.
 - Automatic final user acceptance.
 
-Therefore the current project is a working shell automation core plus a
-validated Claude CLI slash-skill and Claude execution-agent handoff route. It
-is not yet a runtime-agnostic two-agent product.
+## User Boundary
 
-## Current User Interaction
+The less the user needs to talk to the agent, the better.
 
-Current supported Claude interaction after installing `claude_skills/ic-opt`:
+The user should prepare:
 
 ```text
-User -> supervisor agent:
+PROJECT_DIR/opt_requirement.md
+PROJECT_DIR/cadence_env.csh or ~/.ic-opt/cadence_env.csh
+```
+
+Then the user should say only:
+
+```text
 /ic-opt PROJECT_DIR --real
 ```
 
-The Claude skill then runs the implemented shell command:
-
-```bash
-cd /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow
-./.venv/bin/ic-opt PROJECT_DIR --real
-```
-
-By default, the skill passes `--execution-agent claude`, so the supervisor
-agent prepares the package and the shell automation core dispatches an
-independent Claude CLI execution-agent process for the real optimizer task.
-The shell command remains available with `--execution-agent direct` for direct
-operator/debug use.
-
-## Target User Interaction
-
-Target two-agent interaction:
-
-```text
-User -> supervisor agent:
-/ic-opt PROJECT_DIR --real
-
-Supervisor agent:
-validates request, prepares package, dispatches execution work, audits reports,
-and returns only the final result summary or a user-decision question.
-
-Execution agent:
-runs approved real OpenBox/Spectre/OCEAN work from the generated package and
-returns artifacts, without asking the user for formulas or hand-picking points.
-```
-
-The less the user needs to talk to the agent, the better. C-64 proves this
-target for Claude CLI. Other runtimes still need their own adapters or skill
-installation path.
-
-## Required Next Product Work
-
-Next product work should stay release-focused:
-
-1. Run one more fresh real Claude `/ic-opt` handoff acceptance if the user wants
-   repeated product evidence.
-2. Add a clean-machine Claude skill/install check before public release.
-3. Implement Codex or other runtime adapters only when that runtime is selected
-   as a product target.
-
-Do not claim Codex or non-Claude two-agent support until a runtime-specific
-handoff drill passes.
+The supervisor agent should not ask for formulas, variables, testbench paths,
+or optimizer settings already present in `opt_requirement.md`.

@@ -2614,3 +2614,19 @@ C-57 One-Command Optimizer Flow:
 - current_scope: C-57 One-Command Optimizer Flow complete.
 - next_allowed_action: use `hermes-workflow optimize PROJECT_DIR --real` on the next real optimization project, or run `--dry-orchestration` on a prepared project to verify offline gates first. Add new features only when this one-command route exposes a concrete production gap.
 - next_allowed_action exact: Use hermes-workflow optimize PROJECT_DIR --real on the next real optimization project or run --dry-orchestration on a prepared project to verify the offline gates. Add new features only when this one-command route exposes a concrete production gap; do not broaden into a workflow engine or slash wrapper until the CLI route is stable in real use.
+
+C-65 Runtime-Native Agent Adapters:
+
+- Status: complete, verified-only.
+- Product correction: C-64 `--execution-agent claude` subprocess handoff is now classified as development/acceptance evidence, not the C-65 default product target.
+- Target product UX: user enters `/ic-opt PROJECT_DIR --real` in the active agent CLI; that runtime's supervisor agent prepares the Hermes package and delegates real execution to the same runtime's native subagent/task mechanism.
+- Code: added `src/hermes_workflow/agent_runtime.py`; CLI commands `hermes-workflow install-runtime-adapter` and `hermes-workflow runtime-adapter-status`.
+- Runtime assets: updated `claude_skills/ic-opt/SKILL.md`; added OpenCode assets under `agent_runtime/opencode/command/ic-opt.md` and `agent_runtime/opencode/agents/ic-opt-execution.md`.
+- Docs: synchronized README, production quickstart, agent usage manual, agent integration status, product release checklist, Chinese architecture status, and added `docs/AGENT_USER_QUICKSTART_CN.md`.
+- Validation: targeted unit tests passed (`tests/test_agent_runtime.py tests/test_product_cli.py`, 14 passed); targeted ruff passed; status command verified read-only; temp install checks passed for Claude and OpenCode.
+- Runtime smoke: installed adapters into `~/.claude` and `~/.config/opencode`; Claude `/ic-opt` empty-argument smoke entered the new skill; OpenCode `agent list` showed `ic-opt-execution (subagent)`; OpenCode `/ic-opt` empty-argument smoke entered the new command.
+- Dry orchestration smoke: clean `/tmp` Mixer multi-testbench projects containing only `opt_requirement.md` and `cadence_env.csh` passed Claude `/ic-opt PROJECT --real --dry-orchestration --max-evals 1` and OpenCode `opencode run --command ic-opt ... --dry-orchestration --max-evals 1`; both stopped before `run-openbox-real` and did not launch real tools.
+- Boundary: no real-tool rerun in C-65, no PSF parsing, no OCEAN formula rewrite, no optimizer backend change, no synthetic testbench merge, no new fake optimizer ladder.
+- current_scope: C-65 Runtime-native agent adapters complete.
+- next_allowed_action: run a live runtime-native real handoff drill in the selected target runtime, or implement the next runtime adapter such as Codex/OpenClaw/HermesAgent. Do not add optimizer math/features unless a real product run exposes a concrete need.
+- next_allowed_action exact: After user confirmation, choose the next product-landing task: run a live runtime-native real handoff drill in the selected target runtime, or add the next runtime adapter such as Codex/OpenClaw/HermesAgent. Do not add optimizer math/features unless a real product run exposes a concrete need.

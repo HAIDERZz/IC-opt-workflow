@@ -1,15 +1,12 @@
-# Claude Skills
+# Claude Runtime Adapter
 
-This directory contains Claude Code skill entrypoints for the product-facing
-agent UX.
+This directory contains the Claude skill used by C-65's runtime-native product
+route.
 
-## Install `/ic-opt`
-
-From the repository root:
+Install from the repository root:
 
 ```bash
-mkdir -p ~/.claude/skills
-ln -sfn "$PWD/claude_skills/ic-opt" ~/.claude/skills/ic-opt
+./.venv/bin/hermes-workflow install-runtime-adapter claude
 ```
 
 Then a Claude CLI or Claude Code session can run:
@@ -18,14 +15,12 @@ Then a Claude CLI or Claude Code session can run:
 /ic-opt PROJECT_DIR --real
 ```
 
-The skill delegates to the implemented product shell command and appends
-`--execution-agent claude` by default:
+The skill treats Claude as the supervisor agent. It first runs the deterministic
+Hermes supervisor gate, which generates and approves the optimizer execution
+package. Then it asks Claude to use its own native subagent/task mechanism to
+execute `PROJECT_DIR/execution_package/OPTIMIZER_EXECUTION_TASK.md`. After the
+subagent returns, the supervisor runs closeout and reports the decision.
 
-```bash
-./.venv/bin/ic-opt PROJECT_DIR --real --execution-agent claude
-```
-
-The current skill proves the Claude runtime slash entrypoint plus observable
-supervisor-agent to independent Claude CLI execution-agent handoff. Shell
-`ic-opt` remains `--execution-agent direct` by default for operator/debug use.
-Codex and other non-Claude runtimes still need their own adapters.
+The historical C-64 `--execution-agent claude` subprocess route remains useful
+as development acceptance evidence, but it is not the C-65 default product
+target.

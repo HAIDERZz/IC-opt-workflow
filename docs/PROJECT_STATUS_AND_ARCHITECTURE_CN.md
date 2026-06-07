@@ -6,34 +6,34 @@
 
 ## 0. 结论先说清楚
 
-当前项目已经跑通的是一个产品级 shell 自动化核心、第一个 Claude CLI
-slash skill 入口，以及 Claude runtime 下可观察的 supervisor-agent ->
-independent execution-agent handoff。[E1][E2][E3][E19][E20]
+当前项目已经跑通的是一个产品级 shell 自动化核心、真实 OpenBox/Spectre/OCEAN
+优化流程、Claude `/ic-opt` 短入口，以及 C-64 的 Claude subprocess handoff
+验收路径。[E1][E2][E3][E19][E20]
 
 当前可用 shell 入口是 `ic-opt PROJECT_DIR --real`，它是 Python console
 script。[E1][E3]
 
-当前可用 Claude CLI agent 入口是安装 `claude_skills/ic-opt` 后的
-`/ic-opt PROJECT_DIR --real`；C-63 已经用 fresh Mixer multi-testbench 项目
-真实跑通，C-64 进一步证明该入口默认会派发独立 Claude CLI execution-agent
-process。[E19][E20]
+当前 C-65 产品目标已经修正为 runtime-native：用户在哪个 agent CLI 里输入
+`/ic-opt PROJECT_DIR --real`，哪个 CLI 的当前会话就是 supervisor agent，
+并使用同一个 CLI 的原生 subagent/task 机制执行真实优化任务。Claude 和
+OpenCode 的入口资产已经加入仓库；C-64 的 `--execution-agent claude`
+subprocess 方式保留为开发/验收证据，不再被描述为默认产品形态。[E2][E20]
 
-当前 `ic-opt` 有两种执行模式：shell 默认的 `--execution-agent direct`
-会在同一个 Python 流程里调用真实 OpenBox/Spectre/OCEAN 优化后端；
-Claude `/ic-opt` 默认追加 `--execution-agent claude`，会在
-`package-optimizer-task` 之后派发一个独立 Claude CLI execution-agent
-process，然后由 supervisor-side flow 继续审计和汇报。[E3][E4][E20]
+当前 `ic-opt` shell 命令默认是 direct 自动化路径，会在同一个 Python 流程
+里调用真实 OpenBox/Spectre/OCEAN 优化后端。runtime-native `/ic-opt`
+adapter 则应先让 supervisor 运行 `--dry-orchestration` 生成并批准
+`OPTIMIZER_EXECUTION_TASK.md`，再由同一 runtime 的 execution subagent
+运行该任务，最后由 supervisor closeout 和汇报。[E3][E4][E20]
 
 因此，如果用户说“运行 `ic-opt` 之后 agent 接入在哪里”，准确答案是：
-C-63 之前只停留在文档化角色、任务包合同和人工/主管 agent 可操作 CLI 的
-层级；C-63 之后，Claude CLI 可以通过 `/ic-opt` skill 触发该自动化核心；
-C-64 之后，Claude CLI 路径已经能观察到 supervisor -> independent
-execution-agent handoff。[E2][E4][E19][E20]
+shell `ic-opt PROJECT_DIR --real` 本身是自动化脚本入口；agent 接入发生在
+runtime adapter 层，即 `/ic-opt PROJECT_DIR --real` 由当前 CLI 的 supervisor
+agent 执行，并调用同 runtime 的 execution subagent。[E2][E4][E19][E20]
 
-当前仍然不是“任意 agent runtime 都支持”的产品。C-62 把边界写入
-`docs/AGENT_INTEGRATION_STATUS.md`，C-63 把第一个 Claude `/ic-opt`
-入口真实落地，C-64 把 Claude runtime 的独立 execution-agent handoff
-真实落地。[E2][E5][E19][E20]
+当前仍然不是“任意 agent runtime 都已经实测支持”的产品。C-65 增加了
+Claude/OpenCode runtime adapter 资产和安装命令，但每个 runtime 仍需要在
+目标环境完成一次 native-subagent drill，才能声称该 runtime 已经完全落地。
+[E2][E5][E19][E20]
 
 ## 1. 项目原始目标
 
@@ -45,10 +45,11 @@ Virtuoso/Spectre/OCEAN/OpenBox 执行。[E6]
 这个角色模型仍然是目标架构，且 `AGENTS.md` 明确禁止把 Hermes 说成一个
 agent；Hermes 在本项目中是 workflow tooling。[E7]
 
-当前实现最成熟的部分是 Hermes workflow tooling、shell 自动化核心、
-Claude CLI skill 入口，以及 Claude runtime 的独立 execution-agent
-handoff；尚未完成的部分是 Codex/非 Claude agent runtime 的入口适配和
-clean-machine skill installer。[E2][E3][E6][E19][E20]
+当前实现最成熟的部分是 Hermes workflow tooling、shell 自动化核心、真实
+多 testbench optimizer 流程和报告链；agent 侧正在收敛到 runtime-native
+adapter 形态。尚未完成的部分是 Codex/OpenClaw/HermesAgent 等 runtime 的
+入口适配、公开发布级 installer，以及各 runtime 的 native-subagent 实机
+drill。[E2][E3][E6][E19][E20]
 
 ## 2. 当前 `ic-opt` 到底是什么
 

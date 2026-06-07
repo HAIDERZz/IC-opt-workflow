@@ -1,12 +1,11 @@
 ---
 name: ic-opt
-description: Run the IC Auto Opt real optimization workflow from a strict opt_requirement.md project. Trigger when the user enters "/ic-opt PROJECT_DIR --real". This skill runs the implemented ic-opt shell product command, reads optimizer reports, and reports the result without hand-picking candidates or asking for formula details.
+description: Run IC Auto Opt from a strict opt_requirement.md project. Trigger when the user enters "/ic-opt PROJECT_DIR --real". The current Claude runtime acts as supervisor and delegates real execution to a native Claude subagent/task when available.
 ---
 
-# IC Auto Opt Product Entrypoint
+# IC Auto Opt Runtime-Native Entrypoint
 
-This skill IS the user-facing entrypoint. Execute immediately; do not write a
-plan first and do not ask the user to restate the requirement.
+This skill is the Claude-facing `/ic-opt` entrypoint.
 
 User command:
 
@@ -14,48 +13,42 @@ User command:
 /ic-opt PROJECT_DIR --real [optional ic-opt flags]
 ```
 
-`PROJECT_DIR` must contain `opt_requirement.md` and a user-supplied Cadence env
-anchor discoverable by the product CLI, usually `PROJECT_DIR/cadence_env.csh`.
+The user should not need to write a long prompt. Machine-critical setup belongs
+in `PROJECT_DIR/opt_requirement.md`, and optional human guidance belongs in
+`PROJECT_DIR/constraints.md`.
 
 ## Hard Boundaries
 
-- Run a real workflow. Do not run fake or mock optimizer commands.
+- Use the current Claude runtime as supervisor.
+- Delegate the real optimizer execution to a native Claude subagent/task when
+  that tool is available.
+- Do not launch another `claude -p` process as the product execution agent.
 - Do not hand-pick candidate points.
 - Do not rewrite OCEAN formulas.
 - Do not parse PSF in Python.
-- Do not hardcode a Spectre version in the prompt or command.
+- Do not hardcode a Spectre version.
 - Do not create a per-project Python virtualenv.
-- Do not automatically accept the final candidate for the user.
-- Do not poll after every optimizer batch; let the product command run.
+- Do not automatically record final user acceptance.
+- Do not poll after every optimizer batch.
 
-## Argument Parsing
+## Parse Arguments
 
 Parse `$ARGUMENTS` as:
 
-```bash
-PROJECT_DIR="${ARGUMENTS%% --*}"
-PROJECT_DIR="$(echo "$PROJECT_DIR" | xargs)"
-FLAGS="${ARGUMENTS#"$PROJECT_DIR"}"
-FLAGS="$(echo "$FLAGS" | xargs)"
+```text
+PROJECT_DIR --real [optional ic-opt flags]
 ```
 
-If `PROJECT_DIR` is empty, fail with a short message asking for:
+If `PROJECT_DIR` is empty, stop and ask for:
 
 ```text
 /ic-opt PROJECT_DIR --real
 ```
 
-If `FLAGS` does not contain `--real`, append `--real`.
+If flags do not include `--real`, append `--real`.
 
-If `FLAGS` does not contain `--execution-agent`, append:
-
-```text
---execution-agent claude
-```
-
-This is the product landing path: the supervisor skill must dispatch an
-independent Claude CLI execution-agent process through `ic-opt`, not run the
-optimizer entirely inside the supervisor process.
+Do not append `--execution-agent claude`. The historical C-64 subprocess route
+is a development/acceptance fallback, not the C-65 product default.
 
 ## Locate The Workflow Repo
 
@@ -74,28 +67,76 @@ else
 fi
 ```
 
-## Run
+## Supervisor Gate
 
-Run exactly one product command:
+Run the deterministic supervisor preparation gate:
 
 ```bash
 cd "$REPO"
-"$REPO/.venv/bin/ic-opt" "$PROJECT_DIR" $FLAGS
+"$REPO/.venv/bin/ic-opt" "$PROJECT_DIR" $FLAGS --dry-orchestration
 ```
 
-This command owns markdown intake, YAML generation, Maestro point-root import,
-contract validation, package/preflight/approval, real OpenBox/Spectre/OCEAN
-optimization through the execution-agent handoff, artifact checks,
-visualization, and decision reporting.
+This reads `opt_requirement.md`, generates YAML/config, imports Maestro point
+roots, validates contracts, packages/preflights/approves the run, and writes:
+
+```text
+PROJECT_DIR/execution_package/OPTIMIZER_EXECUTION_TASK.md
+PROJECT_DIR/execution_package/optimizer_execution_manifest.json
+```
+
+If the user explicitly included `--dry-orchestration`, stop here and report the
+supervisor gate result. Do not dispatch the execution subagent for a dry
+orchestration check.
+
+## Native Execution Subagent
+
+After the supervisor gate passes, use Claude's native subagent/task mechanism.
+Give the execution subagent only this scoped task:
+
+```text
+You are the IC Auto Opt execution agent.
+
+Repo: REPO
+Project: PROJECT_DIR
+
+Read PROJECT_DIR/execution_package/OPTIMIZER_EXECUTION_TASK.md and
+PROJECT_DIR/execution_package/optimizer_execution_manifest.json.
+
+Run only the approved optimizer command from the manifest, from REPO, with
+REPO/.venv/bin first in PATH. Use the Cadence setup path recorded in the
+manifest. Do not hand-pick candidates. Do not rewrite formulas. Do not parse
+PSF. Do not invoke another CLI agent. Report command status and artifact paths
+back to the supervisor.
+```
+
+If the native subagent/task tool is unavailable or denied, stop and report:
+
+```text
+Runtime-native execution subagent dispatch is unavailable in this Claude
+session. Direct shell ic-opt can run the automation core, but that is not the
+two-agent product route.
+```
+
+## Supervisor Closeout
+
+After the execution subagent reports completion, run the closeout chain from
+`REPO`:
+
+```bash
+"$REPO/.venv/bin/hermes-workflow" check-optimizer-run "$PROJECT_DIR"
+"$REPO/.venv/bin/hermes-workflow" summarize-optimizer-run "$PROJECT_DIR"
+"$REPO/.venv/bin/hermes-workflow" finalize-optimizer-run "$PROJECT_DIR"
+"$REPO/.venv/bin/hermes-workflow" visualize-optimizer-run "$PROJECT_DIR"
+"$REPO/.venv/bin/hermes-workflow" decide-optimizer-run "$PROJECT_DIR"
+```
 
 ## Report
 
-After the command exits successfully, read:
+Read:
 
 ```text
 PROJECT_DIR/reports/optimizer_decision_report.md
-PROJECT_DIR/reports/optimizer_flow_run_report.json
-PROJECT_DIR/reports/execution_agent_handoff_report.json
+PROJECT_DIR/reports/optimizer_insight_report.md
 ```
 
 Report only:
@@ -105,10 +146,9 @@ Report only:
 - recommended run id and action;
 - recommended parameters and metrics;
 - global optimum claim;
-- warnings or user decision required;
-- execution-agent handoff status;
+- bottleneck and warnings;
+- user decision required;
 - report paths.
 
-If the command fails, report the failed flow step and the relevant report path.
-Do not continue by running lower-level commands unless the failure message
-explicitly tells you to do so.
+If any step fails, report the failed step and the relevant report path. Do not
+continue by manually selecting candidates or changing formulas.

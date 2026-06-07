@@ -22,17 +22,30 @@ Current execution state:
 
 - Latest production acceptance note:
   `docs/PRODUCTION_LANDING_ACCEPTANCE_2026-06-07.md`.
-- Current scope: C-64 Observable Claude execution-agent handoff complete.
-- Current status: the implemented product route now has three proven Claude
-  layers: shell `ic-opt PROJECT_DIR --real`, Claude CLI `/ic-opt PROJECT_DIR
-  --real` after installing `claude_skills/ic-opt`, and observable supervisor
-  Claude to independent Claude CLI execution-agent handoff through
-  `--execution-agent claude`.
+- Current scope: C-65 Runtime-native agent adapters complete.
+- Current status: shell `ic-opt PROJECT_DIR --real` remains the deterministic
+  automation core, while product agent UX is now defined as
+  `/ic-opt PROJECT_DIR --real` in the active runtime. The active runtime's
+  supervisor agent should run the Hermes preparation gate, delegate real
+  execution to that same runtime's native subagent/task mechanism, then run
+  closeout and report. C-64 `--execution-agent claude` subprocess handoff is
+  preserved as development/acceptance evidence, not the C-65 default product
+  route.
 - Canonical agent boundary doc:
   `docs/AGENT_INTEGRATION_STATUS.md`.
 - Detailed Chinese project status and architecture explanation:
   `docs/PROJECT_STATUS_AND_ARCHITECTURE_CN.md`.
-- C-64 Claude execution-agent handoff evidence:
+- C-65 runtime-native adapter evidence:
+  Claude and OpenCode adapters are installed via
+  `hermes-workflow install-runtime-adapter`. Claude `/ic-opt` empty-argument
+  smoke entered the new skill and asked for `PROJECT_DIR --real`. OpenCode
+  `agent list` shows `ic-opt-execution (subagent)`, and `opencode run
+  --command ic-opt` empty-argument smoke entered the new command. Clean `/tmp`
+  Mixer dry-orchestration projects containing only `opt_requirement.md` and
+  `cadence_env.csh` passed Claude and OpenCode `/ic-opt PROJECT --real
+  --dry-orchestration --max-evals 1`; both stopped before `run-openbox-real`
+  with no real-tool launch and no C-64 subprocess handoff.
+- C-64 Claude subprocess handoff evidence:
   `docs/CLAUDE_EXECUTION_AGENT_HANDOFF_2026-06-07.md`.
   Fresh project `/tmp/ic_auto_opt_c64_handoff_zX9JrO/Mixer_opt_muti_tb`
   started with only `opt_requirement.md` and `cadence_env.csh`. The command
@@ -59,6 +72,8 @@ Current execution state:
   pass; counts are `65 constraint_failed`, `19 feasible`,
   `16 metric_check_failed`; recommended feasible candidate is `real_066`
   with `F=26`, `L=40n`, `VB_LO=310m`, `W=1u`.
+- C-65 plan:
+  `docs/superpowers/plans/2026-06-07-runtime-native-agent-adapters.md`.
 - C-64 plan:
   `docs/superpowers/plans/2026-06-07-observable-execution-agent-handoff.md`.
 - C-63 plan:
@@ -66,12 +81,11 @@ Current execution state:
 - Product target: one product-level Python environment for
   `ic-auto-opt-workflow`, OpenBox, TuRBO, and report dependencies; no
   per-project virtualenvs. The implemented shell entry is
-  `ic-opt PROJECT --real`; the implemented Claude CLI entry is
-  `/ic-opt PROJECT --real` after installing `claude_skills/ic-opt`; the Claude
-  runtime now has an observable independent execution-agent handoff mode.
-  Codex/non-Claude runtime adapters and clean-machine skill installer remain
-  future work. Do not use long natural-language prompts to compensate for
-  missing command behavior.
+  `ic-opt PROJECT --real`. Runtime adapters under `claude_skills/` and
+  `agent_runtime/opencode/` provide the current Claude/OpenCode `/ic-opt`
+  entry assets. Codex/OpenClaw/HermesAgent runtime adapters and live
+  native-subagent real drills remain future work. Do not use long
+  natural-language prompts to compensate for missing command behavior.
 - C-59 product-entrypoint evidence:
   `/tmp/ic_auto_opt_c59_dry_5J81NM/Mixer_opt_muti_tb` passed one-line dry
   orchestration from `./.venv/bin/ic-opt` with `PROJECT_DIR/cadence_env.csh`

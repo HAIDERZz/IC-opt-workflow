@@ -9,8 +9,8 @@ The implemented shell product command is:
 ic-opt /path/to/project --real
 ```
 
-The implemented Claude CLI skill entrypoint, after installing the included
-skill, is:
+The runtime-native agent entrypoint, after installing the adapter for your
+agent CLI, is:
 
 ```text
 /ic-opt /path/to/project --real
@@ -19,11 +19,11 @@ skill, is:
 The project has been exercised on a real multi-testbench Mixer optimization
 flow with OpenBox, Spectre, OCEAN, and post-run visualization/reporting.
 
-Important agent-integration boundary: the Claude CLI `/ic-opt` skill now maps
-the short agent command to the shell automation core and, by default, dispatches
-an independent Claude CLI execution-agent process for the real optimizer task.
-This Claude runtime handoff is real-tool validated. Codex and other non-Claude
-agent runtimes still need their own adapters. See
+Important agent-integration boundary: `ic-opt` is the deterministic automation
+core. Runtime adapters make the current agent CLI act as supervisor and
+delegate real execution to that same CLI's native subagent/task mechanism.
+C-64's `--execution-agent claude` subprocess handoff remains development
+evidence, not the C-65 default product target. See
 `docs/AGENT_INTEGRATION_STATUS.md` before describing runtime support.
 
 For the detailed Chinese explanation of what the automation does, what evidence
@@ -65,11 +65,18 @@ Expected entrypoints:
 ./.venv/bin/hermes-workflow --help
 ```
 
-For Claude CLI `/ic-opt` support, install the included skill once:
+Install an agent runtime adapter once.
+
+For Claude:
 
 ```bash
-mkdir -p ~/.claude/skills
-ln -sfn "$PWD/claude_skills/ic-opt" ~/.claude/skills/ic-opt
+./.venv/bin/hermes-workflow install-runtime-adapter claude
+```
+
+For OpenCode:
+
+```bash
+./.venv/bin/hermes-workflow install-runtime-adapter opencode
 ```
 
 Then use the short agent command:
@@ -78,11 +85,10 @@ Then use the short agent command:
 /ic-opt /path/to/project --real
 ```
 
-By default this Claude skill uses the observable execution-agent handoff route.
 For direct shell/operator debugging, use:
 
 ```bash
-ic-opt /path/to/project --real --execution-agent direct
+ic-opt /path/to/project --real
 ```
 
 ## Cadence Environment
@@ -202,17 +208,20 @@ project-local `cadence_env.csh` and ran:
 It completed 100 real OpenBox/Spectre/OCEAN evaluations, generated OpenBox
 advanced visualization, and recommended a feasible best-observed candidate.
 
-C-64 Claude handoff acceptance used a fresh Mixer multi-testbench project with
+C-64 Claude subprocess handoff acceptance used a fresh Mixer multi-testbench
+project with
 only `opt_requirement.md` and `cadence_env.csh`, then ran:
 
 ```bash
 claude -p --dangerously-skip-permissions "/ic-opt PROJECT --real"
 ```
 
-The `/ic-opt` skill appended `--execution-agent claude`; the flow wrote
+The historical `/ic-opt` skill appended `--execution-agent claude`; the flow wrote
 `reports/execution_agent_handoff_report.json` with `status=pass`,
 `execution_agent=claude`, `returncode=0`, completed 100 real evaluations, and
-recommended feasible `real_051`.
+recommended feasible `real_051`. C-65 keeps that route as acceptance evidence
+and development fallback, while product adapters target runtime-native
+same-CLI subagent delegation.
 
 ## Documentation
 
@@ -221,6 +230,8 @@ recommended feasible `real_051`.
   manual.
 - `docs/AGENT_INTEGRATION_STATUS.md`: current implemented agent boundary and
   remaining runtime-specific adapter work.
+- `docs/AGENT_USER_QUICKSTART_CN.md`: beginner-friendly Chinese guide for IC
+  users running the agent workflow.
 - `docs/PROJECT_STATUS_AND_ARCHITECTURE_CN.md`: detailed Chinese status and
   architecture explanation with evidence references.
 - `src/hermes_workflow/templates/spectre_maestro_project/OPT_REQUIREMENT_README.md`:

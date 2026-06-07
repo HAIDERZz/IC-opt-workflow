@@ -1925,3 +1925,14 @@ C-57 One-Command Optimizer Flow:
 - Production quickstart and agent usage manual now prefer the one-command route and keep manual commands as fallback.
 - Verification: `tests/test_optimizer_flow.py` passed (`3 passed`); adjacent CLI/readiness/decision/final-summary tests passed (`46 passed`); targeted ruff passed; `git diff --check` passed.
 - current_scope: C-57 One-Command Optimizer Flow complete.
+
+C-65 Runtime-Native Agent Adapters:
+
+- Status: complete, verified-only.
+- Product boundary corrected: shell `ic-opt PROJECT_DIR --real` is deterministic automation; agent product UX is `/ic-opt PROJECT_DIR --real` in the active runtime, with the supervisor delegating to the same runtime's native execution subagent.
+- Added `agent_runtime` installer/status support and runtime assets for Claude and OpenCode.
+- Claude adapter smoke: `/ic-opt` entered the new skill; clean Mixer dry-orchestration project passed all 10 supervisor gate steps and stopped before `run-openbox-real` with `execution_agent=direct`.
+- OpenCode adapter smoke: `ic-opt-execution` appears as a subagent; `/ic-opt` command entered the new command; clean Mixer dry-orchestration project passed and did not dispatch real execution.
+- User-facing docs now point IC users to `docs/AGENT_USER_QUICKSTART_CN.md` and clarify that C-64 `--execution-agent claude` is development/acceptance evidence, not the default product route.
+- Verification: `tests/test_agent_runtime.py tests/test_product_cli.py` passed (`14 passed`), targeted ruff passed, runtime adapter install/status checks passed, and Claude/OpenCode dry runtime smoke checks passed.
+- current_scope: C-65 Runtime-native agent adapters complete.

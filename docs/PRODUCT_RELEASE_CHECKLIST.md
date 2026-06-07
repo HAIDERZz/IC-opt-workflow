@@ -4,13 +4,13 @@ Use this checklist before treating `ic-auto-opt-workflow` as ready for another
 user or another clean machine.
 
 Important boundary: this checklist validates the implemented shell automation
-core, the Claude CLI slash-skill entrypoint, and the Claude runtime
-supervisor-agent to independent execution-agent handoff. The implemented shell
-entrypoint is `ic-opt PROJECT_DIR --real`; the Claude skill entrypoint is
-`/ic-opt PROJECT_DIR --real` after installing `claude_skills/ic-opt`, and it
-defaults to `--execution-agent claude`. Codex/non-Claude runtimes still need
-their own adapters. See `docs/AGENT_INTEGRATION_STATUS.md` before describing
-runtime support.
+core and C-65 runtime-native adapter assets. The implemented shell entrypoint is
+`ic-opt PROJECT_DIR --real`; agent runtimes should install their own adapter and
+then use `/ic-opt PROJECT_DIR --real` so the current runtime supervisor can
+delegate to a same-runtime execution subagent. The historical C-64
+`--execution-agent claude` subprocess route is development acceptance evidence,
+not the C-65 default product target. See `docs/AGENT_INTEGRATION_STATUS.md`
+before describing runtime support.
 
 For the detailed Chinese status explanation, read
 `docs/PROJECT_STATUS_AND_ARCHITECTURE_CN.md`.
@@ -35,11 +35,12 @@ Expected scripts:
 
 Do not use `/tmp/ic_auto_opt_openbox_spike/.venv` as a product dependency.
 
-For Claude CLI slash entrypoint acceptance, install:
+Install runtime adapters as needed:
 
 ```bash
-mkdir -p ~/.claude/skills
-ln -sfn "$PWD/claude_skills/ic-opt" ~/.claude/skills/ic-opt
+./.venv/bin/hermes-workflow install-runtime-adapter claude
+./.venv/bin/hermes-workflow install-runtime-adapter opencode
+./.venv/bin/hermes-workflow runtime-adapter-status
 ```
 
 ## 2. User Project Contract
@@ -107,17 +108,23 @@ The real product route is:
   --parallel-jobs 10
 ```
 
-Acceptance requires:
+Shell acceptance requires:
 
 - `reports/optimizer_flow_run_report.json` has `status=pass`.
-- For Claude `/ic-opt` acceptance, `reports/execution_agent_handoff_report.json`
-  has `status=pass`, `execution_agent=claude`, and `returncode=0`.
 - `reports/optimizer_run_report.json` has `evaluation_count=max_evals`.
 - `reports/optimizer_decision_report.md` recommends a feasible candidate when
   feasible evidence exists.
 - OpenBox advanced visualization status is `generated` or explicitly recorded
   as unavailable with a reason.
 - `global_optimum_claim=false`.
+
+Runtime-native agent acceptance additionally requires:
+
+- the runtime adapter is installed and visible to that CLI;
+- the supervisor gate writes `execution_package/OPTIMIZER_EXECUTION_TASK.md`;
+- the same-runtime execution subagent runs the approved task package;
+- the supervisor runs closeout and reports the decision without asking the user
+  to restate machine-critical information.
 
 ## 6. Final User Acceptance
 

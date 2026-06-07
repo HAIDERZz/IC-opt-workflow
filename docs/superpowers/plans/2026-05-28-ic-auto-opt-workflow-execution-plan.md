@@ -114,18 +114,27 @@ with `global_optimum_claim=false`. This proves a short Claude agent-facing
 entrypoint to the automation core.
 
 C-64 implements and validates observable Claude supervisor-agent to independent
-Claude CLI execution-agent handoff. The Claude `/ic-opt` skill appends
-`--execution-agent claude` by default; `optimizer_flow` dispatches an
-independent Claude CLI execution-agent process after `package-optimizer-task`,
-captures `reports/execution_agent_handoff_report.json` and transcript, then
-resumes supervisor-side closeout. The fresh project
+Claude CLI subprocess handoff. That historical `/ic-opt` skill appended
+`--execution-agent claude`; `optimizer_flow` dispatched an independent Claude
+CLI execution-agent process after `package-optimizer-task`, captured
+`reports/execution_agent_handoff_report.json` and transcript, then resumed
+supervisor-side closeout. The fresh project
 `/tmp/ic_auto_opt_c64_handoff_zX9JrO/Mixer_opt_muti_tb` started with only
 `opt_requirement.md` and `cadence_env.csh`; `claude -p
 --dangerously-skip-permissions "/ic-opt PROJECT --real"` completed the handoff,
 100 real OpenBox/Spectre/OCEAN evaluations, and recommended feasible
-`real_051` with `global_optimum_claim=false`. This proves the Claude runtime
-two-agent handoff route; Codex/non-Claude runtime adapters and clean-machine
-skill installer remain future work.
+`real_051` with `global_optimum_claim=false`. After C-65 this is classified as
+development/acceptance evidence, not the default product target.
+
+C-65 corrects the product agent boundary to runtime-native same-CLI subagent
+delegation. The target product UX is now `/ic-opt PROJECT_DIR --real` in the
+active agent runtime: the current runtime supervisor runs the Hermes
+preparation gate, dispatches that same runtime's native execution subagent to
+run the generated `OPTIMIZER_EXECUTION_TASK.md`, then runs closeout and reports.
+C-65 adds Claude and OpenCode adapter assets plus
+`hermes-workflow install-runtime-adapter` / `runtime-adapter-status`, and
+validates both runtimes with clean dry-orchestration smoke projects. Codex,
+OpenClaw, HermesAgent, and live native-subagent real drills remain future work.
 
 The accepted route is no longer an abstract contract-only optimizer plan; it is
 a practice-first production handoff flow that has been exercised with real
@@ -138,12 +147,11 @@ Current production route:
 ```text
 user supplies a Cadence env anchor once
 -> shell/operator runs ic-opt PROJECT_DIR --real
--> Claude CLI can run /ic-opt PROJECT_DIR --real after installing claude_skills/ic-opt
+-> active agent runtime runs /ic-opt PROJECT_DIR --real after installing its adapter
 -> supervisor agent must use the short command and project files, not a long prompt
 -> Hermes workflow tooling validates/package contracts
 -> Hermes writes optimizer execution task packet
--> Claude /ic-opt dispatches an independent Claude CLI execution-agent process
--> execution agent follows the generated optimizer task package command exactly
+-> runtime-native execution subagent follows the generated optimizer task package command exactly
 -> OpenBox/native TuRBO generates candidates, not hand-picked points
 -> Spectre runs with approved precision/thread settings
 -> OCEAN computes approved metrics
