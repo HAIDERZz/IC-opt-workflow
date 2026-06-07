@@ -95,7 +95,7 @@ The target product-shaped request is one short command:
 The shell-equivalent product command is:
 
 ```text
-ic-opt /home/zzchen/spectre_opt_prj/<project_name> --real --cadence-cshrc /path/to/user_env.csh
+ic-opt /home/zzchen/spectre_opt_prj/<project_name> --real
 ```
 
 The user-facing request should stay short. All machine-critical information
@@ -109,6 +109,23 @@ hermes-workflow optimize /home/zzchen/spectre_opt_prj/<project_name> \
   --real \
   --cadence-cshrc /path/to/user_env.csh
 ```
+
+The Cadence/Spectre/OCEAN environment path is still user supplied. The user may
+provide it once, for example:
+
+```bash
+mkdir -p ~/.ic-opt
+cp /path/to/user/cadence_env.csh ~/.ic-opt/cadence_env.csh
+```
+
+or by placing `cadence_env.csh` in `PROJECT_DIR`. After that, the supervisor can
+use the short `/ic-opt PROJECT_DIR --real` form. `ic-opt` discovers the
+user-supplied cshrc in this order:
+
+1. explicit `--cadence-cshrc PATH`;
+2. `PROJECT_DIR/cadence_env.csh`;
+3. environment variable `IC_OPT_CADENCE_CSHRC`;
+4. `~/.ic-opt/cadence_env.csh`.
 
 The supervisor agent must not ask the user to restate formulas, variables,
 testbench paths, Spectre resources, or optimizer settings that are already
@@ -183,12 +200,11 @@ Typical user-side fixes:
 For production use, prefer the single orchestration command:
 
 ```bash
-./.venv/bin/hermes-workflow optimize PROJECT_DIR \
+./.venv/bin/ic-opt PROJECT_DIR \
   --real \
   --max-evals 100 \
   --batch-size 10 \
-  --parallel-jobs 10 \
-  --cadence-cshrc /path/to/user/cadence_env.csh
+  --parallel-jobs 10
 ```
 
 This command performs the approved package/preflight/approval gate, launches the
@@ -198,13 +214,12 @@ acceptance. It does not record final user acceptance automatically.
 To test the offline gates only:
 
 ```bash
-./.venv/bin/hermes-workflow optimize PROJECT_DIR \
+./.venv/bin/ic-opt PROJECT_DIR \
   --real \
   --dry-orchestration \
   --max-evals 100 \
   --batch-size 10 \
-  --parallel-jobs 10 \
-  --cadence-cshrc /path/to/user/cadence_env.csh
+  --parallel-jobs 10
 ```
 
 ## 8. Manual Fallback: Build The Approved Execution Package

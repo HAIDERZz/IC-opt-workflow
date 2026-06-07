@@ -23,7 +23,7 @@
 
 ## Current Implementation Node
 
-As of 2026-06-07, Plan A, Plan B, and Plan C through C-58 are complete, with
+As of 2026-06-07, Plan A, Plan B, and Plan C through C-59 are complete, with
 post-C-49 real Mixer OpenBox/Spectre/OCEAN evidence through 200 cumulative
 NF=12dB evaluations and C-50 real multi-testbench evidence through 100
 three-testbench evaluations. Post-C50/C-54 reporting now re-scores existing
@@ -77,6 +77,13 @@ recommended feasible `real_066`. A sandboxed real attempt failed with Spectre
 pipe/socket errors, so real Cadence/Spectre/OCEAN acceptance must be run
 unsandboxed.
 
+C-59 removes the remaining repeated Cadence environment flag from the product
+entrypoint without changing the lower-level audited command. The Cadence setup
+path remains user supplied once through explicit `--cadence-cshrc`,
+`PROJECT_DIR/cadence_env.csh`, `IC_OPT_CADENCE_CSHRC`, or
+`~/.ic-opt/cadence_env.csh`; then the product route is
+`ic-opt PROJECT_DIR --real`. `hermes-workflow optimize` remains explicit.
+
 The accepted route is no longer an abstract contract-only optimizer plan; it is
 a practice-first production handoff flow that has been exercised with real
 OpenBox, Spectre, and OCEAN runs. C-50 has addressed the real Mixer landing
@@ -86,7 +93,8 @@ testbenches such as CG/NF/BW, IIP3, and P1dB.
 Current production route:
 
 ```text
-user sends /ic-opt PROJECT_DIR --real or shell runs ic-opt PROJECT_DIR --real
+user supplies a Cadence env anchor once
+-> user sends /ic-opt PROJECT_DIR --real or shell runs ic-opt PROJECT_DIR --real
 -> supervisor agent uses the short command and project files, not a long prompt
 -> Hermes workflow tooling validates/package contracts
 -> Hermes writes optimizer execution task packet

@@ -10,9 +10,9 @@ This note preserves the implementation state for continuing Plan A after context
 - Baseline commit: `885e97f docs: capture workflow planning baseline`
 - Latest C-3 code commit before docs-only cleanup: `edb107f fix: harden preflight readiness gates`; docs cleanup continues through current HEAD
 - Active plan: `docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md`
-- Current scope: C-58 Product Entrypoint And Unified Environment complete
-- Current status: C-58 productized the route with `requirements-product.txt` and the `ic-opt` console entrypoint. The repo `.venv` now carries OpenBox/report dependencies, dry orchestration passed, and an unsandboxed real Mixer multi-testbench 100-eval acceptance passed from the repo `.venv`.
-- Next allowed action: after user confirmation, tighten the final one-line `/ic-opt` supervisor-agent UX and/or user-level Cadence environment discovery. Do not add optimizer features or per-project virtualenvs.
+- Current scope: C-59 Product One-Line Cadence Environment Discovery complete
+- Current status: C-59 keeps the C-58 product route but removes repeated `--cadence-cshrc` friction for `ic-opt`. The Cadence environment path remains user supplied once through explicit `--cadence-cshrc`, `PROJECT_DIR/cadence_env.csh`, `IC_OPT_CADENCE_CSHRC`, or `~/.ic-opt/cadence_env.csh`; then the product route is `ic-opt PROJECT_DIR --real`.
+- Next allowed action: after user confirmation, either run a one-line real acceptance using `PROJECT_DIR/cadence_env.csh` or proceed to release polish/package docs. Do not add optimizer features or per-project virtualenvs.
 - Execution method: `superpowers:subagent-driven-development`
 - Dependencies installed in active Python environment on 2026-05-29: `pytest`, `typer`, `pydantic`, `PyYAML`, `ruff`
 
@@ -226,6 +226,34 @@ Execution note:
   than a project/tool-flow bug.
 
 User project directories remain data-only; no per-project Python virtualenvs.
+
+## C-59 Product One-Line Cadence Environment Discovery 2026-06-07
+
+C-59 is complete, verified-only.
+
+Implementation:
+
+- `ic-opt --cadence-cshrc` is now optional.
+- Discovery order is explicit `--cadence-cshrc`, `PROJECT_DIR/cadence_env.csh`,
+  `IC_OPT_CADENCE_CSHRC`, then `~/.ic-opt/cadence_env.csh`.
+- The setup path is still user supplied; the product does not infer or hardcode
+  a Spectre version from shell startup files.
+- Lower-level `hermes-workflow optimize` remains explicit for audit/admin use.
+
+Verification:
+
+- Product CLI tests cover explicit override, project-local discovery,
+  environment variable discovery, and fail-closed missing env.
+- `./.venv/bin/ic-opt --help` shows `ic-opt [OPTIONS] PROJECT_DIR`; the Cadence
+  cshrc option is not required.
+- One-line dry orchestration passed at
+  `/tmp/ic_auto_opt_c59_dry_5J81NM/Mixer_opt_muti_tb` with
+  `PROJECT_DIR/cadence_env.csh` and no `--cadence-cshrc` flag.
+
+Route audit:
+
+- No optimizer math, OCEAN formulas, multi-testbench aggregation, Spectre
+  version, or product virtualenv contract changed.
 
 Post-C-49 real smoke:
 

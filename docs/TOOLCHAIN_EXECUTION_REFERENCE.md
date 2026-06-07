@@ -50,7 +50,7 @@ python3 -m venv .venv
 Known use:
 
 ```bash
-.venv/bin/ic-opt PROJECT_DIR --real --max-evals 100 --batch-size 10 --parallel-jobs 10 --cadence-cshrc /home/zzchen/cadence_ic231_env.csh
+.venv/bin/ic-opt PROJECT_DIR --real --max-evals 100 --batch-size 10 --parallel-jobs 10
 .venv/bin/hermes-workflow validate PROJECT_DIR
 .venv/bin/hermes-workflow package PROJECT_DIR
 .venv/bin/hermes-workflow package-optimizer-task PROJECT_DIR --backend openbox --max-evals 100 --cadence-cshrc /home/zzchen/cadence_ic231_env.csh --parallel
@@ -71,6 +71,11 @@ Required import check:
 C-58 validated this venv with the product `ic-opt` command. Do not fall back to
 `/tmp/ic_auto_opt_openbox_spike/.venv` for product acceptance unless the task is
 explicitly investigating legacy evidence.
+
+After C-59, `ic-opt` discovers only user-supplied Cadence cshrc anchors in this
+order: explicit `--cadence-cshrc`, `PROJECT_DIR/cadence_env.csh`,
+`IC_OPT_CADENCE_CSHRC`, then `~/.ic-opt/cadence_env.csh`. This is not automatic
+`.bashrc`/`.zshrc` inference and must not hardcode a Spectre version.
 
 ### Legacy OpenBox Development Evidence Venv
 
@@ -212,7 +217,7 @@ bundle, not a formula issue and not a reason to rewrite OCEAN expressions.
 Preferred Spectre/OCEAN/OpenBox real execution command shape after C-58:
 
 ```bash
-.venv/bin/ic-opt PROJECT_DIR --real --max-evals 100 --batch-size 10 --parallel-jobs 10 --cadence-cshrc /home/zzchen/cadence_ic231_env.csh
+.venv/bin/ic-opt PROJECT_DIR --real --max-evals 100 --batch-size 10 --parallel-jobs 10
 ```
 
 Lower-level implementation command:
@@ -406,7 +411,7 @@ Use the product entrypoint unless the task explicitly tests a lower-level
 command:
 
 ```bash
-.venv/bin/ic-opt PROJECT_DIR --real --max-evals 100 --batch-size 10 --parallel-jobs 10 --cadence-cshrc /home/zzchen/cadence_ic231_env.csh
+.venv/bin/ic-opt PROJECT_DIR --real --max-evals 100 --batch-size 10 --parallel-jobs 10
 ```
 
 C-58 successful product-entrypoint acceptance:

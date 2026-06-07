@@ -27,7 +27,7 @@ python3 -m venv .venv
 Target product invocation:
 
 ```bash
-ic-opt ~/spectre_opt_prj/<project_name> --real --cadence-cshrc /path/to/user_env.csh
+ic-opt ~/spectre_opt_prj/<project_name> --real
 ```
 
 Target supervisor-agent invocation:
@@ -43,9 +43,25 @@ Release packaging must make OpenBox, TuRBO, and report dependencies available
 from the product environment. A development-only path such as
 `/tmp/ic_auto_opt_openbox_spike/.venv` is not a valid production dependency.
 
-The Cadence/Spectre/OCEAN environment remains user/project supplied through a
-shell setup path such as `--cadence-cshrc /path/to/user_env.csh`; do not
-hardcode a Spectre version.
+The Cadence/Spectre/OCEAN environment remains user supplied. Configure it once
+before the short product command. Recommended one-user setup:
+
+```bash
+mkdir -p ~/.ic-opt
+cp /path/to/user/cadence_env.csh ~/.ic-opt/cadence_env.csh
+```
+
+Alternatively, put `cadence_env.csh` directly in the project directory or set
+`IC_OPT_CADENCE_CSHRC` in your shell. `ic-opt` then discovers the user-supplied
+cshrc in this order:
+
+1. explicit `--cadence-cshrc PATH`;
+2. `PROJECT_DIR/cadence_env.csh`;
+3. environment variable `IC_OPT_CADENCE_CSHRC`;
+4. `~/.ic-opt/cadence_env.csh`.
+
+Do not expect `ic-opt` to infer `.bashrc`/`.zshrc` content, and do not hardcode
+a Spectre version.
 
 ## 1. Create A User Project
 
@@ -112,8 +128,7 @@ Preferred one-command route:
   --real \
   --max-evals 100 \
   --batch-size 10 \
-  --parallel-jobs 10 \
-  --cadence-cshrc /path/to/user/cadence_env.csh
+  --parallel-jobs 10
 ```
 
 This wraps intake, preparation, validation, readiness, package, netlist
@@ -130,8 +145,7 @@ To check the offline orchestration gates without launching Spectre/OCEAN/OpenBox
   --dry-orchestration \
   --max-evals 100 \
   --batch-size 10 \
-  --parallel-jobs 10 \
-  --cadence-cshrc /path/to/user/cadence_env.csh
+  --parallel-jobs 10
 ```
 
 Manual equivalent: before a real run, the supervisor must build and approve the

@@ -4,12 +4,43 @@
 
 - Repository: `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow`
 - Branch: `plan-a-hermes-file-contract-mvp`
-- Current scope: C-58 Product Entrypoint And Unified Environment complete
-- Current status: verified-only. The repo `.venv` now installs the product route through `requirements-product.txt`; `ic-opt` is the product console entrypoint; dry orchestration and an unsandboxed real Mixer multi-testbench 100-eval acceptance passed from the repo `.venv`.
+- Current scope: C-59 Product One-Line Cadence Environment Discovery complete
+- Current status: verified-only. `ic-opt` now supports the product shape `ic-opt PROJECT_DIR --real` without repeating `--cadence-cshrc` when the user has explicitly supplied a Cadence environment anchor once. Discovery order is explicit `--cadence-cshrc`, `PROJECT_DIR/cadence_env.csh`, `IC_OPT_CADENCE_CSHRC`, then `~/.ic-opt/cadence_env.csh`; lower-level `hermes-workflow optimize` remains explicit.
 - Active spec: `docs/superpowers/specs/2026-06-07-one-command-optimizer-flow-design.md`
-- Active plan: `docs/superpowers/plans/2026-06-07-product-entrypoint-unified-environment.md`
-- Next required action: after user confirmation, tighten the final one-line `/ic-opt` supervisor-agent invocation and/or user-level Cadence environment discovery. Do not add optimizer features or per-project virtualenvs.
-- next_allowed_action: After user confirmation, move to the next product-landing task: tighten the one-line /ic-opt supervisor-agent invocation and/or user-level Cadence environment discovery so users do not need long prompts. Keep the product route based on the existing ic-opt command and requirements-product.txt; do not add optimizer features or create per-project venvs.
+- Active plan: `docs/superpowers/plans/2026-06-07-product-one-line-cadence-env-discovery.md`
+- Next required action: After user confirmation, either run a one-line real acceptance using PROJECT_DIR/cadence_env.csh or proceed to release polish/package docs. Keep the product route based on ic-opt and requirements-product.txt; do not add optimizer features or create per-project venvs.
+- next_allowed_action: After user confirmation, either run a one-line real acceptance using PROJECT_DIR/cadence_env.csh or proceed to release polish/package docs. Keep the product route based on ic-opt and requirements-product.txt; do not add optimizer features or create per-project venvs.
+
+## C-59 Product One-Line Cadence Environment Discovery 2026-06-07
+
+C-59 implementation is complete, verified-only.
+
+Product UX decision:
+
+- The Cadence/Spectre/OCEAN setup path is still user supplied. The product does
+  not infer or hardcode a Spectre version from shell startup files.
+- Users can provide that setup once through `PROJECT_DIR/cadence_env.csh`,
+  `IC_OPT_CADENCE_CSHRC`, or `~/.ic-opt/cadence_env.csh`, then run the short
+  product command `ic-opt PROJECT_DIR --real`.
+- `--cadence-cshrc PATH` remains available as an explicit one-run override.
+- Lower-level `hermes-workflow optimize` remains explicit for audit/admin use.
+
+Implementation evidence:
+
+- `ic-opt --cadence-cshrc` is optional and `ic-opt --help` shows
+  `ic-opt [OPTIONS] PROJECT_DIR`.
+- Product CLI tests cover explicit override, project-local discovery,
+  environment variable discovery, and fail-closed missing env.
+- Targeted test and lint passed for `product_cli.py` and `test_product_cli.py`.
+- One-line dry orchestration passed at
+  `/tmp/ic_auto_opt_c59_dry_5J81NM/Mixer_opt_muti_tb` using
+  `PROJECT_DIR/cadence_env.csh` and no `--cadence-cshrc` flag.
+
+Route audit:
+
+- Aligned with the C-58 product route and the one-command optimizer design.
+- No optimizer math, OCEAN formula, multi-testbench aggregation, Spectre
+  version, or product virtualenv contract changed.
 
 ## C-58 Product Entrypoint And Unified Environment 2026-06-07
 

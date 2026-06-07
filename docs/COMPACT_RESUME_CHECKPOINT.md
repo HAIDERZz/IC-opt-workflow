@@ -22,12 +22,13 @@ Current execution state:
 
 - Latest production acceptance note:
   `docs/PRODUCTION_LANDING_ACCEPTANCE_2026-06-07.md`.
-- Current scope: C-58 Product Entrypoint And Unified Environment complete.
-- Current status: C-58 productized the optimizer route. The repo `.venv` now
-  installs `ic-auto-opt-workflow`, the local OpenBox checkout, and visualization
-  dependencies through `requirements-product.txt`; `ic-opt` is the product
-  console entrypoint; dry orchestration and an unsandboxed 100-eval real Mixer
-  multi-testbench acceptance passed from the repo `.venv`.
+- Current scope: C-59 Product One-Line Cadence Environment Discovery complete.
+- Current status: C-59 keeps the C-58 product route but removes repeated
+  `--cadence-cshrc` friction for `ic-opt`. The Cadence environment path remains
+  user supplied once through explicit `--cadence-cshrc`,
+  `PROJECT_DIR/cadence_env.csh`, `IC_OPT_CADENCE_CSHRC`, or
+  `~/.ic-opt/cadence_env.csh`; then the product route is
+  `ic-opt PROJECT_DIR --real`.
 - C-57 real one-command drill:
   `/tmp/ic_auto_opt_optimize_real_jPaNVI/Mixer_opt_muti_tb` completed 100 real
   multi-testbench OpenBox/Spectre/OCEAN evaluations through the optimize route.
@@ -35,13 +36,20 @@ Current execution state:
   pass; counts are `65 constraint_failed`, `19 feasible`,
   `16 metric_check_failed`; recommended feasible candidate is `real_066`
   with `F=26`, `L=40n`, `VB_LO=310m`, `W=1u`.
-- C-58 plan:
-  `docs/superpowers/plans/2026-06-07-product-entrypoint-unified-environment.md`.
+- C-59 plan:
+  `docs/superpowers/plans/2026-06-07-product-one-line-cadence-env-discovery.md`.
 - Product target: one product-level Python environment for
   `ic-auto-opt-workflow`, OpenBox, TuRBO, and report dependencies; no
   per-project virtualenvs. User-facing entry should be `/ic-opt PROJECT --real`
   for agent sessions and `ic-opt PROJECT --real` for shell sessions. Do not use
   long natural-language prompts to compensate for missing command behavior.
+- C-59 product-entrypoint evidence:
+  `/tmp/ic_auto_opt_c59_dry_5J81NM/Mixer_opt_muti_tb` passed one-line dry
+  orchestration from `./.venv/bin/ic-opt` with `PROJECT_DIR/cadence_env.csh`
+  and no `--cadence-cshrc` flag. `ic-opt --help` no longer marks
+  `--cadence-cshrc` as required. Product CLI tests cover explicit override,
+  project-local discovery, `IC_OPT_CADENCE_CSHRC`, and fail-closed missing env.
+  Lower-level `hermes-workflow optimize` remains explicit.
 - C-58 product-entrypoint evidence:
   `/tmp/ic_auto_opt_c58_real_unsandboxed_rj40MJ/Mixer_opt_muti_tb` completed
   100 real multi-testbench OpenBox/Spectre/OCEAN evaluations through
@@ -78,7 +86,7 @@ Current execution state:
   mistakes such as `W` being overwritten by `L`. Import evidence: 69 netlist
   files copied, 1 safe symlink materialized, and template variables `F`, `W`,
   `L`, and `VB_LO` approved. No Spectre/OCEAN run was launched.
-- current_scope: C-58 Product Entrypoint And Unified Environment complete.
+- current_scope: C-59 Product One-Line Cadence Environment Discovery complete.
 - C-50 files: `docs/superpowers/specs/2026-06-06-multi-testbench-candidate-evaluation-design.md`
   and `docs/superpowers/plans/2026-06-06-multi-testbench-candidate-evaluation.md`.
 - C-49 verification: targeted tests passed with `88 passed`; full suite passed
@@ -87,11 +95,11 @@ Current execution state:
   rewrite; no Maestro/ADE netlist flattening; no optimizer execution behavior
   change. The only schema extension was accepting `optimizer.algorithm: openbox`
   to match the existing OpenBox backend route.
-- next_allowed_action: after user confirmation, tighten the final one-line
-  `/ic-opt` supervisor-agent UX and/or user-level Cadence environment discovery.
-  Do not create per-project venvs, rely on `/tmp/ic_auto_opt_openbox_spike/.venv`,
-  hardcode Spectre versions, change algorithms, or introduce broad workflow
-  layers.
+- next_allowed_action: after user confirmation, either run a one-line real
+  acceptance using `PROJECT_DIR/cadence_env.csh` or proceed to release
+  polish/package docs. Do not create per-project venvs, rely on
+  `/tmp/ic_auto_opt_openbox_spike/.venv`, hardcode Spectre versions, change
+  algorithms, or introduce broad workflow layers.
 - Post-C-49 real Mixer smoke: `real_002` used `F=26`, `W=1u`, `L=40n`,
   `VB_LO=310m`, ran Spectre 25.1, ran batch OCEAN with approved formulas
   unchanged, passed `check-real-run`, and passed `check-metric-results`.
