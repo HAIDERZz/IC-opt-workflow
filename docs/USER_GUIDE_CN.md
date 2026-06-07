@@ -31,12 +31,18 @@ Python 工程。
 只需要给工具本身建一个 Python 环境，不要在每个优化项目里建 venv。
 
 ```bash
-cd /path/to/IC-opt-workflow
-python3.11 -m venv .venv
+git clone https://github.com/HAIDERZz/IC-opt-workflow.git
+cd IC-opt-workflow
+python3 --version  # 需要 Python 3.11 或更新版本
+python3 -m venv .venv
 ./.venv/bin/python -m pip install --upgrade pip
 ./.venv/bin/python -m pip install -r requirements-product.txt
 ./.venv/bin/python -m pip install -e .
 ```
+
+如果服务器上的 `python3` 不是 3.11 或更新版本，就使用管理员提供的 Python 3.11+
+命令，例如 `python3.11` 或 `python3.12`。重点是 Python 版本要满足要求，不是命令
+名字必须叫 `python3.11`。
 
 检查：
 
@@ -108,6 +114,11 @@ cg_nf: 计算 CG / NF / BW
 iip3: 计算 IIP3
 p1db: 计算 P1dB
 ```
+
+`opt_requirement.md` 至少需要 1 个 testbench。当只有一个 testbench 时，就是单 TB
+特例；当一个 candidate 的指标必须从多个 Maestro/ADE 设置里取得时，再使用
+`testbenches:` 列表。格式上没有固定最大数量，实际限制来自仿真时间、license、
+磁盘空间和 `parallel_jobs`。
 
 ## 6. 先做离线检查
 

@@ -3,6 +3,8 @@
 Use this reference when one optimizer candidate needs metrics from more than
 one Maestro/ADE testbench. Each `maestro_point_root` must point to a
 single-point Maestro/ADE result directory that contains `netlist/input.scs`.
+The same evaluation model also supports a single testbench; use this file only
+when one candidate needs metrics from multiple Maestro/ADE setups.
 
 ## Project
 
@@ -75,12 +77,12 @@ testbenches:
 - name: BW
   unit: Hz
   testbench: cg_nf
-  ocean_expression: bandwidth(db20(v("/MIXER_P" ?result "pac") - v("/MIXER_N" ?result "pac")) 3 "low")
+  ocean_expression: bandwidth(db(((vh('pac "/IF_P" '-1) - vh('pac "/IF_N" '-1)) / (vh('pac "/RF_P" '(0)) - vh('pac "/RF_N" '(0))))) 3 "low")
 
 - name: MAX_GAIN
   unit: dB
   testbench: cg_nf
-  ocean_expression: ymax(db20(v("/MIXER_P" ?result "pac") - v("/MIXER_N" ?result "pac")))
+  ocean_expression: ymax(ymax(db(((vh('pac "/IF_P" '-1) - vh('pac "/IF_N" '-1)) / (vh('pac "/RF_P" '(0)) - vh('pac "/RF_N" '(0)))))))
 
 - name: NF_3G
   unit: dB
@@ -90,12 +92,12 @@ testbenches:
 - name: IIP3
   unit: dBm
   testbench: iip3
-  ocean_expression: value(getData("IIP3" ?result "iip3") 3e+09)
+  ocean_expression: rapidIIPN("pac_ip3")
 
 - name: P1DB
   unit: dBm
   testbench: p1db
-  ocean_expression: value(getData("P1dB" ?result "p1db") 3e+09)
+  ocean_expression: compressionVRI((v("/IF_P" ?result "pss_fd") - v("/IF_N" ?result "pss_fd")) '1 ?rport resultParam("PORT2:r" ?result "pss_fd") ?gcomp 1)
 ```
 
 ## Constraints
@@ -103,7 +105,7 @@ testbenches:
 ```yaml
 - metric: BW
   op: gt
-  value: "18e9 Hz"
+  value: "19e9 Hz"
 - metric: MAX_GAIN
   op: gt
   value: "4 dB"
@@ -112,17 +114,17 @@ testbenches:
   value: "12 dB"
 - metric: IIP3
   op: gt
-  value: "-5 dBm"
+  value: "0 dBm"
 - metric: P1DB
   op: gt
-  value: "-15 dBm"
+  value: "-2 dBm"
 ```
 
 ## Objective
 
 ```yaml
 direction: minimize
-expression: "NF_3G / (MAX_GAIN * BW)"
+expression: "NF_3G * 1e9 / (BW*MAX_GAIN*IIP3*P1DB) "
 ```
 
 ## Spectre Settings
@@ -132,7 +134,7 @@ engine: spectre_x
 preset: ax
 output_format: psfxl
 threads_per_run: 10
-parallel_jobs: 10
+parallel_jobs: 12
 timeout_s: 3600
 require_license_check: true
 keep_failed_runs: true

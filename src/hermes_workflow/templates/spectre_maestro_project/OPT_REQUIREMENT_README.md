@@ -104,6 +104,13 @@ For circuits that need multiple Maestro/ADE testbenches for one candidate, use
 `testbench:` routing key. The routing key only decides which child Spectre/OCEAN
 run evaluates the formula; it is not part of the OCEAN expression.
 
+The workflow supports one or more testbenches. A single testbench is the normal
+special case and can use the simpler top-level `maestro_point_root` form. Use
+`testbenches:` only when one candidate's metrics must be collected from multiple
+Maestro/ADE point roots. The file format has no fixed maximum count; simulation
+time, license availability, disk usage, and `parallel_jobs` are the practical
+limits.
+
 After `prepare-from-requirement`, multi-testbench projects should pass:
 
 ```bash

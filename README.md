@@ -27,6 +27,9 @@ CLI.
 - Runs real Spectre simulations and OCEAN metric extraction.
 - Supports multi-testbench evaluation, for example one Mixer candidate measured
   by CG/NF, IIP3, and P1dB testbenches.
+- Uses the same model for one or more testbenches. A single testbench is a valid
+  special case; multiple testbenches are only needed when one candidate's
+  metrics come from different Maestro/ADE setups.
 - Generates decision reports, insight reports, FoM plots, and OpenBox HTML/JSON
   visualization artifacts.
 - Supports continuing an existing run, for example adding 40 more evaluations
@@ -52,14 +55,18 @@ Create one Python environment for the tool itself. Do not create a virtualenv
 inside every optimization project.
 
 ```bash
-git clone git@github.com:HAIDERZz/IC-opt-workflow.git
+git clone https://github.com/HAIDERZz/IC-opt-workflow.git
 cd IC-opt-workflow
 
-python3.11 -m venv .venv
+python3 --version  # must be Python 3.11 or newer
+python3 -m venv .venv
 ./.venv/bin/python -m pip install --upgrade pip
 ./.venv/bin/python -m pip install -r requirements-product.txt
 ./.venv/bin/python -m pip install -e .
 ```
+
+If your server's `python3` is older than 3.11, use whatever Python 3.11+ command
+your administrator provides, such as `python3.11` or `python3.12`.
 
 Check that the command is available:
 
@@ -93,8 +100,11 @@ Example requirement files are in:
 examples/spectre_maestro_project/
 ```
 
-For multi-testbench optimization, `opt_requirement.md` should list each
-Maestro/ADE point root and map each metric to the correct testbench.
+`opt_requirement.md` may describe one testbench or multiple testbenches. For
+multi-testbench optimization, list each Maestro/ADE point root and map each
+metric to the correct testbench. There is no fixed maximum number of
+testbenches in the file format; simulation time, license availability, disk
+space, and `parallel_jobs` are the real limits.
 
 ### 3. Run A Doctor Check
 
