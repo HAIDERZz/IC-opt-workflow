@@ -30,8 +30,8 @@ CLI.
 - Uses the same model for one or more testbenches. A single testbench is a valid
   special case; multiple testbenches are only needed when one candidate's
   metrics come from different Maestro/ADE setups.
-- Generates decision reports, insight reports, FoM plots, and OpenBox HTML/JSON
-  visualization artifacts.
+- Generates decision reports, insight reports, and FoM plots. Optional OpenBox
+  advanced dependencies add HTML/JSON surrogate visualization artifacts.
 - Supports continuing an existing run, for example adding 40 more evaluations
   after the first 100.
 - Provides starter runtime assets for agent workflows such as Claude and
@@ -78,34 +78,23 @@ Then install dependencies:
 
 ```bash
 python -m pip install --upgrade pip setuptools wheel
-python -m pip show wheel
-python -m pip install swig
-swig -version
-python -m pip install --no-build-isolation pyrfr==0.9.0
 python -m pip install -r requirements-product.txt
 ```
 
 If your server's `python3` is older than 3.11, use whatever Python 3.11+ command
 your administrator provides, such as `python3.11` or `python3.12`.
 
-OpenBox may build `pyrfr` during installation. That build needs a `swig`
-command and a C/C++ compiler. The `python -m pip install swig` step above is the
-lowest-friction user-space path. The important check is `swig -version`: do not
-continue until that command works in the same shell where you run `pip`.
-
-If you use the PyPI `swig` package, install `pyrfr` before the full requirements
-with `--no-build-isolation`. Without that flag, `pyrfr`'s isolated build
-environment can call `.venv/bin/swig` but fail with `ModuleNotFoundError: No
-module named 'swig'`.
-
-If `python -m pip install --no-build-isolation pyrfr==0.9.0` fails with
-`invalid command 'bdist_wheel'`, the active environment is missing the `wheel`
-package. Run this again in the active `.venv`, then retry the `pyrfr` command:
+Advanced OpenBox surrogate visualization is optional. The base optimizer,
+Spectre/OCEAN execution, decision report, insight report, continuation, and
+project doctor do not require `pyrfr`. Install the advanced dependencies only if
+you need OpenBox's advanced surrogate verification / importance views:
 
 ```bash
 python -m pip install --upgrade pip setuptools wheel
-python -m pip show wheel
+python -m pip install swig
+swig -version
 python -m pip install --no-build-isolation pyrfr==0.9.0
+python -m pip install -r requirements-advanced.txt
 ```
 
 If you installed `swig` into `.venv` but still see `command 'swig' failed`, the
@@ -129,8 +118,9 @@ or, without shell activation:
 env PATH="$PWD/.venv/bin:$PATH" ./.venv/bin/python -m pip install -r requirements-product.txt
 ```
 
-If `swig -version` still does not work on your server, ask your administrator to
-install the system packages instead:
+If `pyrfr` fails with `fatal error: Python.h: No such file or directory`, your
+Python development headers are missing. Ask your administrator to install the
+package matching the Python used by your `.venv`:
 
 ```bash
 # Ubuntu / Debian
@@ -140,9 +130,11 @@ sudo apt install swig build-essential python3-dev
 sudo dnf install swig gcc gcc-c++ python3-devel
 ```
 
-If you do not have `sudo`, ask your administrator for one of these: a newer
-Python module, `swig`, a compiler toolchain, or a micromamba/conda environment
-that already contains `swig`.
+For Python 3.11 specifically, the package may be named `python3.11-dev` or
+`python3.11-devel`, depending on the distribution. If you do not have `sudo`,
+ask your administrator for one of these: matching Python development headers,
+`swig`, a compiler toolchain, or a micromamba/conda environment that already
+contains them.
 
 Check that the command is available:
 
@@ -314,6 +306,7 @@ docs/                       detailed manuals and project notes
 tests/                      regression tests
 tools/                      development helper scripts
 requirements-product.txt    product Python dependencies
+requirements-advanced.txt   optional OpenBox advanced visualization dependencies
 pyproject.toml              package metadata and console scripts
 ```
 

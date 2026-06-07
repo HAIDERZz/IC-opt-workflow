@@ -53,10 +53,6 @@ source .venv/bin/activate.csh
 
 ```bash
 python -m pip install --upgrade pip setuptools wheel
-python -m pip show wheel
-python -m pip install swig
-swig -version
-python -m pip install --no-build-isolation pyrfr==0.9.0
 python -m pip install -r requirements-product.txt
 ```
 
@@ -64,23 +60,16 @@ python -m pip install -r requirements-product.txt
 命令，例如 `python3.11` 或 `python3.12`。重点是 Python 版本要满足要求，不是命令
 名字必须叫 `python3.11`。
 
-OpenBox 安装时可能会编译 `pyrfr`，这个步骤需要系统里能找到 `swig` 命令和 C/C++
-编译器。上面的 `python -m pip install swig` 是最轻量的用户目录安装方式。关键检查是
-`swig -version`：只有这个命令在同一个 shell 里能运行，后续安装才有机会通过。
-
-如果你使用的是 PyPI 安装的 `swig`，需要先用 `--no-build-isolation` 单独安装
-`pyrfr`，再安装完整 requirements。否则 `pyrfr` 的隔离构建环境可能能找到
-`.venv/bin/swig`，但这个 Python 包装器会报 `ModuleNotFoundError: No module named
-'swig'`。
-
-如果 `python -m pip install --no-build-isolation pyrfr==0.9.0` 报
-`invalid command 'bdist_wheel'`，说明当前激活的 `.venv` 里没有可用的 `wheel` 包。
-在同一个 `.venv` 里重新运行：
+OpenBox 高级代理模型可视化是可选增强。基础优化、Spectre/OCEAN 执行、决策报告、
+insight report、续跑和 doctor 检查都不应该被 `pyrfr` 阻塞。如果你需要 OpenBox 的
+高级 surrogate verification / importance 图，再安装高级依赖：
 
 ```bash
 python -m pip install --upgrade pip setuptools wheel
-python -m pip show wheel
+python -m pip install swig
+swig -version
 python -m pip install --no-build-isolation pyrfr==0.9.0
+python -m pip install -r requirements-advanced.txt
 ```
 
 如果你已经 `pip install swig`，但仍然看到 `command 'swig' failed`，通常是因为没有
@@ -111,7 +100,9 @@ source .venv/bin/activate.csh
 env PATH="$PWD/.venv/bin:$PATH" ./.venv/bin/python -m pip install -r requirements-product.txt
 ```
 
-如果 `swig -version` 仍然不成功，就需要让管理员安装系统依赖：
+如果 `pyrfr` 报 `fatal error: Python.h: No such file or directory`，说明服务器缺少
+当前 Python 对应的开发头文件。这不是项目代码错误，需要管理员安装和你的 `.venv`
+所用 Python 匹配的系统包：
 
 ```bash
 # Ubuntu / Debian
@@ -121,8 +112,9 @@ sudo apt install swig build-essential python3-dev
 sudo dnf install swig gcc gcc-c++ python3-devel
 ```
 
-如果你没有 `sudo`，也没有 `conda`，这不是项目代码错误，而是服务器缺少编译依赖。
-可以请管理员提供 Python 3.11+、`swig`、编译器，或者提供一个已经包含 `swig` 的
+如果你用的是 Python 3.11，包名也可能是 `python3.11-dev` 或 `python3.11-devel`，
+取决于服务器发行版。如果你没有 `sudo`，也没有 `conda`，可以请管理员提供匹配的
+Python 开发头文件、`swig`、编译器，或者提供一个已经包含这些依赖的
 micromamba/conda 环境。
 
 检查：

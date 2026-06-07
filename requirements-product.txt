@@ -4,10 +4,6 @@
 #   python3 -m venv .venv
 #   source .venv/bin/activate
 #   python -m pip install --upgrade pip setuptools wheel
-#   python -m pip show wheel
-#   python -m pip install swig
-#   swig -version
-#   python -m pip install --no-build-isolation pyrfr==0.9.0
 #   python -m pip install -r requirements-product.txt
 #
 # User Spectre optimization projects stay data-only. Do not create a Python venv
@@ -16,10 +12,3 @@
 -e .
 -e vendor/open-box
 -r vendor/open-box/requirements/main.txt
-
-# Keep these pins for reproducibility. If PyPI swig is used, preinstall pyrfr
-# with --no-build-isolation before installing this file.
-swig==4.4.1
-pyrfr==0.9.0
-shap==0.49.1
-lightgbm==4.6.0
