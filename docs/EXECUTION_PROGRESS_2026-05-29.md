@@ -10,9 +10,9 @@ This note preserves the implementation state for continuing Plan A after context
 - Baseline commit: `885e97f docs: capture workflow planning baseline`
 - Latest C-3 code commit before docs-only cleanup: `edb107f fix: harden preflight readiness gates`; docs cleanup continues through current HEAD
 - Active plan: `docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md`
-- Current scope: C-59 Product One-Line Cadence Environment Discovery complete
-- Current status: C-59 keeps the C-58 product route but removes repeated `--cadence-cshrc` friction for `ic-opt`. The Cadence environment path remains user supplied once through explicit `--cadence-cshrc`, `PROJECT_DIR/cadence_env.csh`, `IC_OPT_CADENCE_CSHRC`, or `~/.ic-opt/cadence_env.csh`; then the product route is `ic-opt PROJECT_DIR --real`.
-- Next allowed action: after user confirmation, either run a one-line real acceptance using `PROJECT_DIR/cadence_env.csh` or proceed to release polish/package docs. Do not add optimizer features or per-project virtualenvs.
+- Current scope: C-60 Product One-Line Real Acceptance complete
+- Current status: C-60 verified the product route with a fresh Mixer multi-testbench project and project-local `cadence_env.csh`: `ic-opt PROJECT --real --max-evals 100 --batch-size 10 --parallel-jobs 10` passed 100 real evaluations without `--cadence-cshrc`.
+- Next allowed action: after user confirmation, proceed to release polish/package docs or test the one-line product route on the next real user project. Do not add optimizer features or per-project virtualenvs.
 - Execution method: `superpowers:subagent-driven-development`
 - Dependencies installed in active Python environment on 2026-05-29: `pytest`, `typer`, `pydantic`, `PyYAML`, `ruff`
 
@@ -254,6 +254,49 @@ Route audit:
 
 - No optimizer math, OCEAN formulas, multi-testbench aggregation, Spectre
   version, or product virtualenv contract changed.
+
+## C-60 Product One-Line Real Acceptance 2026-06-07
+
+C-60 is complete, verified-only.
+
+Real acceptance:
+
+- Workspace: `/tmp/ic_auto_opt_c60_one_line_real_PpguO7/Mixer_opt_muti_tb`.
+- Fresh start copied only `opt_requirement.md` and
+  `PROJECT_DIR/cadence_env.csh`; no old generated optimizer artifacts were
+  copied.
+- Command:
+  `./.venv/bin/ic-opt /tmp/ic_auto_opt_c60_one_line_real_PpguO7/Mixer_opt_muti_tb --real --max-evals 100 --batch-size 10 --parallel-jobs 10`.
+- The command did not pass `--cadence-cshrc`, proving project-local environment
+  anchor discovery in a real run.
+- Flow status: `pass`.
+- Evaluations: `100`.
+- Status counts: `68 constraint_failed`, `16 feasible`,
+  `16 metric_check_failed`.
+- Recommended feasible run: `real_051`.
+- Recommended action: `accept_best_observed_or_continue`.
+- OpenBox advanced visualization: `generated`.
+- `global_optimum_claim=false`.
+
+Recommended point:
+
+```text
+F=30
+L=40n
+VB_LO=310m
+W=0.8u
+BW=19592140591.69946
+MAX_GAIN=4.028875688617442
+NF_3G=11.79754488809267
+IIP3=3.2821304958007
+P1DB=-0.8653580069775275
+```
+
+Route audit:
+
+- Aligned with the product landing route.
+- No optimizer math, OCEAN formula, Spectre version, multi-testbench
+  aggregation, or product virtualenv contract changed.
 
 Post-C-49 real smoke:
 

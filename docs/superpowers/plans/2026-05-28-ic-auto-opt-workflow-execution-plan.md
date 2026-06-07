@@ -23,7 +23,7 @@
 
 ## Current Implementation Node
 
-As of 2026-06-07, Plan A, Plan B, and Plan C through C-59 are complete, with
+As of 2026-06-07, Plan A, Plan B, and Plan C through C-60 are complete, with
 post-C-49 real Mixer OpenBox/Spectre/OCEAN evidence through 200 cumulative
 NF=12dB evaluations and C-50 real multi-testbench evidence through 100
 three-testbench evaluations. Post-C50/C-54 reporting now re-scores existing
@@ -83,6 +83,15 @@ path remains user supplied once through explicit `--cadence-cshrc`,
 `PROJECT_DIR/cadence_env.csh`, `IC_OPT_CADENCE_CSHRC`, or
 `~/.ic-opt/cadence_env.csh`; then the product route is
 `ic-opt PROJECT_DIR --real`. `hermes-workflow optimize` remains explicit.
+
+C-60 validates that product route with a fresh real Mixer multi-testbench
+workspace at `/tmp/ic_auto_opt_c60_one_line_real_PpguO7/Mixer_opt_muti_tb`.
+The workspace copied only `opt_requirement.md` and project-local
+`cadence_env.csh`, then ran `ic-opt PROJECT --real --max-evals 100
+--batch-size 10 --parallel-jobs 10` without `--cadence-cshrc`. The flow passed
+100 real OpenBox/Spectre/OCEAN evaluations, recommended feasible `real_051`,
+generated OpenBox advanced visualization, and kept
+`global_optimum_claim=false`.
 
 The accepted route is no longer an abstract contract-only optimizer plan; it is
 a practice-first production handoff flow that has been exercised with real

@@ -4,12 +4,47 @@
 
 - Repository: `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow`
 - Branch: `plan-a-hermes-file-contract-mvp`
-- Current scope: C-59 Product One-Line Cadence Environment Discovery complete
-- Current status: verified-only. `ic-opt` now supports the product shape `ic-opt PROJECT_DIR --real` without repeating `--cadence-cshrc` when the user has explicitly supplied a Cadence environment anchor once. Discovery order is explicit `--cadence-cshrc`, `PROJECT_DIR/cadence_env.csh`, `IC_OPT_CADENCE_CSHRC`, then `~/.ic-opt/cadence_env.csh`; lower-level `hermes-workflow optimize` remains explicit.
+- Current scope: C-60 Product One-Line Real Acceptance complete
+- Current status: verified-only. A fresh Mixer multi-testbench project at `/tmp/ic_auto_opt_c60_one_line_real_PpguO7/Mixer_opt_muti_tb` ran `ic-opt PROJECT --real --max-evals 100 --batch-size 10 --parallel-jobs 10` using project-local `cadence_env.csh` and no `--cadence-cshrc` flag. The flow passed with 100 evaluations, `68 constraint_failed`, `16 feasible`, and `16 metric_check_failed`; decision report recommends feasible `real_051` with `global_optimum_claim=false`.
 - Active spec: `docs/superpowers/specs/2026-06-07-one-command-optimizer-flow-design.md`
-- Active plan: `docs/superpowers/plans/2026-06-07-product-one-line-cadence-env-discovery.md`
-- Next required action: After user confirmation, either run a one-line real acceptance using PROJECT_DIR/cadence_env.csh or proceed to release polish/package docs. Keep the product route based on ic-opt and requirements-product.txt; do not add optimizer features or create per-project venvs.
-- next_allowed_action: After user confirmation, either run a one-line real acceptance using PROJECT_DIR/cadence_env.csh or proceed to release polish/package docs. Keep the product route based on ic-opt and requirements-product.txt; do not add optimizer features or create per-project venvs.
+- Active plan: `docs/superpowers/plans/2026-06-07-product-one-line-real-acceptance.md`
+- Next required action: After user confirmation, proceed to release polish/package docs or test the one-line product route on the next real user project. Keep the product route based on ic-opt and requirements-product.txt; do not add optimizer features or create per-project venvs.
+- next_allowed_action: After user confirmation, proceed to release polish/package docs or test the one-line product route on the next real user project. Keep the product route based on ic-opt and requirements-product.txt; do not add optimizer features or create per-project venvs.
+
+## C-60 Product One-Line Real Acceptance 2026-06-07
+
+C-60 is complete, verified-only.
+
+Real acceptance evidence:
+
+- Workspace: `/tmp/ic_auto_opt_c60_one_line_real_PpguO7/Mixer_opt_muti_tb`.
+- Fresh data-only start: copied `opt_requirement.md` and project-local
+  `cadence_env.csh`; did not copy old `runs/`, `reports/`, `ledger/`, or
+  `state/`.
+- Command:
+  `./.venv/bin/ic-opt /tmp/ic_auto_opt_c60_one_line_real_PpguO7/Mixer_opt_muti_tb --real --max-evals 100 --batch-size 10 --parallel-jobs 10`.
+- No `--cadence-cshrc` flag was passed.
+- Flow status: `pass`.
+- Evaluations: `100`.
+- Status counts: `68 constraint_failed`, `16 feasible`,
+  `16 metric_check_failed`.
+- Recommended action: `accept_best_observed_or_continue`.
+- Recommended run: feasible `real_051`.
+- Parameters: `F=30`, `L=40n`, `VB_LO=310m`, `W=0.8u`.
+- Metrics: `BW=19592140591.69946`, `MAX_GAIN=4.028875688617442`,
+  `NF_3G=11.79754488809267`, `IIP3=3.2821304958007`,
+  `P1DB=-0.8653580069775275`.
+- Bottleneck: `MAX_GAIN`, bottleneck score `0.05775137723488477`.
+- OpenBox advanced visualization: `generated`.
+- Global optimum claim: `false`.
+
+Route audit:
+
+- Aligned with C-58/C-59 product landing route.
+- Verified the product UX with the real one-line command and project-local
+  environment anchor.
+- No optimizer math, OCEAN formula, Spectre version, multi-testbench
+  aggregation, or product environment contract changed.
 
 ## C-59 Product One-Line Cadence Environment Discovery 2026-06-07
 
