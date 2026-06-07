@@ -35,14 +35,32 @@ git clone https://github.com/HAIDERZz/IC-opt-workflow.git
 cd IC-opt-workflow
 python3 --version  # 需要 Python 3.11 或更新版本
 python3 -m venv .venv
-./.venv/bin/python -m pip install --upgrade pip
-./.venv/bin/python -m pip install -r requirements-product.txt
-./.venv/bin/python -m pip install -e .
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install swig
+python -m pip install -r requirements-product.txt
+python -m pip install -e .
 ```
 
 如果服务器上的 `python3` 不是 3.11 或更新版本，就使用管理员提供的 Python 3.11+
 命令，例如 `python3.11` 或 `python3.12`。重点是 Python 版本要满足要求，不是命令
 名字必须叫 `python3.11`。
+
+OpenBox 安装时可能会编译 `pyrfr`，这个步骤需要系统里能找到 `swig` 命令和 C/C++
+编译器。上面的 `python -m pip install swig` 是最轻量的用户目录安装方式。如果这一步
+在你的服务器上不成功，就需要让管理员安装系统依赖：
+
+```bash
+# Ubuntu / Debian
+sudo apt install swig build-essential python3-dev
+
+# RHEL / CentOS / Rocky / AlmaLinux
+sudo dnf install swig gcc gcc-c++ python3-devel
+```
+
+如果你没有 `sudo`，也没有 `conda`，这不是项目代码错误，而是服务器缺少编译依赖。
+可以请管理员提供 Python 3.11+、`swig`、编译器，或者提供一个已经包含 `swig` 的
+micromamba/conda 环境。
 
 检查：
 

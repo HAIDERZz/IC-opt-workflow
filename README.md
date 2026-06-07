@@ -60,13 +60,32 @@ cd IC-opt-workflow
 
 python3 --version  # must be Python 3.11 or newer
 python3 -m venv .venv
-./.venv/bin/python -m pip install --upgrade pip
-./.venv/bin/python -m pip install -r requirements-product.txt
-./.venv/bin/python -m pip install -e .
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install swig
+python -m pip install -r requirements-product.txt
+python -m pip install -e .
 ```
 
 If your server's `python3` is older than 3.11, use whatever Python 3.11+ command
 your administrator provides, such as `python3.11` or `python3.12`.
+
+OpenBox may build `pyrfr` during installation. That build needs a `swig`
+command and a C/C++ compiler. The `python -m pip install swig` step above is the
+lowest-friction user-space path. If it does not work on your server, ask your
+administrator to install the system packages instead:
+
+```bash
+# Ubuntu / Debian
+sudo apt install swig build-essential python3-dev
+
+# RHEL / CentOS / Rocky / AlmaLinux
+sudo dnf install swig gcc gcc-c++ python3-devel
+```
+
+If you do not have `sudo`, ask your administrator for one of these: a newer
+Python module, `swig`, a compiler toolchain, or a micromamba/conda environment
+that already contains `swig`.
 
 Check that the command is available:
 
