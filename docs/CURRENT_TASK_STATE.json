@@ -1,18 +1,18 @@
 {
   "schema_version": "1.0",
-  "current_scope": "C-60 Product One-Line Real Acceptance complete",
-  "current_status": "C-60 is complete, verified-only. A fresh Mixer multi-testbench project at /tmp/ic_auto_opt_c60_one_line_real_PpguO7/Mixer_opt_muti_tb ran the product command ic-opt PROJECT --real --max-evals 100 --batch-size 10 --parallel-jobs 10 using PROJECT_DIR/cadence_env.csh and no --cadence-cshrc flag. The flow passed with 100 evaluations, status counts 68 constraint_failed, 16 feasible, and 16 metric_check_failed. The decision report recommends feasible real_051 with action accept_best_observed_or_continue, confidence medium, global_optimum_claim=false, and OpenBox advanced visualization generated. No optimizer math, OCEAN formulas, multi-testbench aggregation, Spectre version, or product venv contract changed.",
+  "current_scope": "C-61 Product Release Polish complete",
+  "current_status": "C-61 is complete, verified-only. The root README now describes the current product route instead of the early contract-only MVP, including install, user-supplied Cadence env anchor, data-only project layout, ic-opt PROJECT --real, report locations, C-60 real evidence, and hard boundaries. docs/PRODUCT_RELEASE_CHECKLIST.md records product environment, project contract, dry gate, real acceptance, final user acceptance, and non-release files. requirements-product.txt now pins shap==0.49.1 and lightgbm==4.6.0, matching the C-60 product environment. No optimizer math, OCEAN formulas, Spectre version, multi-testbench aggregation, product command behavior, or per-project venv policy changed.",
   "review_status": "verified-only",
   "subagent_dispatch": "available",
   "active_spec": "docs/superpowers/specs/2026-06-07-one-command-optimizer-flow-design.md",
-  "active_plan": "docs/superpowers/plans/2026-06-07-product-one-line-real-acceptance.md",
+  "active_plan": "docs/superpowers/plans/2026-06-07-product-release-polish.md",
   "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
   "progress_files": [
     "docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md",
     "docs/EXECUTION_PROGRESS_2026-05-29.md",
     "docs/COMPACT_RESUME_CHECKPOINT.md"
   ],
-  "next_allowed_action": "After user confirmation, proceed to release polish/package docs or test the one-line product route on the next real user project. Keep the product route based on ic-opt and requirements-product.txt; do not add optimizer features or create per-project venvs.",
+  "next_allowed_action": "After user confirmation, run a final release-readiness check or test ic-opt on the next real user project. Keep the product route based on ic-opt and requirements-product.txt; do not add optimizer features or create per-project venvs.",
   "forbidden_actions": [
     "install unpinned latest shap into the OpenBox venv",
     "run real tool commands without first checking docs/TOOLCHAIN_EXECUTION_REFERENCE.md",
@@ -47,12 +47,12 @@
   ],
   "route_audit": {
     "active_spec": "docs/superpowers/specs/2026-06-07-one-command-optimizer-flow-design.md",
-    "active_plan": "docs/superpowers/plans/2026-06-07-product-one-line-real-acceptance.md",
+    "active_plan": "docs/superpowers/plans/2026-06-07-product-release-polish.md",
     "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
-    "alignment": "Aligned with the C-58/C-59 product landing route. C-60 validates the actual one-line real command against a fresh data-only Mixer project with project-local cadence_env.csh and no --cadence-cshrc flag.",
-    "drift": "No plan drift. C-60 did not change code or contracts and did not infer shell startup files. No PSF parsing, formula rewrite, Spectre-version hardcoding, algorithm replacement, per-project venv, or broad workflow engine was introduced."
+    "alignment": "Aligned with C-58 through C-60 product landing. C-61 updates release-facing docs and product dependency pins so the repository entrypoint matches the proven ic-opt route.",
+    "drift": "No plan drift. C-61 did not change optimizer behavior or real-tool contracts. No PSF parsing, formula rewrite, Spectre-version hardcoding, algorithm replacement, per-project venv, or broad workflow engine was introduced."
   },
-  "latest_valid_commit": "5a7e02d",
+  "latest_valid_commit": "393c48f",
   "review_evidence": {
     "c47_plan": "docs/superpowers/plans/2026-06-05-openbox-advanced-visualization-artifact.md",
     "c47_tests": "Targeted tests passed: /home/zzchen/.venvs/openclaw/bin/python -m pytest tests/test_openbox_backend.py tests/test_optimizer_insights.py tests/test_optimizer_finalize.py",
@@ -99,6 +99,7 @@
     "c58_product_entrypoint_unified_environment_plan": "docs/superpowers/plans/2026-06-07-product-entrypoint-unified-environment.md. Scope: one product-level Python environment for ic-auto-opt-workflow/OpenBox/TuRBO/report dependencies, ic-opt shell entrypoint, /ic-opt supervisor-agent command form, no per-project venvs, no long prompts as product UX, no hardcoded Spectre version.",
     "c58_product_entrypoint_unified_environment": "Implemented verified-only. Added requirements-product.txt, product CLI module hermes_workflow.product_cli, and console script ic-opt. The repo .venv imports openbox/hermes_workflow/lightgbm/shap/pyrfr and ic-opt --help shows ic-opt [OPTIONS] PROJECT_DIR. Targeted tests passed: python -m pytest tests/test_product_cli.py tests/test_optimizer_flow.py -q (5 passed), targeted ruff passed. Dry orchestration passed at /tmp/ic_auto_opt_c58_dry_jCiZAA/Mixer_opt_muti_tb. A sandboxed real run failed because Spectre could not create pipe/server socket; the corrected unsandboxed run at /tmp/ic_auto_opt_c58_real_unsandboxed_rj40MJ/Mixer_opt_muti_tb completed 100 real multi-testbench OpenBox/Spectre/OCEAN evaluations from the repo .venv, passed all flow gates, generated OpenBox advanced visualization, and recommended feasible real_066. Counts: feasible=19, constraint_failed=65, metric_check_failed=16.",
     "c59_product_one_line_cadence_env_discovery": "Implemented verified-only. Added user-supplied Cadence cshrc anchor discovery to ic-opt only: explicit --cadence-cshrc, PROJECT_DIR/cadence_env.csh, IC_OPT_CADENCE_CSHRC, then ~/.ic-opt/cadence_env.csh. ic-opt does not infer .bashrc/.zshrc and does not hardcode Spectre versions. Lower-level hermes-workflow optimize remains explicit. Product CLI tests passed (5 passed), targeted ruff passed, ic-opt --help no longer marks --cadence-cshrc as required, and one-line dry orchestration passed at /tmp/ic_auto_opt_c59_dry_5J81NM/Mixer_opt_muti_tb with PROJECT_DIR/cadence_env.csh and no --cadence-cshrc flag.",
-    "c60_product_one_line_real_acceptance": "Completed verified-only. Fresh workspace /tmp/ic_auto_opt_c60_one_line_real_PpguO7/Mixer_opt_muti_tb copied only opt_requirement.md and PROJECT_DIR/cadence_env.csh, then ran ./.venv/bin/ic-opt PROJECT --real --max-evals 100 --batch-size 10 --parallel-jobs 10 without --cadence-cshrc. Flow status pass, evaluation_count=100, status_counts constraint_failed=68 feasible=16 metric_check_failed=16, recommended_action=accept_best_observed_or_continue, recommended_run_id=real_051, global_optimum_claim=false, OpenBox advanced visualization generated."
+    "c60_product_one_line_real_acceptance": "Completed verified-only. Fresh workspace /tmp/ic_auto_opt_c60_one_line_real_PpguO7/Mixer_opt_muti_tb copied only opt_requirement.md and PROJECT_DIR/cadence_env.csh, then ran ./.venv/bin/ic-opt PROJECT --real --max-evals 100 --batch-size 10 --parallel-jobs 10 without --cadence-cshrc. Flow status pass, evaluation_count=100, status_counts constraint_failed=68 feasible=16 metric_check_failed=16, recommended_action=accept_best_observed_or_continue, recommended_run_id=real_051, global_optimum_claim=false, OpenBox advanced visualization generated.",
+    "c61_product_release_polish": "Completed verified-only. Replaced the stale contract-only README with a product-facing README, added docs/PRODUCT_RELEASE_CHECKLIST.md, and pinned requirements-product.txt visualization dependencies to shap==0.49.1 and lightgbm==4.6.0 matching the C-60 product environment. No optimizer behavior or real-tool contracts changed."
   }
 }

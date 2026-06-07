@@ -14,5 +14,5 @@
 
 swig==4.4.1
 pyrfr==0.9.0
-shap
-lightgbm
+shap==0.49.1
+lightgbm==4.6.0

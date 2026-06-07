@@ -4,12 +4,34 @@
 
 - Repository: `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow`
 - Branch: `plan-a-hermes-file-contract-mvp`
-- Current scope: C-60 Product One-Line Real Acceptance complete
-- Current status: verified-only. A fresh Mixer multi-testbench project at `/tmp/ic_auto_opt_c60_one_line_real_PpguO7/Mixer_opt_muti_tb` ran `ic-opt PROJECT --real --max-evals 100 --batch-size 10 --parallel-jobs 10` using project-local `cadence_env.csh` and no `--cadence-cshrc` flag. The flow passed with 100 evaluations, `68 constraint_failed`, `16 feasible`, and `16 metric_check_failed`; decision report recommends feasible `real_051` with `global_optimum_claim=false`.
+- Current scope: C-61 Product Release Polish complete
+- Current status: verified-only. The root README now reflects the current product route instead of the early contract-only MVP, `docs/PRODUCT_RELEASE_CHECKLIST.md` captures release readiness, and `requirements-product.txt` pins the C-60 validated visualization dependencies `shap==0.49.1` and `lightgbm==4.6.0`.
 - Active spec: `docs/superpowers/specs/2026-06-07-one-command-optimizer-flow-design.md`
-- Active plan: `docs/superpowers/plans/2026-06-07-product-one-line-real-acceptance.md`
-- Next required action: After user confirmation, proceed to release polish/package docs or test the one-line product route on the next real user project. Keep the product route based on ic-opt and requirements-product.txt; do not add optimizer features or create per-project venvs.
-- next_allowed_action: After user confirmation, proceed to release polish/package docs or test the one-line product route on the next real user project. Keep the product route based on ic-opt and requirements-product.txt; do not add optimizer features or create per-project venvs.
+- Active plan: `docs/superpowers/plans/2026-06-07-product-release-polish.md`
+- Next required action: After user confirmation, run a final release-readiness check or test ic-opt on the next real user project. Keep the product route based on ic-opt and requirements-product.txt; do not add optimizer features or create per-project venvs.
+- next_allowed_action: After user confirmation, run a final release-readiness check or test ic-opt on the next real user project. Keep the product route based on ic-opt and requirements-product.txt; do not add optimizer features or create per-project venvs.
+
+## C-61 Product Release Polish 2026-06-07
+
+C-61 is complete, verified-only.
+
+Changes:
+
+- Replaced the stale root `README.md` contract-only text with a product-facing
+  README covering install, Cadence environment anchors, user project layout,
+  `ic-opt PROJECT --real`, reports, C-60 real evidence, and hard boundaries.
+- Added `docs/PRODUCT_RELEASE_CHECKLIST.md` for product environment,
+  user-project contract, Cadence env anchor, dry gate, real acceptance, final
+  user acceptance, and non-release files.
+- Pinned `requirements-product.txt` visualization/report dependencies to the
+  C-60 validated product environment: `shap==0.49.1` and `lightgbm==4.6.0`.
+
+Route audit:
+
+- Aligned with C-58 through C-60 product landing.
+- No real-tool rerun was needed.
+- No optimizer math, OCEAN formula, Spectre version, multi-testbench
+  aggregation, product command behavior, or per-project venv policy changed.
 
 ## C-60 Product One-Line Real Acceptance 2026-06-07
 

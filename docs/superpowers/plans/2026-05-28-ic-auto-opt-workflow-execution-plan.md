@@ -23,7 +23,7 @@
 
 ## Current Implementation Node
 
-As of 2026-06-07, Plan A, Plan B, and Plan C through C-60 are complete, with
+As of 2026-06-07, Plan A, Plan B, and Plan C through C-61 are complete, with
 post-C-49 real Mixer OpenBox/Spectre/OCEAN evidence through 200 cumulative
 NF=12dB evaluations and C-50 real multi-testbench evidence through 100
 three-testbench evaluations. Post-C50/C-54 reporting now re-scores existing
@@ -92,6 +92,12 @@ The workspace copied only `opt_requirement.md` and project-local
 100 real OpenBox/Spectre/OCEAN evaluations, recommended feasible `real_051`,
 generated OpenBox advanced visualization, and kept
 `global_optimum_claim=false`.
+
+C-61 polishes the release-facing entrypoints. The root README now documents the
+current product install and `ic-opt PROJECT --real` path rather than the early
+contract-only MVP. `docs/PRODUCT_RELEASE_CHECKLIST.md` records release
+readiness gates, and `requirements-product.txt` pins the product visualization
+dependencies validated by C-60.
 
 The accepted route is no longer an abstract contract-only optimizer plan; it is
 a practice-first production handoff flow that has been exercised with real

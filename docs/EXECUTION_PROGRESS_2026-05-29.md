@@ -10,9 +10,9 @@ This note preserves the implementation state for continuing Plan A after context
 - Baseline commit: `885e97f docs: capture workflow planning baseline`
 - Latest C-3 code commit before docs-only cleanup: `edb107f fix: harden preflight readiness gates`; docs cleanup continues through current HEAD
 - Active plan: `docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md`
-- Current scope: C-60 Product One-Line Real Acceptance complete
-- Current status: C-60 verified the product route with a fresh Mixer multi-testbench project and project-local `cadence_env.csh`: `ic-opt PROJECT --real --max-evals 100 --batch-size 10 --parallel-jobs 10` passed 100 real evaluations without `--cadence-cshrc`.
-- Next allowed action: after user confirmation, proceed to release polish/package docs or test the one-line product route on the next real user project. Do not add optimizer features or per-project virtualenvs.
+- Current scope: C-61 Product Release Polish complete
+- Current status: C-61 replaced the stale contract-only root README with a product-facing README, added `docs/PRODUCT_RELEASE_CHECKLIST.md`, and pinned product visualization/report dependencies in `requirements-product.txt`.
+- Next allowed action: after user confirmation, run a final release-readiness check or test `ic-opt` on the next real user project. Do not add optimizer features or per-project virtualenvs.
 - Execution method: `superpowers:subagent-driven-development`
 - Dependencies installed in active Python environment on 2026-05-29: `pytest`, `typer`, `pydantic`, `PyYAML`, `ruff`
 
@@ -297,6 +297,30 @@ Route audit:
 - Aligned with the product landing route.
 - No optimizer math, OCEAN formula, Spectre version, multi-testbench
   aggregation, or product virtualenv contract changed.
+
+## C-61 Product Release Polish 2026-06-07
+
+C-61 is complete, verified-only.
+
+Changes:
+
+- Replaced root `README.md` with a product-facing release entry.
+- Added `docs/PRODUCT_RELEASE_CHECKLIST.md`.
+- Pinned `requirements-product.txt` visualization/report dependencies to
+  `shap==0.49.1` and `lightgbm==4.6.0`, matching the C-60 product environment.
+
+Verification:
+
+- Product import check passed in the repo `.venv`.
+- `ic-opt --help` and `hermes-workflow --help` are available from the repo
+  `.venv`.
+- Development cadence check and `git diff --check` passed.
+
+Route audit:
+
+- No real-tool rerun was needed.
+- No optimizer math, OCEAN formula, Spectre version, multi-testbench
+  aggregation, product command behavior, or per-project venv policy changed.
 
 Post-C-49 real smoke:
 

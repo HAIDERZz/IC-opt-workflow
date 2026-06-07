@@ -22,11 +22,10 @@ Current execution state:
 
 - Latest production acceptance note:
   `docs/PRODUCTION_LANDING_ACCEPTANCE_2026-06-07.md`.
-- Current scope: C-60 Product One-Line Real Acceptance complete.
-- Current status: C-60 verified the product route with a fresh Mixer
-  multi-testbench project and project-local `cadence_env.csh`:
-  `ic-opt PROJECT --real --max-evals 100 --batch-size 10 --parallel-jobs 10`
-  passed 100 real evaluations without `--cadence-cshrc`.
+- Current scope: C-61 Product Release Polish complete.
+- Current status: C-61 replaced the stale contract-only root README with a
+  product-facing README, added `docs/PRODUCT_RELEASE_CHECKLIST.md`, and pinned
+  product visualization/report dependencies in `requirements-product.txt`.
 - C-57 real one-command drill:
   `/tmp/ic_auto_opt_optimize_real_jPaNVI/Mixer_opt_muti_tb` completed 100 real
   multi-testbench OpenBox/Spectre/OCEAN evaluations through the optimize route.
@@ -34,8 +33,8 @@ Current execution state:
   pass; counts are `65 constraint_failed`, `19 feasible`,
   `16 metric_check_failed`; recommended feasible candidate is `real_066`
   with `F=26`, `L=40n`, `VB_LO=310m`, `W=1u`.
-- C-60 plan:
-  `docs/superpowers/plans/2026-06-07-product-one-line-real-acceptance.md`.
+- C-61 plan:
+  `docs/superpowers/plans/2026-06-07-product-release-polish.md`.
 - Product target: one product-level Python environment for
   `ic-auto-opt-workflow`, OpenBox, TuRBO, and report dependencies; no
   per-project virtualenvs. User-facing entry should be `/ic-opt PROJECT --real`
@@ -56,6 +55,11 @@ Current execution state:
   evaluations completed with `68 constraint_failed`, `16 feasible`, and
   `16 metric_check_failed`; decision report recommends feasible `real_051`,
   `global_optimum_claim=false`; OpenBox advanced visualization generated.
+- C-61 release polish evidence:
+  root `README.md` now describes the product install/use path;
+  `docs/PRODUCT_RELEASE_CHECKLIST.md` records release readiness gates; and
+  `requirements-product.txt` pins `shap==0.49.1` and `lightgbm==4.6.0`, matching
+  the C-60 product environment.
 - C-58 product-entrypoint evidence:
   `/tmp/ic_auto_opt_c58_real_unsandboxed_rj40MJ/Mixer_opt_muti_tb` completed
   100 real multi-testbench OpenBox/Spectre/OCEAN evaluations through
@@ -92,7 +96,7 @@ Current execution state:
   mistakes such as `W` being overwritten by `L`. Import evidence: 69 netlist
   files copied, 1 safe symlink materialized, and template variables `F`, `W`,
   `L`, and `VB_LO` approved. No Spectre/OCEAN run was launched.
-- current_scope: C-60 Product One-Line Real Acceptance complete.
+- current_scope: C-61 Product Release Polish complete.
 - C-50 files: `docs/superpowers/specs/2026-06-06-multi-testbench-candidate-evaluation-design.md`
   and `docs/superpowers/plans/2026-06-06-multi-testbench-candidate-evaluation.md`.
 - C-49 verification: targeted tests passed with `88 passed`; full suite passed
@@ -101,9 +105,9 @@ Current execution state:
   rewrite; no Maestro/ADE netlist flattening; no optimizer execution behavior
   change. The only schema extension was accepting `optimizer.algorithm: openbox`
   to match the existing OpenBox backend route.
-- next_allowed_action: after user confirmation, proceed to release
-  polish/package docs or test the one-line product route on the next real user
-  project. Do not create per-project venvs, rely on
+- next_allowed_action: after user confirmation, run a final release-readiness
+  check or test `ic-opt` on the next real user project. Do not create
+  per-project venvs, rely on
   `/tmp/ic_auto_opt_openbox_spike/.venv`, hardcode Spectre versions, change
   algorithms, or introduce broad workflow layers.
 - Post-C-49 real Mixer smoke: `real_002` used `F=26`, `W=1u`, `L=40n`,
