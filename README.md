@@ -63,6 +63,7 @@ python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
 python -m pip install swig
+swig -version
 python -m pip install -r requirements-product.txt
 python -m pip install -e .
 ```
@@ -72,8 +73,26 @@ your administrator provides, such as `python3.11` or `python3.12`.
 
 OpenBox may build `pyrfr` during installation. That build needs a `swig`
 command and a C/C++ compiler. The `python -m pip install swig` step above is the
-lowest-friction user-space path. If it does not work on your server, ask your
-administrator to install the system packages instead:
+lowest-friction user-space path. The important check is `swig -version`: do not
+continue until that command works in the same shell where you run `pip`.
+
+If you installed `swig` into `.venv` but still see `command 'swig' failed`, the
+virtual environment is probably not on `PATH`. Run:
+
+```bash
+source .venv/bin/activate
+swig -version
+```
+
+or, without shell activation:
+
+```bash
+PATH="$PWD/.venv/bin:$PATH" ./.venv/bin/python -m pip install -r requirements-product.txt
+PATH="$PWD/.venv/bin:$PATH" ./.venv/bin/python -m pip install -e .
+```
+
+If `swig -version` still does not work on your server, ask your administrator to
+install the system packages instead:
 
 ```bash
 # Ubuntu / Debian

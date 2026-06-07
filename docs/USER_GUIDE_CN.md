@@ -38,6 +38,7 @@ python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
 python -m pip install swig
+swig -version
 python -m pip install -r requirements-product.txt
 python -m pip install -e .
 ```
@@ -47,8 +48,25 @@ python -m pip install -e .
 名字必须叫 `python3.11`。
 
 OpenBox 安装时可能会编译 `pyrfr`，这个步骤需要系统里能找到 `swig` 命令和 C/C++
-编译器。上面的 `python -m pip install swig` 是最轻量的用户目录安装方式。如果这一步
-在你的服务器上不成功，就需要让管理员安装系统依赖：
+编译器。上面的 `python -m pip install swig` 是最轻量的用户目录安装方式。关键检查是
+`swig -version`：只有这个命令在同一个 shell 里能运行，后续安装才有机会通过。
+
+如果你已经 `pip install swig`，但仍然看到 `command 'swig' failed`，通常是因为没有
+激活 `.venv`，导致 `.venv/bin/swig` 没有进入 `PATH`。先运行：
+
+```bash
+source .venv/bin/activate
+swig -version
+```
+
+如果你不想激活 shell，也可以这样显式带上路径：
+
+```bash
+PATH="$PWD/.venv/bin:$PATH" ./.venv/bin/python -m pip install -r requirements-product.txt
+PATH="$PWD/.venv/bin:$PATH" ./.venv/bin/python -m pip install -e .
+```
+
+如果 `swig -version` 仍然不成功，就需要让管理员安装系统依赖：
 
 ```bash
 # Ubuntu / Debian
