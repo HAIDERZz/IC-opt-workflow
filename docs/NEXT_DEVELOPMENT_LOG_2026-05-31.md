@@ -4,12 +4,45 @@
 
 - Repository: `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow`
 - Branch: `plan-a-hermes-file-contract-mvp`
-- Current scope: C-61 Product Release Polish complete
-- Current status: verified-only. The root README now reflects the current product route instead of the early contract-only MVP, `docs/PRODUCT_RELEASE_CHECKLIST.md` captures release readiness, and `requirements-product.txt` pins the C-60 validated visualization dependencies `shap==0.49.1` and `lightgbm==4.6.0`.
+- Current scope: C-62 Agent Integration Reality Audit complete
+- Current status: verified-only. The implemented product route is the shell automation core `ic-opt PROJECT_DIR --real`, backed by `hermes-workflow optimize` and Hermes file contracts. A real `/ic-opt` slash command and automatic supervisor-agent to execution-agent dispatch are not implemented yet. Documentation has been synchronized to make that boundary explicit, including the detailed Chinese explanation `docs/PROJECT_STATUS_AND_ARCHITECTURE_CN.md`.
 - Active spec: `docs/superpowers/specs/2026-06-07-one-command-optimizer-flow-design.md`
-- Active plan: `docs/superpowers/plans/2026-06-07-product-release-polish.md`
-- Next required action: After user confirmation, run a final release-readiness check or test ic-opt on the next real user project. Keep the product route based on ic-opt and requirements-product.txt; do not add optimizer features or create per-project venvs.
-- next_allowed_action: After user confirmation, run a final release-readiness check or test ic-opt on the next real user project. Keep the product route based on ic-opt and requirements-product.txt; do not add optimizer features or create per-project venvs.
+- Active plan: `docs/superpowers/plans/2026-06-07-agent-integration-reality-audit.md`
+- Next required action: After user confirmation, choose and implement the first real agent-facing integration proof: a slash-command/plugin wrapper that maps `/ic-opt PROJECT_DIR --real` to the repo `ic-opt` command and proves an observable supervisor-agent to execution-agent handoff, or explicitly decide the product is a single-agent CLI operator.
+- next_allowed_action: After user confirmation, choose and implement the first real agent-facing integration proof: either a slash-command/plugin wrapper that maps /ic-opt PROJECT_DIR --real to the repo ic-opt command and shows an observable supervisor-agent to execution-agent handoff, or explicitly decide the product is a single-agent CLI operator. Do not add optimizer math/features until this product boundary is resolved.
+
+## C-62 Agent Integration Reality Audit 2026-06-07
+
+C-62 is complete, verified-only.
+
+Root cause:
+
+- The project has implemented `ic-opt PROJECT_DIR --real` as a shell product
+  CLI, plus `hermes-workflow optimize` and execution task-package contracts.
+- The project has not implemented a real `/ic-opt` slash command in an agent
+  runtime or automatic supervisor-agent to execution-agent dispatch.
+- Recent product docs blurred the target two-agent shape with the implemented
+  shell automation core.
+
+Changes:
+
+- Added `docs/AGENT_INTEGRATION_STATUS.md` as the canonical current boundary.
+- Added `docs/PROJECT_STATUS_AND_ARCHITECTURE_CN.md` to explain, in Chinese
+  and with evidence references, what `ic-opt` automates, what C-60 proved, and
+  what agent integration is still missing.
+- Synchronized README, product quickstart, agent usage manual, release
+  checklist, `AGENTS.md`, this log, execution progress, compact checkpoint,
+  current task state, and the top-level plan.
+
+Route audit:
+
+- Aligned with the locked role model: supervisor agent is the planner/decision
+  owner, Hermes is workflow tooling, and execution agent is the tool-side
+  worker.
+- No optimizer math, OCEAN formula, Spectre setup, OpenBox/TuRBO behavior,
+  multi-testbench aggregation, or product environment contract changed.
+- Next product work must implement or explicitly reject the real agent-facing
+  `/ic-opt` + supervisor/execution handoff layer.
 
 ## C-61 Product Release Polish 2026-06-07
 

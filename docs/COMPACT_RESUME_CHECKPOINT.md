@@ -22,10 +22,14 @@ Current execution state:
 
 - Latest production acceptance note:
   `docs/PRODUCTION_LANDING_ACCEPTANCE_2026-06-07.md`.
-- Current scope: C-61 Product Release Polish complete.
-- Current status: C-61 replaced the stale contract-only root README with a
-  product-facing README, added `docs/PRODUCT_RELEASE_CHECKLIST.md`, and pinned
-  product visualization/report dependencies in `requirements-product.txt`.
+- Current scope: C-62 Agent Integration Reality Audit complete.
+- Current status: the implemented product route is the shell automation core
+  `ic-opt PROJECT_DIR --real`. A real `/ic-opt` slash command and automatic
+  supervisor-agent to execution-agent dispatch are not implemented yet.
+- Canonical agent boundary doc:
+  `docs/AGENT_INTEGRATION_STATUS.md`.
+- Detailed Chinese project status and architecture explanation:
+  `docs/PROJECT_STATUS_AND_ARCHITECTURE_CN.md`.
 - C-57 real one-command drill:
   `/tmp/ic_auto_opt_optimize_real_jPaNVI/Mixer_opt_muti_tb` completed 100 real
   multi-testbench OpenBox/Spectre/OCEAN evaluations through the optimize route.
@@ -33,13 +37,15 @@ Current execution state:
   pass; counts are `65 constraint_failed`, `19 feasible`,
   `16 metric_check_failed`; recommended feasible candidate is `real_066`
   with `F=26`, `L=40n`, `VB_LO=310m`, `W=1u`.
-- C-61 plan:
-  `docs/superpowers/plans/2026-06-07-product-release-polish.md`.
+- C-62 plan:
+  `docs/superpowers/plans/2026-06-07-agent-integration-reality-audit.md`.
 - Product target: one product-level Python environment for
   `ic-auto-opt-workflow`, OpenBox, TuRBO, and report dependencies; no
-  per-project virtualenvs. User-facing entry should be `/ic-opt PROJECT --real`
-  for agent sessions and `ic-opt PROJECT --real` for shell sessions. Do not use
-  long natural-language prompts to compensate for missing command behavior.
+  per-project virtualenvs. The implemented entry is `ic-opt PROJECT --real` for
+  shell/agent-operated CLI sessions. The final `/ic-opt PROJECT --real` slash
+  command and supervisor-agent to execution-agent dispatch still need a real
+  wrapper/handoff implementation and drill. Do not use long natural-language
+  prompts to compensate for missing command behavior.
 - C-59 product-entrypoint evidence:
   `/tmp/ic_auto_opt_c59_dry_5J81NM/Mixer_opt_muti_tb` passed one-line dry
   orchestration from `./.venv/bin/ic-opt` with `PROJECT_DIR/cadence_env.csh`
@@ -1327,6 +1333,12 @@ C-57 One-Command Optimizer Flow Completion:
 
 C-58 Product Entrypoint And Unified Environment Planning:
 
+C-62 note: the following C-58 historical section used `/ic-opt` as a target
+agent-facing shape. It is superseded by `docs/AGENT_INTEGRATION_STATUS.md`:
+the implemented entry is `ic-opt PROJECT_DIR --real`; the real `/ic-opt`
+slash command and automatic supervisor-agent to execution-agent dispatch are
+not implemented yet.
+
 - Status: planned.
 - Plan: `docs/superpowers/plans/2026-06-07-product-entrypoint-unified-environment.md`.
 - Real C-57 route drill: `/tmp/ic_auto_opt_optimize_real_jPaNVI/Mixer_opt_muti_tb`
@@ -1336,8 +1348,9 @@ C-58 Product Entrypoint And Unified Environment Planning:
 - Product gap: repo `.venv` lacks OpenBox; the successful drill used the
   development OpenBox venv. This must be fixed by product packaging, not hidden
   in prompts or per-project venvs.
-- Product target: `/ic-opt PROJECT_DIR --real` for supervisor-agent sessions
-  and `ic-opt PROJECT_DIR --real` for shell sessions.
+- Historical product target: future `/ic-opt PROJECT_DIR --real` for
+  supervisor-agent sessions and implemented `ic-opt PROJECT_DIR --real` for
+  shell sessions.
 - Environment target: one product-level Python venv for `ic-auto-opt-workflow`,
   OpenBox, TuRBO, and report dependencies. User project directories remain
   data-only.
@@ -1349,5 +1362,5 @@ C-58 Product Entrypoint And Unified Environment Planning:
 ## Latest Resume Prompt
 
 ```text
-请继续 IC auto optimization workflow。先阅读 AGENTS.md、docs/CURRENT_TASK_STATE.json、docs/TOOLCHAIN_EXECUTION_REFERENCE.md、docs/OPTIMIZER_PRODUCTION_QUICKSTART.md、docs/AGENT_OPTIMIZER_USAGE_MANUAL.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-57 One-Command Optimizer Flow 已完成 verified-only，commit e6ce269；docs commit 4550ce8 记录了该路线。真实 drill `/tmp/ic_auto_opt_optimize_real_jPaNVI/Mixer_opt_muti_tb` 通过 optimize route 完成 100 个真实 multi-testbench OpenBox/Spectre/OCEAN evaluations，`check-optimizer-run` accepted，推荐 feasible `real_066`，counts=`65 constraint_failed/19 feasible/16 metric_check_failed`。但是 repo `.venv` 直接运行失败，因为 OpenBox 不在产品 venv 中；成功路径依赖 `/tmp/ic_auto_opt_openbox_spike/.venv`，这不能作为发布形态。当前进入 C-58：按 `docs/superpowers/plans/2026-06-07-product-entrypoint-unified-environment.md` 实现一个产品级单 venv 环境和入口，目标是 `/ic-opt PROJECT_DIR --real`（agent-facing）与 `ic-opt PROJECT_DIR --real`（shell-facing）。不要创建每项目 venv，不要依赖 /tmp OpenBox venv，不要用长 prompt 伪装产品 UX，不要硬编码 Spectre 版本，不要改变优化算法，不要解析 PSF，不要重写 OCEAN 公式，不要新增宽泛 workflow 框架。
+请继续 IC auto optimization workflow。先阅读 AGENTS.md、docs/CURRENT_TASK_STATE.json、docs/TOOLCHAIN_EXECUTION_REFERENCE.md、docs/OPTIMIZER_PRODUCTION_QUICKSTART.md、docs/AGENT_OPTIMIZER_USAGE_MANUAL.md、docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md、docs/EXECUTION_PROGRESS_2026-05-29.md、docs/COMPACT_RESUME_CHECKPOINT.md。当前 repo 是 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow，branch 是 plan-a-hermes-file-contract-mvp。C-57 One-Command Optimizer Flow 已完成 verified-only，commit e6ce269；docs commit 4550ce8 记录了该路线。真实 drill `/tmp/ic_auto_opt_optimize_real_jPaNVI/Mixer_opt_muti_tb` 通过 optimize route 完成 100 个真实 multi-testbench OpenBox/Spectre/OCEAN evaluations，`check-optimizer-run` accepted，推荐 feasible `real_066`，counts=`65 constraint_failed/19 feasible/16 metric_check_failed`。但是 repo `.venv` 直接运行失败，因为 OpenBox 不在产品 venv 中；成功路径依赖 `/tmp/ic_auto_opt_openbox_spike/.venv`，这不能作为发布形态。当前进入 C-58：按 `docs/superpowers/plans/2026-06-07-product-entrypoint-unified-environment.md` 实现一个产品级单 venv 环境和入口，目标是未来 `/ic-opt PROJECT_DIR --real`（agent-facing）与当前 `ic-opt PROJECT_DIR --real`（shell-facing）。C-62 后须明确：shell entry 已实现，slash command 和自动 supervisor/execution-agent dispatch 未实现。不要创建每项目 venv，不要依赖 /tmp OpenBox venv，不要用长 prompt 伪装产品 UX，不要硬编码 Spectre 版本，不要改变优化算法，不要解析 PSF，不要重写 OCEAN 公式，不要新增宽泛 workflow 框架。
 ```

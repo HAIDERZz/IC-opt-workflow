@@ -3,7 +3,7 @@
 `ic-auto-opt-workflow` is a file-driven IC optimization workflow for
 Maestro-exported Spectre/OCEAN projects.
 
-The product goal is simple:
+The implemented shell product command is:
 
 ```bash
 ic-opt /path/to/project --real
@@ -11,6 +11,17 @@ ic-opt /path/to/project --real
 
 The project has been exercised on a real multi-testbench Mixer optimization
 flow with OpenBox, Spectre, OCEAN, and post-run visualization/reporting.
+
+Important agent-integration boundary: a real `/ic-opt` slash command and
+automatic supervisor-agent to execution-agent dispatch are not implemented yet.
+The current product is a working optimization automation core plus file
+contracts and manuals that can support agent orchestration. See
+`docs/AGENT_INTEGRATION_STATUS.md` before describing this as a completed
+two-agent product.
+
+For the detailed Chinese explanation of what the automation does, what evidence
+proves it, and where the two-agent integration is still missing, read
+`docs/PROJECT_STATUS_AND_ARCHITECTURE_CN.md`.
 
 ## What This Project Does
 
@@ -169,6 +180,10 @@ advanced visualization, and recommended a feasible best-observed candidate.
 - `docs/OPTIMIZER_PRODUCTION_QUICKSTART.md`: shortest production workflow.
 - `docs/AGENT_OPTIMIZER_USAGE_MANUAL.md`: supervisor/execution-agent operating
   manual.
+- `docs/AGENT_INTEGRATION_STATUS.md`: current implemented agent boundary and
+  missing two-agent product work.
+- `docs/PROJECT_STATUS_AND_ARCHITECTURE_CN.md`: detailed Chinese status and
+  architecture explanation with evidence references.
 - `src/hermes_workflow/templates/spectre_maestro_project/OPT_REQUIREMENT_README.md`:
   `opt_requirement.md` format reference.
 - `docs/TOOLCHAIN_EXECUTION_REFERENCE.md`: mandatory real-tool execution

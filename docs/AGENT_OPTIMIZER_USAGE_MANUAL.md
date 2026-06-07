@@ -6,6 +6,18 @@ with `ic-auto-opt-workflow`.
 Use this document when you want a supervisor agent to help you optimize a real
 Virtuoso/Maestro/Spectre circuit.
 
+Current implementation boundary:
+
+- Implemented: shell command `ic-opt PROJECT_DIR --real`.
+- Implemented: Hermes workflow task packages and execution-agent instructions.
+- Not implemented: a real `/ic-opt` slash command in an agent runtime.
+- Not implemented: automatic supervisor-agent to execution-agent dispatch.
+
+Read `docs/AGENT_INTEGRATION_STATUS.md` before claiming the two-agent product
+itself is complete. Read `docs/PROJECT_STATUS_AND_ARCHITECTURE_CN.md` for the
+detailed Chinese explanation of what the current `ic-opt` automation actually
+does and what agent integration remains missing.
+
 ## 1. What You Prepare
 
 Create one project directory:
@@ -84,18 +96,29 @@ Good examples:
 Do not put machine-critical formulas only in `constraints.md`. Formulas,
 variable ranges, and resource settings belong in `opt_requirement.md`.
 
-## 4. Target Product Invocation
+## 4. Current Product Invocation
 
-The target product-shaped request is one short command:
+The implemented product command is the shell CLI:
+
+```text
+ic-opt /home/zzchen/spectre_opt_prj/<project_name> --real
+```
+
+The target product-shaped agent request is still:
 
 ```text
 /ic-opt /home/zzchen/spectre_opt_prj/<project_name> --real
 ```
 
-The shell-equivalent product command is:
+but `/ic-opt` is not yet implemented as a real slash command. Do not tell users
+that it is available until an agent runtime wrapper exists and has passed a real
+handoff drill.
+
+The current supervisor-agent request should be:
 
 ```text
-ic-opt /home/zzchen/spectre_opt_prj/<project_name> --real
+Run the ic-auto-opt workflow on /home/zzchen/spectre_opt_prj/<project_name>
+using the implemented ic-opt command, then report optimizer_decision_report.md.
 ```
 
 The user-facing request should stay short. All machine-critical information
@@ -119,7 +142,7 @@ cp /path/to/user/cadence_env.csh ~/.ic-opt/cadence_env.csh
 ```
 
 or by placing `cadence_env.csh` in `PROJECT_DIR`. After that, the supervisor can
-use the short `/ic-opt PROJECT_DIR --real` form. `ic-opt` discovers the
+use the short shell command `ic-opt PROJECT_DIR --real`. `ic-opt` discovers the
 user-supplied cshrc in this order:
 
 1. explicit `--cadence-cshrc PATH`;
@@ -131,8 +154,9 @@ The supervisor agent must not ask the user to restate formulas, variables,
 testbench paths, Spectre resources, or optimizer settings that are already
 present in `opt_requirement.md`.
 
-Do not validate the production UX by giving the supervisor a long prompt that
-explains the manual. The command and project files must carry the workflow.
+Do not validate the future slash-command UX by giving the supervisor a long
+prompt that explains the manual. The command and project files must carry the
+workflow, and the slash-command wrapper still needs to be implemented.
 
 ## 5. Product Environment Model
 
@@ -197,7 +221,8 @@ Typical user-side fixes:
 
 ## 7. Agent Step 2: Preferred One-Command Flow
 
-For production use, prefer the single orchestration command:
+For current production use, the supervisor agent runs the single orchestration
+command:
 
 ```bash
 ./.venv/bin/ic-opt PROJECT_DIR \
@@ -209,7 +234,9 @@ For production use, prefer the single orchestration command:
 
 This command performs the approved package/preflight/approval gate, launches the
 real OpenBox optimizer, runs the closeout report chain, and then stops for user
-acceptance. It does not record final user acceptance automatically.
+acceptance. It does not record final user acceptance automatically. In this
+current form, the supervisor agent is operating the automation core directly;
+automatic execution-agent dispatch is not yet implemented.
 
 To test the offline gates only:
 
@@ -446,7 +473,7 @@ A successful first production session looks like:
 
 ```text
 1. User creates PROJECT_DIR and writes opt_requirement.md.
-2. Agent runs `hermes-workflow optimize PROJECT_DIR --real ...`.
+2. Supervisor agent runs `ic-opt PROJECT_DIR --real ...`.
 3. Hermes writes `reports/optimizer_flow_run_report.json` and closeout reports.
 4. Supervisor reports best observed feasible result and bottleneck.
 5. User accepts or asks to continue.
@@ -456,3 +483,7 @@ A successful first production session looks like:
 
 At that point, the user can use the accepted candidate as the current optimized
 design point, while remembering it is not a mathematical global optimum proof.
+
+This is not yet proof of the final two-agent product. The final product still
+needs a real `/ic-opt` entrypoint and an observable supervisor-agent to
+execution-agent handoff.

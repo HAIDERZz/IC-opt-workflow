@@ -4,7 +4,10 @@ This is the shortest supported path for using `ic-auto-opt-workflow` on a real
 Maestro-exported Spectre/OCEAN optimization project.
 
 For a user-facing manual that explains how to ask a supervisor agent to run the
-workflow, read `docs/AGENT_OPTIMIZER_USAGE_MANUAL.md`.
+workflow, read `docs/AGENT_OPTIMIZER_USAGE_MANUAL.md`. For the current
+implemented agent boundary, read `docs/AGENT_INTEGRATION_STATUS.md`; for the
+detailed Chinese status explanation, read
+`docs/PROJECT_STATUS_AND_ARCHITECTURE_CN.md`.
 
 The workflow is file based. Do not describe machine-critical setup only in
 chat. Put the request in `opt_requirement.md`, optionally put human guidance in
@@ -24,20 +27,22 @@ python3 -m venv .venv
 ./.venv/bin/python -m pip install -r requirements-product.txt
 ```
 
-Target product invocation:
+Implemented shell product invocation:
 
 ```bash
 ic-opt ~/spectre_opt_prj/<project_name> --real
 ```
 
-Target supervisor-agent invocation:
+Target supervisor-agent invocation, not yet implemented as a real slash command:
 
 ```text
 /ic-opt ~/spectre_opt_prj/<project_name> --real
 ```
 
-`hermes-workflow optimize ... --real` is the lower-level implementation command
-behind that product entrypoint.
+The current project does not yet provide a Codex/Claude slash-command wrapper
+or automatic supervisor-agent to execution-agent dispatch. `ic-opt` is the
+implemented automation command. `hermes-workflow optimize ... --real` is the
+lower-level implementation command behind it.
 
 Release packaging must make OpenBox, TuRBO, and report dependencies available
 from the product environment. A development-only path such as

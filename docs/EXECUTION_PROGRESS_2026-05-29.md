@@ -10,11 +10,37 @@ This note preserves the implementation state for continuing Plan A after context
 - Baseline commit: `885e97f docs: capture workflow planning baseline`
 - Latest C-3 code commit before docs-only cleanup: `edb107f fix: harden preflight readiness gates`; docs cleanup continues through current HEAD
 - Active plan: `docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md`
-- Current scope: C-61 Product Release Polish complete
-- Current status: C-61 replaced the stale contract-only root README with a product-facing README, added `docs/PRODUCT_RELEASE_CHECKLIST.md`, and pinned product visualization/report dependencies in `requirements-product.txt`.
-- Next allowed action: after user confirmation, run a final release-readiness check or test `ic-opt` on the next real user project. Do not add optimizer features or per-project virtualenvs.
+- Current scope: C-62 Agent Integration Reality Audit complete
+- Current status: The implemented route is `ic-opt PROJECT_DIR --real` as a shell automation core. A real `/ic-opt` slash command and automatic supervisor-agent to execution-agent dispatch are not implemented yet. The project docs now say this explicitly instead of treating the target two-agent shape as current behavior. The detailed Chinese explanation is `docs/PROJECT_STATUS_AND_ARCHITECTURE_CN.md`.
+- Next allowed action: after user confirmation, choose the first real agent-facing integration proof: implement a slash-command/plugin wrapper plus observable supervisor/execution handoff, or explicitly decide the product is a single-agent CLI operator. Do not add optimizer features or per-project virtualenvs before resolving this boundary.
 - Execution method: `superpowers:subagent-driven-development`
 - Dependencies installed in active Python environment on 2026-05-29: `pytest`, `typer`, `pydantic`, `PyYAML`, `ruff`
+
+## Current C-62 Checkpoint 2026-06-07
+
+C-62 is a docs/status correction checkpoint.
+
+Implemented today:
+
+- Added `docs/AGENT_INTEGRATION_STATUS.md`.
+- Added `docs/PROJECT_STATUS_AND_ARCHITECTURE_CN.md`.
+- Synchronized product-facing docs and progress files to distinguish the
+  implemented shell CLI from the unimplemented two-agent runtime layer.
+
+Current truth:
+
+```text
+Implemented:
+  ic-opt PROJECT_DIR --real
+  hermes-workflow optimize PROJECT_DIR --real
+  file contracts, task package, real optimizer reports
+
+Not implemented:
+  /ic-opt slash command in an agent runtime
+  automatic supervisor-agent -> execution-agent dispatch
+```
+
+No code or simulator behavior changed.
 
 ## Current C-50 Checkpoint 2026-06-06
 
@@ -186,12 +212,17 @@ C-58 plan:
 docs/superpowers/plans/2026-06-07-product-entrypoint-unified-environment.md
 ```
 
-Target UX:
+Historical C-58 target UX, superseded by C-62 boundary clarification:
 
 ```text
-/ic-opt /path/to/project --real
-ic-opt /path/to/project --real
+target future agent entry: /ic-opt /path/to/project --real
+implemented shell entry: ic-opt /path/to/project --real
 ```
+
+C-62 clarification: the shell entry is implemented; the real `/ic-opt` slash
+command and automatic supervisor-agent to execution-agent dispatch are not.
+See `docs/AGENT_INTEGRATION_STATUS.md` and
+`docs/PROJECT_STATUS_AND_ARCHITECTURE_CN.md`.
 
 ## C-58 Product Entrypoint Completion 2026-06-07
 

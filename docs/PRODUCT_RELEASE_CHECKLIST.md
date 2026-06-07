@@ -3,6 +3,16 @@
 Use this checklist before treating `ic-auto-opt-workflow` as ready for another
 user or another clean machine.
 
+Important boundary: this checklist validates the implemented shell automation
+core, not the final two-agent product. The implemented entrypoint is
+`ic-opt PROJECT_DIR --real`. A real `/ic-opt` slash command and automatic
+supervisor-agent to execution-agent dispatch are still pending. See
+`docs/AGENT_INTEGRATION_STATUS.md` before describing a release as a completed
+two-agent product.
+
+For the detailed Chinese status explanation, read
+`docs/PROJECT_STATUS_AND_ARCHITECTURE_CN.md`.
+
 ## 1. Product Environment
 
 From the repository root:

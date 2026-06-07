@@ -23,7 +23,7 @@
 
 ## Current Implementation Node
 
-As of 2026-06-07, Plan A, Plan B, and Plan C through C-61 are complete, with
+As of 2026-06-07, Plan A, Plan B, and Plan C through C-62 are complete, with
 post-C-49 real Mixer OpenBox/Spectre/OCEAN evidence through 200 cumulative
 NF=12dB evaluations and C-50 real multi-testbench evidence through 100
 three-testbench evaluations. Post-C50/C-54 reporting now re-scores existing
@@ -99,6 +99,17 @@ contract-only MVP. `docs/PRODUCT_RELEASE_CHECKLIST.md` records release
 readiness gates, and `requirements-product.txt` pins the product visualization
 dependencies validated by C-60.
 
+C-62 corrects the agent-integration boundary. The implemented product route is
+the shell automation core `ic-opt PROJECT_DIR --real`, backed by
+`hermes-workflow optimize` and Hermes file/task-package contracts. A real
+agent-runtime slash command `/ic-opt PROJECT_DIR --real` and automatic
+supervisor-agent to execution-agent dispatch are not implemented yet. The
+canonical boundary note is `docs/AGENT_INTEGRATION_STATUS.md`, and the detailed
+Chinese project status explanation is
+`docs/PROJECT_STATUS_AND_ARCHITECTURE_CN.md`. Do not describe the current
+repository as a completed two-agent product until an observable
+supervisor/execution-agent handoff drill passes.
+
 The accepted route is no longer an abstract contract-only optimizer plan; it is
 a practice-first production handoff flow that has been exercised with real
 OpenBox, Spectre, and OCEAN runs. C-50 has addressed the real Mixer landing
@@ -109,8 +120,9 @@ Current production route:
 
 ```text
 user supplies a Cadence env anchor once
--> user sends /ic-opt PROJECT_DIR --real or shell runs ic-opt PROJECT_DIR --real
--> supervisor agent uses the short command and project files, not a long prompt
+-> shell/operator runs ic-opt PROJECT_DIR --real
+-> future agent product should expose /ic-opt PROJECT_DIR --real
+-> supervisor agent must use the short command and project files, not a long prompt
 -> Hermes workflow tooling validates/package contracts
 -> Hermes writes optimizer execution task packet
 -> execution agent follows the packet command exactly
