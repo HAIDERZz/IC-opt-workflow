@@ -5,6 +5,11 @@ from dataclasses import asdict, dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any, Callable
 
+from hermes_workflow.cli import (
+    CONTINUATION_ACQ_OPTIMIZER_TYPE,
+    CONTINUATION_ACQ_TYPE,
+    CONTINUATION_SURROGATE_TYPE,
+)
 from hermes_workflow.execution_adapters.remote_spectre_ocean import (
     run_remote_multi_testbench_adapter,
     run_remote_spectre_ocean_adapter,
@@ -145,6 +150,9 @@ def continue_remote_project(
             batch_size=batch_size,
             parallel_jobs=parallel_jobs,
             adapter=selected_adapter,
+            surrogate_type=CONTINUATION_SURROGATE_TYPE,
+            acq_type=CONTINUATION_ACQ_TYPE,
+            acq_optimizer_type=CONTINUATION_ACQ_OPTIMIZER_TYPE,
         )
 
     report = _run_continuation_closeout(

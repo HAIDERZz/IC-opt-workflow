@@ -88,3 +88,69 @@ def test_prepare_remote_project_cache_quotes_paths_with_spaces(tmp_path: Path) -
 
     assert result.status == "pass"
     assert any(expected_quoted in cmd for cmd in commands_run)
+
+
+def test_prepare_remote_project_cache_materializes_symlinks(tmp_path: Path) -> None:
+    """Symlinks in downloaded remote netlists must be materialized as regular files."""
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+
+    class SymlinkFakeRunner(FakeRunner):
+        def download_tree(self, remote_path, local_path, include=None, exclude=None) -> None:
+            local_path.mkdir(parents=True, exist_ok=True)
+            (local_path / "input.scs").write_text(
+                "simulator lang=spectre\n"
+                "parameters FN=2 WN=0.3u FP=2 WP=0.3u\n"
+                "tran tran stop=10n\n",
+                encoding="utf-8",
+            )
+            # Create a regular file and a symlink pointing to it
+            (local_path / "real_output.log").write_text("data\n", encoding="utf-8")
+            (local_path / "exprOutputs.log").symlink_to(local_path / "real_output.log")
+
+    runner = SymlinkFakeRunner()
+    result = prepare_remote_project_cache(ref, runner=runner, cache_root=tmp_path)
+
+    assert result.status == "pass"
+    exported = result.cache_dir / "netlists" / "exported"
+    assert (exported / "exprOutputs.log").is_file()
+    assert not (exported / "exprOutputs.log").is_symlink()
+
+
+def test_prepare_remote_project_cache_rejects_symlink_escaping_directory(tmp_path: Path) -> None:
+    """Symlinks whose target escapes the downloaded directory must be rejected."""
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    outside_file = tmp_path / "outside_secret.txt"
+    outside_file.write_text("secret\n", encoding="utf-8")
+
+    class EscapingSymlinkRunner(FakeRunner):
+        def download_tree(self, remote_path, local_path, include=None, exclude=None) -> None:
+            local_path.mkdir(parents=True, exist_ok=True)
+            (local_path / "input.scs").write_text(
+                "simulator lang=spectre\n", encoding="utf-8",
+            )
+            (local_path / "escape.log").symlink_to(outside_file)
+
+    runner = EscapingSymlinkRunner()
+    result = prepare_remote_project_cache(ref, runner=runner, cache_root=tmp_path)
+
+    assert result.status == "fail"
+    assert any("symlink" in issue.lower() or "escapes" in issue.lower() for issue in result.issues)
+
+
+def test_prepare_remote_project_cache_rejects_broken_symlink(tmp_path: Path) -> None:
+    """Symlinks whose target does not exist must be rejected."""
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+
+    class BrokenSymlinkRunner(FakeRunner):
+        def download_tree(self, remote_path, local_path, include=None, exclude=None) -> None:
+            local_path.mkdir(parents=True, exist_ok=True)
+            (local_path / "input.scs").write_text(
+                "simulator lang=spectre\n", encoding="utf-8",
+            )
+            (local_path / "broken.log").symlink_to(Path("/nonexistent/target"))
+
+    runner = BrokenSymlinkRunner()
+    result = prepare_remote_project_cache(ref, runner=runner, cache_root=tmp_path)
+
+    assert result.status == "fail"
+    assert any("symlink" in issue.lower() or "not a regular file" in issue.lower() for issue in result.issues)

@@ -478,6 +478,98 @@ def test_continue_remote_project_syncs_history_and_runs_additional_evals(tmp_pat
     assert calls[-1] == "sync_reports"
 
 
+def test_continue_remote_project_passes_openbox_strategy_defaults(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """Remote continuation must pass surrogate_type, acq_type, acq_optimizer_type
+    matching the local continuation defaults (prf, eic, local_random)."""
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir(parents=True)
+    (cache_dir / "execution_package").mkdir()
+    ((cache_dir / "execution_package") / "execution_manifest.json").write_text("{}")
+
+    captured_kwargs: dict = {}
+
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.prepare_remote_project_cache",
+        lambda *a, **k: SimpleNamespace(status="pass", cache_dir=cache_dir, issues=[]),
+    )
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow._sync_remote_history_to_cache",
+        lambda *a, **k: None,
+    )
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow._sync_cache_reports_to_remote",
+        lambda *a, **k: None,
+    )
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.build_execution_package",
+        lambda *a, **k: None,
+    )
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.assert_valid_project",
+        lambda *a, **k: SimpleNamespace(testbenches=None),
+    )
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.run_remote_spectre_ocean_adapter",
+        lambda *a, **k: None,
+    )
+
+    def capture_openbox(project_dir, **kwargs):
+        captured_kwargs.update(kwargs)
+        return SimpleNamespace(
+            evaluation_count=6,
+            report_path=None,
+            evaluations_path=None,
+        )
+
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.run_openbox_real_optimization",
+        capture_openbox,
+    )
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.check_optimizer_run",
+        lambda *a, **k: SimpleNamespace(status="accepted"),
+    )
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.summarize_optimizer_run",
+        lambda *a, **k: SimpleNamespace(status="pass"),
+    )
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.finalize_optimizer_run",
+        lambda *a, **k: SimpleNamespace(status="pass"),
+    )
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.generate_optimizer_insight_report",
+        lambda *a, **k: SimpleNamespace(status="pass"),
+    )
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.generate_optimizer_decision_report",
+        lambda *a, **k: SimpleNamespace(
+            status="pass",
+            recommended_run_id="real_141",
+            recommended_action="stop_for_user_review",
+        ),
+    )
+
+    from hermes_workflow.remote_optimizer_flow import continue_remote_project
+
+    continue_remote_project(
+        ref,
+        additional_evals=4,
+        remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
+        batch_size=2,
+        parallel_jobs=2,
+        cache_root=tmp_path,
+        runner=object(),
+    )
+
+    assert captured_kwargs["surrogate_type"] == "prf"
+    assert captured_kwargs["acq_type"] == "eic"
+    assert captured_kwargs["acq_optimizer_type"] == "local_random"
+
+
 def test_sync_remote_history_to_cache_raises_on_download_failure(tmp_path: Path) -> None:
     from hermes_workflow.remote_optimizer_flow import _sync_remote_history_to_cache
 

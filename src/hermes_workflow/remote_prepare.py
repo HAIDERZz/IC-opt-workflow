@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shutil
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -47,7 +48,10 @@ def prepare_remote_project_cache(
         return RemotePrepareResult(status="fail", cache_dir=cache_dir, issues=report.issues)
 
     write_config_payloads(cache_dir, render_config_payloads(report.sections))
-    _download_remote_netlists(cache_dir, report.sections, runner)
+    try:
+        _download_remote_netlists(cache_dir, report.sections, runner)
+    except FileExistsError as exc:
+        return RemotePrepareResult(status="fail", cache_dir=cache_dir, issues=[str(exc)])
     netlist_report = prepare_netlist(cache_dir)
     if netlist_report.status.value != "pass":
         return RemotePrepareResult(status="fail", cache_dir=cache_dir, issues=netlist_report.issues)
@@ -66,5 +70,36 @@ def _download_remote_netlists(cache_dir: Path, sections: dict[str, object], runn
         else:
             destination = cache_dir / "netlists" / "exported"
         runner.download_tree(remote_netlist, destination)
+        _materialize_downloaded_symlinks(destination)
         if index == 0 and "testbenches" in maestro:
-            runner.download_tree(remote_netlist, cache_dir / "netlists" / "exported")
+            primary = cache_dir / "netlists" / "exported"
+            runner.download_tree(remote_netlist, primary)
+            _materialize_downloaded_symlinks(primary)
+
+
+def _materialize_downloaded_symlinks(directory: Path) -> None:
+    """Replace symlinks in a downloaded netlist directory with regular file copies.
+
+    Raises ``FileExistsError`` if any symlink target escapes *directory* or is
+    not a regular file.  This mirrors the safety contract of
+    ``requirement_intake._collect_import_entries`` for local Maestro imports.
+    """
+    resolved_dir = directory.resolve()
+    for path in sorted(directory.rglob("*")):
+        if not path.is_symlink():
+            continue
+        target = path.resolve(strict=False)
+        try:
+            target.relative_to(resolved_dir)
+        except ValueError:
+            raise FileExistsError(
+                f"downloaded netlist symlink target escapes directory: "
+                f"{path.relative_to(directory)} -> {target}"
+            )
+        if not target.is_file():
+            raise FileExistsError(
+                f"downloaded netlist symlink target is not a regular file: "
+                f"{path.relative_to(directory)} -> {target}"
+            )
+        path.unlink()
+        shutil.copy2(target, path)
