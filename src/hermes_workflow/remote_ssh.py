@@ -123,14 +123,15 @@ class RemoteSshRunner:
         include: str | None = None,
         exclude: str | None = None,
     ) -> None:
+        if include is not None:
+            raise ValueError("include is not supported for tree transfer yet")
         local_path.mkdir(parents=True, exist_ok=True)
         remote = PurePosixPath(remote_path)
-        remote_parent = remote.parent
-        remote_basename = remote.name
 
-        remote_cmd = self._remote_tar_cmd(
-            str(remote_parent), remote_basename, exclude=exclude, include=include,
-        )
+        parts: list[str] = ["tar", "-C", str(remote), "-cf", "-", "."]
+        if exclude:
+            parts.extend(["--exclude", exclude])
+        remote_cmd = " ".join(shlex.quote(p) for p in parts)
         ssh_argv = ["ssh", "-o", "BatchMode=yes", self.profile, remote_cmd]
 
         ssh_proc = subprocess.Popen(
@@ -170,20 +171,22 @@ class RemoteSshRunner:
         include: str | None = None,
         exclude: str | None = None,
     ) -> None:
+        if include is not None:
+            raise ValueError("include is not supported for tree transfer yet")
         remote = PurePosixPath(remote_path)
-        remote_parent = remote.parent
 
-        remote_cmd = self._remote_tar_cmd(
-            str(remote_parent), None, extract=True,
-        )
+        self.run(f"mkdir -p {quote_remote_path(remote)}", check=True)
+
+        parts: list[str] = ["tar", "-C", str(remote), "-xf", "-"]
+        remote_cmd = " ".join(shlex.quote(p) for p in parts)
         ssh_argv = ["ssh", "-o", "BatchMode=yes", self.profile, remote_cmd]
 
-        local_tar_argv = self._local_tar_cmd(
-            str(local_path), exclude=exclude, include=include,
-        )
+        local_parts: list[str] = ["tar", "-C", str(local_path), "-cf", "-", "."]
+        if exclude:
+            local_parts.extend(["--exclude", exclude])
 
         local_tar = subprocess.Popen(
-            local_tar_argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            local_parts, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
         )
         ssh_proc = subprocess.Popen(
             ssh_argv, stdin=local_tar.stdout, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
@@ -213,45 +216,6 @@ class RemoteSshRunner:
                 f"remote tar upload failed: "
                 f"return_code={ssh_proc.returncode}, stderr={stderr.strip()}"
             )
-
-    @staticmethod
-    def _remote_tar_cmd(
-        remote_parent: str,
-        remote_basename: str | None,
-        *,
-        extract: bool = False,
-        include: str | None = None,
-        exclude: str | None = None,
-    ) -> str:
-        parts: list[str] = ["tar", "-C", remote_parent]
-        if exclude:
-            parts.extend(["--exclude", exclude])
-        if include:
-            parts.extend(["--include", include])
-        if extract:
-            parts.extend(["-xf", "-"])
-        else:
-            assert remote_basename is not None
-            parts.extend(["-cf", "-", remote_basename])
-        return " ".join(shlex.quote(p) for p in parts)
-
-    @staticmethod
-    def _local_tar_cmd(
-        local_parent: str,
-        *,
-        include: str | None = None,
-        exclude: str | None = None,
-    ) -> list[str]:
-        local_path = Path(local_parent)
-        basename = local_path.name
-        parent = str(local_path.parent)
-        parts: list[str] = ["tar", "-C", parent]
-        if exclude:
-            parts.extend(["--exclude", exclude])
-        if include:
-            parts.extend(["--include", include])
-        parts.extend(["-cf", "-", basename])
-        return parts
 
     def _raise_checked_error(self, result: RemoteCommandResult) -> None:
         if result.return_code == 255:

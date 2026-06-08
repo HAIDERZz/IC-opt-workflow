@@ -198,20 +198,19 @@ class FakeCompletedProcess:
 class FakePipe:
     """Fake pipe object with close() for Popen stdout/stderr."""
 
-    def __init__(self) -> None:
+    def __init__(self, content: bytes = b"") -> None:
+        self._content = content
         self._closed = False
 
     def close(self) -> None:
         self._closed = True
 
     def read(self) -> bytes:
-        return b""
+        return self._content
 
 
 class FakePopen:
     """Records argv and returns a controllable process for monkeypatching."""
-
-    instances: list[FakePopen] = []
 
     def __init__(
         self,
@@ -220,13 +219,14 @@ class FakePopen:
         stdout: int | None = None,
         stderr: int | None = None,
         stdin: int | None = None,
+        returncode: int = 0,
+        stderr_content: bytes = b"",
     ) -> None:
         self.argv = argv
         self.stdout: FakePipe | None = FakePipe() if stdout is not None else None
-        self.stderr: FakePipe | None = FakePipe() if stderr is not None else None
+        self.stderr: FakePipe | None = FakePipe(stderr_content) if stderr is not None else None
         self.stdin = stdin
-        self.returncode = 0
-        FakePopen.instances.append(self)
+        self.returncode = returncode
 
     def wait(self) -> int:
         return self.returncode
@@ -267,23 +267,17 @@ def test_download_tree_uses_ssh_tar(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     # Verify local directory was created
     assert local_path.exists()
 
-    # Verify SSH command includes tar with correct paths
+    # Verify remote command: tar -C <remote_path> -cf - .
     assert len(popen_calls) == 1
     ssh_argv = popen_calls[0][0]
     assert ssh_argv[:4] == ["ssh", "-o", "BatchMode=yes", "lab"]
     remote_cmd = ssh_argv[4]
-    assert "tar" in remote_cmd
-    assert "-C" in remote_cmd
-    assert "-cf" in remote_cmd
-    assert "/remote/project" in remote_cmd
-    assert "data" in remote_cmd
+    assert remote_cmd == "tar -C /remote/project/data -cf - ."
 
-    # Verify local tar extraction command
+    # Verify local tar extraction command: tar -C <local_path> -xf -
     assert len(run_calls) == 1
     local_tar_argv = run_calls[0][0]
-    assert local_tar_argv[:3] == ["tar", "-C", str(local_path)]
-    assert "-xf" in local_tar_argv
-    assert "-" in local_tar_argv
+    assert local_tar_argv == ["tar", "-C", str(local_path), "-xf", "-"]
 
 
 def _make_fake_popen(popen_calls: list, returncode: int = 0):
@@ -331,20 +325,11 @@ def test_download_tree_with_exclude(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     assert "*.log" in remote_cmd
 
 
-def test_download_tree_with_include(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    popen_calls: list = []
-    monkeypatch.setattr(subprocess, "Popen", _make_fake_popen(popen_calls))
-    monkeypatch.setattr(subprocess, "run", lambda argv, **kw: FakeCompletedProcess())
+def test_download_tree_include_raises_not_supported(tmp_path: Path) -> None:
+    runner = RemoteSshRunner("lab", execute=lambda *a, **kw: RemoteCommandResult(0, "", "", []))
 
-    runner = RemoteSshRunner("lab")
-
-    local_path = tmp_path / "downloaded"
-    runner.download_tree(PurePosixPath("/remote/project"), local_path, include="*.py")
-
-    ssh_argv = popen_calls[0][0]
-    remote_cmd = ssh_argv[4]
-    assert "--include" in remote_cmd
-    assert "*.py" in remote_cmd
+    with pytest.raises(ValueError, match="include is not supported for tree transfer yet"):
+        runner.download_tree(PurePosixPath("/remote/project"), tmp_path / "out", include="*.py")
 
 
 def test_download_tree_raises_on_ssh_failure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -385,13 +370,14 @@ def test_download_tree_quotes_paths_with_spaces(tmp_path: Path, monkeypatch: pyt
 
     ssh_argv = popen_calls[0][0]
     remote_cmd = ssh_argv[4]
-    assert "'/remote/my project'" in remote_cmd
+    assert remote_cmd == "tar -C '/remote/my project/data' -cf - ."
 
 
 def test_upload_tree_uses_ssh_tar(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     popen_calls: list = []
+    run_calls: list[list[str]] = []
     monkeypatch.setattr(subprocess, "Popen", _make_fake_popen(popen_calls))
-    monkeypatch.setattr(subprocess, "run", lambda argv, **kw: FakeCompletedProcess())
+    monkeypatch.setattr(subprocess, "run", lambda argv, **kw: (run_calls.append(argv) or FakeCompletedProcess()))
 
     runner = RemoteSshRunner("lab")
 
@@ -400,21 +386,24 @@ def test_upload_tree_uses_ssh_tar(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
     (local_path / "file.txt").write_text("content")
     runner.upload_tree(local_path, PurePosixPath("/remote/dest"))
 
+    # Should call run() first for remote mkdir -p
+    assert len(run_calls) == 1
+    mkdir_argv = run_calls[0]
+    assert mkdir_argv[:4] == ["ssh", "-o", "BatchMode=yes", "lab"]
+    assert "mkdir -p /remote/dest" in mkdir_argv[4]
+
     # Should have two Popen calls: local tar + SSH
     assert len(popen_calls) == 2
 
-    # First call: local tar -cf
+    # First call: local tar -C <local_path> -cf - .
     local_tar_argv = popen_calls[0][0]
-    assert local_tar_argv[0] == "tar"
-    assert "-cf" in local_tar_argv
+    assert local_tar_argv == ["tar", "-C", str(local_path), "-cf", "-", "."]
 
-    # Second call: SSH with remote tar -xf
+    # Second call: SSH with remote tar -C <remote_path> -xf -
     ssh_argv = popen_calls[1][0]
     assert ssh_argv[:4] == ["ssh", "-o", "BatchMode=yes", "lab"]
     remote_cmd = ssh_argv[4]
-    assert "tar" in remote_cmd
-    assert "-xf" in remote_cmd
-    assert "/remote" in remote_cmd
+    assert remote_cmd == "tar -C /remote/dest -xf -"
 
 
 def test_upload_tree_with_exclude(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -434,20 +423,27 @@ def test_upload_tree_with_exclude(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
     assert "*.tmp" in local_tar_argv
 
 
-def test_upload_tree_with_include(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    popen_calls: list = []
-    monkeypatch.setattr(subprocess, "Popen", _make_fake_popen(popen_calls))
-    monkeypatch.setattr(subprocess, "run", lambda argv, **kw: FakeCompletedProcess())
-
-    runner = RemoteSshRunner("lab")
+def test_upload_tree_include_raises_not_supported(tmp_path: Path) -> None:
+    runner = RemoteSshRunner("lab", execute=lambda *a, **kw: RemoteCommandResult(0, "", "", []))
 
     local_path = tmp_path / "upload_data"
     local_path.mkdir()
-    runner.upload_tree(local_path, PurePosixPath("/remote/dest"), include="*.py")
 
-    local_tar_argv = popen_calls[0][0]
-    assert "--include" in local_tar_argv
-    assert "*.py" in local_tar_argv
+    with pytest.raises(ValueError, match="include is not supported for tree transfer yet"):
+        runner.upload_tree(local_path, PurePosixPath("/remote/dest"), include="*.py")
+
+
+def test_upload_tree_raises_on_mkdir_failure(tmp_path: Path) -> None:
+    def fake_execute(argv, **kw):
+        return RemoteCommandResult(return_code=1, stdout="", stderr="permission denied", argv=argv)
+
+    runner = RemoteSshRunner("lab", execute=fake_execute)
+
+    local_path = tmp_path / "upload_data"
+    local_path.mkdir()
+
+    with pytest.raises(RuntimeError, match="remote command failed"):
+        runner.upload_tree(local_path, PurePosixPath("/remote/dest"))
 
 
 def test_upload_tree_raises_on_ssh_failure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -502,8 +498,9 @@ def test_upload_tree_raises_on_local_tar_failure(tmp_path: Path, monkeypatch: py
 
 def test_upload_tree_quotes_remote_paths_with_spaces(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     popen_calls: list = []
+    run_calls: list[list[str]] = []
     monkeypatch.setattr(subprocess, "Popen", _make_fake_popen(popen_calls))
-    monkeypatch.setattr(subprocess, "run", lambda argv, **kw: FakeCompletedProcess())
+    monkeypatch.setattr(subprocess, "run", lambda argv, **kw: (run_calls.append(argv) or FakeCompletedProcess()))
 
     runner = RemoteSshRunner("lab")
 
@@ -511,6 +508,11 @@ def test_upload_tree_quotes_remote_paths_with_spaces(tmp_path: Path, monkeypatch
     local_path.mkdir()
     runner.upload_tree(local_path, PurePosixPath("/remote/my dest/data"))
 
+    # mkdir -p should quote the remote path
+    mkdir_cmd = run_calls[0][4]
+    assert "mkdir -p '/remote/my dest/data'" in mkdir_cmd
+
+    # remote tar should quote the remote path
     ssh_argv = popen_calls[1][0]
     remote_cmd = ssh_argv[4]
-    assert "'/remote/my dest'" in remote_cmd
+    assert remote_cmd == "tar -C '/remote/my dest/data' -xf -"
