@@ -13,12 +13,13 @@ This note preserves the implementation state for continuing Plan A after context
 - Current scope: C-69 Remote SSH Execution Backend Design
 - current_scope: C-69 Remote SSH Execution Backend Design
 - current_scope_exact: C-69 Remote SSH Execution Backend Design
-- Current status: C-69 design spec is written, verified-only. It defines a
-  remote SSH execution mode where the Linux EDA server remains the source of
-  truth for the project directory, user-configured passwordless SSH is required,
-  local workstation `ic-opt` runs OpenBox/controller/report logic, and remote
-  Linux runs Spectre/OCEAN while preserving full artifacts.
-- Next allowed action: User review C-69 remote SSH execution backend design spec; if approved, write implementation plan starting with Remote SSH Runner and doctor MVP.
+- Current status: C-69 design spec and implementation plan are written,
+  verified-only. The plan starts with `RemoteSshRunner` and remote doctor MVP,
+  then proceeds through remote cache preparation, remote Spectre/OCEAN
+  single-candidate smoke, remote OpenBox real flow, remote continuation, and
+  documentation/real acceptance.
+- Active plan: `docs/superpowers/plans/2026-06-08-remote-ssh-execution-backend.md`
+- Next allowed action: Implement C-69 Task 1: Remote SSH Runner, using tests/test_remote_ssh.py first and no real SSH/network call.
 - Execution method: `superpowers:subagent-driven-development`
 - Dependencies installed in active Python environment on 2026-05-29: `pytest`, `typer`, `pydantic`, `PyYAML`, `ruff`
 

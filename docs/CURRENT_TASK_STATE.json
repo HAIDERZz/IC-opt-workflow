@@ -1,18 +1,18 @@
 {
   "schema_version": "1.0",
   "current_scope": "C-69 Remote SSH Execution Backend Design",
-  "current_status": "C-69 remote SSH execution backend design spec is written and verified-only. The design keeps the optimization project directory on the Linux EDA server with the same local-mode structure, assumes user-configured passwordless SSH like virtuoso-bridge-lite, runs OpenBox/controller/report logic on the local workstation, runs Spectre/OCEAN on the remote Linux server, keeps full artifacts on the remote project, and mirrors reports locally. Implementation has not started; the implementation plan is pending user review/approval of the design spec.",
+  "current_status": "C-69 remote SSH execution backend implementation plan is written and verified-only. The plan starts with a no-network RemoteSshRunner and remote doctor MVP, then proceeds through remote cache preparation, remote Spectre/OCEAN single-candidate smoke, remote OpenBox real flow, remote continuation, and documentation/real acceptance. Implementation has not started.",
   "review_status": "verified-only",
   "subagent_dispatch": "available",
   "active_spec": "docs/superpowers/specs/2026-06-08-remote-ssh-execution-backend-design.md",
-  "active_plan": "docs/superpowers/specs/2026-06-08-remote-ssh-execution-backend-design.md",
+  "active_plan": "docs/superpowers/plans/2026-06-08-remote-ssh-execution-backend.md",
   "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
   "progress_files": [
     "docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md",
     "docs/EXECUTION_PROGRESS_2026-05-29.md",
     "docs/COMPACT_RESUME_CHECKPOINT.md"
   ],
-  "next_allowed_action": "User review C-69 remote SSH execution backend design spec; if approved, write implementation plan starting with Remote SSH Runner and doctor MVP.",
+  "next_allowed_action": "Implement C-69 Task 1: Remote SSH Runner, using tests/test_remote_ssh.py first and no real SSH/network call.",
   "forbidden_actions": [
     "install unpinned latest shap into the OpenBox venv",
     "run real tool commands without first checking docs/TOOLCHAIN_EXECUTION_REFERENCE.md",
@@ -49,10 +49,10 @@
   ],
   "route_audit": {
     "active_spec": "docs/superpowers/specs/2026-06-08-remote-ssh-execution-backend-design.md",
-    "active_plan": "docs/superpowers/specs/2026-06-08-remote-ssh-execution-backend-design.md",
+    "active_plan": "docs/superpowers/plans/2026-06-08-remote-ssh-execution-backend.md",
     "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
     "alignment": "Aligned with the top-level product-landing goal: C-69 targets deployment friction by keeping Python/OpenBox on the user's local workstation while keeping Spectre/OCEAN on the Linux EDA server.",
-    "drift": "The design intentionally supersedes the older runtime-adapter product boundary in AGENTS.md; implementation plan is still pending user approval, so active_plan temporarily points to the design spec for cadence-check continuity."
+    "drift": "No implementation drift yet. The plan explicitly gates real SSH/Spectre acceptance until after no-network runner, doctor, cache, and remote adapter tasks are tested."
   },
   "latest_valid_commit": "f074393",
   "review_evidence": {

@@ -7,26 +7,23 @@
 - Current scope: C-69 Remote SSH Execution Backend Design
 - current_scope: C-69 Remote SSH Execution Backend Design
 - current_scope_exact: C-69 Remote SSH Execution Backend Design
-- Current status: verified-only. The C-69 design spec is written. It keeps the
-  optimization project directory on the Linux EDA server with the same
-  local-mode structure, assumes user-configured passwordless SSH like
-  `virtuoso-bridge-lite`, runs OpenBox/controller/report logic on the local
-  workstation, runs Spectre/OCEAN on the remote Linux server, keeps full
-  artifacts on the remote project, and mirrors reports locally.
+- Current status: verified-only. The C-69 design spec and implementation plan
+  are written. The plan starts with a no-network `RemoteSshRunner` and remote
+  doctor MVP, then proceeds through remote cache preparation, remote
+  Spectre/OCEAN single-candidate smoke, remote OpenBox real flow, remote
+  continuation, and documentation/real acceptance.
 - Active evidence: `docs/superpowers/specs/2026-06-08-remote-ssh-execution-backend-design.md`
-- Active plan: implementation plan pending user approval of the design spec.
-- Next required action: user review C-69 remote SSH execution backend design
-  spec; if approved, write implementation plan starting with Remote SSH Runner
-  and doctor MVP.
-- next_allowed_action: User review C-69 remote SSH execution backend design spec; if approved, write implementation plan starting with Remote SSH Runner and doctor MVP.
-- next_allowed_action_exact_json: User review C-69 remote SSH execution backend design spec; if approved, write implementation plan starting with Remote SSH Runner and doctor MVP.
-- next_allowed_action_exact: User review C-69 remote SSH execution backend design
-  spec; if approved, write implementation plan starting with Remote SSH Runner
-  and doctor MVP.
+- Active plan: `docs/superpowers/plans/2026-06-08-remote-ssh-execution-backend.md`
+- Next required action: implement C-69 Task 1 Remote SSH Runner with
+  `tests/test_remote_ssh.py` first and no real SSH/network call.
+- next_allowed_action: Implement C-69 Task 1: Remote SSH Runner, using tests/test_remote_ssh.py first and no real SSH/network call.
+- next_allowed_action_exact_json: Implement C-69 Task 1: Remote SSH Runner, using tests/test_remote_ssh.py first and no real SSH/network call.
+- next_allowed_action_exact: Implement C-69 Task 1 Remote SSH Runner with
+  no-network tests first.
 
-## C-69 Remote SSH Execution Backend Design 2026-06-08
+## C-69 Remote SSH Execution Backend Design And Plan 2026-06-08
 
-C-69 design is written, verified-only.
+C-69 design and implementation plan are written, verified-only.
 
 Design summary:
 
@@ -42,6 +39,25 @@ Design summary:
   execution manifests.
 - MVP should start with remote doctor, then a remote single-candidate
   Spectre/OCEAN smoke, then OpenBox real remote run, then continuation.
+
+Implementation plan:
+
+```text
+docs/superpowers/plans/2026-06-08-remote-ssh-execution-backend.md
+```
+
+Task order:
+
+- Task 1: Remote SSH Runner, no-network unit tests only.
+- Task 2: Remote project reference and cache path.
+- Task 3: Requirement parser extraction for remote path checks.
+- Task 4: Remote doctor MVP.
+- Task 5: Product CLI `--ssh-profile ... --doctor`.
+- Task 6: Remote project cache preparation.
+- Task 7: Remote Spectre/OCEAN single-candidate adapter.
+- Task 8: Remote OpenBox real flow.
+- Task 9: Remote continuation.
+- Task 10: Documentation, skill, and real remote acceptance.
 
 ## C-66 Claude `/ic-opt` Continuation Validation 2026-06-07
 
