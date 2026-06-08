@@ -4,13 +4,11 @@ Use this checklist before treating `ic-auto-opt-workflow` as ready for another
 user or another clean machine.
 
 Important boundary: this checklist validates the implemented shell automation
-core and C-65 runtime-native adapter assets. The implemented shell entrypoint is
-`ic-opt PROJECT_DIR --real`; agent runtimes should install their own adapter and
-then use `/ic-opt PROJECT_DIR --real` so the current runtime supervisor can
-delegate to a same-runtime execution subagent. The historical C-64
-`--execution-agent claude` subprocess route is development acceptance evidence,
-not the C-65 default product target. See `docs/AGENT_INTEGRATION_STATUS.md`
-before describing runtime support.
+core and platform-neutral agent skill assets. The implemented shell entrypoint is
+`ic-opt PROJECT_DIR --real`; agent runtimes should load the platform-neutral
+`skills/ic-opt/SKILL.md` and then use `/ic-opt PROJECT_DIR --real`. The current
+agent operates the deterministic CLI and explains the reports. See
+`docs/AGENT_INTEGRATION_STATUS.md` before describing runtime support.
 
 For a Chinese user guide, read `docs/USER_GUIDE_CN.md`.
 
@@ -34,12 +32,10 @@ Expected scripts:
 
 Do not use `.venv` as a product dependency.
 
-Install runtime adapters as needed:
+Confirm the agent-facing skill is present:
 
 ```bash
-./.venv/bin/hermes-workflow install-runtime-adapter claude
-./.venv/bin/hermes-workflow install-runtime-adapter opencode
-./.venv/bin/hermes-workflow runtime-adapter-status
+./.venv/bin/hermes-workflow agent-skill-path
 ```
 
 ## 2. User Project Contract
@@ -117,13 +113,12 @@ Shell acceptance requires:
   as unavailable with a reason.
 - `global_optimum_claim=false`.
 
-Runtime-native agent acceptance additionally requires:
+Agent acceptance additionally requires:
 
-- the runtime adapter is installed and visible to that CLI;
-- the supervisor gate writes `execution_package/OPTIMIZER_EXECUTION_TASK.md`;
-- the same-runtime execution subagent runs the approved task package;
-- the supervisor runs closeout and reports the decision without asking the user
-  to restate machine-critical information.
+- the platform-neutral skill is visible to the agent;
+- the agent runs the product command rather than rebuilding lower-level steps;
+- the agent reads closeout reports and explains the decision without asking the
+  user to restate machine-critical information.
 
 ## 6. Final User Acceptance
 

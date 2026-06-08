@@ -40,6 +40,7 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 hermes_workflow = [
+    "agent_skills/ic-opt/SKILL.md",
     "templates/spectre_maestro_project/*.md",
     "templates/spectre_maestro_project/config/*.yaml",
     "templates/spectre_maestro_project/**/.gitkeep",

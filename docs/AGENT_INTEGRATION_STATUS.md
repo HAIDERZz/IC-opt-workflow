@@ -29,25 +29,25 @@ For an agent runtime that supports commands or skills, the user-facing shape is:
 /ic-opt PROJECT_DIR --continue M
 ```
 
-The intended role model is:
+The intended default role model is:
 
 ```text
-user -> current runtime supervisor agent -> same-runtime execution subagent
+user -> current agent -> ic-opt CLI -> reports -> current agent explains result
 ```
 
-The supervisor agent should perform preparation, approval, and report reading.
-The execution subagent should run only the approved command from the generated
-optimizer task package.
+The agent should operate `ic-opt`, wait for completion, read reports, and explain
+the result. Native same-runtime subagents are optional advanced mode only when
+the user explicitly requests them and the runtime supports them.
 
-## Included Runtime Assets
+## Included Agent Assets
 
-This package includes starter assets for:
+This package includes:
 
-- Claude: `claude_skills/ic-opt/`
-- OpenCode-style runtimes: `agent_runtime/opencode/`
+- platform-neutral skill: `skills/ic-opt/`
 
-These assets are templates. Each runtime may require local installation steps
-before `/ic-opt` becomes available.
+The skill is not limited to one agent platform. Runtime-specific adapters are not
+part of the core release boundary; users may adapt the same `SKILL.md` to their
+own agent environment if needed.
 
 ## Hard Boundaries
 
@@ -63,7 +63,7 @@ Agents must not:
 
 ## Current v0.1 Claim
 
-v0.1 packages the command-line product flow and starter agent runtime assets.
-Users can run the automation directly with `ic-opt`. Runtime-native two-agent
-behavior should be validated in the target user's own agent environment before
-claiming full integration for that runtime.
+v0.1 packages the command-line product flow and a platform-neutral agent skill.
+Users and agents can run the automation directly with `ic-opt`. Optional
+runtime-native subagent behavior should be validated in the target user's own
+agent environment before claiming support for that optional mode.

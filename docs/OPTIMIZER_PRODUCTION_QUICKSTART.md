@@ -8,16 +8,18 @@ workflow, read `docs/AGENT_OPTIMIZER_USAGE_MANUAL.md`. For the current
 implemented agent boundary, read `docs/AGENT_INTEGRATION_STATUS.md`. For a
 Chinese user guide, read `docs/USER_GUIDE_CN.md`.
 
-Install the adapter for the agent CLI you use. For Claude:
+For agents, the canonical skill is platform-neutral:
 
-```bash
-./.venv/bin/hermes-workflow install-runtime-adapter claude
+```text
+skills/ic-opt/SKILL.md
 ```
 
-For OpenCode:
+This skill can be copied or loaded into any agent environment that supports
+reading skill/command instructions. It is not tied to a specific agent platform.
+After installation, locate the packaged copy with:
 
 ```bash
-./.venv/bin/hermes-workflow install-runtime-adapter opencode
+hermes-workflow agent-skill-path
 ```
 
 ```text
@@ -48,17 +50,17 @@ Implemented shell product invocation for direct operator/debug use:
 ic-opt ~/spectre_opt_prj/<project_name> --real
 ```
 
-Runtime-native supervisor-agent invocation after installing the matching
-adapter:
+Agent invocation after giving the agent the canonical skill:
 
 ```text
 /ic-opt ~/spectre_opt_prj/<project_name> --real
 ```
 
-The runtime adapter should make the current agent CLI act as supervisor, run the
-Hermes preparation gate, dispatch that same CLI's native execution subagent, and
-then run closeout. `hermes-workflow optimize ... --real` is the lower-level
-implementation command behind the shell route.
+The current agent should operate the deterministic `ic-opt` CLI, wait for
+completion, read reports, and explain the result. Native subagent execution is
+optional advanced behavior only when explicitly requested. `hermes-workflow
+optimize ... --real` is the lower-level implementation command behind the shell
+route.
 
 Release packaging must make OpenBox, TuRBO, and report dependencies available
 from the product environment. A development-only path such as
@@ -162,27 +164,11 @@ Preferred one-command route:
   --parallel-jobs 10
 ```
 
-Shell/operator default is direct execution. The historical C-64
-`--execution-agent claude` subprocess route remains available only for
-acceptance/debugging:
-
-```bash
-./.venv/bin/ic-opt ~/spectre_opt_prj/<project_name> \
-  --real \
-  --execution-agent claude \
-  --max-evals 100 \
-  --batch-size 10 \
-  --parallel-jobs 10
-```
-
 This wraps intake, preparation, validation, readiness, package, netlist
 preparation, dry run, preflight health, approval, optimizer task packaging, real
 OpenBox execution, optimizer acceptance, completion, finalization,
 visualization, and decision reporting. It stops before recording user
-acceptance. In `--execution-agent claude` mode, the real OpenBox execution step
-is performed by an independent Claude CLI subprocess and the supervisor-side
-flow resumes for closeout. Do not describe this as the C-65 default product
-model.
+acceptance.
 
 To check the offline orchestration gates without launching Spectre/OCEAN/OpenBox:
 

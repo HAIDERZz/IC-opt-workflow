@@ -107,11 +107,7 @@ subagent.
 
 ## Files To Update
 
-- `claude_skills/ic-opt/SKILL.md`
-- `claude_skills/README.md`
-- `agent_runtime/README.md`
-- `agent_runtime/opencode/command/ic-opt.md`
-- `agent_runtime/opencode/agents/ic-opt-execution.md`
+- `skills/ic-opt/SKILL.md`
 - `docs/AGENT_OPTIMIZER_USAGE_MANUAL.md`
 
 ## Acceptance Criteria

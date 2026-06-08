@@ -362,7 +362,7 @@ Agent 不应该：
 ## 11. 当前 v0.1.3 边界
 
 - 已经支持 shell 自动化的完整真实流程。
-- Claude/OpenCode runtime adapter 是产品化方向的一部分，但不同 agent runtime 的
-  原生 subagent 行为仍需要继续实测。
+- 已经提供平台无关 `skills/ic-opt/SKILL.md`，任何能运行 shell 命令并读取文件的
+  agent 都可以按这份 skill 操作 `ic-opt`。
 - 结果是 best observed，不是全局最优证明。
 - 项目使用 MIT License 发布；Cadence、PDK 和仿真 license 不包含在本项目内。

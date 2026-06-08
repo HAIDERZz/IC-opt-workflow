@@ -25,8 +25,7 @@ requirements-product.txt
 src/
 docs/
 examples/
-agent_runtime/
-claude_skills/
+skills/
 vendor/
 tests/
 tools/
@@ -35,8 +34,8 @@ LICENSE
 ```
 
 `tests/` is intentionally kept in the GitHub source repository so other
-developers can verify parser, workflow, optimizer, reporting, and runtime
-adapter behavior.
+developers can verify parser, workflow, optimizer, reporting, and agent skill
+behavior.
 
 ## What Not To Publish
 

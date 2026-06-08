@@ -6,7 +6,8 @@ This document locks the project role model. Future plans, specs, prompts, and im
 
 ## Locked Role Model
 
-The workflow has two agent roles and one deterministic tooling layer:
+The original workflow model has two agent roles and one deterministic tooling
+layer:
 
 ```text
 User
@@ -22,6 +23,10 @@ User
 ## Supervisor Agent
 
 The supervisor agent is the planning and decision-making agent.
+
+In the v0.1 product route, the current user-facing agent normally performs this
+role and calls the deterministic `ic-opt` CLI directly. A separate execution
+agent is optional, not required for normal use.
 
 It uses Hermes workflow tooling, but it is not the same thing as Hermes.
 
@@ -81,7 +86,9 @@ Hermes workflow state is file state. If it is not in a validated contract file o
 
 The execution agent is the tool-side agent that operates Cadence and bridge tooling.
 
-The execution agent may be implemented with Claude CLI, another agent runtime, a scripted worker, or a future `virtuoso-bridge-lite` adapter. The role is defined by responsibilities, not by a specific model vendor.
+The execution agent may be implemented with a native subagent in the current
+runtime, a scripted worker, or a future adapter. The role is defined by
+responsibilities, not by a specific model vendor.
 
 The execution agent owns:
 
@@ -143,9 +150,10 @@ Avoid these ambiguous terms:
 - `Hermes agent`
 - `Hermes supervisor agent`
 - `real Hermes service`
-- `Claude execution agent` as a permanent role name
+- any vendor-specific execution agent name as a permanent role name
 
-It is acceptable to mention Claude CLI only as one possible implementation of an execution worker or review worker. It is not the locked role name.
+It is acceptable to mention a specific agent platform only as one possible local
+implementation. It is not the locked role name.
 
 ## Project Goal Fit
 

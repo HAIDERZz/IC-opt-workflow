@@ -8,6 +8,9 @@ description: Operate IC Auto Opt Workflow from a project directory. Trigger when
 Use this skill to operate `ic-opt` for a user. The product is a deterministic
 CLI workflow; the agent is the operator and report interpreter.
 
+This skill is platform-neutral. It can be used by any agent runtime that can run
+shell commands and read files.
+
 Default route:
 
 ```text

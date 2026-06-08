@@ -25,8 +25,8 @@
 2. 生成 optimizer 所需 YAML 配置；
 3. 复制 Maestro/ADE 已经跑通过的 netlist bundle；
 4. 检查项目是否可以真实运行；
-5. 派一个执行 subagent 去跑 Spectre/OCEAN/OpenBox；
-6. 主管 agent 读取报告，并告诉你最佳已观察点、指标、约束通过情况和下一步建议。
+5. 调用 `ic-opt` 跑 Spectre/OCEAN/OpenBox 优化流程；
+6. 读取报告，并告诉你最佳已观察点、指标、约束通过情况和下一步建议。
 
 ## 先分清两个入口
 
@@ -48,12 +48,9 @@ ic-opt PROJECT_DIR --continue 40
 /ic-opt PROJECT_DIR --continue 40
 ```
 
-这是 agent 入口。当前 agent CLI 的主会话是 supervisor agent，它应该调用同
-一个 CLI 里的 execution subagent 来执行真实优化任务。
-
-C-65 之后，项目目标是第二种：你在 Claude、OpenCode、Codex 等当前 agent
-窗口里发一句 `/ic-opt ...`，由当前 runtime 自己派 subagent。不是让 OpenCode
-或 Codex 再去调用 `claude -p`。
+这是 agent 入口。agent 的默认职责是根据平台无关 skill 操作 `ic-opt` CLI，
+等待流程完成，读取报告并解释结果。native subagent 只是可选高级模式，不是默认
+产品路线。
 
 ## 第一次安装
 
@@ -78,24 +75,23 @@ python3 -m venv .venv
 ./.venv/bin/hermes-workflow --help
 ```
 
-## 安装你正在用的 agent 入口
+## 给 agent 使用的 skill
 
-如果你用 Claude：
+平台无关 skill 在：
 
-```bash
-./.venv/bin/hermes-workflow install-runtime-adapter claude
+```text
+skills/ic-opt/SKILL.md
 ```
 
-如果你用 OpenCode：
+任何能运行 shell 命令、读取文件的 agent 都可以按这个 skill 工作。不同 agent
+平台的 skill 安装目录可能不同；把这份 `SKILL.md` 放到你当前 agent 能读取的
+skill/command 目录即可。这个 skill 本身不绑定任何具体 agent 平台。
+
+如果你是用 `pip install` 安装的，而不是从源码目录里使用，可以用下面命令找到
+安装后的 skill 文件：
 
 ```bash
-./.venv/bin/hermes-workflow install-runtime-adapter opencode
-```
-
-检查安装状态：
-
-```bash
-./.venv/bin/hermes-workflow runtime-adapter-status
+hermes-workflow agent-skill-path
 ```
 
 ## 配置 Cadence/Spectre/OCEAN 环境
@@ -179,7 +175,7 @@ testbench。项目会保留每个 testbench 的原生 Maestro/ADE 文件结构�
 
 ## 正式运行
 
-打开你使用的 agent CLI，比如 Claude 或 OpenCode。
+打开你正在使用的 agent 窗口，并确认它能读取 `skills/ic-opt/SKILL.md`。
 
 然后只发一句：
 
@@ -198,7 +194,7 @@ testbench。项目会保留每个 testbench 的原生 Maestro/ADE 文件结构�
 1. 检查 `opt_requirement.md`；
 2. 生成配置；
 3. 生成执行包；
-4. 调用同 runtime 的 execution subagent 真实运行；
+4. 调用 `ic-opt` CLI 真实运行；
 5. 写报告；
 6. 汇报结果。
 
@@ -272,11 +268,10 @@ PROJECT_DIR/reports/openbox_advanced_visualization/
 - 你想继续追加更多 evaluations；
 - 你想改搜索范围、FoM 或约束。
 
-当前边界：C-66 已验证 Claude 能把“请再进行40个点的优化”这种短句转成
-continuation 命令；后续也已经做了窄修复，使 OpenBox 在已有 100 个点后凑不满
-完整唯一候选批次时可以使用部分批次继续。续跑时 agent 不应随手覆盖
-`parallel_jobs`，应默认继承项目 `config/spectre.yaml` 里的资源设置，除非用户明确
-要求改变资源。
+当前边界：agent skill 的默认路线是单 agent 操作 `ic-opt` CLI。用户说“请再进行
+40 个点的优化”时，agent 应转换成 `ic-opt PROJECT --continue 40`。续跑时 agent
+不应随手覆盖 `parallel_jobs`，应默认继承项目 `config/spectre.yaml` 里的资源设置，
+除非用户明确要求改变资源。
 
 ## 一句原则
 

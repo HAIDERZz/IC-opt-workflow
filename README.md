@@ -19,6 +19,13 @@ The same command can also be called by an AI agent. The agent should operate the
 tool and explain the reports; the deterministic optimization work is done by the
 CLI.
 
+The platform-neutral agent skill is available in the source tree at
+`skills/ic-opt/SKILL.md`. After installation, locate the packaged copy with:
+
+```bash
+hermes-workflow agent-skill-path
+```
+
 ## What This Tool Does
 
 - Converts a structured `opt_requirement.md` into project `config/*.yaml`.
@@ -34,8 +41,7 @@ CLI.
   advanced dependencies add HTML/JSON surrogate visualization artifacts.
 - Supports continuing an existing run, for example adding 40 more evaluations
   after the first 100.
-- Provides starter runtime assets for agent workflows such as Claude and
-  OpenCode.
+- Provides a platform-neutral agent skill for any shell-capable AI agent.
 
 ## What This Tool Does Not Provide
 
@@ -315,8 +321,8 @@ optimizer points, or change resource settings unless the user explicitly asks.
 ```text
 src/hermes_workflow/        Python package and CLI implementation
 vendor/open-box/            vendored OpenBox backend used by the product env
-agent_runtime/              starter runtime assets for agent workflows
-claude_skills/              Claude skill asset
+skills/ic-opt/              platform-neutral agent skill
+skills/ic-opt/              platform-neutral agent skill
 examples/                   requirement examples for users
 docs/                       detailed manuals and project notes
 tests/                      regression tests
