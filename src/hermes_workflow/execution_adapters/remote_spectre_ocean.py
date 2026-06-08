@@ -7,9 +7,7 @@ from typing import Any
 
 from hermes_workflow.execution_adapters.spectre_ocean import (
     METRIC_RESULT_MANIFEST_NAME,
-    OCEAN_LOG_NAME,
     OCEAN_MAX_ATTEMPTS,
-    OCEAN_SCALARS_NAME,
     OCEAN_STDERR_NAME,
     OCEAN_STDOUT_NAME,
     RESULT_MANIFEST_NAME,
@@ -112,20 +110,13 @@ def run_remote_spectre_ocean_adapter(
     _download_remote_file(runner, remote_run_dir / "metrics" / OCEAN_STDOUT_NAME, context.metrics_dir / OCEAN_STDOUT_NAME)
     _download_remote_file(runner, remote_run_dir / "metrics" / OCEAN_STDERR_NAME, context.metrics_dir / OCEAN_STDERR_NAME)
 
-    # Validate required OCEAN artifacts exist locally
-    if not (context.metrics_dir / OCEAN_SCALARS_NAME).is_file():
-        return _write_remote_failure(context, "ocean_scalars.tsv missing after download", runner=runner, remote_run_dir=remote_run_dir)
-    if not (context.metrics_dir / OCEAN_STDOUT_NAME).exists():
-        return _write_remote_failure(context, f"{OCEAN_STDOUT_NAME} missing after remote ocean", runner=runner, remote_run_dir=remote_run_dir)
-    if not (context.metrics_dir / OCEAN_STDERR_NAME).exists():
-        return _write_remote_failure(context, f"{OCEAN_STDERR_NAME} missing after remote ocean", runner=runner, remote_run_dir=remote_run_dir)
-    if not (context.metrics_dir / OCEAN_LOG_NAME).exists():
-        return _write_remote_failure(context, f"{OCEAN_LOG_NAME} missing after remote ocean", runner=runner, remote_run_dir=remote_run_dir)
-
     started = datetime.now(UTC).replace(microsecond=0).strftime("%Y-%m-%dT%H:%M:%SZ")
     completed = started
 
     # Write metric result manifest first (records ocean failure if rc != 0).
+    # write_metric_result_manifest handles missing ocean_scalars.tsv gracefully
+    # by recording AdapterPreconditionError in the manifest issues, matching
+    # local adapter semantics.
     metric_result = write_metric_result_manifest(
         context,
         ocean_return_code=ocean_result.return_code,

@@ -665,7 +665,14 @@ def test_remote_adapter_fails_when_spectre_stderr_missing(tmp_path: Path) -> Non
     assert manifest["status"] == "failed"
 
 
-def test_remote_adapter_fails_when_ocean_stdout_missing(tmp_path: Path) -> None:
+def test_remote_adapter_handles_missing_ocean_stdout(tmp_path: Path) -> None:
+    """Missing ocean.stdout is a diagnostic gap, not a hard failure.
+
+    The local adapter includes diagnostic files in artifact_files if they
+    exist but does not fail when they are absent.  The remote adapter must
+    match: missing ocean.stdout means the manifest omits it from
+    artifact_files, but the run still succeeds.
+    """
     project_dir = create_approved_real_project(tmp_path)
     run_dir = project_dir / "runs" / "real" / "real_001"
     ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
@@ -679,13 +686,14 @@ def test_remote_adapter_fails_when_ocean_stdout_missing(tmp_path: Path) -> None:
         runner=runner,
     )
 
-    assert result.status == "failed"
-    assert any("ocean.stdout" in issue for issue in result.issues)
-    manifest = json.loads((run_dir / "result_manifest.json").read_text(encoding="utf-8"))
-    assert manifest["status"] == "failed"
+    # Diagnostic artifact gaps don't cause adapter failure
+    assert result.status == "succeeded"
+    assert (run_dir / "result_manifest.json").is_file()
+    assert (run_dir / "metrics" / "metric_result_manifest.json").is_file()
 
 
-def test_remote_adapter_fails_when_ocean_stderr_missing(tmp_path: Path) -> None:
+def test_remote_adapter_handles_missing_ocean_stderr(tmp_path: Path) -> None:
+    """Missing ocean.stderr is a diagnostic gap, not a hard failure."""
     project_dir = create_approved_real_project(tmp_path)
     run_dir = project_dir / "runs" / "real" / "real_001"
     ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
@@ -699,13 +707,13 @@ def test_remote_adapter_fails_when_ocean_stderr_missing(tmp_path: Path) -> None:
         runner=runner,
     )
 
-    assert result.status == "failed"
-    assert any("ocean.stderr" in issue for issue in result.issues)
-    manifest = json.loads((run_dir / "result_manifest.json").read_text(encoding="utf-8"))
-    assert manifest["status"] == "failed"
+    assert result.status == "succeeded"
+    assert (run_dir / "result_manifest.json").is_file()
+    assert (run_dir / "metrics" / "metric_result_manifest.json").is_file()
 
 
-def test_remote_adapter_fails_when_ocean_log_missing(tmp_path: Path) -> None:
+def test_remote_adapter_handles_missing_ocean_log(tmp_path: Path) -> None:
+    """Missing ocean.log is a diagnostic gap, not a hard failure."""
     project_dir = create_approved_real_project(tmp_path)
     run_dir = project_dir / "runs" / "real" / "real_001"
     ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
@@ -719,10 +727,9 @@ def test_remote_adapter_fails_when_ocean_log_missing(tmp_path: Path) -> None:
         runner=runner,
     )
 
-    assert result.status == "failed"
-    assert any("ocean.log" in issue for issue in result.issues)
-    manifest = json.loads((run_dir / "result_manifest.json").read_text(encoding="utf-8"))
-    assert manifest["status"] == "failed"
+    assert result.status == "succeeded"
+    assert (run_dir / "result_manifest.json").is_file()
+    assert (run_dir / "metrics" / "metric_result_manifest.json").is_file()
 
 
 class MetricFailFakeRunner(FakeRunner):
@@ -792,6 +799,82 @@ def test_remote_adapter_propagates_metric_failure(tmp_path: Path) -> None:
     assert any("fall" in issue for issue in result.issues), (
         "adapter issues must mention the failing metric name"
     )
+
+
+class OceanFailNoScalarsFakeRunner(FakeRunner):
+    """FakeRunner where OCEAN fails all attempts and ocean_scalars.tsv is missing.
+
+    Simulates the case where remote OCEAN crashes without producing output,
+    but diagnostic files (ocean.stdout, ocean.stderr, ocean.log) are still
+    captured by the shell redirect.
+    """
+
+    def run(self, command: str, **kwargs: object) -> RemoteCommandResult:
+        self.commands.append(command)
+        if "ocean" in command:
+            return RemoteCommandResult(1, "", "ocean crash", ["ssh", "lab", command])
+        return RemoteCommandResult(0, "", "", ["ssh", "lab", command])
+
+    def download_tree(self, remote_path, local_path, include=None, exclude=None) -> None:
+        self.downloads.append((str(remote_path), Path(local_path)))
+        Path(local_path).mkdir(parents=True, exist_ok=True)
+        remote = str(remote_path)
+        if remote.endswith("/psf"):
+            (Path(local_path) / "spectre.out").write_text("spectre output", encoding="utf-8")
+        elif remote.endswith("/metrics"):
+            # Do NOT create ocean_scalars.tsv -- OCEAN failed to produce it
+            (Path(local_path) / "ocean.stdout").write_text("ocean crash output", encoding="utf-8")
+            (Path(local_path) / "ocean.stderr").write_text("ocean error", encoding="utf-8")
+            (Path(local_path) / "ocean.log").write_text("ocean log", encoding="utf-8")
+
+
+def test_remote_adapter_writes_metric_manifest_when_ocean_fails_without_scalars(tmp_path: Path) -> None:
+    """C-70 parity: OCEAN failure without scalars must still write metric manifest.
+
+    When OCEAN fails all OCEAN_MAX_ATTEMPTS and ocean_scalars.tsv is missing,
+    the local adapter still writes metric_result_manifest (recording ocean
+    command failed), then result_manifest with status=succeeded and
+    include_metric_manifest=True.  The remote adapter must match.
+    """
+    project_dir = create_approved_real_project(tmp_path)
+    run_dir = project_dir / "runs" / "real" / "real_001"
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    runner = OceanFailNoScalarsFakeRunner()
+
+    result = run_remote_spectre_ocean_adapter(
+        project_dir,
+        run_id="real_001",
+        remote_ref=ref,
+        remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
+        runner=runner,
+    )
+
+    # Adapter result must be failed
+    assert result.status == "failed"
+    assert any("ocean" in issue.lower() for issue in result.issues)
+
+    # metric_result_manifest must exist and record ocean failure
+    metric_manifest_path = run_dir / "metrics" / "metric_result_manifest.json"
+    assert metric_manifest_path.is_file(), "metric_result_manifest.json must be written even when ocean fails"
+    metric_manifest = json.loads(metric_manifest_path.read_text(encoding="utf-8"))
+    assert metric_manifest["status"] == "failed"
+    assert any("ocean command failed" in issue for issue in metric_manifest.get("issues", []))
+    assert metric_manifest["ocean"]["return_code"] != 0
+    assert len(metric_manifest["ocean"]["return_codes"]) > 1  # retried
+
+    # result_manifest must say succeeded (spectre succeeded) with metric manifest ref
+    result_manifest = json.loads((run_dir / "result_manifest.json").read_text(encoding="utf-8"))
+    assert result_manifest["status"] == "succeeded", (
+        "result_manifest must report succeeded when spectre succeeded "
+        "(ocean failure is recorded in metric_result_manifest)"
+    )
+    assert result_manifest["metric_result_manifest"] is not None
+
+    # Both manifests must be uploaded
+    metric_uploads = [r for _, r in runner.uploads if "metric_result_manifest" in r]
+    result_uploads = [r for _, r in runner.uploads if r.endswith("result_manifest.json")]
+    assert len(metric_uploads) >= 1
+    assert len(result_uploads) >= 1
 
 
 def test_remote_multi_testbench_writes_ocean_scripts_under_project_dir(tmp_path: Path) -> None:
