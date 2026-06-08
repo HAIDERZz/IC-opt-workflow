@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Annotated, NoReturn
 
 import typer
 
 from hermes_workflow.optimizer_flow import optimize_project
+from hermes_workflow.remote_doctor import run_remote_doctor
+from hermes_workflow.remote_project import RemoteProjectRef
 
 
 CADENCE_CSHRC_ENV_VAR = "IC_OPT_CADENCE_CSHRC"
@@ -100,7 +102,42 @@ def main(
             help="Execution mode: direct or claude.",
         ),
     ] = "direct",
+    ssh_profile: Annotated[
+        str | None,
+        typer.Option("--ssh-profile", help="OpenSSH profile for remote Linux EDA server."),
+    ] = None,
+    doctor: Annotated[
+        bool,
+        typer.Option("--doctor", help="Check project/tool readiness without running Spectre."),
+    ] = False,
+    continue_evals: Annotated[
+        int | None,
+        typer.Option("--continue", min=1, help="Continue an existing optimization by N evaluations."),
+    ] = None,
 ) -> None:
+    if ssh_profile is not None:
+        ref = RemoteProjectRef(
+            ssh_profile=ssh_profile,
+            remote_project_dir=PurePosixPath(project_dir.as_posix()),
+        )
+        if doctor:
+            report = run_remote_doctor(ref, cadence_cshrc=cadence_cshrc)
+            if report.status == "pass":
+                typer.echo("remote doctor completed")
+                typer.echo(f"remote report: {report.remote_report_path}")
+                typer.echo(f"local report: {report.local_report_path}")
+                return
+            typer.echo("remote doctor failed")
+            for issue in report.issues:
+                typer.echo(issue)
+            typer.echo(f"local report: {report.local_report_path}")
+            raise typer.Exit(code=1)
+        if real:
+            _exit_with_error(ValueError("remote --real is not implemented yet; run --doctor first"))
+        if continue_evals is not None:
+            _exit_with_error(ValueError("remote --continue is not implemented yet; run --doctor first"))
+        _exit_with_error(ValueError("remote mode requires --doctor, --real, or --continue N"))
+
     try:
         resolved_cadence_cshrc = _resolve_cadence_cshrc(project_dir, cadence_cshrc)
         report = optimize_project(
