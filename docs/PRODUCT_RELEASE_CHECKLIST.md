@@ -146,7 +146,16 @@ Cadence setup live on the remote Linux EDA server:
 
 Remote acceptance requires:
 
+- WSL2 is documented as the recommended Windows route; native Windows
+  PowerShell remote mode is documented as theoretically possible but
+  release-unverified, and users must validate Python 3.11+, `ssh`, `scp`, and
+  local `tar` themselves;
+- `PROFILE` is documented as an OpenSSH target, preferably a `~/.ssh/config`
+  alias such as `eda-lab`;
+- the first interactive `ssh PROFILE true` has accepted the host key;
 - passwordless SSH passes with `ssh -o BatchMode=yes PROFILE true`;
+- remote project files pass simple checks such as
+  `ssh PROFILE 'test -f /remote/path/to/project/opt_requirement.md'`;
 - remote doctor passes;
 - 80 real evaluations pass through remote Spectre/OCEAN;
 - 20 continuation evaluations reach 100 cumulative evaluations;

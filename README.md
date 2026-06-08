@@ -117,8 +117,10 @@ sudo apt install python3 python3-venv python3-pip git openssh-client
 python3 -m venv .venv
 ```
 
-Native Windows PowerShell can work for remote mode if Python 3.11+ and OpenSSH
-are installed, but WSL2 is simpler for IC/EDA workflows.
+Native Windows PowerShell is theoretically possible for remote mode, but it has
+not been release-validated. If you choose native Windows, verify Python 3.11+,
+`ssh`, `scp`, and local `tar` yourself before running `ic-opt`. WSL2 is the
+recommended Windows path for now.
 
 Advanced OpenBox surrogate visualization is optional. The base optimizer,
 Spectre/OCEAN execution, decision report, insight report, continuation, and
@@ -307,6 +309,11 @@ mode:
   cadence_env.csh         # remote Cadence setup file
 ```
 
+`--ssh-profile` is the SSH target that your local OpenSSH client understands.
+It can be a raw target such as `user@server`, but a stable alias in
+`~/.ssh/config` is recommended because it keeps `ic-opt` commands short and
+repeatable.
+
 Configure passwordless SSH yourself, the same way you would for other EDA bridge
 tools. A typical `~/.ssh/config` entry on your local machine is:
 
@@ -317,10 +324,42 @@ Host eda-lab
   IdentityFile ~/.ssh/id_ed25519
 ```
 
-Verify that the connection does not ask for a password:
+If you do not already have an SSH key, create one on the local machine:
+
+```bash
+ssh-keygen -t ed25519 -C "your_email@example.com"
+```
+
+Copy the public key to the remote EDA server. If `ssh-copy-id` is available:
+
+```bash
+ssh-copy-id eda-lab
+```
+
+If `ssh-copy-id` is not available, ask your server administrator how to add
+`~/.ssh/id_ed25519.pub` to the remote `~/.ssh/authorized_keys`.
+
+The first SSH connection may ask you to trust the remote host key. Do this once
+interactively:
+
+```bash
+ssh eda-lab true
+```
+
+Then verify that the connection does not ask for a password:
 
 ```bash
 ssh -o BatchMode=yes eda-lab true
+```
+
+`BatchMode=yes` is important. If this command fails, `ic-opt --ssh-profile` is
+not ready yet.
+
+Before running optimization, also verify the remote project path:
+
+```bash
+ssh eda-lab 'test -f /remote/path/to/my_mixer_opt/opt_requirement.md'
+ssh eda-lab 'test -f /remote/path/to/my_mixer_opt/cadence_env.csh'
 ```
 
 Then run the same workflow with `--ssh-profile`:

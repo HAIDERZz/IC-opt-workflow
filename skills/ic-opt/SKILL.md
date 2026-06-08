@@ -43,9 +43,11 @@ If the user gives only a project path and asks to optimize, use `--real`.
 If the user says "add/run/continue M more points", use `--continue M`.
 If the user asks to check readiness, use `--doctor`.
 If the user says the project is on a remote EDA server, use remote mode with
-`--ssh-profile PROFILE`. If the SSH profile is missing, ask only for the profile
-name or tell the user to configure passwordless SSH and verify
-`ssh -o BatchMode=yes PROFILE true`.
+`--ssh-profile PROFILE`. `PROFILE` is any OpenSSH target the local machine can
+use, preferably a `~/.ssh/config` alias such as `eda-lab`. If the SSH profile is
+missing, ask only for the profile name. Do not collect passwords. Tell the user
+to configure passwordless SSH, accept the host key once with `ssh PROFILE true`,
+and verify `ssh -o BatchMode=yes PROFILE true`.
 
 Do not ask the user to restate formulas, variables, metric routes, testbench
 paths, Spectre resources, or optimizer settings. Those belong in
@@ -101,6 +103,9 @@ backup. Do not install this Python package, OpenBox, or a virtualenv on the EDA
 server. The local CLI mirrors reports under
 `~/.ic-opt/remote_runs/<ssh-profile>/<project-hash>/reports/` and also uploads
 reports back to `REMOTE_PROJECT/reports/`.
+Before a remote real run, prefer `ic-opt --ssh-profile PROFILE REMOTE_PROJECT
+--doctor`. If SSH fails, report the exact SSH readiness command the user should
+fix first instead of changing optimizer settings.
 
 Do not translate continuation into a lower-level `hermes-workflow` command for
 normal users. Do not restart from scratch unless the user changed variables,

@@ -105,7 +105,10 @@ python -m pip install -e .
 ```
 
 Windows 用户同样推荐使用远程 SSH 模式：项目和 Cadence 在 Linux 服务器上，本机
-只负责运行优化器和查看报告。
+只负责运行优化器和查看报告。原生 Windows PowerShell 理论上也可能运行远程模式，
+但当前 release 没有正式验证；如果你坚持不用 WSL2，需要自己确认 Python 3.11+、
+`ssh`、`scp` 和本机 `tar` 都可用。遇到路径、权限或 tar/ssh 行为问题时，优先
+切回 WSL2。
 
 OpenBox 高级代理模型可视化是可选增强。基础优化、Spectre/OCEAN 执行、决策报告、
 insight report、续跑和 doctor 检查都不应该被 `pyrfr` 阻塞。如果你需要 OpenBox 的
@@ -367,6 +370,10 @@ expression: >-
   cadence_env.csh         # 远程服务器上的 Cadence 环境文件
 ```
 
+`--ssh-profile` 指的是本机 OpenSSH 能识别的连接名。它可以直接写成
+`user@server`，但更推荐在本机 `~/.ssh/config` 里写一个稳定别名，这样命令更短，
+也更不容易写错。
+
 你需要自己配置免密 SSH 登录。推荐在本机 `~/.ssh/config` 写一个 profile：
 
 ```sshconfig
@@ -376,11 +383,47 @@ Host eda-lab
   IdentityFile ~/.ssh/id_ed25519
 ```
 
-先确认不会要求输入密码：
+如果本机还没有 SSH key，先生成一个：
+
+```bash
+ssh-keygen -t ed25519 -C "your_email@example.com"
+```
+
+然后把公钥放到远程 EDA 服务器。如果系统有 `ssh-copy-id`：
+
+```bash
+ssh-copy-id eda-lab
+```
+
+如果没有 `ssh-copy-id`，就把本机 `~/.ssh/id_ed25519.pub` 的内容追加到远程服务器的
+`~/.ssh/authorized_keys`。这一步如果你不熟悉，建议让服务器管理员帮你做。
+
+第一次连接远程服务器时，SSH 可能会询问是否信任 host key。先手动连一次：
+
+```bash
+ssh eda-lab true
+```
+
+看到 `Are you sure you want to continue connecting` 时，确认服务器地址没错后输入
+`yes`。这一步只需要做一次。
+
+然后确认不会要求输入密码：
 
 ```bash
 ssh -o BatchMode=yes eda-lab true
 ```
+
+这里的 `BatchMode=yes` 很重要。如果这条命令失败，说明免密 SSH 还没准备好，
+不要继续跑 `ic-opt --ssh-profile`。
+
+再确认远程项目文件确实存在：
+
+```bash
+ssh eda-lab 'test -f /remote/path/to/Mixer_opt/opt_requirement.md'
+ssh eda-lab 'test -f /remote/path/to/Mixer_opt/cadence_env.csh'
+```
+
+上面两条命令没有输出、返回成功，就说明远程路径基本可用。
 
 然后运行：
 
