@@ -321,8 +321,8 @@ def test_download_tree_with_exclude(tmp_path: Path, monkeypatch: pytest.MonkeyPa
 
     ssh_argv = popen_calls[0][0]
     remote_cmd = ssh_argv[4]
-    assert "--exclude" in remote_cmd
-    assert "*.log" in remote_cmd
+    # --exclude must come before path operands for real tar
+    assert remote_cmd == "tar -C /remote/project --exclude '*.log' -cf - ."
 
 
 def test_download_tree_include_raises_not_supported(tmp_path: Path) -> None:
@@ -417,10 +417,9 @@ def test_upload_tree_with_exclude(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
     local_path.mkdir()
     runner.upload_tree(local_path, PurePosixPath("/remote/dest"), exclude="*.tmp")
 
-    # Local tar command should include --exclude
+    # Local tar command: --exclude must come before path operands
     local_tar_argv = popen_calls[0][0]
-    assert "--exclude" in local_tar_argv
-    assert "*.tmp" in local_tar_argv
+    assert local_tar_argv == ["tar", "-C", str(local_path), "--exclude", "*.tmp", "-cf", "-", "."]
 
 
 def test_upload_tree_include_raises_not_supported(tmp_path: Path) -> None:

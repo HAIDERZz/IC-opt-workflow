@@ -128,9 +128,10 @@ class RemoteSshRunner:
         local_path.mkdir(parents=True, exist_ok=True)
         remote = PurePosixPath(remote_path)
 
-        parts: list[str] = ["tar", "-C", str(remote), "-cf", "-", "."]
+        parts: list[str] = ["tar", "-C", str(remote)]
         if exclude:
             parts.extend(["--exclude", exclude])
+        parts.extend(["-cf", "-", "."])
         remote_cmd = " ".join(shlex.quote(p) for p in parts)
         ssh_argv = ["ssh", "-o", "BatchMode=yes", self.profile, remote_cmd]
 
@@ -181,9 +182,10 @@ class RemoteSshRunner:
         remote_cmd = " ".join(shlex.quote(p) for p in parts)
         ssh_argv = ["ssh", "-o", "BatchMode=yes", self.profile, remote_cmd]
 
-        local_parts: list[str] = ["tar", "-C", str(local_path), "-cf", "-", "."]
+        local_parts: list[str] = ["tar", "-C", str(local_path)]
         if exclude:
             local_parts.extend(["--exclude", exclude])
+        local_parts.extend(["-cf", "-", "."])
 
         local_tar = subprocess.Popen(
             local_parts, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
