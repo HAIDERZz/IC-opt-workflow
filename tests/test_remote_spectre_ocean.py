@@ -4,7 +4,10 @@ import json
 import shlex
 from pathlib import Path, PurePosixPath
 
-from hermes_workflow.execution_adapters.remote_spectre_ocean import run_remote_spectre_ocean_adapter
+from hermes_workflow.execution_adapters.remote_spectre_ocean import (
+    run_remote_multi_testbench_adapter,
+    run_remote_spectre_ocean_adapter,
+)
 from hermes_workflow.remote_project import RemoteProjectRef
 from hermes_workflow.remote_ssh import RemoteCommandResult
 from tests.real_run_smoke_helpers import create_approved_real_project
@@ -70,7 +73,8 @@ def test_remote_adapter_runs_spectre_and_ocean_remotely(tmp_path: Path) -> None:
     assert (run_dir / "result_manifest.json").is_file()
     assert (run_dir / "metrics" / "metric_result_manifest.json").is_file()
     manifest = json.loads((run_dir / "result_manifest.json").read_text(encoding="utf-8"))
-    assert manifest["backend"] == "remote_spectre_ocean"
+    assert manifest["status"] == "succeeded"
+    assert "remote spectre and ocean completed" in manifest.get("notes", "")
 
 
 def test_remote_adapter_csh_payload_quotes_paths(tmp_path: Path) -> None:
@@ -153,3 +157,170 @@ def test_remote_adapter_ocean_failure_uploads_manifest_to_remote(tmp_path: Path)
         if remote.endswith("result_manifest.json") and local == run_dir / "result_manifest.json"
     ]
     assert len(manifest_uploads) == 1
+
+
+class MultiTestbenchFakeRunner(FakeRunner):
+    """FakeRunner that writes correct ocean_scalars.tsv per child testbench."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.child_metric_names: dict[str, list[str]] = {}
+
+    def download_tree(self, remote_path, local_path, include=None, exclude=None) -> None:
+        self.downloads.append((str(remote_path), Path(local_path)))
+        Path(local_path).mkdir(parents=True, exist_ok=True)
+        local = Path(local_path)
+        metric_names = self._resolve_metric_names(local)
+        header = "metric\tvalue\tunit\tstatus\texpression_sha256\tmessage\n"
+        rows = "".join(
+            f"{name}\t1e-12\ts\tpass\t{'a' * 64}\t\n" for name in metric_names
+        )
+        (local / "ocean_scalars.tsv").write_text(header + rows, encoding="utf-8")
+
+    def _resolve_metric_names(self, local_path: Path) -> list[str]:
+        parts = local_path.parts
+        for i, part in enumerate(parts):
+            if part == "testbenches" and i + 1 < len(parts):
+                testbench_id = parts[i + 1]
+                if testbench_id in self.child_metric_names:
+                    return self.child_metric_names[testbench_id]
+        return ["rise", "fall", "DC"]
+
+
+def test_remote_multi_testbench_adapter_runs_each_child(tmp_path: Path) -> None:
+    from tests.test_multi_testbench_aggregation import (
+        _create_ready_multi_testbench_project,
+    )
+
+    project_dir = _create_ready_multi_testbench_project(tmp_path)
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    runner = MultiTestbenchFakeRunner()
+    runner.child_metric_names = {
+        "cg_nf": ["MAX_GAIN"],
+        "iip3": ["IIP3"],
+    }
+
+    result = run_remote_multi_testbench_adapter(
+        project_dir,
+        run_id="real_001",
+        remote_ref=ref,
+        remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
+        runner=runner,
+    )
+
+    assert result.status == "succeeded"
+    spectre_cmds = [c for c in runner.commands if "spectre" in c]
+    ocean_cmds = [c for c in runner.commands if "ocean" in c]
+    assert len(spectre_cmds) == 2
+    assert len(ocean_cmds) == 2
+    for cmd in ocean_cmds:
+        assert "testbenches/" in cmd
+        assert "metric_probe.ocn" in cmd
+    aggregate_uploads = [
+        (local, remote) for local, remote in runner.uploads
+        if str(remote).endswith("result_manifest.json")
+        and "/testbenches/" not in str(remote)
+    ]
+    assert len(aggregate_uploads) >= 1
+    child_result_uploads = [
+        (local, remote) for local, remote in runner.uploads
+        if "/testbenches/" in str(remote) and str(remote).endswith("/result_manifest.json")
+    ]
+    assert len(child_result_uploads) == 2
+    child_metric_uploads = [
+        (local, remote) for local, remote in runner.uploads
+        if "/testbenches/" in str(remote) and "metric_result_manifest.json" in str(remote)
+    ]
+    assert len(child_metric_uploads) == 2
+
+
+def test_remote_multi_testbench_adapter_child_metric_probe_paths(tmp_path: Path) -> None:
+    """Verify ocean commands use child metric_probe.ocn, not top-level."""
+    from tests.test_multi_testbench_aggregation import _create_ready_multi_testbench_project
+
+    project_dir = _create_ready_multi_testbench_project(tmp_path)
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    runner = MultiTestbenchFakeRunner()
+    runner.child_metric_names = {
+        "cg_nf": ["MAX_GAIN"],
+        "iip3": ["IIP3"],
+    }
+
+    run_remote_multi_testbench_adapter(
+        project_dir,
+        run_id="real_001",
+        remote_ref=ref,
+        remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
+        runner=runner,
+    )
+
+    ocean_cmds = [c for c in runner.commands if "ocean" in c]
+    for cmd in ocean_cmds:
+        inner = shlex.split(cmd)[2]
+        assert "/real/real_001/metrics/metric_probe.ocn" not in inner
+        assert "testbenches/" in inner
+        assert "metric_probe.ocn" in inner
+
+
+def test_remote_multi_testbench_adapter_child_failure_reports_issues(tmp_path: Path) -> None:
+    from tests.test_multi_testbench_aggregation import _create_ready_multi_testbench_project
+
+    project_dir = _create_ready_multi_testbench_project(tmp_path)
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    runner = MultiTestbenchFakeRunner()
+    runner.child_metric_names = {
+        "cg_nf": ["MAX_GAIN"],
+        "iip3": ["IIP3"],
+    }
+
+    def failing_run(command: str, **kwargs: object) -> RemoteCommandResult:
+        runner.commands.append(command)
+        if "spectre" in command and "iip3" in command:
+            return RemoteCommandResult(1, "", "spectre error", ["ssh", "lab", command])
+        return RemoteCommandResult(0, "", "", ["ssh", "lab", command])
+
+    runner.run = failing_run
+
+    result = run_remote_multi_testbench_adapter(
+        project_dir,
+        run_id="real_001",
+        remote_ref=ref,
+        remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
+        runner=runner,
+    )
+
+    assert result.status == "failed"
+    assert any("iip3" in issue for issue in result.issues)
+
+
+def test_remote_multi_testbench_adapter_aggregates_upload(tmp_path: Path) -> None:
+    """Verify aggregate result_manifest and metric_result_manifest are uploaded."""
+    from tests.test_multi_testbench_aggregation import _create_ready_multi_testbench_project
+
+    project_dir = _create_ready_multi_testbench_project(tmp_path)
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    runner = MultiTestbenchFakeRunner()
+    runner.child_metric_names = {
+        "cg_nf": ["MAX_GAIN"],
+        "iip3": ["IIP3"],
+    }
+
+    run_remote_multi_testbench_adapter(
+        project_dir,
+        run_id="real_001",
+        remote_ref=ref,
+        remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
+        runner=runner,
+    )
+
+    remote_run_dir = "/remote/project/runs/real/real_001"
+    result_uploads = [
+        r for _, r in runner.uploads
+        if r == f"{remote_run_dir}/result_manifest.json"
+    ]
+    assert len(result_uploads) >= 1
+    metric_uploads = [
+        r for _, r in runner.uploads
+        if r == f"{remote_run_dir}/metrics/metric_result_manifest.json"
+    ]
+    assert len(metric_uploads) >= 1

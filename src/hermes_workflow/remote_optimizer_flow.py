@@ -4,6 +4,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 from hermes_workflow.execution_adapters.remote_spectre_ocean import (
+    run_remote_multi_testbench_adapter,
     run_remote_spectre_ocean_adapter,
 )
 from hermes_workflow.openbox_backend import run_openbox_real_optimization
@@ -15,6 +16,7 @@ from hermes_workflow.optimizer_flow import (
 from hermes_workflow.remote_doctor import run_remote_doctor
 from hermes_workflow.remote_prepare import prepare_remote_project_cache
 from hermes_workflow.remote_project import RemoteProjectRef
+from hermes_workflow.validate import assert_valid_project
 from hermes_workflow.remote_ssh import RemoteSshRunner
 
 
@@ -45,15 +47,28 @@ def optimize_remote_project(
         raise ValueError("remote prepare failed: " + "; ".join(prepared.issues))
 
     def remote_openbox(project_dir: Path, **kwargs: object):
-        return run_openbox_real_optimization(
-            project_dir,
-            adapter=lambda local_project, run_id, cadence_cshrc: run_remote_spectre_ocean_adapter(
+        bundle = assert_valid_project(project_dir)
+
+        def selected_adapter(local_project: Path, run_id: str, cadence_cshrc: Path) -> object:
+            if bundle.testbenches is not None:
+                return run_remote_multi_testbench_adapter(
+                    local_project,
+                    run_id=run_id,
+                    remote_ref=ref,
+                    remote_cadence_cshrc=remote_cadence_cshrc,
+                    runner=ssh,
+                )
+            return run_remote_spectre_ocean_adapter(
                 local_project,
                 run_id=run_id,
                 remote_ref=ref,
                 remote_cadence_cshrc=remote_cadence_cshrc,
                 runner=ssh,
-            ),
+            )
+
+        return run_openbox_real_optimization(
+            project_dir,
+            adapter=selected_adapter,
             **kwargs,
         )
 
@@ -92,6 +107,25 @@ def continue_remote_project(
     _sync_remote_history_to_cache(ref, prepared.cache_dir, ssh)
 
     def remote_openbox(project_dir: Path, **kwargs: object):
+        bundle = assert_valid_project(project_dir)
+
+        def selected_adapter(local_project: Path, run_id: str, cadence_cshrc: Path) -> object:
+            if bundle.testbenches is not None:
+                return run_remote_multi_testbench_adapter(
+                    local_project,
+                    run_id=run_id,
+                    remote_ref=ref,
+                    remote_cadence_cshrc=remote_cadence_cshrc,
+                    runner=ssh,
+                )
+            return run_remote_spectre_ocean_adapter(
+                local_project,
+                run_id=run_id,
+                remote_ref=ref,
+                remote_cadence_cshrc=remote_cadence_cshrc,
+                runner=ssh,
+            )
+
         return run_openbox_real_optimization(
             project_dir,
             max_evals=None,
@@ -99,13 +133,7 @@ def continue_remote_project(
             continue_from_existing=True,
             batch_size=batch_size,
             parallel_jobs=parallel_jobs,
-            adapter=lambda local_project, run_id, cadence_cshrc: run_remote_spectre_ocean_adapter(
-                local_project,
-                run_id=run_id,
-                remote_ref=ref,
-                remote_cadence_cshrc=remote_cadence_cshrc,
-                runner=ssh,
-            ),
+            adapter=selected_adapter,
         )
 
     services = OptimizerFlowServices(run_openbox_real_optimization=remote_openbox)
