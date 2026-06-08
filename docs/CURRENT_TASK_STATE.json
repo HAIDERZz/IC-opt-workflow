@@ -54,7 +54,7 @@
     "alignment": "Aligned with the top-level product-landing goal: C-69 adds remote SSH mode while keeping local mode unchanged and keeping OpenBox/product Python on the local workstation.",
     "drift": "No real remote target was provided, so Task 10 real remote doctor/real/continue acceptance was not run. Claude completed the implementation and internal reviews; Codex final acceptance found six offline spec/code-quality blockers, then Claude fixed them in commit 95e6bba."
   },
-  "latest_valid_commit": "95e6bba",
+  "latest_valid_commit": "92bdbe4",
   "review_evidence": {
     "spec_review": "C-69 was reviewed against docs/superpowers/specs/2026-06-08-remote-ssh-execution-backend-design.md and docs/superpowers/plans/2026-06-08-remote-ssh-execution-backend.md. Offline/product-contract scope is accepted: passwordless SSH boundary, remote project source of truth, local OpenBox/controller, remote Spectre/OCEAN adapter without remote Python product env, doctor without Spectre launch, report/history mirror, and remote continuation are implemented. Real remote acceptance remains blocked by missing explicit user SSH profile/project.",
     "code_quality_review": "Claude performed internal spec/code-quality review and Codex performed final acceptance. Codex found six blockers after Claude's first completion: missing remote real report sync, silent history sync failure, unquoted remote prepare path, unquoted inner csh paths, missing remote failure manifest upload, and missing continuation assertion. Claude fixed them in 95e6bba. Final full pytest passed with 699 passed and 1 warning; ruff, cadence check, and git diff --check passed.",
