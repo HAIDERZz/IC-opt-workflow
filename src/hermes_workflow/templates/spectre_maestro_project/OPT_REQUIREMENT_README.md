@@ -83,6 +83,38 @@ Each section must contain exactly one fenced `yaml` block.
 `maestro_point_root` is the important field. It should point to the Maestro/ADE
 single-point result directory that contains `netlist/input.scs`.
 
+How to find the correct directory:
+
+1. In Maestro/ADE, run one known-good simulation point for the testbench.
+2. In the filesystem, go to that testbench's Maestro result tree, usually shaped
+   like:
+
+```text
+~/simulation/<library>/<cell>/<test_name>/results/maestro/Interactive.<N>/<point>/<run_name>/
+```
+
+3. Use the leaf `<run_name>/` directory as `maestro_point_root`.
+
+The quick check is:
+
+```bash
+ls <maestro_point_root>
+# expected: netlist/  psf/
+
+ls <maestro_point_root>/netlist/input.scs
+# expected: the file exists
+```
+
+For example, if the ADE result tree is:
+
+```text
+.../results/maestro/Interactive.45/1/<run_name>/
+```
+
+then `maestro_point_root` should be exactly that leaf directory. Do not point it
+to `Interactive.45`, `Interactive.45/1`, the `netlist/` subdirectory, or the
+`psf/` subdirectory.
+
 The following fields are metadata used for traceability and reports:
 
 ```yaml
@@ -358,10 +390,39 @@ Rules:
 
 ### Objective
 
+Simple lower-is-better FoM:
+
 ```yaml
 direction: minimize
 expression: "(rise + fall) * DC"
 ```
+
+For `direction: minimize`, smaller expression values are better.
+
+Higher-is-better normalized score:
+
+```yaml
+direction: maximize
+expression: >-
+  0.7*min(
+    max(0,min(1,10*(ln(BW/19e9)/ln(10))/0.5)),
+    max(0,min(1,(MAX_GAIN-4)/0.5)),
+    max(0,min(1,(12-NF_3G)/0.1)),
+    max(0,min(1,(IIP3-0)/0.5)),
+    max(0,min(1,(P1DB+2)/0.5))
+  )
+  +0.3*(
+    0.15*max(0,min(1,10*(ln(BW/19e9)/ln(10))/0.5))
+    +0.10*max(0,min(1,(MAX_GAIN-4)/0.5))
+    +0.25*max(0,min(1,(12-NF_3G)/0.1))
+    +0.30*max(0,min(1,(IIP3-0)/0.5))
+    +0.20*max(0,min(1,(P1DB+2)/0.5))
+  )
+```
+
+For `direction: maximize`, larger expression values are better. Internally, the
+optimizer still minimizes, so feasible candidates use `objective = -FoM`. Reports
+show both the user FoM and the internal minimized objective.
 
 Supported directions:
 
@@ -371,9 +432,11 @@ Supported directions:
 Rules:
 
 - Expression may use metric names and arithmetic operators.
-- Do not call functions in the objective expression.
+- Supported objective functions are `min(...)`, `max(...)`, and `ln(...)`.
 - Do not reference undeclared metrics.
 - This is the FoM comparison expression, not an OCEAN formula.
+- Write the expression using metric names, not OCEAN expressions. OCEAN belongs
+  in `## Metrics`; `## Objective` combines already extracted scalar metrics.
 
 ### Spectre Settings
 

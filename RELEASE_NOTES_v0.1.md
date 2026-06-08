@@ -1,4 +1,38 @@
-# Release Notes v0.1.0
+# Release Notes v0.1.x
+
+## v0.1.3
+
+Date: 2026-06-08
+
+### Summary
+
+v0.1.3 clarifies production user guidance and fixes maximize-style FoM reporting.
+
+### Changes
+
+- Documented how to find the correct Maestro/ADE `maestro_point_root` directory:
+  use the leaf run directory containing both `netlist/` and `psf/`; verify that
+  `<maestro_point_root>/netlist/input.scs` exists.
+- Documented objective/FoM behavior:
+  - `direction: minimize` means smaller user FoM is better.
+  - `direction: maximize` means larger user FoM is better, while the optimizer
+    internally minimizes `-FoM` for feasible candidates.
+- Added simple and normalized weighted FoM examples for IC users.
+- Updated the multi-testbench Mixer template to use a normalized bottleneck plus
+  weighted higher-is-better FoM.
+- Fixed optimizer insight reporting for `direction: maximize`: reports now keep
+  user FoM and internal minimized objective separate, and rank all-evaluable FoM
+  using the correct direction.
+
+### Verification
+
+- `tests/test_optimizer_insights.py`
+- `tests/test_requirement_intake.py`
+- `tests/test_product_cli.py`
+
+Result: 42 tests passed.
+
+## v0.1.0
 
 Date: 2026-06-07
 

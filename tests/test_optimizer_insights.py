@@ -256,6 +256,55 @@ objective:
     assert "Configured Objective Ranking" in markdown
 
 
+def test_generate_optimizer_insight_report_respects_maximize_direction(
+    tmp_path: Path,
+) -> None:
+    rows = [
+        _trace_row(
+            evaluation_index=1,
+            run_id="real_001",
+            status="feasible",
+            objective=-0.25,
+        ),
+        _trace_row(
+            evaluation_index=2,
+            run_id="real_002",
+            status="feasible",
+            objective=-0.9,
+        ),
+    ]
+    rows[0]["metrics"] = {"score": 0.25}
+    rows[1]["metrics"] = {"score": 0.9}
+    project_dir = _write_accepted_optimizer_project(tmp_path, rows=rows)
+    (project_dir / "config" / "metrics.yaml").write_text(
+        """
+schema_version: "1.0"
+metrics:
+  - name: score
+    unit: ""
+constraints: []
+objective:
+  direction: maximize
+  expression: "score"
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    report = generate_optimizer_insight_report(project_dir)
+
+    payload = json.loads(report.report_path.read_text(encoding="utf-8"))
+    summary = payload["all_evaluable_fom_summary"]
+    assert summary["direction"] == "maximize"
+    assert summary["best_run_id"] == "real_002"
+    assert summary["best_fom"] == pytest.approx(0.9)
+    assert summary["best_objective"] == pytest.approx(-0.9)
+    ranking = payload["configured_objective_ranking"]
+    assert ranking["direction"] == "maximize"
+    assert ranking["best_candidate"]["run_id"] == "real_002"
+    assert ranking["best_candidate"]["fom"] == pytest.approx(0.9)
+    assert ranking["best_candidate"]["objective"] == pytest.approx(-0.9)
+
+
 def test_generate_optimizer_insight_report_writes_bottleneck_weighted_plot(
     tmp_path: Path,
 ) -> None:

@@ -1,4 +1,4 @@
-# IC Auto Opt Workflow v0.1.2
+# IC Auto Opt Workflow v0.1.3
 
 IC Auto Opt Workflow helps analog/RF IC designers run repeatable Spectre/OCEAN
 optimization from a project folder.
@@ -174,6 +174,22 @@ metric to the correct testbench. There is no fixed maximum number of
 testbenches in the file format; simulation time, license availability, disk
 space, and `parallel_jobs` are the real limits.
 
+Each `maestro_point_root` must be the leaf Maestro/ADE run directory that
+contains both `netlist/` and `psf/`, and
+`<maestro_point_root>/netlist/input.scs` must exist. A typical path looks like:
+
+```text
+~/simulation/<library>/<cell>/<test_name>/results/maestro/Interactive.<N>/<point>/<run_name>/
+```
+
+Use the final `<run_name>/` directory. Do not use the parent `Interactive.<N>`
+directory, the `<point>` directory, or the `netlist/` subdirectory itself.
+
+Objective expressions combine extracted scalar metric names, not OCEAN
+expressions. Use `direction: minimize` for lower-is-better FoM. Use
+`direction: maximize` for higher-is-better FoM; the tool keeps the user FoM and
+internally minimizes `-FoM` for feasible candidates.
+
 ### 3. Run A Doctor Check
 
 Before launching real simulations, run:
@@ -322,7 +338,7 @@ pyproject.toml              package metadata and console scripts
 
 ## Version
 
-Current release: `v0.1.2`.
+Current release: `v0.1.3`.
 
 This release has been clean-installed from GitHub and validated on a real
 multi-testbench Mixer optimization flow:

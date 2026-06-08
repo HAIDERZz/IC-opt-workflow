@@ -3,6 +3,10 @@
 Use this reference when one optimizer candidate needs metrics from more than
 one Maestro/ADE testbench. Each `maestro_point_root` must point to a
 single-point Maestro/ADE result directory that contains `netlist/input.scs`.
+The correct directory is the leaf run directory that usually contains both
+`netlist/` and `psf/`, for example
+`.../results/maestro/Interactive.45/1/<run_name>/`. Do not use the parent
+`Interactive.<N>` directory or the `netlist/` subdirectory itself.
 The same evaluation model also supports a single testbench; use this file only
 when one candidate needs metrics from multiple Maestro/ADE setups.
 
@@ -123,8 +127,22 @@ testbenches:
 ## Objective
 
 ```yaml
-direction: minimize
-expression: "NF_3G * 1e9 / (BW*MAX_GAIN*IIP3*P1DB) "
+direction: maximize
+expression: >-
+  0.7*min(
+    max(0,min(1,10*(ln(BW/19e9)/ln(10))/0.5)),
+    max(0,min(1,(MAX_GAIN-4)/0.5)),
+    max(0,min(1,(12-NF_3G)/0.1)),
+    max(0,min(1,(IIP3-0)/0.5)),
+    max(0,min(1,(P1DB+2)/0.5))
+  )
+  +0.3*(
+    0.15*max(0,min(1,10*(ln(BW/19e9)/ln(10))/0.5))
+    +0.10*max(0,min(1,(MAX_GAIN-4)/0.5))
+    +0.25*max(0,min(1,(12-NF_3G)/0.1))
+    +0.30*max(0,min(1,(IIP3-0)/0.5))
+    +0.20*max(0,min(1,(P1DB+2)/0.5))
+  )
 ```
 
 ## Spectre Settings

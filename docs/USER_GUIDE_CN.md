@@ -1,4 +1,4 @@
-# IC Auto Opt Workflow v0.1.2 使用说明
+# IC Auto Opt Workflow v0.1.3 使用说明
 
 这份说明面向集成电路方向用户，假设你会使用 Linux 和 Cadence，但不要求你熟悉
 Python 工程。
@@ -193,6 +193,81 @@ p1db: 计算 P1dB
 `testbenches:` 列表。格式上没有固定最大数量，实际限制来自仿真时间、license、
 磁盘空间和 `parallel_jobs`。
 
+### Maestro/ADE point root 到底填哪一层
+
+先在 Maestro/ADE 里把每个 testbench 跑通一次。然后去仿真结果目录里找单个
+仿真点的 leaf 目录，常见形状是：
+
+```text
+~/simulation/<library>/<cell>/<test_name>/results/maestro/Interactive.<N>/<point>/<run_name>/
+```
+
+`maestro_point_root` 应该填最后这个 `<run_name>/` 目录。判断标准很简单：
+
+```bash
+ls <maestro_point_root>
+# 应该能看到：netlist/  psf/
+
+ls <maestro_point_root>/netlist/input.scs
+# 应该能找到 input.scs
+```
+
+例如 ADE 结果路径是：
+
+```text
+.../results/maestro/Interactive.45/1/<run_name>/
+```
+
+那就把这一整层 leaf 目录填进 `maestro_point_root`。不要填
+`Interactive.45`，不要填 `Interactive.45/1`，也不要填更深的 `netlist/`
+或 `psf/` 子目录。
+
+### FoM / objective 怎么写
+
+`Objective` 不是 OCEAN 公式，而是用已经提取出来的 metric 名字做数学运算。脚本
+内部的 optimizer 始终按“objective 越小越好”工作。
+
+如果你的 FoM 本来就是越小越好，写：
+
+```yaml
+direction: minimize
+expression: "(rise + fall) * DC"
+```
+
+如果你的 FoM 是越大越好，写 `direction: maximize`。工具会保留用户 FoM 原值，
+并在内部自动转换成 `objective = -FoM` 交给最小化器：
+
+```yaml
+direction: maximize
+expression: "gain / NF_3G"
+```
+
+对于多指标 RF/模拟电路，更推荐先把每个指标归一化成 0 到 1 的 score，再组合成
+一个越大越好的综合分数。例如：
+
+```yaml
+direction: maximize
+expression: >-
+  0.7*min(
+    max(0,min(1,10*(ln(BW/19e9)/ln(10))/0.5)),
+    max(0,min(1,(MAX_GAIN-4)/0.5)),
+    max(0,min(1,(12-NF_3G)/0.1)),
+    max(0,min(1,(IIP3-0)/0.5)),
+    max(0,min(1,(P1DB+2)/0.5))
+  )
+  +0.3*(
+    0.15*max(0,min(1,10*(ln(BW/19e9)/ln(10))/0.5))
+    +0.10*max(0,min(1,(MAX_GAIN-4)/0.5))
+    +0.25*max(0,min(1,(12-NF_3G)/0.1))
+    +0.30*max(0,min(1,(IIP3-0)/0.5))
+    +0.20*max(0,min(1,(P1DB+2)/0.5))
+  )
+```
+
+这里的 `min(...)` 是瓶颈分数，防止某一个指标很差但平均分很高；后面的加权和用于
+在都满足基本要求时继续区分优劣。当前 objective 表达式支持 metric 名字、数字、
+四则运算、括号，以及 `min(...)`、`max(...)`、`ln(...)`。
+
 ## 6. 先做离线检查
 
 这个命令不会启动 Spectre/OCEAN：
@@ -284,7 +359,7 @@ Agent 不应该：
 - 在用户没要求时改变并行资源
 - 把失败点当作主推荐点
 
-## 11. 当前 v0.1.2 边界
+## 11. 当前 v0.1.3 边界
 
 - 已经支持 shell 自动化的完整真实流程。
 - Claude/OpenCode runtime adapter 是产品化方向的一部分，但不同 agent runtime 的
