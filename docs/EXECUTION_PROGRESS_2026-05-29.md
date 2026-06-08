@@ -13,13 +13,13 @@ This note preserves the implementation state for continuing Plan A after context
 - Current scope: C-69 Remote SSH Execution Backend Design
 - current_scope: C-69 Remote SSH Execution Backend Design
 - current_scope_exact: C-69 Remote SSH Execution Backend Design
-- Current status: C-69 design spec and implementation plan are written,
-  verified-only. The plan starts with `RemoteSshRunner` and remote doctor MVP,
-  then proceeds through remote cache preparation, remote Spectre/OCEAN
-  single-candidate smoke, remote OpenBox real flow, remote continuation, and
-  documentation/real acceptance.
+- Current status: C-69 Task 1 Remote SSH Runner is implemented and reviewed.
+  Claude performed the coding work under the new division of labor; Codex
+  performed final spec/code-quality review and functional verification. The
+  task added no-network unit-tested OpenSSH runner primitives. No real SSH,
+  network, Cadence, Spectre, or OCEAN command was run.
 - Active plan: `docs/superpowers/plans/2026-06-08-remote-ssh-execution-backend.md`
-- Next allowed action: Implement C-69 Task 1: Remote SSH Runner, using tests/test_remote_ssh.py first and no real SSH/network call.
+- Next allowed action: Implement C-69 Task 2: Remote Project Reference And Cache, using tests/test_remote_project.py first and no real SSH/network call.
 - Execution method: `superpowers:subagent-driven-development`
 - Dependencies installed in active Python environment on 2026-05-29: `pytest`, `typer`, `pydantic`, `PyYAML`, `ruff`
 

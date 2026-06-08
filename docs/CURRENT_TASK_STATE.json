@@ -1,8 +1,8 @@
 {
   "schema_version": "1.0",
   "current_scope": "C-69 Remote SSH Execution Backend Design",
-  "current_status": "C-69 remote SSH execution backend implementation plan is written and verified-only. The plan starts with a no-network RemoteSshRunner and remote doctor MVP, then proceeds through remote cache preparation, remote Spectre/OCEAN single-candidate smoke, remote OpenBox real flow, remote continuation, and documentation/real acceptance. Implementation has not started.",
-  "review_status": "verified-only",
+  "current_status": "C-69 Task 1 Remote SSH Runner is implemented by Claude and accepted after Codex spec/code-quality review. It added no-network unit-tested RemoteSshRunner primitives for ssh command execution, text read/write, existence/mkdir, scp file upload/download, and tar-over-ssh tree upload/download. No real SSH, network, Cadence, Spectre, or OCEAN was run. Next task is C-69 Task 2 Remote Project Reference And Cache.",
+  "review_status": "reviewed",
   "subagent_dispatch": "available",
   "active_spec": "docs/superpowers/specs/2026-06-08-remote-ssh-execution-backend-design.md",
   "active_plan": "docs/superpowers/plans/2026-06-08-remote-ssh-execution-backend.md",
@@ -12,7 +12,7 @@
     "docs/EXECUTION_PROGRESS_2026-05-29.md",
     "docs/COMPACT_RESUME_CHECKPOINT.md"
   ],
-  "next_allowed_action": "Implement C-69 Task 1: Remote SSH Runner, using tests/test_remote_ssh.py first and no real SSH/network call.",
+  "next_allowed_action": "Implement C-69 Task 2: Remote Project Reference And Cache, using tests/test_remote_project.py first and no real SSH/network call.",
   "forbidden_actions": [
     "install unpinned latest shap into the OpenBox venv",
     "run real tool commands without first checking docs/TOOLCHAIN_EXECUTION_REFERENCE.md",
@@ -51,11 +51,13 @@
     "active_spec": "docs/superpowers/specs/2026-06-08-remote-ssh-execution-backend-design.md",
     "active_plan": "docs/superpowers/plans/2026-06-08-remote-ssh-execution-backend.md",
     "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
-    "alignment": "Aligned with the top-level product-landing goal: C-69 targets deployment friction by keeping Python/OpenBox on the user's local workstation while keeping Spectre/OCEAN on the Linux EDA server.",
-    "drift": "No implementation drift yet. The plan explicitly gates real SSH/Spectre acceptance until after no-network runner, doctor, cache, and remote adapter tasks are tested."
+    "alignment": "Aligned with the top-level product-landing goal: C-69 Task 1 added only the local OpenSSH wrapper primitives needed before remote doctor/cache work.",
+    "drift": "Task 1 stayed no-network and did not run real SSH/Spectre/OCEAN. One spec gap was found during Codex review (missing tree transfer helpers), then Claude fixed it; one quality gap was found (tree copy tar semantics and exclude order), then Claude fixed it."
   },
-  "latest_valid_commit": "8cd8816",
+  "latest_valid_commit": "bd510ab",
   "review_evidence": {
+    "spec_review": "C-69 Task 1 was reviewed against docs/superpowers/specs/2026-06-08-remote-ssh-execution-backend-design.md and docs/superpowers/plans/2026-06-08-remote-ssh-execution-backend.md. Accepted scope: no-network RemoteSshRunner primitives only; no real SSH/Cadence/Spectre/OCEAN execution.",
+    "code_quality_review": "Codex review found and Claude fixed missing tree helpers, incorrect tar tree nesting semantics, stderr propagation gaps, and tar --exclude ordering. Final targeted tests, ruff, cadence check, and whitespace check passed before docs acceptance.",
     "c47_plan": "docs/superpowers/plans/2026-06-05-openbox-advanced-visualization-artifact.md",
     "c47_tests": "Targeted tests passed: /home/zzchen/.venvs/openclaw/bin/python -m pytest tests/test_openbox_backend.py tests/test_optimizer_insights.py tests/test_optimizer_finalize.py",
     "c47_full_suite": "Full suite passed: /home/zzchen/.venvs/openclaw/bin/python -m pytest (574 passed, 1 skipped).",

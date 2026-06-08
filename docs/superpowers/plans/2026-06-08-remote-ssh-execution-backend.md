@@ -85,11 +85,14 @@ docs/USER_GUIDE_CN.md or release-package equivalent
 
 ## Task 1: Remote SSH Runner
 
+Status: completed and reviewed in commits `17a5037`, `b658ebd`, `c35c39e`,
+`3680050`, and `bd510ab`.
+
 **Files:**
 - Create: `src/hermes_workflow/remote_ssh.py`
 - Test: `tests/test_remote_ssh.py`
 
-- [ ] **Step 1: Write failing tests for command construction and failure mapping**
+- [x] **Step 1: Write failing tests for command construction and failure mapping**
 
 Create `tests/test_remote_ssh.py`:
 
@@ -166,7 +169,7 @@ def test_remote_runner_read_text_uses_cat() -> None:
     assert calls[0][-1] == "cat /remote/opt_requirement.md"
 ```
 
-- [ ] **Step 2: Run tests and verify they fail because the module is missing**
+- [x] **Step 2: Run tests and verify they fail because the module is missing**
 
 Run:
 
@@ -176,7 +179,7 @@ rtk proxy ./.venv/bin/python -m pytest tests/test_remote_ssh.py -q
 
 Expected: FAIL with `ModuleNotFoundError: No module named 'hermes_workflow.remote_ssh'`.
 
-- [ ] **Step 3: Implement the minimal SSH runner**
+- [x] **Step 3: Implement the minimal SSH runner**
 
 Create `src/hermes_workflow/remote_ssh.py`:
 
@@ -312,7 +315,7 @@ class RemoteSshRunner:
         )
 ```
 
-- [ ] **Step 4: Run targeted tests**
+- [x] **Step 4: Run targeted tests**
 
 Run:
 
@@ -322,7 +325,7 @@ rtk proxy ./.venv/bin/python -m pytest tests/test_remote_ssh.py -q
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Run:
 

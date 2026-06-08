@@ -24,15 +24,16 @@ Current execution state:
 - current_scope: C-69 Remote SSH Execution Backend Design.
 - current_scope_exact: C-69 Remote SSH execution backend design for
   passwordless-SSH remote Spectre/OCEAN runs.
-- Current status: design spec and implementation plan are written and synced as
-  a verified-only checkpoint. Implementation has not started. The next gated
-  action is C-69 Task 1 Remote SSH Runner with no-network tests first.
+- Current status: C-69 Task 1 Remote SSH Runner is implemented and reviewed.
+  Claude handled the coding task; Codex performed final spec/code-quality
+  review and functional verification. No real SSH/network/Cadence/Spectre/OCEAN
+  command was run.
 - Active spec:
   `docs/superpowers/specs/2026-06-08-remote-ssh-execution-backend-design.md`.
 - Active plan:
   `docs/superpowers/plans/2026-06-08-remote-ssh-execution-backend.md`.
-- Next allowed action: Implement C-69 Task 1: Remote SSH Runner, using
-  tests/test_remote_ssh.py first and no real SSH/network call.
+- Next allowed action: Implement C-69 Task 2: Remote Project Reference And
+  Cache, using tests/test_remote_project.py first and no real SSH/network call.
 - C-69 design decision: the Linux EDA server project directory remains the
   source of truth and keeps the same local-mode layout. The local workstation
   runs the product Python environment, OpenBox/controller, agent skill, and

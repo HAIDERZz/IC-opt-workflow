@@ -7,19 +7,19 @@
 - Current scope: C-69 Remote SSH Execution Backend Design
 - current_scope: C-69 Remote SSH Execution Backend Design
 - current_scope_exact: C-69 Remote SSH Execution Backend Design
-- Current status: verified-only. The C-69 design spec and implementation plan
-  are written. The plan starts with a no-network `RemoteSshRunner` and remote
-  doctor MVP, then proceeds through remote cache preparation, remote
-  Spectre/OCEAN single-candidate smoke, remote OpenBox real flow, remote
-  continuation, and documentation/real acceptance.
+- Current status: reviewed. C-69 Task 1 Remote SSH Runner is implemented by
+  Claude and accepted after Codex spec/code-quality review. It added no-network
+  unit-tested OpenSSH runner primitives for command execution, text read/write,
+  existence/mkdir, scp file upload/download, and tar-over-SSH tree
+  upload/download.
 - Active evidence: `docs/superpowers/specs/2026-06-08-remote-ssh-execution-backend-design.md`
 - Active plan: `docs/superpowers/plans/2026-06-08-remote-ssh-execution-backend.md`
-- Next required action: implement C-69 Task 1 Remote SSH Runner with
-  `tests/test_remote_ssh.py` first and no real SSH/network call.
-- next_allowed_action: Implement C-69 Task 1: Remote SSH Runner, using tests/test_remote_ssh.py first and no real SSH/network call.
-- next_allowed_action_exact_json: Implement C-69 Task 1: Remote SSH Runner, using tests/test_remote_ssh.py first and no real SSH/network call.
-- next_allowed_action_exact: Implement C-69 Task 1 Remote SSH Runner with
-  no-network tests first.
+- Next required action: implement C-69 Task 2 Remote Project Reference And
+  Cache with `tests/test_remote_project.py` first and no real SSH/network call.
+- next_allowed_action: Implement C-69 Task 2: Remote Project Reference And Cache, using tests/test_remote_project.py first and no real SSH/network call.
+- next_allowed_action_exact_json: Implement C-69 Task 2: Remote Project Reference And Cache, using tests/test_remote_project.py first and no real SSH/network call.
+- next_allowed_action_exact: Implement C-69 Task 2 Remote Project Reference And
+  Cache with no-network tests first.
 
 ## C-69 Remote SSH Execution Backend Design And Plan 2026-06-08
 
@@ -48,7 +48,8 @@ docs/superpowers/plans/2026-06-08-remote-ssh-execution-backend.md
 
 Task order:
 
-- Task 1: Remote SSH Runner, no-network unit tests only.
+- Task 1: Remote SSH Runner, no-network unit tests only. Completed reviewed in
+  commits `17a5037`, `b658ebd`, `c35c39e`, `3680050`, and `bd510ab`.
 - Task 2: Remote project reference and cache path.
 - Task 3: Requirement parser extraction for remote path checks.
 - Task 4: Remote doctor MVP.
@@ -58,6 +59,19 @@ Task order:
 - Task 8: Remote OpenBox real flow.
 - Task 9: Remote continuation.
 - Task 10: Documentation, skill, and real remote acceptance.
+
+Task 1 verification:
+
+- `./.venv/bin/python -m pytest tests/test_remote_ssh.py -q` passed with
+  26 tests.
+- `./.venv/bin/python -m ruff check src/hermes_workflow/remote_ssh.py tests/test_remote_ssh.py`
+  passed.
+- `./.venv/bin/python tools/check_development_cadence.py` passed.
+- `git diff --check HEAD~3..HEAD` passed before final status sync.
+- No real SSH/network/Cadence/Spectre/OCEAN command was run.
+- Codex review findings fixed by Claude:
+  missing tree helpers; tree transfer basename nesting; tar `--exclude`
+  ordering; tree transfer stderr assertions.
 
 ## C-66 Claude `/ic-opt` Continuation Validation 2026-06-07
 
