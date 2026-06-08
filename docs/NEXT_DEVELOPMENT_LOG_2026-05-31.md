@@ -4,30 +4,64 @@
 
 - Repository: `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow`
 - Branch: `plan-a-hermes-file-contract-mvp`
-- Current scope: C-69 Remote SSH Execution Backend Design
-- current_scope: C-69 Remote SSH Execution Backend Design
-- current_scope_exact: C-69 Remote SSH Execution Backend Design
-- Current status: reviewed and real-accepted. C-69 Remote SSH Execution Backend
-  is implemented by Claude and accepted by Codex with real remote
-  SSH/Spectre/OCEAN evidence. The implementation covers SSH runner, remote
-  project/cache, remote doctor, remote prepare, remote Spectre/OCEAN adapter,
-  remote OpenBox real flow, remote continuation, CLI/docs/skill updates, remote
-  Maestro symlink materialization, and report/history mirroring.
-- Active evidence: `docs/superpowers/specs/2026-06-08-remote-ssh-execution-backend-design.md`
-- Active plan: `docs/superpowers/plans/2026-06-08-remote-ssh-execution-backend.md`
-- Next required action: use remote mode with beta users or address concrete
-  remote diagnostics/user-doc feedback. Do not rerun remote real tools only for
-  documentation formatting.
-- next_allowed_action: C-69 remote SSH MVP is accepted; continue only with
-  concrete beta feedback or targeted diagnostic polish.
-- next_allowed_action_exact_current_state: C-69 remote SSH MVP is accepted. Next remote work should be driven by concrete beta feedback, such as improving diagnostics for unsafe remote symlinks, improving metric formula troubleshooting, or polishing remote user docs. Do not rerun remote real tools just for documentation formatting.
-- next_allowed_action_exact_json: C-69 remote SSH MVP is accepted; continue
-  only with concrete beta feedback or targeted diagnostic polish.
-- next_allowed_action_exact: C-69 remote SSH MVP is accepted.
+- Current scope: C-70 Remote Spectre/OCEAN Local-Parity Design
+- current_scope: C-70 Remote Spectre/OCEAN Local-Parity Design
+- current_scope_exact: C-70 Remote Spectre/OCEAN Local-Parity Design
+- Current status: verified-only. C-70 spec and implementation plan are written;
+  coding has not started. C-69 SSH/product plumbing is reusable, but artifact
+  inspection downgraded the C-69 Spectre/OCEAN evidence: the remote adapter
+  hand-built Spectre/OCEAN commands and success manifests instead of following
+  the proven local adapter semantics.
+- Active evidence: `docs/superpowers/specs/2026-06-08-remote-spectre-ocean-local-parity-design.md`
+- Active plan: `docs/superpowers/plans/2026-06-08-remote-spectre-ocean-local-parity.md`
+- Next required action: assign Claude to implement C-70 through
+  `superpowers:subagent-driven-development`, then Codex performs final spec and
+  functional acceptance only.
+- next_allowed_action: Implement C-70 only after assigning Claude to follow docs/superpowers/plans/2026-06-08-remote-spectre-ocean-local-parity.md with superpowers:subagent-driven-development. Keep the change limited to remote Spectre/OCEAN local-parity tests, canonical argv reuse, artifact download validation, and manifest delegation.
+- next_allowed_action_exact_current_state: Implement C-70 only after assigning Claude to follow docs/superpowers/plans/2026-06-08-remote-spectre-ocean-local-parity.md with superpowers:subagent-driven-development. Keep the change limited to remote Spectre/OCEAN local-parity tests, canonical argv reuse, artifact download validation, and manifest delegation.
+- next_allowed_action_exact_json: Implement C-70 only after assigning Claude to
+  follow docs/superpowers/plans/2026-06-08-remote-spectre-ocean-local-parity.md.
+- next_allowed_action_exact: Implement C-70 remote Spectre/OCEAN local parity.
+
+## C-70 Remote Spectre/OCEAN Local-Parity Design And Plan 2026-06-08
+
+C-70 is planned, verified-only. No code has been changed.
+
+Why this exists:
+
+- The local Spectre/OCEAN adapter already has the proven command, cwd, OCEAN
+  replay, artifact, and manifest semantics.
+- C-69 remote mode kept useful SSH/product plumbing, but the remote
+  Spectre/OCEAN adapter rebuilt those semantics by hand.
+- That drift allowed a remote result manifest to claim success while expected
+  child PSF artifacts were missing, and allowed child metric failures to be
+  reported inconsistently.
+- The user requirement file is not the root cause. The same requirement passed
+  in the local RC multi-testbench project.
+
+Design and plan:
+
+```text
+docs/superpowers/specs/2026-06-08-remote-spectre-ocean-local-parity-design.md
+docs/superpowers/plans/2026-06-08-remote-spectre-ocean-local-parity.md
+```
+
+Strict implementation boundary:
+
+- Preserve SSH runner, remote project/cache, doctor, prepare, CLI routing, and
+  report mirror plumbing from C-69.
+- Replace the remote Spectre/OCEAN semantic implementation.
+- Remote Spectre/OCEAN must reuse local canonical argv and cwd semantics.
+- Remote mode must download PSF/log/scalar artifacts before manifest writing.
+- Remote success manifests must be delegated to local manifest helper semantics.
+- Do not change optimizer candidate generation, requirement grammar, metric
+  formulas, FoM logic, report visualization, or multi-testbench aggregation.
+- Do not parse PSF or install the product Python environment on the EDA server.
 
 ## C-69 Remote SSH Execution Backend Design And Plan 2026-06-08
 
-C-69 implementation is complete and real-accepted for the remote SSH MVP.
+C-69 implementation is complete for SSH/product plumbing, but its remote
+Spectre/OCEAN adapter is superseded by C-70.
 
 Design summary:
 
@@ -67,8 +101,9 @@ Task order:
   hardening in `95e6bba`.
 - Task 9: Remote continuation. Completed in `ac33bc0` and final history-sync
   hardening in `95e6bba`.
-- Task 10: Documentation, skill, and real remote acceptance. Documentation and
-  skill updates completed in `ba5de1e`; real remote acceptance is recorded in
+- Task 10: Documentation, skill, and remote orchestration evidence.
+  Documentation and skill updates completed in `ba5de1e`; remote orchestration
+  evidence is recorded in
   `docs/REMOTE_SSH_ACCEPTANCE_2026-06-08.md`.
 
 Verification:
@@ -92,7 +127,7 @@ Verification:
   repo cwd, remote continuation rerunning the first-run package step, and
   remote Maestro symlink materialization. Claude fixed these through commits
   `943360d`, `3c99af5`, `f1f2c9f`, and `fb0497c`.
-- Real remote evidence:
+- Remote orchestration evidence:
   `docs/REMOTE_SSH_ACCEPTANCE_2026-06-08.md`.
   User verified passwordless SSH for `zzchen@10.113.216.131`. Clean remote
   project `/home/zzchen/remote_opt/mixer_muti_tb_c69_accept_20260608_001`
@@ -100,10 +135,10 @@ Verification:
   completed `--continue 4`; cumulative evaluations reached 14 in both the
   remote project and the local mirror
   `/home/zzchen/.ic-opt/remote_runs/zzchen@10.113.216.131/150c658badc47d17`.
-  `check-optimizer-run` accepted the remote mirror. The user's current metric
-  formulas produced only `metric_check_failed` rows, so this proves remote
-  execution/artifact sync/failure classification, not an optimized usable point
-  for that project.
+  `check-optimizer-run` accepted the remote mirror. Later artifact inspection
+  found that this is not sufficient Spectre/OCEAN local-parity evidence because
+  the C-69 remote adapter hand-built commands/manifests and could reference
+  missing PSF artifacts. C-70 is the active correction.
 - Final full regression passed:
   `./.venv/bin/python -m pytest -q` -> `718 passed, 1 warning`.
 - Final ruff passed: `./.venv/bin/python -m ruff check src tests`.

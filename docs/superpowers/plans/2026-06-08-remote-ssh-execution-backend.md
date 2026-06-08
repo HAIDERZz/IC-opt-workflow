@@ -4,9 +4,25 @@
 
 **Goal:** Add a remote SSH execution mode where local `ic-opt`/OpenBox/report orchestration controls a project directory on a Linux EDA server, while Spectre/OCEAN run remotely through user-configured passwordless SSH.
 
-**Status 2026-06-08:** Implemented, reviewed, and real-accepted for the remote SSH MVP. Tasks 1-10 are complete. Final code commit for the remote Maestro symlink materialization path is `fb0497c`. Final full regression passed with `718 passed, 1 warning`; ruff, cadence check, and `git diff --check` passed. Real remote doctor, real smoke, and continuation acceptance are recorded in `docs/REMOTE_SSH_ACCEPTANCE_2026-06-08.md`.
+**Status 2026-06-08, corrected by C-70 planning:** C-69 implemented useful
+remote SSH/product plumbing, but its remote Spectre/OCEAN adapter semantics are
+superseded by C-70. Tasks 1-10 remain historical implementation evidence for
+SSH runner, remote project/cache, doctor, prepare, CLI routing, report/history
+mirroring, and continuation routing. Do not use this plan as authority for
+remote Spectre/OCEAN command or manifest behavior. The active correction is:
 
-**Real acceptance summary:** user verified passwordless SSH for `zzchen@10.113.216.131`. Clean remote project `/home/zzchen/remote_opt/mixer_muti_tb_c69_accept_20260608_001` passed `--doctor`, completed a 10-evaluation remote `--real` smoke, and completed `--continue 4`; cumulative evaluations reached 14 on both the remote project and local mirror. The user's current metric formulas produced only `metric_check_failed` rows, so the evidence proves remote execution, artifact sync, and failure classification, not a usable optimized point for that project.
+```text
+docs/superpowers/specs/2026-06-08-remote-spectre-ocean-local-parity-design.md
+docs/superpowers/plans/2026-06-08-remote-spectre-ocean-local-parity.md
+```
+
+Final C-69 regression passed with `718 passed, 1 warning`; ruff, cadence check,
+and `git diff --check` passed. Later artifact inspection downgraded the real
+remote evidence to SSH orchestration/product-routing evidence because the remote
+adapter duplicated local Spectre/OCEAN semantics and could reference missing
+PSF artifacts.
+
+**Remote orchestration summary:** user verified passwordless SSH for `zzchen@10.113.216.131`. Clean remote project `/home/zzchen/remote_opt/mixer_muti_tb_c69_accept_20260608_001` passed `--doctor`, completed a 10-evaluation remote `--real` smoke, and completed `--continue 4`; cumulative evaluations reached 14 on both the remote project and local mirror. After C-70 review, this evidence proves SSH orchestration and product routing only. It does not prove remote Spectre/OCEAN local parity.
 
 **Architecture:** Keep local mode unchanged. Add a focused OpenSSH runner, a remote project/cache layer, a remote doctor gate, and a remote Spectre/OCEAN adapter that runs Cadence commands on Linux without requiring the full Python product environment there. Route product CLI remote commands through these new pieces and sync reports back to both local cache and remote project.
 

@@ -20,40 +20,43 @@ ic-auto-opt-workflow/AGENTS.md
 
 Current execution state:
 
-- Current scope: C-69 Remote SSH Execution Backend Design.
-- current_scope: C-69 Remote SSH Execution Backend Design.
-- current_scope_exact: C-69 Remote SSH execution backend design for
-  passwordless-SSH remote Spectre/OCEAN runs.
-- Current status: C-69 Remote SSH Execution Backend is implemented, reviewed,
-  and real-accepted for the MVP. Claude handled the coding tasks and internal
-  review loop; Codex performed final acceptance only. The route now includes
-  SSH runner, remote project/cache, remote doctor, remote prepare, remote
-  Spectre/OCEAN adapter, remote OpenBox real flow, remote continuation,
-  CLI/docs/skill updates, remote Maestro symlink materialization, and
-  report/history mirroring.
+- Current scope: C-70 Remote Spectre/OCEAN Local-Parity Design.
+- current_scope: C-70 Remote Spectre/OCEAN Local-Parity Design.
+- current_scope_exact: C-70 Remote Spectre/OCEAN Local-Parity Design.
+- Current status: C-70 spec and implementation plan are written,
+  verified-only; coding has not started. C-69 SSH/product plumbing is reusable,
+  but the remote Spectre/OCEAN adapter is not accepted because it duplicated and
+  drifted from the proven local adapter command, cwd, artifact, and manifest
+  semantics.
 - Active spec:
-  `docs/superpowers/specs/2026-06-08-remote-ssh-execution-backend-design.md`.
+  `docs/superpowers/specs/2026-06-08-remote-spectre-ocean-local-parity-design.md`.
 - Active plan:
-  `docs/superpowers/plans/2026-06-08-remote-ssh-execution-backend.md`.
-- Next allowed action: C-69 remote SSH MVP is accepted. Continue remote work
-  only from concrete beta feedback or targeted diagnostic polish; do not rerun
-  remote real tools just to refresh docs.
-- C-69 design decision: the Linux EDA server project directory remains the
+  `docs/superpowers/plans/2026-06-08-remote-spectre-ocean-local-parity.md`.
+- Next allowed action: Implement C-70 only after assigning Claude to follow docs/superpowers/plans/2026-06-08-remote-spectre-ocean-local-parity.md with superpowers:subagent-driven-development. Keep the change limited to remote Spectre/OCEAN local-parity tests, canonical argv reuse, artifact download validation, and manifest delegation.
+- C-70 design decision: remote mode may change only where Spectre/OCEAN
+  executes. It must not change local adapter Spectre/OCEAN argv, cwd, OCEAN
+  replay mode, artifact expectations, manifest semantics, metric failure
+  semantics, or multi-testbench aggregation.
+- C-70 implementation boundary: keep the C-69 SSH runner, remote project/cache,
+  doctor, prepare, CLI routing, and report mirroring. Replace the duplicated
+  remote Spectre/OCEAN semantic implementation with local-adapter parity.
+- C-69 retained plumbing decision: the Linux EDA server project directory remains the
   source of truth and keeps the same local-mode layout. The local workstation
   runs the product Python environment, OpenBox/controller, agent skill, and
   report interpretation. The remote Linux host runs Spectre/OCEAN through
   user-configured passwordless SSH, following the `virtuoso-bridge-lite`
   connection assumption. The tool must not manage passwords or private keys.
-- C-69 real acceptance evidence: user verified passwordless SSH for
+- C-69 remote orchestration evidence: user verified passwordless SSH for
   `zzchen@10.113.216.131`. Clean remote project
   `/home/zzchen/remote_opt/mixer_muti_tb_c69_accept_20260608_001` passed
   `--doctor`, completed a 10-evaluation remote `--real` smoke, and completed
   `--continue 4`; cumulative evaluations reached 14 in both the remote project
   and local mirror
   `/home/zzchen/.ic-opt/remote_runs/zzchen@10.113.216.131/150c658badc47d17`.
-  `check-optimizer-run` accepted. The current project formulas produced only
-  `metric_check_failed` rows, so this proves remote execution/artifact
-  sync/failure classification rather than a usable optimized point.
+  `check-optimizer-run` accepted. Later artifact inspection found this does not
+  prove Spectre/OCEAN local parity because the C-69 remote adapter hand-built
+  commands/manifests and could reference missing PSF artifacts. Do not claim
+  production remote Spectre/OCEAN acceptance until C-70 real parity passes.
 - Historical C-66/C-65 notes below are retained for context; they are not the
   active development scope.
 - Latest production acceptance note:

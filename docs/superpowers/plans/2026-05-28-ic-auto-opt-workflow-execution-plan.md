@@ -45,6 +45,16 @@ replay, and continuation package resource inheritance. The next clean product
 drill should validate continuation through generated runtime-agent packages
 without manual resource overrides.
 
+C-69 added reusable remote SSH/product plumbing: passwordless OpenSSH profile
+use, remote project/cache routing, remote doctor, remote prepare, local
+OpenBox/controller execution, remote report/history mirroring, and remote
+continuation routing. Post-acceptance artifact inspection found that the remote
+Spectre/OCEAN adapter itself is not production-accepted because it duplicated
+and drifted from the proven local adapter command, cwd, artifact, and manifest
+semantics. C-70 is the active correction: keep the SSH/product plumbing, but
+make remote Spectre/OCEAN locally equivalent before any further remote feature
+work.
+
 C-55 records the production landing acceptance note at
 `docs/PRODUCTION_LANDING_ACCEPTANCE_2026-06-07.md`. The real Mixer
 multi-testbench project passed `check-project-ready` with
