@@ -49,11 +49,14 @@ C-69 added reusable remote SSH/product plumbing: passwordless OpenSSH profile
 use, remote project/cache routing, remote doctor, remote prepare, local
 OpenBox/controller execution, remote report/history mirroring, and remote
 continuation routing. Post-acceptance artifact inspection found that the remote
-Spectre/OCEAN adapter itself is not production-accepted because it duplicated
+Spectre/OCEAN adapter itself was not production-accepted because it duplicated
 and drifted from the proven local adapter command, cwd, artifact, and manifest
-semantics. C-70 is the active correction: keep the SSH/product plumbing, but
-make remote Spectre/OCEAN locally equivalent before any further remote feature
-work.
+semantics. C-70 fixed that drift for local/unit coverage in commits `4fb3d29`
+and `84afe18`: remote Spectre/OCEAN now reuses canonical local argv wrappers,
+validates required artifacts, delegates manifest semantics to local helpers,
+preserves multi-testbench aggregation, and matches OCEAN retry/failure behavior.
+The remaining remote gate is user-authorized real SSH/Spectre/OCEAN parity
+acceptance.
 
 C-55 records the production landing acceptance note at
 `docs/PRODUCTION_LANDING_ACCEPTANCE_2026-06-07.md`. The real Mixer

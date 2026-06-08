@@ -22,6 +22,17 @@ docs/superpowers/specs/2026-06-08-remote-spectre-ocean-local-parity-design.md
 docs/superpowers/plans/2026-06-08-remote-spectre-ocean-local-parity.md
 ```
 
+C-70 local/unit implementation status as of 2026-06-09:
+
+- implemented in commits `4fb3d29` and `84afe18`;
+- remote mode reuses canonical local Spectre/OCEAN argv wrappers;
+- remote mode validates required PSF/log/scalar artifacts;
+- remote mode delegates result and metric manifest semantics to local helpers;
+- remote mode preserves multi-testbench aggregation;
+- targeted tests passed with `98 passed`;
+- full pytest passed with `733 passed, 1 warning`;
+- real remote parity acceptance remains pending user authorization.
+
 The intended route remains:
 
 - local workstation runs `ic-opt`, OpenBox/controller logic, closeout checks,

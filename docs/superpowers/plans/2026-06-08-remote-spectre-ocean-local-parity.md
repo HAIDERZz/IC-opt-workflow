@@ -9,6 +9,12 @@
 proven local Spectre/OCEAN adapter. C-70 keeps the C-69 SSH/product plumbing but
 replaces the duplicated remote command/manifest behavior.
 
+**Status 2026-06-09:** implemented and reviewed for local/unit parity in
+commits `4fb3d29` and `84afe18`. Targeted C-70 tests passed with `98 passed`;
+full pytest passed with `733 passed, 1 warning`; ruff, cadence, and
+`git diff --check` passed. Real remote SSH/Spectre/OCEAN parity acceptance is
+still pending user authorization.
+
 **Design authority:**
 
 ```text
