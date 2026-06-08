@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path, PurePosixPath
 
+import shlex
+
 from hermes_workflow.remote_prepare import prepare_remote_project_cache
 from hermes_workflow.remote_project import RemoteProjectRef
 
@@ -54,3 +56,35 @@ def test_prepare_remote_project_cache_writes_local_controller_project(tmp_path: 
     assert runner.downloads == [
         ("/remote/maestro/point_1/netlist", result.cache_dir / "netlists" / "exported")
     ]
+
+
+def test_prepare_remote_project_cache_quotes_paths_with_spaces(tmp_path: Path) -> None:
+    spaced_requirement = (
+        Path("tests/fixtures/requirement_intake/valid_project/opt_requirement.md")
+        .read_text(encoding="utf-8")
+        .replace("__MAESTRO_POINT_ROOT__", "/remote/maestro/my point 1")
+    )
+    spaced_path = "/remote/maestro/my point 1/netlist/input.scs"
+    expected_quoted = shlex.quote(spaced_path)
+    commands_run: list[str] = []
+
+    class SpacedFakeRunner(FakeRunner):
+        def read_text(self, remote_path):
+            path = str(remote_path)
+            if path == "/remote/project/opt_requirement.md":
+                return spaced_requirement
+            if path == "/remote/project/constraints.md":
+                return "# guidance\n"
+            raise FileNotFoundError(path)
+
+        def run(self, command: str, **kwargs):
+            commands_run.append(command)
+            return super().run(command, **kwargs)
+
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    runner = SpacedFakeRunner()
+
+    result = prepare_remote_project_cache(ref, runner=runner, cache_root=tmp_path)
+
+    assert result.status == "pass"
+    assert any(expected_quoted in cmd for cmd in commands_run)

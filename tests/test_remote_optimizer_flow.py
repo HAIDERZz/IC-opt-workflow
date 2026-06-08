@@ -38,6 +38,10 @@ def test_optimize_remote_project_runs_doctor_prepare_openbox_and_sync(tmp_path: 
         )
 
     monkeypatch.setattr("hermes_workflow.remote_optimizer_flow.optimize_project", fake_optimize_project)
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow._sync_cache_reports_to_remote",
+        lambda *args, **kwargs: calls.append("sync_reports"),
+    )
 
     result = optimize_remote_project(
         ref,
@@ -52,7 +56,7 @@ def test_optimize_remote_project_runs_doctor_prepare_openbox_and_sync(tmp_path: 
 
     assert result.status == "pass"
     assert result.recommended_run_id == "real_001"
-    assert calls == ["optimize_project"]
+    assert calls == ["optimize_project", "sync_reports"]
 
 
 def test_continue_remote_project_syncs_history_and_runs_additional_evals(tmp_path: Path, monkeypatch) -> None:
@@ -103,3 +107,23 @@ def test_continue_remote_project_syncs_history_and_runs_additional_evals(tmp_pat
     assert result.status == "pass"
     assert result.recommended_run_id == "real_141"
     assert calls == ["sync_history", "optimize_project", "sync_reports"]
+
+
+def test_sync_remote_history_to_cache_raises_on_download_failure(tmp_path: Path) -> None:
+    from hermes_workflow.remote_optimizer_flow import _sync_remote_history_to_cache
+
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir(parents=True)
+
+    class FakeSSH:
+        def exists(self, path):
+            return True
+
+        def download_tree(self, remote, local):
+            raise OSError("connection reset")
+
+    import pytest
+
+    with pytest.raises(RuntimeError, match="ledger"):
+        _sync_remote_history_to_cache(ref, cache_dir, FakeSSH())

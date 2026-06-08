@@ -92,3 +92,4 @@ def test_ic_opt_remote_continue_routes_additional_evals(monkeypatch, tmp_path: P
     assert result.exit_code == 0, result.output
     assert "remote continuation completed" in result.output
     assert "recommended: real_141" in result.output
+    assert calls[0]["additional_evals"] == 40

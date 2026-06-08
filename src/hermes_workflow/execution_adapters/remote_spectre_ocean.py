@@ -34,25 +34,25 @@ def run_remote_spectre_ocean_adapter(
     spectre_command = (
         "csh -fc "
         + quote_remote_path(
-            f"source {remote_cadence_cshrc}; cd {remote_input_dir}; "
+            f"source {quote_remote_path(remote_cadence_cshrc)}; cd {quote_remote_path(remote_input_dir)}; "
             f"spectre -64 +preset=aps +mt={context.request.spectre.get('threads_per_run', 1)} "
             f"-format psfxl -raw ../psf input.scs"
         )
     )
     spectre_result = runner.run(spectre_command)
     if spectre_result.return_code != 0:
-        return _write_remote_failure(context, "spectre command failed")
+        return _write_remote_failure(context, "spectre command failed", runner=runner, remote_run_dir=remote_run_dir)
 
     ocean_command = (
         "csh -fc "
         + quote_remote_path(
-            f"source {remote_cadence_cshrc}; cd {remote_ref.remote_project_dir}; "
-            f"ocean -nograph -restore {remote_run_dir / 'metrics' / 'metric_probe.ocn'}"
+            f"source {quote_remote_path(remote_cadence_cshrc)}; cd {quote_remote_path(remote_ref.remote_project_dir)}; "
+            f"ocean -nograph -restore {quote_remote_path(remote_run_dir / 'metrics' / 'metric_probe.ocn')}"
         )
     )
     ocean_result = runner.run(ocean_command)
     if ocean_result.return_code != 0:
-        return _write_remote_failure(context, "ocean command failed")
+        return _write_remote_failure(context, "ocean command failed", runner=runner, remote_run_dir=remote_run_dir)
 
     runner.download_tree(remote_run_dir / "metrics", context.metrics_dir)
     result = _write_remote_success_manifests(context)
@@ -64,7 +64,7 @@ def run_remote_spectre_ocean_adapter(
     return result
 
 
-def _write_remote_failure(context: Any, notes: str) -> AdapterRunResult:
+def _write_remote_failure(context: Any, notes: str, *, runner: Any, remote_run_dir: PurePosixPath) -> AdapterRunResult:
     started = datetime.now(UTC).replace(microsecond=0).strftime("%Y-%m-%dT%H:%M:%SZ")
     result_path = context.run_dir / "result_manifest.json"
     payload = {
@@ -78,6 +78,7 @@ def _write_remote_failure(context: Any, notes: str) -> AdapterRunResult:
         "notes": notes,
     }
     result_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    runner.upload(result_path, remote_run_dir / "result_manifest.json")
     return AdapterRunResult(
         status="failed",
         run_id=context.run_id,

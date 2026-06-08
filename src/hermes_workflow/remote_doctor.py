@@ -101,7 +101,7 @@ def run_remote_doctor(
         ssh.run(
             "csh -fc "
             + quote_remote_path(
-                f"source {cshrc_path}; which spectre; which ocean"
+                f"source {quote_remote_path(cshrc_path)}; which spectre; which ocean"
             )
         ),
         "spectre and ocean are available after sourcing cshrc",

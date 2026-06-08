@@ -58,7 +58,7 @@ def optimize_remote_project(
         )
 
     services = OptimizerFlowServices(run_openbox_real_optimization=remote_openbox)
-    return optimize_project(
+    report = optimize_project(
         prepared.cache_dir,
         real=True,
         dry_orchestration=False,
@@ -69,6 +69,8 @@ def optimize_remote_project(
         execution_agent="direct",
         services=services,
     )
+    _sync_cache_reports_to_remote(ref, prepared.cache_dir, ssh)
+    return report
 
 
 def continue_remote_project(
@@ -135,8 +137,10 @@ def _sync_remote_history_to_cache(
             local_dir.mkdir(parents=True, exist_ok=True)
             try:
                 ssh.download_tree(remote_dir, local_dir)
-            except Exception:
-                pass  # Best-effort: continuation works even if some dirs are missing
+            except Exception as exc:
+                raise RuntimeError(
+                    f"Failed to sync remote history subdir '{subdir}': {exc}"
+                ) from exc
 
 
 def _sync_cache_reports_to_remote(

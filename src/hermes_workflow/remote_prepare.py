@@ -6,6 +6,7 @@ from typing import Any
 
 from hermes_workflow.netlists import prepare_netlist
 from hermes_workflow.remote_project import RemoteProjectRef, remote_cache_dir
+from hermes_workflow.remote_ssh import quote_remote_path
 from hermes_workflow.requirement_intake import (
     render_config_payloads,
     write_config_payloads,
@@ -40,7 +41,7 @@ def prepare_remote_project_cache(
     report = parse_requirement_text(
         requirement_text,
         constraints_text=constraints_text,
-        maestro_input_exists=lambda path: runner.run(f"test -f {path}").return_code == 0,
+        maestro_input_exists=lambda path: runner.run(f"test -f {quote_remote_path(path)}").return_code == 0,
     )
     if report.status != "pass":
         return RemotePrepareResult(status="fail", cache_dir=cache_dir, issues=report.issues)

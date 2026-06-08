@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import shlex
 from pathlib import Path, PurePosixPath
 
 from hermes_workflow.remote_doctor import run_remote_doctor
@@ -90,3 +91,35 @@ def test_remote_doctor_fails_before_optimizer_when_ssh_is_not_ready(
     assert report.status == "fail"
     assert report.checks["ssh"]["status"] == "fail"
     assert "ssh lab true" in report.checks["ssh"]["message"]
+
+
+def test_remote_doctor_csh_payload_quotes_cshrc_path(tmp_path: Path) -> None:
+    cshrc = PurePosixPath("/remote/project/my cadence env.csh")
+
+    class SpacePathRunner(FakeRunner):
+        def run(self, command: str, **kwargs: object) -> RemoteCommandResult:
+            self.commands.append(command)
+            if command == "true":
+                return RemoteCommandResult(0, "", "", ["ssh", "lab", command])
+            if "test -d" in command:
+                return RemoteCommandResult(0, "", "", ["ssh", "lab", command])
+            if "test -w" in command:
+                return RemoteCommandResult(0, "", "", ["ssh", "lab", command])
+            if f"test -f {shlex.quote(str(cshrc))}" in command:
+                return RemoteCommandResult(0, "", "", ["ssh", "lab", command])
+            if "which spectre" in command and "which ocean" in command:
+                return RemoteCommandResult(
+                    0, "/tools/spectre\n/tools/ocean\n", "", ["ssh", "lab", command]
+                )
+            if "mkdir -p" in command:
+                return RemoteCommandResult(0, "", "", ["ssh", "lab", command])
+            return RemoteCommandResult(1, "", "unexpected command", ["ssh", "lab", command])
+
+    runner = SpacePathRunner()
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+
+    run_remote_doctor(ref, runner=runner, cadence_cshrc=cshrc, cache_root=tmp_path)
+
+    csh_commands = [c for c in runner.commands if c.startswith("csh -fc")]
+    assert len(csh_commands) == 1
+    assert shlex.quote(str(cshrc)) in csh_commands[0]
