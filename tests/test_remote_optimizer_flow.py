@@ -570,6 +570,194 @@ def test_continue_remote_project_passes_openbox_strategy_defaults(
     assert captured_kwargs["acq_optimizer_type"] == "local_random"
 
 
+def test_optimize_remote_project_routes_multi_testbench_to_multi_adapter(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """When testbenches config is present, optimize_remote_project must route
+    to run_remote_multi_testbench_adapter instead of run_remote_spectre_ocean_adapter."""
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    cache_dir = tmp_path / "cache"
+    captured_adapter_name: list[str] = []
+
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.run_remote_doctor",
+        lambda *args, **kwargs: SimpleNamespace(status="pass", issues=[]),
+    )
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.prepare_remote_project_cache",
+        lambda *args, **kwargs: SimpleNamespace(status="pass", cache_dir=cache_dir, issues=[]),
+    )
+
+    # Mock run_openbox_real_optimization so it invokes the adapter callback
+    # (the routing decision happens inside the adapter passed by remote_openbox).
+    def fake_openbox(*args, **kwargs):
+        adapter = kwargs.get("adapter")
+        if adapter is not None:
+            adapter(cache_dir, run_id="test_run", cadence_cshrc=Path("test"))
+        return SimpleNamespace(evaluation_count=0)
+
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.run_openbox_real_optimization",
+        fake_openbox,
+    )
+
+    def fake_optimize_project(project_dir: Path, **kwargs):
+        services = kwargs["services"]
+        assert services is not None
+        # Exercise the remote_openbox callback so the adapter routing fires.
+        services.run_openbox_real_optimization(project_dir)
+        report_path = cache_dir / "reports" / "optimizer_flow_run_report.json"
+        report_path.parent.mkdir(parents=True)
+        report_path.write_text('{"status": "pass"}\n', encoding="utf-8")
+        return SimpleNamespace(
+            status="pass",
+            report_path=report_path,
+            recommended_run_id="real_001",
+            user_decision_required=True,
+            issues=[],
+        )
+
+    monkeypatch.setattr("hermes_workflow.remote_optimizer_flow.optimize_project", fake_optimize_project)
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow._sync_cache_reports_to_remote",
+        lambda *args, **kwargs: None,
+    )
+
+    # Mock assert_valid_project to return a bundle WITH testbenches
+    class FakeTestbench:
+        def __init__(self, id: str) -> None:
+            self.id = id
+
+    class FakeTestbenches:
+        testbenches = [FakeTestbench("tb1"), FakeTestbench("tb2")]
+
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.assert_valid_project",
+        lambda *args, **kwargs: SimpleNamespace(testbenches=FakeTestbenches()),
+    )
+
+    # Capture which adapter is called
+    def fake_multi_adapter(*args, **kwargs):
+        captured_adapter_name.append("multi")
+        return SimpleNamespace(status="succeeded", issues=[])
+
+    def fake_single_adapter(*args, **kwargs):
+        captured_adapter_name.append("single")
+        return SimpleNamespace(status="succeeded", issues=[])
+
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.run_remote_multi_testbench_adapter",
+        fake_multi_adapter,
+    )
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.run_remote_spectre_ocean_adapter",
+        fake_single_adapter,
+    )
+
+    result = optimize_remote_project(
+        ref,
+        real=True,
+        max_evals=2,
+        batch_size=1,
+        parallel_jobs=1,
+        remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
+        cache_root=tmp_path,
+        runner=object(),
+    )
+
+    assert captured_adapter_name == ["multi"]
+    assert result.status == "pass"
+
+
+def test_optimize_remote_project_routes_single_testbench_to_single_adapter(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """When testbenches config is absent, optimize_remote_project must route
+    to run_remote_spectre_ocean_adapter, not run_remote_multi_testbench_adapter."""
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    cache_dir = tmp_path / "cache"
+    captured_adapter_name: list[str] = []
+
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.run_remote_doctor",
+        lambda *args, **kwargs: SimpleNamespace(status="pass", issues=[]),
+    )
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.prepare_remote_project_cache",
+        lambda *args, **kwargs: SimpleNamespace(status="pass", cache_dir=cache_dir, issues=[]),
+    )
+
+    # Mock run_openbox_real_optimization so it invokes the adapter callback
+    # (the routing decision happens inside the adapter passed by remote_openbox).
+    def fake_openbox(*args, **kwargs):
+        adapter = kwargs.get("adapter")
+        if adapter is not None:
+            adapter(cache_dir, run_id="test_run", cadence_cshrc=Path("test"))
+        return SimpleNamespace(evaluation_count=0)
+
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.run_openbox_real_optimization",
+        fake_openbox,
+    )
+
+    def fake_optimize_project(project_dir: Path, **kwargs):
+        services = kwargs["services"]
+        # Exercise the remote_openbox callback so the adapter routing fires.
+        services.run_openbox_real_optimization(project_dir)
+        report_path = cache_dir / "reports" / "optimizer_flow_run_report.json"
+        report_path.parent.mkdir(parents=True)
+        report_path.write_text('{"status": "pass"}\n', encoding="utf-8")
+        return SimpleNamespace(
+            status="pass",
+            report_path=report_path,
+            recommended_run_id="real_001",
+            user_decision_required=True,
+            issues=[],
+        )
+
+    monkeypatch.setattr("hermes_workflow.remote_optimizer_flow.optimize_project", fake_optimize_project)
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow._sync_cache_reports_to_remote",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.assert_valid_project",
+        lambda *args, **kwargs: SimpleNamespace(testbenches=None),
+    )
+
+    # Capture which adapter is called
+    def fake_multi_adapter(*args, **kwargs):
+        captured_adapter_name.append("multi")
+        return SimpleNamespace(status="succeeded", issues=[])
+
+    def fake_single_adapter(*args, **kwargs):
+        captured_adapter_name.append("single")
+        return SimpleNamespace(status="succeeded", issues=[])
+
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.run_remote_multi_testbench_adapter",
+        fake_multi_adapter,
+    )
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.run_remote_spectre_ocean_adapter",
+        fake_single_adapter,
+    )
+
+    result = optimize_remote_project(
+        ref,
+        real=True,
+        max_evals=2,
+        batch_size=1,
+        parallel_jobs=1,
+        remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
+        cache_root=tmp_path,
+        runner=object(),
+    )
+
+    assert captured_adapter_name == ["single"]
+    assert result.status == "pass"
+
+
 def test_sync_remote_history_to_cache_raises_on_download_failure(tmp_path: Path) -> None:
     from hermes_workflow.remote_optimizer_flow import _sync_remote_history_to_cache
 

@@ -9,6 +9,7 @@ from hermes_workflow.execution_adapters.remote_spectre_ocean import (
     run_remote_multi_testbench_adapter,
     run_remote_spectre_ocean_adapter,
 )
+from hermes_workflow.execution_adapters.spectre_ocean import load_adapter_context
 from hermes_workflow.remote_project import RemoteProjectRef
 from hermes_workflow.remote_ssh import RemoteCommandResult
 from tests.real_run_smoke_helpers import create_approved_real_project
@@ -26,13 +27,35 @@ class FakeRunner:
     def download_tree(self, remote_path, local_path, include=None, exclude=None) -> None:
         self.downloads.append((str(remote_path), Path(local_path)))
         Path(local_path).mkdir(parents=True, exist_ok=True)
-        (Path(local_path) / "ocean_scalars.tsv").write_text(
-            "metric\tvalue\tunit\tstatus\texpression_sha256\tmessage\n"
-            "rise\t1e-12\ts\tpass\t352e7b3256d5417f58d087382bd2054efbcf696d06b58fc6d39002bb09489748\t\n"
-            "fall\t1e-12\ts\tpass\t8ba00c0d961decb9275b9636f61dbbd5659b5ed066a74b0083cd0e1d6d3d5493\t\n"
-            "DC\t1e-06\tW\tpass\tcb82f3f25ee13ea3cb45f605a763ed0806ebb7f47fd27ce4a9c4a4cd902bb7c4\t\n",
-            encoding="utf-8",
-        )
+        remote = str(remote_path)
+        if remote.endswith("/psf"):
+            (Path(local_path) / "spectre.out").write_text("spectre output", encoding="utf-8")
+        elif remote.endswith("/metrics"):
+            (Path(local_path) / "ocean_scalars.tsv").write_text(
+                "metric\tvalue\tunit\tstatus\texpression_sha256\tmessage\n"
+                "rise\t1e-12\ts\tpass\t352e7b3256d5417f58d087382bd2054efbcf696d06b58fc6d39002bb09489748\t\n"
+                "fall\t1e-12\ts\tpass\t8ba00c0d961decb9275b9636f61dbbd5659b5ed066a74b0083cd0e1d6d3d5493\t\n"
+                "DC\t1e-06\tW\tpass\tcb82f3f25ee13ea3cb45f605a763ed0806ebb7f47fd27ce4a9c4a4cd902bb7c4\t\n",
+                encoding="utf-8",
+            )
+            (Path(local_path) / "ocean.stdout").write_text("ocean stdout output", encoding="utf-8")
+            (Path(local_path) / "ocean.stderr").write_text("", encoding="utf-8")
+            (Path(local_path) / "ocean.log").write_text("ocean log output", encoding="utf-8")
+
+    def download(self, remote_path: str, local_path: Path) -> None:
+        self.downloads.append((remote_path, local_path))
+        # Only create the file if the remote path is a plausible artifact
+        # location.  This prevents unconditional file creation from masking
+        # redirect-placement bugs (e.g. files landing in the SSH session cwd
+        # instead of remote_run_dir).
+        name = Path(remote_path).name
+        parent = str(Path(remote_path).parent)
+        if name in ("spectre.stdout", "spectre.stderr") and parent.rstrip("/").endswith("real_001"):
+            local_path.parent.mkdir(parents=True, exist_ok=True)
+            local_path.write_text(f"content of {name}", encoding="utf-8")
+        elif name in ("ocean.stdout", "ocean.stderr", "ocean.log") and parent.rstrip("/").endswith("metrics"):
+            local_path.parent.mkdir(parents=True, exist_ok=True)
+            local_path.write_text(f"content of {name}", encoding="utf-8")
 
     def run(self, command: str, **kwargs: object) -> RemoteCommandResult:
         self.commands.append(command)
@@ -75,7 +98,7 @@ def test_remote_adapter_runs_spectre_and_ocean_remotely(tmp_path: Path) -> None:
     assert (run_dir / "metrics" / "metric_result_manifest.json").is_file()
     manifest = json.loads((run_dir / "result_manifest.json").read_text(encoding="utf-8"))
     assert manifest["status"] == "succeeded"
-    assert "remote spectre and ocean completed" in manifest.get("notes", "")
+    assert "spectre command completed" in manifest.get("notes", "")
 
 
 def test_remote_adapter_csh_payload_quotes_paths(tmp_path: Path) -> None:
@@ -106,14 +129,30 @@ def test_remote_adapter_csh_payload_quotes_paths(tmp_path: Path) -> None:
     quoted_cshrc = shlex.quote(str(cshrc))
     quoted_input_dir = shlex.quote(str(remote_run_dir / "netlist"))
     quoted_project = shlex.quote(str(remote_project))
-    quoted_restore = shlex.quote(str(remote_run_dir / "metrics" / "metric_probe.ocn"))
 
     assert f"source {quoted_cshrc}" in inner_spectre
     assert f"cd {quoted_input_dir}" in inner_spectre
 
     assert f"source {quoted_cshrc}" in inner_ocean
     assert f"cd {quoted_project}" in inner_ocean
-    assert f"-restore {quoted_restore}" in inner_ocean
+    assert "-replay" in inner_ocean
+    assert "-log" in inner_ocean
+    assert "-restore" not in inner_ocean
+
+    # Redirects must be INSIDE the csh wrapper using absolute remote paths,
+    # not outside as relative paths interpreted by the outer SSH shell.
+    quoted_spectre_stdout = shlex.quote(str(remote_run_dir / "spectre.stdout"))
+    quoted_spectre_stderr = shlex.quote(str(remote_run_dir / "spectre.stderr"))
+    assert f"> {quoted_spectre_stdout}" in inner_spectre
+    assert f"2> {quoted_spectre_stderr}" in inner_spectre
+    # Outer command must not have trailing redirects
+    assert not spectre_cmd.rstrip("'").endswith("spectre.stdout")
+
+    quoted_ocean_stdout = shlex.quote(str(remote_run_dir / "metrics" / "ocean.stdout"))
+    quoted_ocean_stderr = shlex.quote(str(remote_run_dir / "metrics" / "ocean.stderr"))
+    assert f"> {quoted_ocean_stdout}" in inner_ocean
+    assert f"2> {quoted_ocean_stderr}" in inner_ocean
+    assert not ocean_cmd.rstrip("'").endswith("ocean.stdout")
 
 
 def test_remote_adapter_spectre_failure_uploads_manifest_to_remote(tmp_path: Path) -> None:
@@ -166,17 +205,73 @@ class MultiTestbenchFakeRunner(FakeRunner):
     def __init__(self) -> None:
         super().__init__()
         self.child_metric_names: dict[str, list[str]] = {}
+        # Maps testbench_id -> {metric_name: expression_sha256}
+        self.child_expression_sha256: dict[str, dict[str, str]] = {}
+        # Maps testbench_id -> {metric_name: unit}
+        self.child_metric_units: dict[str, dict[str, str]] = {}
+        self._project_dir: Path | None = None
+
+    def set_project_dir(self, project_dir: Path) -> None:
+        """Store project_dir so metric metadata can be resolved from metric requests."""
+        self._project_dir = project_dir
+
+    def _populate_from_request(self, testbench_id: str) -> None:
+        """Auto-populate expression_sha256 and unit from the metric request file."""
+        if self._project_dir is None:
+            return
+        if testbench_id in self.child_expression_sha256 and testbench_id in self.child_metric_units:
+            return
+        request_path = (
+            self._project_dir / "runs" / "real" / "real_001"
+            / "testbenches" / testbench_id / "metric_extraction_request.json"
+        )
+        if request_path.is_file():
+            import json as _json
+            request = _json.loads(request_path.read_text(encoding="utf-8"))
+            self.child_expression_sha256[testbench_id] = {
+                m["name"]: m["expression_sha256"] for m in request.get("metrics", [])
+            }
+            self.child_metric_units[testbench_id] = {
+                m["name"]: m["unit"] for m in request.get("metrics", [])
+            }
 
     def download_tree(self, remote_path, local_path, include=None, exclude=None) -> None:
         self.downloads.append((str(remote_path), Path(local_path)))
         Path(local_path).mkdir(parents=True, exist_ok=True)
         local = Path(local_path)
-        metric_names = self._resolve_metric_names(local)
-        header = "metric\tvalue\tunit\tstatus\texpression_sha256\tmessage\n"
-        rows = "".join(
-            f"{name}\t1e-12\ts\tpass\t{'a' * 64}\t\n" for name in metric_names
-        )
-        (local / "ocean_scalars.tsv").write_text(header + rows, encoding="utf-8")
+        remote = str(remote_path)
+        if remote.endswith("/psf"):
+            (local / "spectre.out").write_text("spectre output", encoding="utf-8")
+        elif remote.endswith("/metrics"):
+            metric_names = self._resolve_metric_names(local)
+            sha256_map = self._resolve_expression_sha256(local)
+            unit_map = self._resolve_metric_units(local)
+            header = "metric\tvalue\tunit\tstatus\texpression_sha256\tmessage\n"
+            rows = "".join(
+                f"{name}\t1e-12\t{unit_map.get(name, 's')}\tpass\t{sha256_map.get(name, 'a' * 64)}\t\n"
+                for name in metric_names
+            )
+            (local / "ocean_scalars.tsv").write_text(header + rows, encoding="utf-8")
+            (local / "ocean.stdout").write_text("ocean stdout output", encoding="utf-8")
+            (local / "ocean.stderr").write_text("", encoding="utf-8")
+            (local / "ocean.log").write_text("ocean log output", encoding="utf-8")
+
+    def download(self, remote_path: str, local_path: Path) -> None:
+        self.downloads.append((remote_path, local_path))
+        # Only create the file if the remote path is a plausible artifact
+        # location.  This prevents unconditional file creation from masking
+        # redirect-placement bugs (e.g. files landing in the SSH session cwd
+        # instead of remote_run_dir).
+        name = Path(remote_path).name
+        parent = str(Path(remote_path).parent)
+        parent_stripped = parent.rstrip("/")
+        is_run_dir = parent_stripped.endswith("real_001") or "/testbenches/" in parent_stripped
+        if name in ("spectre.stdout", "spectre.stderr") and is_run_dir:
+            local_path.parent.mkdir(parents=True, exist_ok=True)
+            local_path.write_text(f"content of {name}", encoding="utf-8")
+        elif name in ("ocean.stdout", "ocean.stderr", "ocean.log") and parent_stripped.endswith("metrics"):
+            local_path.parent.mkdir(parents=True, exist_ok=True)
+            local_path.write_text(f"content of {name}", encoding="utf-8")
 
     def _resolve_metric_names(self, local_path: Path) -> list[str]:
         parts = local_path.parts
@@ -187,6 +282,26 @@ class MultiTestbenchFakeRunner(FakeRunner):
                     return self.child_metric_names[testbench_id]
         return ["rise", "fall", "DC"]
 
+    def _resolve_expression_sha256(self, local_path: Path) -> dict[str, str]:
+        parts = local_path.parts
+        for i, part in enumerate(parts):
+            if part == "testbenches" and i + 1 < len(parts):
+                testbench_id = parts[i + 1]
+                self._populate_from_request(testbench_id)
+                if testbench_id in self.child_expression_sha256:
+                    return self.child_expression_sha256[testbench_id]
+        return {}
+
+    def _resolve_metric_units(self, local_path: Path) -> dict[str, str]:
+        parts = local_path.parts
+        for i, part in enumerate(parts):
+            if part == "testbenches" and i + 1 < len(parts):
+                testbench_id = parts[i + 1]
+                self._populate_from_request(testbench_id)
+                if testbench_id in self.child_metric_units:
+                    return self.child_metric_units[testbench_id]
+        return {}
+
 
 def test_remote_multi_testbench_adapter_runs_each_child(tmp_path: Path) -> None:
     from tests.test_multi_testbench_aggregation import (
@@ -196,6 +311,7 @@ def test_remote_multi_testbench_adapter_runs_each_child(tmp_path: Path) -> None:
     project_dir = _create_ready_multi_testbench_project(tmp_path)
     ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
     runner = MultiTestbenchFakeRunner()
+    runner.set_project_dir(project_dir)
     runner.child_metric_names = {
         "cg_nf": ["MAX_GAIN"],
         "iip3": ["IIP3"],
@@ -242,6 +358,7 @@ def test_remote_multi_testbench_adapter_child_metric_probe_paths(tmp_path: Path)
     project_dir = _create_ready_multi_testbench_project(tmp_path)
     ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
     runner = MultiTestbenchFakeRunner()
+    runner.set_project_dir(project_dir)
     runner.child_metric_names = {
         "cg_nf": ["MAX_GAIN"],
         "iip3": ["IIP3"],
@@ -258,9 +375,10 @@ def test_remote_multi_testbench_adapter_child_metric_probe_paths(tmp_path: Path)
     ocean_cmds = [c for c in runner.commands if "ocean" in c]
     for cmd in ocean_cmds:
         inner = shlex.split(cmd)[2]
-        assert "/real/real_001/metrics/metric_probe.ocn" not in inner
         assert "testbenches/" in inner
         assert "metric_probe.ocn" in inner
+        # Verify child testbench path, not top-level metrics path
+        assert "/real/real_001/metrics/metric_probe.ocn" not in inner.replace("testbenches/", "")
 
 
 def test_remote_multi_testbench_adapter_child_failure_reports_issues(tmp_path: Path) -> None:
@@ -269,6 +387,7 @@ def test_remote_multi_testbench_adapter_child_failure_reports_issues(tmp_path: P
     project_dir = _create_ready_multi_testbench_project(tmp_path)
     ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
     runner = MultiTestbenchFakeRunner()
+    runner.set_project_dir(project_dir)
     runner.child_metric_names = {
         "cg_nf": ["MAX_GAIN"],
         "iip3": ["IIP3"],
@@ -301,6 +420,7 @@ def test_remote_multi_testbench_adapter_aggregates_upload(tmp_path: Path) -> Non
     project_dir = _create_ready_multi_testbench_project(tmp_path)
     ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
     runner = MultiTestbenchFakeRunner()
+    runner.set_project_dir(project_dir)
     runner.child_metric_names = {
         "cg_nf": ["MAX_GAIN"],
         "iip3": ["IIP3"],
@@ -355,6 +475,325 @@ def test_remote_adapter_writes_ocean_script_under_project_dir_not_cwd(tmp_path: 
     assert not wrong_script.exists(), f"metric_probe.ocn leaked to cwd: {wrong_script}"
 
 
+def test_remote_spectre_command_uses_canonical_local_argv(tmp_path: Path) -> None:
+    """Regression C-70: remote spectre must use the same flags as the local adapter.
+
+    The local adapter _spectre_argv includes +escchars, +lqtimeout 900,
+    -maxw 5, -maxn 5, -env ade, +logstatus, and +log ../psf/spectre.out.
+    It reads preset from context.request.spectre, not hardcoded.
+    The C-69 remote adapter hardcodes +preset=aps and omits all those flags.
+    """
+    project_dir = create_approved_real_project(tmp_path)
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    runner = FakeRunner()
+
+    run_remote_spectre_ocean_adapter(
+        project_dir,
+        run_id="real_001",
+        remote_ref=ref,
+        remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
+        runner=runner,
+    )
+
+    spectre_cmd = next(c for c in runner.commands if "spectre" in c)
+    inner = shlex.split(spectre_cmd)[2]
+
+    # Preset must come from the configured request, not be hardcoded
+    context = load_adapter_context(project_dir, run_id="real_001")
+    expected_preset = context.request.spectre["preset"]
+    assert f"+preset={expected_preset}" in inner, (
+        f"spectre command must use configured preset +preset={expected_preset}, "
+        f"not hardcoded +preset=aps"
+    )
+
+    # All local adapter flags must be present
+    for flag in ("+escchars", "+lqtimeout", "-maxw", "-maxn", "-env ade", "+logstatus"):
+        assert flag in inner, f"local adapter flag missing from remote spectre command: {flag}"
+
+    # Local adapter includes +log ../psf/spectre.out
+    assert "+log" in inner, "remote spectre command must include +log for spectre.out"
+
+
+def test_remote_ocean_command_uses_replay_not_restore(tmp_path: Path) -> None:
+    """Regression C-70: remote ocean must use -replay/-log, not -restore.
+
+    The local adapter _ocean_argv uses: ocean -nograph -replay <script> -log <log>
+    The C-69 remote adapter uses: ocean -nograph -restore <metric_probe.ocn>
+    """
+    project_dir = create_approved_real_project(tmp_path)
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    runner = FakeRunner()
+
+    run_remote_spectre_ocean_adapter(
+        project_dir,
+        run_id="real_001",
+        remote_ref=ref,
+        remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
+        runner=runner,
+    )
+
+    ocean_cmd = next(c for c in runner.commands if "ocean" in c)
+    inner = shlex.split(ocean_cmd)[2]
+
+    assert "-replay" in inner, "remote ocean must use -replay, not -restore"
+    assert "-log" in inner, "remote ocean must include -log for ocean.log"
+    assert "-restore" not in inner, "remote ocean must not use -restore"
+
+
+class NoPsfFakeRunner(FakeRunner):
+    """FakeRunner that succeeds but does not create PSF artifacts locally.
+
+    This simulates the case where remote spectre succeeds but the psf/
+    directory is not present locally (e.g. download failed silently).
+    Metrics and log files are still created so the failure is specifically
+    about the missing PSF directory.
+    """
+
+    def download_tree(self, remote_path, local_path, include=None, exclude=None) -> None:
+        self.downloads.append((str(remote_path), Path(local_path)))
+        Path(local_path).mkdir(parents=True, exist_ok=True)
+        remote = str(remote_path)
+        if remote.endswith("/psf"):
+            # Do NOT create spectre.out -- simulate missing PSF artifacts
+            pass
+        elif remote.endswith("/metrics"):
+            (Path(local_path) / "ocean_scalars.tsv").write_text(
+                "metric\tvalue\tunit\tstatus\texpression_sha256\tmessage\n"
+                "rise\t1e-12\ts\tpass\t352e7b3256d5417f58d087382bd2054efbcf696d06b58fc6d39002bb09489748\t\n"
+                "fall\t1e-12\ts\tpass\t8ba00c0d961decb9275b9636f61dbbd5659b5ed066a74b0083cd0e1d6d3d5493\t\n"
+                "DC\t1e-06\tW\tpass\tcb82f3f25ee13ea3cb45f605a763ed0806ebb7f47fd27ce4a9c4a4cd902bb7c4\t\n",
+                encoding="utf-8",
+            )
+            (Path(local_path) / "ocean.stdout").write_text("ocean stdout output", encoding="utf-8")
+            (Path(local_path) / "ocean.stderr").write_text("", encoding="utf-8")
+            (Path(local_path) / "ocean.log").write_text("ocean log output", encoding="utf-8")
+
+
+def test_remote_adapter_fails_when_psf_artifacts_missing(tmp_path: Path) -> None:
+    """Regression C-70: adapter must fail if PSF artifacts are not present locally.
+
+    When remote spectre returns success but psf/ and psf/spectre.out are not
+    downloaded, the adapter must not write a success result manifest.
+    The C-69 adapter skips PSF download and writes a success manifest anyway.
+    """
+    project_dir = create_approved_real_project(tmp_path)
+    run_dir = project_dir / "runs" / "real" / "real_001"
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    runner = NoPsfFakeRunner()
+
+    result = run_remote_spectre_ocean_adapter(
+        project_dir,
+        run_id="real_001",
+        remote_ref=ref,
+        remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
+        runner=runner,
+    )
+
+    assert result.status == "failed", (
+        "adapter must fail when psf/spectre.out artifacts are missing"
+    )
+    manifest = json.loads((run_dir / "result_manifest.json").read_text(encoding="utf-8"))
+    assert manifest["status"] == "failed", (
+        "result_manifest must report failed when PSF artifacts are missing"
+    )
+
+
+class MissingArtifactFakeRunner(FakeRunner):
+    """FakeRunner that suppresses creation of one specific artifact file.
+
+    This simulates a download that succeeds but does not produce the expected
+    file on disk (e.g. silent truncation or path mismatch).
+    """
+
+    def __init__(self, missing_name: str) -> None:
+        super().__init__()
+        self._missing = missing_name
+
+    def download_tree(self, remote_path, local_path, include=None, exclude=None) -> None:
+        super().download_tree(remote_path, local_path, include=include, exclude=exclude)
+        # Remove the suppressed artifact if download_tree created it
+        if str(remote_path).endswith("/metrics"):
+            target = Path(local_path) / self._missing
+            if target.exists():
+                target.unlink()
+
+    def download(self, remote_path: str, local_path: Path) -> None:
+        name = Path(remote_path).name
+        if name == self._missing:
+            self.downloads.append((remote_path, local_path))
+            return
+        super().download(remote_path, local_path)
+
+
+def test_remote_adapter_fails_when_spectre_stdout_missing(tmp_path: Path) -> None:
+    project_dir = create_approved_real_project(tmp_path)
+    run_dir = project_dir / "runs" / "real" / "real_001"
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    runner = MissingArtifactFakeRunner("spectre.stdout")
+
+    result = run_remote_spectre_ocean_adapter(
+        project_dir,
+        run_id="real_001",
+        remote_ref=ref,
+        remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
+        runner=runner,
+    )
+
+    assert result.status == "failed"
+    assert any("spectre.stdout" in issue for issue in result.issues)
+    manifest = json.loads((run_dir / "result_manifest.json").read_text(encoding="utf-8"))
+    assert manifest["status"] == "failed"
+
+
+def test_remote_adapter_fails_when_spectre_stderr_missing(tmp_path: Path) -> None:
+    project_dir = create_approved_real_project(tmp_path)
+    run_dir = project_dir / "runs" / "real" / "real_001"
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    runner = MissingArtifactFakeRunner("spectre.stderr")
+
+    result = run_remote_spectre_ocean_adapter(
+        project_dir,
+        run_id="real_001",
+        remote_ref=ref,
+        remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
+        runner=runner,
+    )
+
+    assert result.status == "failed"
+    assert any("spectre.stderr" in issue for issue in result.issues)
+    manifest = json.loads((run_dir / "result_manifest.json").read_text(encoding="utf-8"))
+    assert manifest["status"] == "failed"
+
+
+def test_remote_adapter_fails_when_ocean_stdout_missing(tmp_path: Path) -> None:
+    project_dir = create_approved_real_project(tmp_path)
+    run_dir = project_dir / "runs" / "real" / "real_001"
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    runner = MissingArtifactFakeRunner("ocean.stdout")
+
+    result = run_remote_spectre_ocean_adapter(
+        project_dir,
+        run_id="real_001",
+        remote_ref=ref,
+        remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
+        runner=runner,
+    )
+
+    assert result.status == "failed"
+    assert any("ocean.stdout" in issue for issue in result.issues)
+    manifest = json.loads((run_dir / "result_manifest.json").read_text(encoding="utf-8"))
+    assert manifest["status"] == "failed"
+
+
+def test_remote_adapter_fails_when_ocean_stderr_missing(tmp_path: Path) -> None:
+    project_dir = create_approved_real_project(tmp_path)
+    run_dir = project_dir / "runs" / "real" / "real_001"
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    runner = MissingArtifactFakeRunner("ocean.stderr")
+
+    result = run_remote_spectre_ocean_adapter(
+        project_dir,
+        run_id="real_001",
+        remote_ref=ref,
+        remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
+        runner=runner,
+    )
+
+    assert result.status == "failed"
+    assert any("ocean.stderr" in issue for issue in result.issues)
+    manifest = json.loads((run_dir / "result_manifest.json").read_text(encoding="utf-8"))
+    assert manifest["status"] == "failed"
+
+
+def test_remote_adapter_fails_when_ocean_log_missing(tmp_path: Path) -> None:
+    project_dir = create_approved_real_project(tmp_path)
+    run_dir = project_dir / "runs" / "real" / "real_001"
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    runner = MissingArtifactFakeRunner("ocean.log")
+
+    result = run_remote_spectre_ocean_adapter(
+        project_dir,
+        run_id="real_001",
+        remote_ref=ref,
+        remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
+        runner=runner,
+    )
+
+    assert result.status == "failed"
+    assert any("ocean.log" in issue for issue in result.issues)
+    manifest = json.loads((run_dir / "result_manifest.json").read_text(encoding="utf-8"))
+    assert manifest["status"] == "failed"
+
+
+class MetricFailFakeRunner(FakeRunner):
+    """FakeRunner that writes ocean_scalars.tsv with a metric row marked fail."""
+
+    def download_tree(self, remote_path, local_path, include=None, exclude=None) -> None:
+        self.downloads.append((str(remote_path), Path(local_path)))
+        Path(local_path).mkdir(parents=True, exist_ok=True)
+        remote = str(remote_path)
+        if remote.endswith("/psf"):
+            (Path(local_path) / "spectre.out").write_text("spectre output", encoding="utf-8")
+        elif remote.endswith("/metrics"):
+            (Path(local_path) / "ocean_scalars.tsv").write_text(
+                "metric\tvalue\tunit\tstatus\texpression_sha256\tmessage\n"
+                "rise\t1e-12\ts\tpass\t352e7b3256d5417f58d087382bd2054efbcf696d06b58fc6d39002bb09489748\t\n"
+                "fall\t\ts\tfail\t8ba00c0d961decb9275b9636f61dbbd5659b5ed066a74b0083cd0e1d6d3d5493\t\n"
+                "DC\t1e-06\tW\tpass\tcb82f3f25ee13ea3cb45f605a763ed0806ebb7f47fd27ce4a9c4a4cd902bb7c4\t\n",
+                encoding="utf-8",
+            )
+            (Path(local_path) / "ocean.stdout").write_text("ocean stdout output", encoding="utf-8")
+            (Path(local_path) / "ocean.stderr").write_text("", encoding="utf-8")
+            (Path(local_path) / "ocean.log").write_text("ocean log output", encoding="utf-8")
+
+
+def test_remote_adapter_propagates_metric_failure(tmp_path: Path) -> None:
+    """Regression C-70: metric failures in ocean_scalars.tsv must propagate.
+
+    When ocean_scalars.tsv contains a requested metric row with status=fail,
+    the metric result manifest must have status=failed, and the adapter
+    result must have status=failed.
+    The C-69 adapter does not propagate metric row failures.
+    """
+    project_dir = create_approved_real_project(tmp_path)
+    run_dir = project_dir / "runs" / "real" / "real_001"
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    runner = MetricFailFakeRunner()
+
+    result = run_remote_spectre_ocean_adapter(
+        project_dir,
+        run_id="real_001",
+        remote_ref=ref,
+        remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
+        runner=runner,
+    )
+
+    manifest = json.loads((run_dir / "result_manifest.json").read_text(encoding="utf-8"))
+    # result_manifest reports spectre status (succeeded), not metric status.
+    # Metric failures are recorded in metric_result_manifest instead.
+    assert manifest["status"] == "succeeded", (
+        "result_manifest must report succeeded when spectre succeeded (metric failure is in metric_result_manifest)"
+    )
+
+    metric_manifest = json.loads(
+        (run_dir / "metrics" / "metric_result_manifest.json").read_text(encoding="utf-8")
+    )
+    assert metric_manifest["status"] == "failed", (
+        "metric_result_manifest must report failed when a metric row has status=fail"
+    )
+    fall_metric = next(m for m in metric_manifest["metrics"] if m["name"] == "fall")
+    assert fall_metric["status"] == "failed", (
+        "individual metric with status=fail in TSV must be marked failed in manifest"
+    )
+
+    assert result.status == "failed", (
+        "adapter result must be failed when a metric row has status=fail"
+    )
+    assert any("fall" in issue for issue in result.issues), (
+        "adapter issues must mention the failing metric name"
+    )
+
+
 def test_remote_multi_testbench_writes_ocean_scripts_under_project_dir(tmp_path: Path) -> None:
     """Regression: child metric_probe.ocn files must be under project_dir, not cwd."""
     from tests.test_multi_testbench_aggregation import _create_ready_multi_testbench_project
@@ -364,6 +803,7 @@ def test_remote_multi_testbench_writes_ocean_scripts_under_project_dir(tmp_path:
     separate_cwd.mkdir()
     ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
     runner = MultiTestbenchFakeRunner()
+    runner.set_project_dir(project_dir)
     runner.child_metric_names = {
         "cg_nf": ["MAX_GAIN"],
         "iip3": ["IIP3"],
@@ -394,3 +834,152 @@ def test_remote_multi_testbench_writes_ocean_scripts_under_project_dir(tmp_path:
             / "testbenches" / tb_id / "metrics" / "metric_probe.ocn"
         )
         assert not wrong.exists(), f"metric_probe.ocn leaked to cwd for {tb_id}: {wrong}"
+
+
+def test_remote_multi_testbench_adapter_metric_failure_propagates(tmp_path: Path) -> None:
+    """When a child ocean produces a metric row with status=fail, the multi-testbench
+    adapter must propagate the failure through aggregation."""
+    from tests.test_multi_testbench_aggregation import _create_ready_multi_testbench_project
+
+    project_dir = _create_ready_multi_testbench_project(tmp_path)
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    runner = MultiTestbenchFakeRunner()
+    runner.set_project_dir(project_dir)
+    runner.child_metric_names = {
+        "cg_nf": ["MAX_GAIN"],
+        "iip3": ["IIP3"],
+    }
+
+    # Make iip3 ocean produce a failing metric row
+    def metric_fail_download_tree(remote_path, local_path, include=None, exclude=None):
+        Path(local_path).mkdir(parents=True, exist_ok=True)
+        remote = str(remote_path)
+        if remote.endswith("/psf"):
+            (Path(local_path) / "spectre.out").write_text("spectre output", encoding="utf-8")
+        elif remote.endswith("/metrics") and "iip3" in remote:
+            (Path(local_path) / "ocean_scalars.tsv").write_text(
+                "metric\tvalue\tunit\tstatus\texpression_sha256\tmessage\n"
+                "IIP3\t\tdBm\tfail\t" + "a" * 64 + "\tmetric extraction failed\n",
+                encoding="utf-8",
+            )
+            (Path(local_path) / "ocean.stdout").write_text("ocean stdout", encoding="utf-8")
+            (Path(local_path) / "ocean.stderr").write_text("", encoding="utf-8")
+            (Path(local_path) / "ocean.log").write_text("ocean log", encoding="utf-8")
+        elif remote.endswith("/metrics"):
+            # cg_nf succeeds
+            (Path(local_path) / "ocean_scalars.tsv").write_text(
+                "metric\tvalue\tunit\tstatus\texpression_sha256\tmessage\n"
+                "MAX_GAIN\tdB\tdB\tpass\t" + "b" * 64 + "\t\n",
+                encoding="utf-8",
+            )
+            (Path(local_path) / "ocean.stdout").write_text("ocean stdout", encoding="utf-8")
+            (Path(local_path) / "ocean.stderr").write_text("", encoding="utf-8")
+            (Path(local_path) / "ocean.log").write_text("ocean log", encoding="utf-8")
+
+    runner.download_tree = metric_fail_download_tree
+
+    result = run_remote_multi_testbench_adapter(
+        project_dir,
+        run_id="real_001",
+        remote_ref=ref,
+        remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
+        runner=runner,
+    )
+
+    # The child adapter for iip3 should return failed due to metric failure,
+    # and the multi-testbench adapter must propagate that.
+    assert result.status == "failed"
+    assert any("iip3" in issue for issue in result.issues)
+
+
+def test_remote_multi_testbench_adapter_aggregate_manifest_content(tmp_path: Path) -> None:
+    """Verify the aggregate manifest contains metrics from ALL children."""
+    import json as _json
+
+    from tests.test_multi_testbench_aggregation import _create_ready_multi_testbench_project
+
+    project_dir = _create_ready_multi_testbench_project(tmp_path)
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    runner = MultiTestbenchFakeRunner()
+    runner.set_project_dir(project_dir)
+    runner.child_metric_names = {
+        "cg_nf": ["MAX_GAIN"],
+        "iip3": ["IIP3"],
+    }
+
+    run_remote_multi_testbench_adapter(
+        project_dir,
+        run_id="real_001",
+        remote_ref=ref,
+        remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
+        runner=runner,
+    )
+
+    run_dir = project_dir / "runs" / "real" / "real_001"
+
+    # Aggregate metric manifest must contain metrics from both children
+    metric_manifest = _json.loads(
+        (run_dir / "metrics" / "metric_result_manifest.json").read_text(encoding="utf-8")
+    )
+    metric_names = [m["name"] for m in metric_manifest["metrics"]]
+    assert "MAX_GAIN" in metric_names, "aggregate must include cg_nf metric"
+    assert "IIP3" in metric_names, "aggregate must include iip3 metric"
+
+    # Aggregate result manifest must reference both child results
+    result_manifest = _json.loads(
+        (run_dir / "result_manifest.json").read_text(encoding="utf-8")
+    )
+    child_testbenches = [c["testbench"] for c in result_manifest.get("child_results", [])]
+    assert "cg_nf" in child_testbenches, "aggregate result must reference cg_nf child"
+    assert "iip3" in child_testbenches, "aggregate result must reference iip3 child"
+
+    # Aggregate metric manifest must reference both child metric results
+    child_metric_testbenches = [
+        c["testbench"] for c in metric_manifest.get("child_metric_results", [])
+    ]
+    assert "cg_nf" in child_metric_testbenches
+    assert "iip3" in child_metric_testbenches
+
+
+def test_remote_multi_testbench_adapter_does_not_multiply_parallel_jobs(tmp_path: Path) -> None:
+    """Verify the multi-testbench adapter does not multiply spectre.parallel_jobs
+    by the number of testbenches. Each child runs with its own configured resources."""
+    from tests.test_multi_testbench_aggregation import _create_ready_multi_testbench_project
+
+    project_dir = _create_ready_multi_testbench_project(tmp_path)
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    runner = MultiTestbenchFakeRunner()
+    runner.set_project_dir(project_dir)
+    runner.child_metric_names = {
+        "cg_nf": ["MAX_GAIN"],
+        "iip3": ["IIP3"],
+    }
+
+    run_remote_multi_testbench_adapter(
+        project_dir,
+        run_id="real_001",
+        remote_ref=ref,
+        remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
+        runner=runner,
+    )
+
+    # The spectre commands should each have the same thread count from the
+    # configured request, not a multiplied value.
+    spectre_cmds = [c for c in runner.commands if "spectre" in c and "csh" in c]
+    assert len(spectre_cmds) == 2
+
+    # Read the expected thread count from the project config.
+    import yaml
+
+    spectre_cfg = yaml.safe_load(
+        (project_dir / "config" / "spectre.yaml").read_text(encoding="utf-8")
+    )
+    expected_threads = spectre_cfg["spectre"]["threads_per_run"]
+
+    # Extract the inner csh payload for each spectre command and verify
+    # +mt= matches the configured value (not multiplied by testbench count).
+    for cmd in spectre_cmds:
+        inner = shlex.split(cmd)[2]
+        assert f"+mt={expected_threads}" in inner, (
+            f"expected +mt={expected_threads} in spectre command, got: {inner}"
+        )

@@ -1,16 +1,28 @@
 from __future__ import annotations
 
-import hashlib
-import json
+import shlex
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any
 
 from hermes_workflow.execution_adapters.spectre_ocean import (
+    METRIC_RESULT_MANIFEST_NAME,
+    OCEAN_LOG_NAME,
+    OCEAN_MAX_ATTEMPTS,
+    OCEAN_SCALARS_NAME,
+    OCEAN_STDERR_NAME,
+    OCEAN_STDOUT_NAME,
+    RESULT_MANIFEST_NAME,
+    SPECTRE_STDERR_NAME,
+    SPECTRE_STDOUT_NAME,
     AdapterRunResult,
     _project_relative_path,
+    build_ocean_argv,
+    build_spectre_argv,
     load_adapter_context,
     render_ocean_replay_script,
+    write_metric_result_manifest,
+    write_spectre_result_manifest,
 )
 from hermes_workflow.remote_project import RemoteProjectRef
 from hermes_workflow.remote_ssh import quote_remote_path
@@ -38,68 +50,133 @@ def run_remote_spectre_ocean_adapter(
     runner.upload_tree(context.run_dir, remote_run_dir)
 
     remote_input_dir = remote_run_dir / "netlist"
+    spectre_argv = build_spectre_argv(context)
+    spectre_cmd_body = " ".join(shlex.quote(a) for a in spectre_argv)
+    spectre_stdout_remote = remote_run_dir / SPECTRE_STDOUT_NAME
+    spectre_stderr_remote = remote_run_dir / SPECTRE_STDERR_NAME
     spectre_command = (
         "csh -fc "
         + quote_remote_path(
-            f"source {quote_remote_path(remote_cadence_cshrc)}; cd {quote_remote_path(remote_input_dir)}; "
-            f"spectre -64 +preset=aps +mt={context.request.spectre.get('threads_per_run', 1)} "
-            f"-format psfxl -raw ../psf input.scs"
+            f"source {quote_remote_path(remote_cadence_cshrc)}; "
+            f"cd {quote_remote_path(remote_input_dir)}; "
+            f"{spectre_cmd_body}"
+            f" > {quote_remote_path(spectre_stdout_remote)}"
+            f" 2> {quote_remote_path(spectre_stderr_remote)}"
         )
     )
     spectre_result = runner.run(spectre_command)
     if spectre_result.return_code != 0:
         return _write_remote_failure(context, "spectre command failed", runner=runner, remote_run_dir=remote_run_dir)
 
+    # Download Spectre artifacts: psf/, spectre.stdout, spectre.stderr
+    runner.download_tree(remote_run_dir / "psf", context.psf_dir)
+    _download_remote_file(runner, remote_run_dir / SPECTRE_STDOUT_NAME, context.run_dir / SPECTRE_STDOUT_NAME)
+    _download_remote_file(runner, remote_run_dir / SPECTRE_STDERR_NAME, context.run_dir / SPECTRE_STDERR_NAME)
+
+    # Validate required Spectre artifacts exist locally
+    if not context.psf_dir.is_dir():
+        return _write_remote_failure(context, "psf directory missing after download", runner=runner, remote_run_dir=remote_run_dir)
+    if not (context.psf_dir / "spectre.out").is_file():
+        return _write_remote_failure(context, "psf/spectre.out missing after download", runner=runner, remote_run_dir=remote_run_dir)
+    if not (context.run_dir / SPECTRE_STDOUT_NAME).exists():
+        return _write_remote_failure(context, f"{SPECTRE_STDOUT_NAME} missing after remote spectre", runner=runner, remote_run_dir=remote_run_dir)
+    if not (context.run_dir / SPECTRE_STDERR_NAME).exists():
+        return _write_remote_failure(context, f"{SPECTRE_STDERR_NAME} missing after remote spectre", runner=runner, remote_run_dir=remote_run_dir)
+
+    ocean_argv = build_ocean_argv(context)
+    ocean_cmd_body = " ".join(shlex.quote(a) for a in ocean_argv)
+    ocean_stdout_remote = remote_run_dir / "metrics" / OCEAN_STDOUT_NAME
+    ocean_stderr_remote = remote_run_dir / "metrics" / OCEAN_STDERR_NAME
     ocean_command = (
         "csh -fc "
         + quote_remote_path(
-            f"source {quote_remote_path(remote_cadence_cshrc)}; cd {quote_remote_path(remote_ref.remote_project_dir)}; "
-            f"ocean -nograph -restore {quote_remote_path(remote_run_dir / 'metrics' / 'metric_probe.ocn')}"
+            f"source {quote_remote_path(remote_cadence_cshrc)}; "
+            f"cd {quote_remote_path(remote_ref.remote_project_dir)}; "
+            f"{ocean_cmd_body}"
+            f" > {quote_remote_path(ocean_stdout_remote)}"
+            f" 2> {quote_remote_path(ocean_stderr_remote)}"
         )
     )
-    ocean_result = runner.run(ocean_command)
-    if ocean_result.return_code != 0:
-        return _write_remote_failure(context, "ocean command failed", runner=runner, remote_run_dir=remote_run_dir)
 
+    # Retry OCEAN up to OCEAN_MAX_ATTEMPTS, matching local adapter semantics.
+    ocean_return_codes: list[int] = []
+    for _attempt in range(OCEAN_MAX_ATTEMPTS):
+        ocean_result = runner.run(ocean_command)
+        ocean_return_codes.append(ocean_result.return_code)
+        if ocean_result.return_code == 0:
+            break
+
+    # Download OCEAN artifacts regardless of return code, matching local
+    # adapter behaviour where the metric manifest records the failure.
     runner.download_tree(remote_run_dir / "metrics", context.metrics_dir)
-    result = _write_remote_success_manifests(context)
-    runner.upload(context.run_dir / "result_manifest.json", remote_run_dir / "result_manifest.json")
-    runner.upload(
-        context.metrics_dir / "metric_result_manifest.json",
-        remote_run_dir / "metrics" / "metric_result_manifest.json",
+    _download_remote_file(runner, remote_run_dir / "metrics" / OCEAN_STDOUT_NAME, context.metrics_dir / OCEAN_STDOUT_NAME)
+    _download_remote_file(runner, remote_run_dir / "metrics" / OCEAN_STDERR_NAME, context.metrics_dir / OCEAN_STDERR_NAME)
+
+    # Validate required OCEAN artifacts exist locally
+    if not (context.metrics_dir / OCEAN_SCALARS_NAME).is_file():
+        return _write_remote_failure(context, "ocean_scalars.tsv missing after download", runner=runner, remote_run_dir=remote_run_dir)
+    if not (context.metrics_dir / OCEAN_STDOUT_NAME).exists():
+        return _write_remote_failure(context, f"{OCEAN_STDOUT_NAME} missing after remote ocean", runner=runner, remote_run_dir=remote_run_dir)
+    if not (context.metrics_dir / OCEAN_STDERR_NAME).exists():
+        return _write_remote_failure(context, f"{OCEAN_STDERR_NAME} missing after remote ocean", runner=runner, remote_run_dir=remote_run_dir)
+    if not (context.metrics_dir / OCEAN_LOG_NAME).exists():
+        return _write_remote_failure(context, f"{OCEAN_LOG_NAME} missing after remote ocean", runner=runner, remote_run_dir=remote_run_dir)
+
+    started = datetime.now(UTC).replace(microsecond=0).strftime("%Y-%m-%dT%H:%M:%SZ")
+    completed = started
+
+    # Write metric result manifest first (records ocean failure if rc != 0).
+    metric_result = write_metric_result_manifest(
+        context,
+        ocean_return_code=ocean_result.return_code,
+        ocean_return_codes=ocean_return_codes,
     )
-    return result
+
+    # Result manifest always says "succeeded" when spectre succeeded,
+    # matching local adapter semantics.
+    result_manifest_path = write_spectre_result_manifest(
+        context,
+        status="succeeded",
+        started_at_utc=started,
+        completed_at_utc=completed,
+        include_metric_manifest=True,
+        notes="spectre command completed",
+    )
+
+    # Upload both manifests back to remote.
+    runner.upload(result_manifest_path, remote_run_dir / RESULT_MANIFEST_NAME)
+    runner.upload(
+        metric_result.path,
+        remote_run_dir / "metrics" / METRIC_RESULT_MANIFEST_NAME,
+    )
+
+    status = "succeeded" if metric_result.status == "succeeded" else "failed"
+    return AdapterRunResult(
+        status=status,
+        run_id=context.run_id,
+        result_manifest_path=result_manifest_path,
+        metric_result_manifest_path=metric_result.path,
+        issues=metric_result.issues,
+    )
+
+
+def _download_remote_file(runner: Any, remote_path: PurePosixPath, local_path: Path) -> None:
+    """Download a single file from the remote host to *local_path*."""
+    runner.download(str(remote_path), local_path)
 
 
 def _write_remote_failure(context: Any, notes: str, *, runner: Any, remote_run_dir: PurePosixPath) -> AdapterRunResult:
+    """Write a failed result manifest using the shared local helper and upload it."""
     started = datetime.now(UTC).replace(microsecond=0).strftime("%Y-%m-%dT%H:%M:%SZ")
-    result_path = context.run_dir / "result_manifest.json"
-    spectre_stderr = f"{context.run_relative}/spectre.stderr"
-    payload = {
-        "schema_version": "1.0",
-        "run_id": context.run_id,
-        "candidate_id": context.prepared.candidate_id,
-        "status": "failed",
-        "started_at_utc": started,
-        "completed_at_utc": started,
-        "simulator": {
-            "engine": "spectre",
-            "preset": str(context.request.spectre.get("preset", "aps")),
-            "output_format": str(context.request.spectre.get("output_format", "psfxl")),
-            "threads_per_run": int(context.request.spectre.get("threads_per_run", 1)),
-            "timeout_s": int(context.request.spectre.get("timeout_s", 3600)),
-            "command_label": "remote_spectre_run",
-        },
-        "prepared_input_scs": context.prepared.rendered_input_scs,
-        "prepared_input_sha256": context.prepared.rendered_input_sha256,
-        "log_file": spectre_stderr,
-        "artifact_files": [],
-        "result_data": None,
-        "metric_result_manifest": None,
-        "notes": notes,
-    }
-    result_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    runner.upload(result_path, remote_run_dir / "result_manifest.json")
+    result_path = write_spectre_result_manifest(
+        context,
+        status="failed",
+        started_at_utc=started,
+        completed_at_utc=started,
+        include_metric_manifest=False,
+        notes=notes,
+    )
+    runner.upload(result_path, remote_run_dir / RESULT_MANIFEST_NAME)
     return AdapterRunResult(
         status="failed",
         run_id=context.run_id,
@@ -107,133 +184,6 @@ def _write_remote_failure(context: Any, notes: str, *, runner: Any, remote_run_d
         metric_result_manifest_path=None,
         issues=[notes],
     )
-
-
-def _write_remote_success_manifests(context: Any) -> AdapterRunResult:
-    from hermes_workflow.execution_adapters.spectre_ocean import (
-        METRIC_RESULT_MANIFEST_NAME,
-        parse_ocean_scalars,
-    )
-
-    completed = datetime.now(UTC).replace(microsecond=0).strftime("%Y-%m-%dT%H:%M:%SZ")
-    result_path = context.run_dir / "result_manifest.json"
-    spectre_out = f"{context.run_relative}/psf/spectre.out"
-    metric_manifest_relative = f"{context.run_relative}/metrics/{METRIC_RESULT_MANIFEST_NAME}"
-    payload = {
-        "schema_version": "1.0",
-        "run_id": context.run_id,
-        "candidate_id": context.prepared.candidate_id,
-        "status": "succeeded",
-        "started_at_utc": completed,
-        "completed_at_utc": completed,
-        "simulator": {
-            "engine": "spectre",
-            "preset": str(context.request.spectre.get("preset", "aps")),
-            "output_format": str(context.request.spectre.get("output_format", "psfxl")),
-            "threads_per_run": int(context.request.spectre.get("threads_per_run", 1)),
-            "timeout_s": int(context.request.spectre.get("timeout_s", 3600)),
-            "command_label": "remote_spectre_run",
-        },
-        "prepared_input_scs": context.prepared.rendered_input_scs,
-        "prepared_input_sha256": context.prepared.rendered_input_sha256,
-        "log_file": spectre_out,
-        "artifact_files": [spectre_out],
-        "result_data": {
-            "kind": "spectre_psf",
-            "psf_dir": context.request.expected_psf_dir,
-            "spectre_out": spectre_out,
-        },
-        "metric_result_manifest": metric_manifest_relative,
-        "notes": "remote spectre and ocean completed",
-    }
-    result_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-
-    # Write metric result manifest
-    scalar_path = context.metrics_dir / "ocean_scalars.tsv"
-    issues: list[str] = []
-    try:
-        scalar_rows = parse_ocean_scalars(scalar_path)
-    except Exception as exc:
-        scalar_rows = {}
-        issues.append(str(exc))
-
-    metrics = []
-    for request_metric in context.request.metrics:
-        row = scalar_rows.get(request_metric.name)
-        if row is None:
-            metrics.append({
-                "name": request_metric.name,
-                "status": "failed",
-                "value": None,
-                "value_text": None,
-                "unit": request_metric.unit,
-                "result": request_metric.result,
-                "expression": request_metric.expression,
-                "expression_sha256": request_metric.expression_sha256,
-                "expression_source": request_metric.expression_source,
-                "issues": ["metric missing from ocean scalar output"],
-            })
-            issues.append(f"metric {request_metric.name} missing from ocean scalar output")
-            continue
-        metric_issues = []
-        if row.status != "pass":
-            metric_issues.append(row.message or "ocean metric evaluation failed")
-        metric_status = "succeeded" if not metric_issues else "failed"
-        metrics.append({
-            "name": request_metric.name,
-            "status": metric_status,
-            "value": row.value if metric_status == "succeeded" else None,
-            "value_text": row.value_text if metric_status == "succeeded" else None,
-            "unit": request_metric.unit,
-            "result": request_metric.result,
-            "expression": request_metric.expression,
-            "expression_sha256": request_metric.expression_sha256,
-            "expression_source": request_metric.expression_source,
-            "issues": metric_issues,
-        })
-
-    extra_metrics = sorted(set(scalar_rows) - {metric.name for metric in context.request.metrics})
-    issues.extend(f"unrequested metric in ocean scalar output: {name}" for name in extra_metrics)
-
-    metric_manifest_path = context.metrics_dir / METRIC_RESULT_MANIFEST_NAME
-    metric_payload = {
-        "schema_version": "1.0",
-        "run_id": context.run_id,
-        "candidate_id": context.prepared.candidate_id,
-        "backend": "remote_spectre_ocean",
-        "status": "succeeded" if not issues else "failed",
-        "request_file": context.prepared.metric_extraction_request,
-        "request_sha256": context.prepared.metric_extraction_request_sha256,
-        "psf_dir": context.request.expected_psf_dir,
-        "ocean": {
-            "mode": "nograph_replay",
-            "return_code": 0,
-            "attempts": 1,
-            "return_codes": [0],
-            "script_file": context.request.ocean.script_file,
-            "script_sha256": _sha256_text(render_ocean_replay_script(context)),
-            "log_file": context.request.ocean.log_file,
-            "scalar_output_file": context.request.ocean.scalar_output_file,
-        },
-        "metrics": metrics,
-        "issues": issues,
-    }
-    metric_manifest_path.write_text(
-        json.dumps(metric_payload, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
-
-    return AdapterRunResult(
-        status="succeeded" if not issues else "failed",
-        run_id=context.run_id,
-        result_manifest_path=result_path,
-        metric_result_manifest_path=metric_manifest_path,
-        issues=issues,
-    )
-
-
-def _sha256_text(text: str) -> str:
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 def run_remote_multi_testbench_adapter(
