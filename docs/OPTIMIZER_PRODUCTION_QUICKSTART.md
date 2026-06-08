@@ -3,10 +3,9 @@
 This is the shortest supported path for using `ic-auto-opt-workflow` on a real
 Maestro-exported Spectre/OCEAN optimization project.
 
-For a user-facing manual that explains how to ask a supervisor agent to run the
-workflow, read `docs/AGENT_OPTIMIZER_USAGE_MANUAL.md`. For the current
-implemented agent boundary, read `docs/AGENT_INTEGRATION_STATUS.md`. For a
-Chinese user guide, read `docs/USER_GUIDE_CN.md`.
+For a user-facing manual that explains how to ask an agent to run the workflow,
+read `docs/AGENT_OPTIMIZER_USAGE_MANUAL.md`. For a Chinese user guide, read
+`docs/USER_GUIDE_CN.md`.
 
 For agents, the canonical skill is platform-neutral:
 

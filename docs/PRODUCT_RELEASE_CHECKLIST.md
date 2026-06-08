@@ -8,7 +8,7 @@ core and platform-neutral agent skill assets. The implemented shell entrypoint i
 `ic-opt PROJECT_DIR --real`; agent runtimes should load the platform-neutral
 `skills/ic-opt/SKILL.md` and then use `/ic-opt PROJECT_DIR --real`. The current
 agent operates the deterministic CLI and explains the reports. See
-`docs/AGENT_INTEGRATION_STATUS.md` before describing runtime support.
+`docs/AGENT_OPTIMIZER_USAGE_MANUAL.md` before describing agent usage.
 
 For a Chinese user guide, read `docs/USER_GUIDE_CN.md`.
 

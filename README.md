@@ -20,7 +20,8 @@ tool and explain the reports; the deterministic optimization work is done by the
 CLI.
 
 The platform-neutral agent skill is available in the source tree at
-`skills/ic-opt/SKILL.md`. After installation, locate the packaged copy with:
+`skills/ic-opt/SKILL.md`. If you installed the package with `pip`, locate the
+packaged copy with:
 
 ```bash
 hermes-workflow agent-skill-path
@@ -313,6 +314,21 @@ agent should:
 - explain the recommended point, feasible count, failure categories, and whether
   continuation is worth doing.
 
+Give your agent the platform-neutral skill before asking it to operate the tool:
+
+```text
+skills/ic-opt/SKILL.md
+```
+
+For a pip-installed copy, ask the tool where the packaged skill lives:
+
+```bash
+hermes-workflow agent-skill-path
+```
+
+The skill is not tied to one agent platform. Any agent that can read files and
+run shell commands can use it.
+
 The agent should not rewrite OCEAN formulas, parse PSF directly, hand-pick
 optimizer points, or change resource settings unless the user explicitly asks.
 
@@ -322,9 +338,8 @@ optimizer points, or change resource settings unless the user explicitly asks.
 src/hermes_workflow/        Python package and CLI implementation
 vendor/open-box/            vendored OpenBox backend used by the product env
 skills/ic-opt/              platform-neutral agent skill
-skills/ic-opt/              platform-neutral agent skill
 examples/                   requirement examples for users
-docs/                       detailed manuals and project notes
+docs/                       user, agent, and release manuals
 tests/                      regression tests
 tools/                      development helper scripts
 requirements-product.txt    product Python dependencies
@@ -339,7 +354,9 @@ pyproject.toml              package metadata and console scripts
 - `docs/TOOLCHAIN_EXECUTION_REFERENCE.md`: known-good tool execution rules.
 - `examples/spectre_maestro_project/OPT_REQUIREMENT_README.md`: requirement file
   format.
-- `docs/AGENT_USER_QUICKSTART_CN.md`: short agent usage guide.
+- `docs/AGENT_OPTIMIZER_USAGE_MANUAL.md`: platform-neutral agent operating
+  manual.
+- `docs/AGENT_USER_QUICKSTART_CN.md`: short Chinese agent usage guide.
 - `docs/GITHUB_PUBLISH_GUIDE.md`: first GitHub publication checklist.
 
 ## Version
