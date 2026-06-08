@@ -8,6 +8,7 @@ import typer
 
 from hermes_workflow.optimizer_flow import optimize_project
 from hermes_workflow.remote_doctor import run_remote_doctor
+from hermes_workflow.remote_optimizer_flow import optimize_remote_project
 from hermes_workflow.remote_project import RemoteProjectRef
 
 
@@ -133,7 +134,26 @@ def main(
             typer.echo(f"local report: {report.local_report_path}")
             raise typer.Exit(code=1)
         if real:
-            _exit_with_error(ValueError("remote --real is not implemented yet; run --doctor first"))
+            remote_cshrc = PurePosixPath(str(cadence_cshrc)) if cadence_cshrc is not None else ref.remote_project_dir / "cadence_env.csh"
+            try:
+                report = optimize_remote_project(
+                    ref,
+                    real=True,
+                    remote_cadence_cshrc=remote_cshrc,
+                    max_evals=max_evals,
+                    batch_size=batch_size,
+                    parallel_jobs=parallel_jobs,
+                )
+            except (OSError, RuntimeError, ValueError) as exc:
+                _exit_with_error(exc)
+            if report.status == "pass":
+                typer.echo("remote optimizer flow completed")
+                if report.recommended_run_id is not None:
+                    typer.echo(f"recommended: {report.recommended_run_id}")
+                typer.echo(f"local report: {report.report_path}")
+                typer.echo(f"remote report: {ref.remote_project_dir / 'reports' / 'optimizer_decision_report.md'}")
+                return
+            raise typer.Exit(code=1)
         if continue_evals is not None:
             _exit_with_error(ValueError("remote --continue is not implemented yet; run --doctor first"))
         _exit_with_error(ValueError("remote mode requires --doctor, --real, or --continue N"))

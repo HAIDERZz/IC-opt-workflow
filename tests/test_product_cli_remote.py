@@ -40,11 +40,30 @@ def test_ic_opt_remote_doctor_does_not_resolve_local_cadence_env(monkeypatch, tm
     assert "remote report: /remote/project/reports/ic_opt_doctor_report.json" in result.output
 
 
-def test_ic_opt_remote_real_reports_not_implemented_until_remote_flow_lands(monkeypatch) -> None:
+def test_ic_opt_remote_real_calls_optimize_remote_project(monkeypatch, tmp_path: Path) -> None:
+    calls: list[dict[str, object]] = []
+
+    def fake_optimize_remote_project(ref, **kwargs):
+        calls.append({"ref": ref, **kwargs})
+        report_path = tmp_path / "reports" / "optimizer_flow_run_report.json"
+        report_path.parent.mkdir(parents=True)
+        report_path.write_text('{"status": "pass"}\n', encoding="utf-8")
+        return SimpleNamespace(
+            status="pass",
+            report_path=report_path,
+            recommended_run_id="real_001",
+            user_decision_required=True,
+            issues=[],
+        )
+
+    monkeypatch.setattr(product_cli, "optimize_remote_project", fake_optimize_remote_project)
+
     result = runner.invoke(
         product_cli.app,
         ["--ssh-profile", "lab", "/remote/project", "--real"],
     )
 
-    assert result.exit_code == 1
-    assert "remote --real is not implemented yet; run --doctor first" in result.output
+    assert result.exit_code == 0, result.output
+    assert calls[0]["ref"].ssh_profile == "lab"
+    assert "remote optimizer flow completed" in result.output
+    assert "recommended: real_001" in result.output
