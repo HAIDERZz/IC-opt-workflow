@@ -24,28 +24,36 @@ Current execution state:
 - current_scope: C-69 Remote SSH Execution Backend Design.
 - current_scope_exact: C-69 Remote SSH execution backend design for
   passwordless-SSH remote Spectre/OCEAN runs.
-- Current status: C-69 Remote SSH Execution Backend is implemented and reviewed
-  for offline/product-contract readiness. Claude handled the coding tasks and
-  internal review loop; Codex performed final acceptance only. The route now
-  includes SSH runner, remote project/cache, remote doctor, remote prepare,
-  remote Spectre/OCEAN adapter, remote OpenBox real flow, remote continuation,
-  CLI/docs/skill updates, and report/history mirroring. Real remote
-  SSH/Spectre/OCEAN acceptance is blocked until the user provides an explicit
-  SSH profile and remote project path.
+- Current status: C-69 Remote SSH Execution Backend is implemented, reviewed,
+  and real-accepted for the MVP. Claude handled the coding tasks and internal
+  review loop; Codex performed final acceptance only. The route now includes
+  SSH runner, remote project/cache, remote doctor, remote prepare, remote
+  Spectre/OCEAN adapter, remote OpenBox real flow, remote continuation,
+  CLI/docs/skill updates, remote Maestro symlink materialization, and
+  report/history mirroring.
 - Active spec:
   `docs/superpowers/specs/2026-06-08-remote-ssh-execution-backend-design.md`.
 - Active plan:
   `docs/superpowers/plans/2026-06-08-remote-ssh-execution-backend.md`.
-- Next allowed action: Run C-69 real remote acceptance after the user provides
-  an explicit SSH profile and remote project path: `ic-opt --ssh-profile
-  PROFILE /remote/project --doctor`, then a small `--real` smoke, then a
-  small `--continue` smoke.
+- Next allowed action: C-69 remote SSH MVP is accepted. Continue remote work
+  only from concrete beta feedback or targeted diagnostic polish; do not rerun
+  remote real tools just to refresh docs.
 - C-69 design decision: the Linux EDA server project directory remains the
   source of truth and keeps the same local-mode layout. The local workstation
   runs the product Python environment, OpenBox/controller, agent skill, and
   report interpretation. The remote Linux host runs Spectre/OCEAN through
   user-configured passwordless SSH, following the `virtuoso-bridge-lite`
   connection assumption. The tool must not manage passwords or private keys.
+- C-69 real acceptance evidence: user verified passwordless SSH for
+  `zzchen@10.113.216.131`. Clean remote project
+  `/home/zzchen/remote_opt/mixer_muti_tb_c69_accept_20260608_001` passed
+  `--doctor`, completed a 10-evaluation remote `--real` smoke, and completed
+  `--continue 4`; cumulative evaluations reached 14 in both the remote project
+  and local mirror
+  `/home/zzchen/.ic-opt/remote_runs/zzchen@10.113.216.131/150c658badc47d17`.
+  `check-optimizer-run` accepted. The current project formulas produced only
+  `metric_check_failed` rows, so this proves remote execution/artifact
+  sync/failure classification rather than a usable optimized point.
 - Historical C-66/C-65 notes below are retained for context; they are not the
   active development scope.
 - Latest production acceptance note:

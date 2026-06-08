@@ -13,22 +13,68 @@ This note preserves the implementation state for continuing Plan A after context
 - Current scope: C-69 Remote SSH Execution Backend Design
 - current_scope: C-69 Remote SSH Execution Backend Design
 - current_scope_exact: C-69 Remote SSH Execution Backend Design
-- Current status: C-69 Remote SSH Execution Backend is implemented and reviewed
-  for offline/product-contract readiness. Claude performed the coding work
-  under the new division of labor and its own subagent-driven review loop;
-  Codex performed final acceptance only. The route now includes the remote SSH
-  runner, remote project/cache reference, remote doctor, remote prepare,
-  remote Spectre/OCEAN adapter, remote OpenBox real flow, remote continuation,
-  CLI/docs/skill updates, and report/history mirroring. Real remote
-  SSH/Spectre/OCEAN acceptance is blocked until the user provides an explicit
-  SSH profile and remote project path.
+- Current status: C-69 Remote SSH Execution Backend is implemented, reviewed,
+  and real-accepted for the MVP. Claude performed the coding work under the new
+  division of labor and its own subagent-driven review loop; Codex performed
+  final acceptance only. The route now includes the remote SSH runner, remote
+  project/cache reference, remote doctor, remote prepare, remote Spectre/OCEAN
+  adapter, remote OpenBox real flow, remote continuation, CLI/docs/skill
+  updates, remote Maestro symlink materialization, and report/history
+  mirroring.
 - Active plan: `docs/superpowers/plans/2026-06-08-remote-ssh-execution-backend.md`
-- Next allowed action: Run C-69 real remote acceptance after the user provides
-  an explicit SSH profile and remote project path: `ic-opt --ssh-profile
-  PROFILE /remote/project --doctor`, then a small `--real` smoke, then a
-  small `--continue` smoke.
+- Next allowed action: C-69 remote SSH MVP is accepted. Continue remote work
+  only from concrete beta feedback or targeted diagnostic polish; do not rerun
+  remote real tools just to refresh docs.
 - Execution method: `superpowers:subagent-driven-development`
 - Dependencies installed in active Python environment on 2026-05-29: `pytest`, `typer`, `pydantic`, `PyYAML`, `ruff`
+
+## C-69 Remote SSH Real Acceptance 2026-06-08
+
+C-69 is real-accepted for the remote SSH MVP.
+
+Evidence:
+
+```text
+docs/REMOTE_SSH_ACCEPTANCE_2026-06-08.md
+```
+
+Remote target:
+
+```text
+ssh_profile: zzchen@10.113.216.131
+remote_project: /home/zzchen/remote_opt/mixer_muti_tb_c69_accept_20260608_001
+local_mirror: /home/zzchen/.ic-opt/remote_runs/zzchen@10.113.216.131/150c658badc47d17
+```
+
+Accepted commands:
+
+```text
+ic-opt --ssh-profile zzchen@10.113.216.131 PROJECT --doctor
+ic-opt --ssh-profile zzchen@10.113.216.131 PROJECT --real --max-evals 10 --batch-size 2 --parallel-jobs 2
+ic-opt --ssh-profile zzchen@10.113.216.131 PROJECT --continue 4 --batch-size 2 --parallel-jobs 2
+```
+
+Result:
+
+- Doctor passed and wrote remote/local reports.
+- Remote real smoke completed 10 evaluations and `check-optimizer-run`
+  accepted the local mirror.
+- Remote continuation completed and raised cumulative evaluations to 14 on
+  both remote project and local mirror.
+- Flow closeout passed through OpenBox run, acceptance, completion,
+  finalization, visualization, and decision report generation.
+- The user's current remote metric formulas produced only
+  `metric_check_failed` rows, which is correct failure classification and not a
+  remote Spectre/OCEAN execution failure.
+
+Final verification:
+
+```text
+pytest -q: 718 passed, 1 warning
+ruff check src tests: passed
+tools/check_development_cadence.py: passed
+git diff --check: passed
+```
 
 ## C-66 Claude `/ic-opt` Continuation Validation 2026-06-07
 

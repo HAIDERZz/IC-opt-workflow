@@ -1,10 +1,12 @@
 # Remote SSH Execution Backend Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Add a remote SSH execution mode where local `ic-opt`/OpenBox/report orchestration controls a project directory on a Linux EDA server, while Spectre/OCEAN run remotely through user-configured passwordless SSH.
 
-**Status 2026-06-08:** Implemented and reviewed for offline/product-contract readiness. Tasks 1-9 and Task 10 documentation/skill updates are implemented through commit `95e6bba`. Final full regression passed with `699 passed, 1 warning`; ruff, cadence check, and `git diff --check` passed. Task 10 real remote SSH/Spectre/OCEAN acceptance is recorded as blocked in `docs/REMOTE_SSH_ACCEPTANCE_2026-06-08.md` because no explicit SSH profile and remote project path were provided.
+**Status 2026-06-08:** Implemented, reviewed, and real-accepted for the remote SSH MVP. Tasks 1-10 are complete. Final code commit for the remote Maestro symlink materialization path is `fb0497c`. Final full regression passed with `718 passed, 1 warning`; ruff, cadence check, and `git diff --check` passed. Real remote doctor, real smoke, and continuation acceptance are recorded in `docs/REMOTE_SSH_ACCEPTANCE_2026-06-08.md`.
+
+**Real acceptance summary:** user verified passwordless SSH for `zzchen@10.113.216.131`. Clean remote project `/home/zzchen/remote_opt/mixer_muti_tb_c69_accept_20260608_001` passed `--doctor`, completed a 10-evaluation remote `--real` smoke, and completed `--continue 4`; cumulative evaluations reached 14 on both the remote project and local mirror. The user's current metric formulas produced only `metric_check_failed` rows, so the evidence proves remote execution, artifact sync, and failure classification, not a usable optimized point for that project.
 
 **Architecture:** Keep local mode unchanged. Add a focused OpenSSH runner, a remote project/cache layer, a remote doctor gate, and a remote Spectre/OCEAN adapter that runs Cadence commands on Linux without requiring the full Python product environment there. Route product CLI remote commands through these new pieces and sync reports back to both local cache and remote project.
 
@@ -342,7 +344,7 @@ rtk git commit -m "feat: add remote ssh runner"
 - Create: `src/hermes_workflow/remote_project.py`
 - Test: `tests/test_remote_project.py`
 
-- [ ] **Step 1: Write failing tests for remote path validation and cache path**
+- [x] **Step 1: Write failing tests for remote path validation and cache path**
 
 Create `tests/test_remote_project.py`:
 
@@ -387,7 +389,7 @@ def test_remote_project_ref_report_paths_are_posix() -> None:
     assert ref.remote_doctor_report == PurePosixPath("/remote/project/reports/ic_opt_doctor_report.json")
 ```
 
-- [ ] **Step 2: Run tests and verify failure**
+- [x] **Step 2: Run tests and verify failure**
 
 Run:
 
@@ -397,7 +399,7 @@ rtk proxy ./.venv/bin/python -m pytest tests/test_remote_project.py -q
 
 Expected: FAIL because `hermes_workflow.remote_project` is missing.
 
-- [ ] **Step 3: Implement remote project reference**
+- [x] **Step 3: Implement remote project reference**
 
 Create `src/hermes_workflow/remote_project.py`:
 
@@ -444,7 +446,7 @@ def remote_cache_dir(
     return root / ref.ssh_profile / digest
 ```
 
-- [ ] **Step 4: Run targeted tests**
+- [x] **Step 4: Run targeted tests**
 
 Run:
 
@@ -454,7 +456,7 @@ rtk proxy ./.venv/bin/python -m pytest tests/test_remote_project.py -q
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Run:
 
@@ -469,7 +471,7 @@ rtk git commit -m "feat: add remote project cache reference"
 - Modify: `src/hermes_workflow/requirement_intake.py`
 - Test: `tests/test_requirement_intake.py`
 
-- [ ] **Step 1: Write failing tests for injectable Maestro path checks**
+- [x] **Step 1: Write failing tests for injectable Maestro path checks**
 
 Append to `tests/test_requirement_intake.py`:
 
@@ -515,7 +517,7 @@ def test_parse_requirement_text_reports_remote_maestro_missing() -> None:
     assert "maestro_point_root/netlist/input.scs is missing: /remote/missing_point/netlist/input.scs" in report.issues
 ```
 
-- [ ] **Step 2: Run tests and verify failure**
+- [x] **Step 2: Run tests and verify failure**
 
 Run:
 
@@ -525,7 +527,7 @@ rtk proxy ./.venv/bin/python -m pytest tests/test_requirement_intake.py::test_pa
 
 Expected: FAIL because `parse_requirement_text` is missing.
 
-- [ ] **Step 3: Extract public parser without changing local behavior**
+- [x] **Step 3: Extract public parser without changing local behavior**
 
 Modify `src/hermes_workflow/requirement_intake.py`:
 
@@ -613,7 +615,7 @@ Add missing import:
 from pathlib import Path, PurePosixPath
 ```
 
-- [ ] **Step 4: Run targeted and existing intake tests**
+- [x] **Step 4: Run targeted and existing intake tests**
 
 Run:
 
@@ -623,7 +625,7 @@ rtk proxy ./.venv/bin/python -m pytest tests/test_requirement_intake.py -q
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Run:
 
@@ -638,7 +640,7 @@ rtk git commit -m "refactor: expose requirement parser for remote paths"
 - Create: `src/hermes_workflow/remote_doctor.py`
 - Test: `tests/test_remote_doctor.py`
 
-- [ ] **Step 1: Write failing tests for pass/fail doctor reports**
+- [x] **Step 1: Write failing tests for pass/fail doctor reports**
 
 Create `tests/test_remote_doctor.py`:
 
@@ -729,7 +731,7 @@ def test_remote_doctor_fails_before_optimizer_when_ssh_is_not_ready(tmp_path: Pa
     assert "ssh lab true" in report.checks["ssh"]["message"]
 ```
 
-- [ ] **Step 2: Run tests and verify failure**
+- [x] **Step 2: Run tests and verify failure**
 
 Run:
 
@@ -739,7 +741,7 @@ rtk proxy ./.venv/bin/python -m pytest tests/test_remote_doctor.py -q
 
 Expected: FAIL because `hermes_workflow.remote_doctor` is missing.
 
-- [ ] **Step 3: Implement remote doctor**
+- [x] **Step 3: Implement remote doctor**
 
 Create `src/hermes_workflow/remote_doctor.py` with:
 
@@ -845,7 +847,7 @@ def run_remote_doctor(
 
 Also define `_record_command_check`, `_read_required_remote_text`, `_read_optional_remote_text`, and `_write_doctor` in the same file. `_write_doctor` must call `ssh.mkdir(ref.remote_reports_dir)`, write JSON to `ref.remote_doctor_report`, write the same JSON locally, and return `status="pass"` only when `issues` is empty.
 
-- [ ] **Step 4: Run targeted doctor tests**
+- [x] **Step 4: Run targeted doctor tests**
 
 Run:
 
@@ -855,7 +857,7 @@ rtk proxy ./.venv/bin/python -m pytest tests/test_remote_doctor.py tests/test_re
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Run:
 
@@ -870,7 +872,7 @@ rtk git commit -m "feat: add remote doctor gate"
 - Modify: `src/hermes_workflow/product_cli.py`
 - Test: `tests/test_product_cli_remote.py`
 
-- [ ] **Step 1: Write failing CLI tests**
+- [x] **Step 1: Write failing CLI tests**
 
 Create `tests/test_product_cli_remote.py`:
 
@@ -927,7 +929,7 @@ def test_ic_opt_remote_real_reports_not_implemented_until_remote_flow_lands(monk
     assert "remote --real is not implemented yet; run --doctor first" in result.output
 ```
 
-- [ ] **Step 2: Run tests and verify failure**
+- [x] **Step 2: Run tests and verify failure**
 
 Run:
 
@@ -937,7 +939,7 @@ rtk proxy ./.venv/bin/python -m pytest tests/test_product_cli_remote.py -q
 
 Expected: FAIL because `--ssh-profile` and `--doctor` are not wired.
 
-- [ ] **Step 3: Wire product CLI remote doctor**
+- [x] **Step 3: Wire product CLI remote doctor**
 
 Modify `src/hermes_workflow/product_cli.py`:
 
@@ -993,7 +995,7 @@ At the start of `main()`:
 
 Keep existing local behavior unchanged.
 
-- [ ] **Step 4: Run product CLI tests**
+- [x] **Step 4: Run product CLI tests**
 
 Run:
 
@@ -1003,7 +1005,7 @@ rtk proxy ./.venv/bin/python -m pytest tests/test_product_cli.py tests/test_prod
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Run:
 
@@ -1018,7 +1020,7 @@ rtk git commit -m "feat: expose remote doctor in ic-opt"
 - Create: `src/hermes_workflow/remote_prepare.py`
 - Test: `tests/test_remote_prepare.py`
 
-- [ ] **Step 1: Write failing tests for cache preparation**
+- [x] **Step 1: Write failing tests for cache preparation**
 
 Create `tests/test_remote_prepare.py`:
 
@@ -1076,7 +1078,7 @@ def test_prepare_remote_project_cache_writes_local_controller_project(tmp_path: 
     ]
 ```
 
-- [ ] **Step 2: Run tests and verify failure**
+- [x] **Step 2: Run tests and verify failure**
 
 Run:
 
@@ -1086,7 +1088,7 @@ rtk proxy ./.venv/bin/python -m pytest tests/test_remote_prepare.py -q
 
 Expected: FAIL because `remote_prepare` is missing.
 
-- [ ] **Step 3: Implement remote cache preparation**
+- [x] **Step 3: Implement remote cache preparation**
 
 Create `src/hermes_workflow/remote_prepare.py` with:
 
@@ -1167,7 +1169,7 @@ def _download_remote_netlists(cache_dir: Path, sections: dict[str, object], runn
 
 This MVP downloads the remote `netlist/` directory. If a later real remote acceptance proves required sidecars live above `netlist/`, extend `download_tree()` roots in a new task with evidence.
 
-- [ ] **Step 4: Run targeted tests**
+- [x] **Step 4: Run targeted tests**
 
 Run:
 
@@ -1177,7 +1179,7 @@ rtk proxy ./.venv/bin/python -m pytest tests/test_remote_prepare.py tests/test_r
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Run:
 
@@ -1192,7 +1194,7 @@ rtk git commit -m "feat: prepare remote project cache"
 - Create: `src/hermes_workflow/execution_adapters/remote_spectre_ocean.py`
 - Test: `tests/test_remote_spectre_ocean.py`
 
-- [ ] **Step 1: Write failing tests for upload/run/download behavior**
+- [x] **Step 1: Write failing tests for upload/run/download behavior**
 
 Create `tests/test_remote_spectre_ocean.py`:
 
@@ -1254,7 +1256,7 @@ def test_remote_adapter_runs_spectre_and_ocean_remotely(tmp_path: Path) -> None:
     assert manifest["backend"] == "remote_spectre_ocean"
 ```
 
-- [ ] **Step 2: Run tests and verify failure**
+- [x] **Step 2: Run tests and verify failure**
 
 Run:
 
@@ -1264,7 +1266,7 @@ rtk proxy ./.venv/bin/python -m pytest tests/test_remote_spectre_ocean.py -q
 
 Expected: FAIL because remote adapter is missing.
 
-- [ ] **Step 3: Implement remote adapter using local Python and remote Cadence commands**
+- [x] **Step 3: Implement remote adapter using local Python and remote Cadence commands**
 
 Create `src/hermes_workflow/execution_adapters/remote_spectre_ocean.py`:
 
@@ -1335,7 +1337,7 @@ def run_remote_spectre_ocean_adapter(
 
 Implement `_write_remote_failure()` and `_write_remote_success_manifests()` by reusing the manifest schema shape from `spectre_ocean.py`. Keep the backend label `remote_spectre_ocean` so acceptance reports can distinguish local and remote real runs.
 
-- [ ] **Step 4: Run remote adapter and existing adapter tests**
+- [x] **Step 4: Run remote adapter and existing adapter tests**
 
 Run:
 
@@ -1345,7 +1347,7 @@ rtk proxy ./.venv/bin/python -m pytest tests/test_remote_spectre_ocean.py tests/
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Run:
 
@@ -1362,7 +1364,7 @@ rtk git commit -m "feat: add remote spectre ocean adapter"
 - Test: `tests/test_remote_optimizer_flow.py`
 - Test: `tests/test_product_cli_remote.py`
 
-- [ ] **Step 1: Write failing orchestration tests**
+- [x] **Step 1: Write failing orchestration tests**
 
 Append to `tests/test_remote_optimizer_flow.py`:
 
@@ -1424,7 +1426,7 @@ def test_optimize_remote_project_runs_doctor_prepare_openbox_and_sync(tmp_path: 
     assert calls == ["optimize_project"]
 ```
 
-- [ ] **Step 2: Run tests and verify failure**
+- [x] **Step 2: Run tests and verify failure**
 
 Run:
 
@@ -1434,7 +1436,7 @@ rtk proxy ./.venv/bin/python -m pytest tests/test_remote_optimizer_flow.py -q
 
 Expected: FAIL because `remote_optimizer_flow` is missing.
 
-- [ ] **Step 3: Implement remote optimizer flow with service injection**
+- [x] **Step 3: Implement remote optimizer flow with service injection**
 
 Create `src/hermes_workflow/remote_optimizer_flow.py`:
 
@@ -1509,7 +1511,7 @@ def optimize_remote_project(
 
 After the first test passes, add a sync helper so `reports/`, `ledger/`, `state/`, and `execution_package/` are uploaded back to the remote project after closeout. Add a test asserting the runner receives `upload_tree(cache_dir / "reports", "/remote/project/reports")`.
 
-- [ ] **Step 4: Wire product CLI remote real**
+- [x] **Step 4: Wire product CLI remote real**
 
 Modify `src/hermes_workflow/product_cli.py`:
 
@@ -1540,7 +1542,7 @@ Replace the temporary remote `--real` error with:
             raise typer.Exit(code=1)
 ```
 
-- [ ] **Step 5: Run remote flow tests**
+- [x] **Step 5: Run remote flow tests**
 
 Run:
 
@@ -1550,7 +1552,7 @@ rtk proxy ./.venv/bin/python -m pytest tests/test_remote_optimizer_flow.py tests
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 Run:
 
@@ -1567,7 +1569,7 @@ rtk git commit -m "feat: run remote openbox optimizer flow"
 - Test: `tests/test_remote_optimizer_flow.py`
 - Test: `tests/test_product_cli_remote.py`
 
-- [ ] **Step 1: Write failing tests for `--continue`**
+- [x] **Step 1: Write failing tests for `--continue`**
 
 Append to `tests/test_product_cli_remote.py`:
 
@@ -1598,7 +1600,7 @@ def test_ic_opt_remote_continue_routes_additional_evals(monkeypatch, tmp_path: P
     assert "recommended: real_141" in result.output
 ```
 
-- [ ] **Step 2: Run tests and verify failure**
+- [x] **Step 2: Run tests and verify failure**
 
 Run:
 
@@ -1608,7 +1610,7 @@ rtk proxy ./.venv/bin/python -m pytest tests/test_product_cli_remote.py::test_ic
 
 Expected: FAIL because `continue_remote_project` is missing.
 
-- [ ] **Step 3: Implement remote continuation**
+- [x] **Step 3: Implement remote continuation**
 
 Add to `src/hermes_workflow/remote_optimizer_flow.py`:
 
@@ -1666,11 +1668,11 @@ def continue_remote_project(
 
 Implement `_sync_remote_history_to_cache()` to download `ledger/`, `state/`, `reports/`, and `execution_package/` if they exist. Continuation must not change resources unless the user passes resource overrides.
 
-- [ ] **Step 4: Wire product CLI remote continuation**
+- [x] **Step 4: Wire product CLI remote continuation**
 
 Modify `src/hermes_workflow/product_cli.py` to call `continue_remote_project()` when `ssh_profile is not None and continue_evals is not None`.
 
-- [ ] **Step 5: Run targeted continuation tests**
+- [x] **Step 5: Run targeted continuation tests**
 
 Run:
 
@@ -1680,7 +1682,7 @@ rtk proxy ./.venv/bin/python -m pytest tests/test_remote_optimizer_flow.py tests
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 Run:
 
@@ -1699,7 +1701,7 @@ rtk git commit -m "feat: support remote optimizer continuation"
 - Modify: `docs/NEXT_DEVELOPMENT_LOG_2026-05-31.md`
 - Add evidence doc after real run: `docs/REMOTE_SSH_ACCEPTANCE_2026-06-08.md`
 
-- [ ] **Step 1: Add user-facing remote SSH docs**
+- [x] **Step 1: Add user-facing remote SSH docs**
 
 Add a short section:
 
@@ -1728,7 +1730,7 @@ The project path is the Linux server path. Reports are written on the server
 under `PROJECT/reports/` and mirrored locally under `~/.ic-opt/remote_runs/`.
 ```
 
-- [ ] **Step 2: Update agent skill**
+- [x] **Step 2: Update agent skill**
 
 Modify `skills/ic-opt/SKILL.md` so agents map:
 
@@ -1745,7 +1747,7 @@ ic-opt --ssh-profile lab /home/user/spectre_opt_prj/Mixer_opt --real
 
 The skill must state that the agent should not ask for SSH passwords and should tell the user to verify `ssh PROFILE true` if doctor reports SSH failure.
 
-- [ ] **Step 3: Run full local regression**
+- [x] **Step 3: Run full local regression**
 
 Run:
 
@@ -1758,7 +1760,7 @@ rtk git diff --check
 
 Expected: all commands pass.
 
-- [ ] **Step 4: Run real remote doctor acceptance**
+- [x] **Step 4: Run real remote doctor acceptance**
 
 Use a user-provided SSH profile and remote project. Do not invent a remote project path.
 
@@ -1778,7 +1780,7 @@ local report: ...
 
 Record the actual profile/project/report paths in `docs/REMOTE_SSH_ACCEPTANCE_2026-06-08.md`, redacting private PDK/license paths.
 
-- [ ] **Step 5: Run smallest meaningful remote real acceptance**
+- [x] **Step 5: Run smallest meaningful remote real acceptance**
 
 Only after doctor passes, run a small but real optimization:
 
@@ -1796,7 +1798,7 @@ Expected:
 
 If no feasible candidate appears in 10 points, that is acceptable for the smoke. The acceptance criterion is correct remote execution and artifact sync, not optimizer quality.
 
-- [ ] **Step 6: Run remote continuation acceptance**
+- [x] **Step 6: Run remote continuation acceptance**
 
 After the real smoke:
 
@@ -1810,7 +1812,7 @@ Expected:
 - Resource settings are inherited unless explicitly overridden.
 - Remote and local reports refresh.
 
-- [ ] **Step 7: Commit docs and evidence**
+- [x] **Step 7: Commit docs and evidence**
 
 Run:
 

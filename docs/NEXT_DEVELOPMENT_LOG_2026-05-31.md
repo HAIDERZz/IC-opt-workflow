@@ -7,25 +7,27 @@
 - Current scope: C-69 Remote SSH Execution Backend Design
 - current_scope: C-69 Remote SSH Execution Backend Design
 - current_scope_exact: C-69 Remote SSH Execution Backend Design
-- Current status: reviewed. C-69 Remote SSH Execution Backend is implemented
-  by Claude and accepted by Codex for offline/product-contract readiness. The
-  implementation covers SSH runner, remote project/cache, remote doctor,
-  remote prepare, remote Spectre/OCEAN adapter, remote OpenBox real flow,
-  remote continuation, CLI/docs/skill updates, and report/history mirroring.
-  Real remote SSH/Spectre/OCEAN acceptance is blocked until the user provides
-  an explicit SSH profile and remote project path.
+- Current status: reviewed and real-accepted. C-69 Remote SSH Execution Backend
+  is implemented by Claude and accepted by Codex with real remote
+  SSH/Spectre/OCEAN evidence. The implementation covers SSH runner, remote
+  project/cache, remote doctor, remote prepare, remote Spectre/OCEAN adapter,
+  remote OpenBox real flow, remote continuation, CLI/docs/skill updates, remote
+  Maestro symlink materialization, and report/history mirroring.
 - Active evidence: `docs/superpowers/specs/2026-06-08-remote-ssh-execution-backend-design.md`
 - Active plan: `docs/superpowers/plans/2026-06-08-remote-ssh-execution-backend.md`
-- Next required action: run C-69 real remote acceptance after the user provides
-  an explicit SSH profile and remote project path.
-- next_allowed_action: Run C-69 real remote acceptance after the user provides an explicit SSH profile and remote project path: ic-opt --ssh-profile PROFILE /remote/project --doctor, then --real smoke, then --continue smoke.
-- next_allowed_action_exact_json: Run C-69 real remote acceptance after the user provides an explicit SSH profile and remote project path: ic-opt --ssh-profile PROFILE /remote/project --doctor, then --real smoke, then --continue smoke.
-- next_allowed_action_exact: Run C-69 real remote doctor/real/continue
-  acceptance with user-provided SSH profile and remote project path.
+- Next required action: use remote mode with beta users or address concrete
+  remote diagnostics/user-doc feedback. Do not rerun remote real tools only for
+  documentation formatting.
+- next_allowed_action: C-69 remote SSH MVP is accepted; continue only with
+  concrete beta feedback or targeted diagnostic polish.
+- next_allowed_action_exact_current_state: C-69 remote SSH MVP is accepted. Next remote work should be driven by concrete beta feedback, such as improving diagnostics for unsafe remote symlinks, improving metric formula troubleshooting, or polishing remote user docs. Do not rerun remote real tools just for documentation formatting.
+- next_allowed_action_exact_json: C-69 remote SSH MVP is accepted; continue
+  only with concrete beta feedback or targeted diagnostic polish.
+- next_allowed_action_exact: C-69 remote SSH MVP is accepted.
 
 ## C-69 Remote SSH Execution Backend Design And Plan 2026-06-08
 
-C-69 implementation is complete for offline/product-contract readiness.
+C-69 implementation is complete and real-accepted for the remote SSH MVP.
 
 Design summary:
 
@@ -66,9 +68,8 @@ Task order:
 - Task 9: Remote continuation. Completed in `ac33bc0` and final history-sync
   hardening in `95e6bba`.
 - Task 10: Documentation, skill, and real remote acceptance. Documentation and
-  skill updates completed in `ba5de1e`; real remote acceptance is recorded as
-  blocked in `docs/REMOTE_SSH_ACCEPTANCE_2026-06-08.md` because no explicit
-  SSH profile/remote project was provided.
+  skill updates completed in `ba5de1e`; real remote acceptance is recorded in
+  `docs/REMOTE_SSH_ACCEPTANCE_2026-06-08.md`.
 
 Verification:
 
@@ -78,7 +79,6 @@ Verification:
   passed.
 - `./.venv/bin/python tools/check_development_cadence.py` passed.
 - `git diff --check HEAD~3..HEAD` passed before final status sync.
-- No real SSH/network/Cadence/Spectre/OCEAN command was run.
 - Codex review findings fixed by Claude:
   missing tree helpers; tree transfer basename nesting; tar `--exclude`
   ordering; tree transfer stderr assertions.
@@ -87,8 +87,25 @@ Verification:
   history sync failure, unquoted remote prepare path, unquoted inner `csh`
   paths, missing remote failure manifest upload, and missing continuation CLI
   assertion. Claude fixed these in `95e6bba`.
+- Real remote acceptance exposed and fixed additional product blockers:
+  multi-testbench remote adapter routing, `metric_probe.ocn` being written to
+  repo cwd, remote continuation rerunning the first-run package step, and
+  remote Maestro symlink materialization. Claude fixed these through commits
+  `943360d`, `3c99af5`, `f1f2c9f`, and `fb0497c`.
+- Real remote evidence:
+  `docs/REMOTE_SSH_ACCEPTANCE_2026-06-08.md`.
+  User verified passwordless SSH for `zzchen@10.113.216.131`. Clean remote
+  project `/home/zzchen/remote_opt/mixer_muti_tb_c69_accept_20260608_001`
+  passed `--doctor`, completed a 10-evaluation remote `--real` smoke, and then
+  completed `--continue 4`; cumulative evaluations reached 14 in both the
+  remote project and the local mirror
+  `/home/zzchen/.ic-opt/remote_runs/zzchen@10.113.216.131/150c658badc47d17`.
+  `check-optimizer-run` accepted the remote mirror. The user's current metric
+  formulas produced only `metric_check_failed` rows, so this proves remote
+  execution/artifact sync/failure classification, not an optimized usable point
+  for that project.
 - Final full regression passed:
-  `./.venv/bin/python -m pytest -q` -> `699 passed, 1 warning`.
+  `./.venv/bin/python -m pytest -q` -> `718 passed, 1 warning`.
 - Final ruff passed: `./.venv/bin/python -m ruff check src tests`.
 - Final cadence and whitespace gates passed:
   `./.venv/bin/python tools/check_development_cadence.py` and

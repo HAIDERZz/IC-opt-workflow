@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "current_scope": "C-69 Remote SSH Execution Backend Design",
-  "current_status": "C-69 Remote SSH Execution Backend code/docs are implemented by Claude and accepted by Codex for offline/product-contract readiness. The remote route now has SSH runner, remote project/cache, remote doctor, remote prepare, remote Spectre/OCEAN adapter, remote OpenBox real flow, remote continuation, CLI/docs/skill updates, and report/history mirroring. Real remote SSH/Spectre/OCEAN acceptance is blocked until the user provides an explicit SSH profile and remote project path.",
+  "current_status": "C-69 Remote SSH Execution Backend is implemented by Claude and accepted by Codex with real remote SSH/Spectre/OCEAN evidence. The route has SSH runner, remote project/cache, remote doctor, remote prepare, remote Spectre/OCEAN adapter, remote OpenBox real flow, remote continuation, CLI/docs/skill updates, and report/history mirroring. Real acceptance used ssh profile zzchen@10.113.216.131 and clean remote project /home/zzchen/remote_opt/mixer_muti_tb_c69_accept_20260608_001: --doctor passed, --real completed 10 remote evaluations, --continue 4 raised cumulative evaluations to 14, and check-optimizer-run accepted. The user-provided remote metric formulas still produced metric_check_failed rows, so this acceptance proves remote execution/artifact sync/failure classification, not a usable optimized point for that project.",
   "review_status": "reviewed",
   "subagent_dispatch": "available",
   "active_spec": "docs/superpowers/specs/2026-06-08-remote-ssh-execution-backend-design.md",
@@ -12,7 +12,7 @@
     "docs/EXECUTION_PROGRESS_2026-05-29.md",
     "docs/COMPACT_RESUME_CHECKPOINT.md"
   ],
-  "next_allowed_action": "Run C-69 real remote acceptance after the user provides an explicit SSH profile and remote project path: ic-opt --ssh-profile PROFILE /remote/project --doctor, then --real smoke, then --continue smoke.",
+  "next_allowed_action": "C-69 remote SSH MVP is accepted. Next remote work should be driven by concrete beta feedback, such as improving diagnostics for unsafe remote symlinks, improving metric formula troubleshooting, or polishing remote user docs. Do not rerun remote real tools just for documentation formatting.",
   "forbidden_actions": [
     "install unpinned latest shap into the OpenBox venv",
     "run real tool commands without first checking docs/TOOLCHAIN_EXECUTION_REFERENCE.md",
@@ -24,7 +24,6 @@
     "replace optimizer backend again without an evidence-backed decision checkpoint",
     "ship a product route that depends on /tmp/ic_auto_opt_openbox_spike/.venv",
     "create a Python virtualenv inside each user optimization project",
-    "claim remote SSH execution is implemented before remote doctor and remote real acceptance pass",
     "require installing OpenBox or the product Python environment on the remote EDA server for the C-69 MVP",
     "validate production UX with long natural-language prompts instead of the implemented ic-opt shell command or platform-neutral agent skill",
     "run Virtuoso before explicit task confirmation",
@@ -52,13 +51,13 @@
     "active_plan": "docs/superpowers/plans/2026-06-08-remote-ssh-execution-backend.md",
     "top_level_plan": "docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md",
     "alignment": "Aligned with the top-level product-landing goal: C-69 adds remote SSH mode while keeping local mode unchanged and keeping OpenBox/product Python on the local workstation.",
-    "drift": "No real remote target was provided, so Task 10 real remote doctor/real/continue acceptance was not run. Claude completed the implementation and internal reviews; Codex final acceptance found six offline spec/code-quality blockers, then Claude fixed them in commit 95e6bba."
+    "drift": "No open drift for C-69 MVP. Claude completed implementation and internal review; Codex found and Claude fixed offline blockers, then real remote doctor, real smoke, and continuation acceptance passed. The acceptance project still has user metric formula failures, which are correctly classified as metric_check_failed and are not remote execution failures."
   },
-  "latest_valid_commit": "92bdbe4",
+  "latest_valid_commit": "fb0497c",
   "review_evidence": {
-    "spec_review": "C-69 was reviewed against docs/superpowers/specs/2026-06-08-remote-ssh-execution-backend-design.md and docs/superpowers/plans/2026-06-08-remote-ssh-execution-backend.md. Offline/product-contract scope is accepted: passwordless SSH boundary, remote project source of truth, local OpenBox/controller, remote Spectre/OCEAN adapter without remote Python product env, doctor without Spectre launch, report/history mirror, and remote continuation are implemented. Real remote acceptance remains blocked by missing explicit user SSH profile/project.",
-    "code_quality_review": "Claude performed internal spec/code-quality review and Codex performed final acceptance. Codex found six blockers after Claude's first completion: missing remote real report sync, silent history sync failure, unquoted remote prepare path, unquoted inner csh paths, missing remote failure manifest upload, and missing continuation assertion. Claude fixed them in 95e6bba. Final full pytest passed with 699 passed and 1 warning; ruff, cadence check, and git diff --check passed.",
-    "c69_remote_ssh_backend": "Implemented by Claude through commits f34c366, b1e8fbb, ee34666, 14b9239, 8800c1e, 91f10b0, 1f162e1, ac33bc0, ba5de1e, and 95e6bba. Final real remote acceptance evidence is recorded as BLOCKED in docs/REMOTE_SSH_ACCEPTANCE_2026-06-08.md because no explicit SSH profile/remote project was provided.",
+    "spec_review": "C-69 was reviewed against docs/superpowers/specs/2026-06-08-remote-ssh-execution-backend-design.md and docs/superpowers/plans/2026-06-08-remote-ssh-execution-backend.md. MVP scope is accepted: passwordless SSH boundary, remote project source of truth, local OpenBox/controller, remote Spectre/OCEAN adapter without remote Python product env, doctor without Spectre launch, report/history mirror, remote continuation, and remote Maestro symlink materialization are implemented and real-accepted.",
+    "code_quality_review": "Claude performed internal spec/code-quality review and Codex performed final acceptance. Codex found offline and real-acceptance blockers, including missing remote report sync, silent history sync failure, quoting issues, missing remote failure manifest upload, missing continuation assertion, multi-testbench remote adapter routing, cwd metric_probe.ocn leakage, remote continuation rerunning package, and remote Maestro symlink materialization. Claude fixed them through fb0497c. Final full pytest passed with 718 passed and 1 warning; ruff, cadence check, and git diff --check passed.",
+    "c69_remote_ssh_backend": "Implemented by Claude through commits f34c366, b1e8fbb, ee34666, 14b9239, 8800c1e, 91f10b0, 1f162e1, ac33bc0, ba5de1e, 95e6bba, 943360d, 3c99af5, f1f2c9f, and fb0497c. Real remote acceptance evidence is recorded in docs/REMOTE_SSH_ACCEPTANCE_2026-06-08.md: doctor passed, 10-eval remote real smoke passed artifact acceptance, continuation +4 passed, and cumulative evaluations reached 14 on both remote project and local mirror.",
     "c47_plan": "docs/superpowers/plans/2026-06-05-openbox-advanced-visualization-artifact.md",
     "c47_tests": "Targeted tests passed: /home/zzchen/.venvs/openclaw/bin/python -m pytest tests/test_openbox_backend.py tests/test_optimizer_insights.py tests/test_optimizer_finalize.py",
     "c47_full_suite": "Full suite passed: /home/zzchen/.venvs/openclaw/bin/python -m pytest (574 passed, 1 skipped).",
