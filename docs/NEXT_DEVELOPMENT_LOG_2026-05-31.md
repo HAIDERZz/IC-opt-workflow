@@ -7,23 +7,25 @@
 - Current scope: C-69 Remote SSH Execution Backend Design
 - current_scope: C-69 Remote SSH Execution Backend Design
 - current_scope_exact: C-69 Remote SSH Execution Backend Design
-- Current status: reviewed. C-69 Task 1 Remote SSH Runner is implemented by
-  Claude and accepted after Codex spec/code-quality review. It added no-network
-  unit-tested OpenSSH runner primitives for command execution, text read/write,
-  existence/mkdir, scp file upload/download, and tar-over-SSH tree
-  upload/download.
+- Current status: reviewed. C-69 Remote SSH Execution Backend is implemented
+  by Claude and accepted by Codex for offline/product-contract readiness. The
+  implementation covers SSH runner, remote project/cache, remote doctor,
+  remote prepare, remote Spectre/OCEAN adapter, remote OpenBox real flow,
+  remote continuation, CLI/docs/skill updates, and report/history mirroring.
+  Real remote SSH/Spectre/OCEAN acceptance is blocked until the user provides
+  an explicit SSH profile and remote project path.
 - Active evidence: `docs/superpowers/specs/2026-06-08-remote-ssh-execution-backend-design.md`
 - Active plan: `docs/superpowers/plans/2026-06-08-remote-ssh-execution-backend.md`
-- Next required action: implement C-69 Task 2 Remote Project Reference And
-  Cache with `tests/test_remote_project.py` first and no real SSH/network call.
-- next_allowed_action: Implement C-69 Task 2: Remote Project Reference And Cache, using tests/test_remote_project.py first and no real SSH/network call.
-- next_allowed_action_exact_json: Implement C-69 Task 2: Remote Project Reference And Cache, using tests/test_remote_project.py first and no real SSH/network call.
-- next_allowed_action_exact: Implement C-69 Task 2 Remote Project Reference And
-  Cache with no-network tests first.
+- Next required action: run C-69 real remote acceptance after the user provides
+  an explicit SSH profile and remote project path.
+- next_allowed_action: Run C-69 real remote acceptance after the user provides an explicit SSH profile and remote project path: ic-opt --ssh-profile PROFILE /remote/project --doctor, then --real smoke, then --continue smoke.
+- next_allowed_action_exact_json: Run C-69 real remote acceptance after the user provides an explicit SSH profile and remote project path: ic-opt --ssh-profile PROFILE /remote/project --doctor, then --real smoke, then --continue smoke.
+- next_allowed_action_exact: Run C-69 real remote doctor/real/continue
+  acceptance with user-provided SSH profile and remote project path.
 
 ## C-69 Remote SSH Execution Backend Design And Plan 2026-06-08
 
-C-69 design and implementation plan are written, verified-only.
+C-69 implementation is complete for offline/product-contract readiness.
 
 Design summary:
 
@@ -48,19 +50,27 @@ docs/superpowers/plans/2026-06-08-remote-ssh-execution-backend.md
 
 Task order:
 
-- Task 1: Remote SSH Runner, no-network unit tests only. Completed reviewed in
-  commits `17a5037`, `b658ebd`, `c35c39e`, `3680050`, and `bd510ab`.
-- Task 2: Remote project reference and cache path.
-- Task 3: Requirement parser extraction for remote path checks.
-- Task 4: Remote doctor MVP.
-- Task 5: Product CLI `--ssh-profile ... --doctor`.
-- Task 6: Remote project cache preparation.
-- Task 7: Remote Spectre/OCEAN single-candidate adapter.
-- Task 8: Remote OpenBox real flow.
-- Task 9: Remote continuation.
-- Task 10: Documentation, skill, and real remote acceptance.
+- Task 1: Remote SSH Runner, no-network unit tests only. Completed and
+  reviewed in commits `17a5037`, `b658ebd`, `c35c39e`, `3680050`, and
+  `bd510ab`.
+- Task 2: Remote project reference and cache path. Completed in `f34c366`.
+- Task 3: Requirement parser extraction for remote path checks. Completed in
+  `b1e8fbb`.
+- Task 4: Remote doctor MVP. Completed in `ee34666`.
+- Task 5: Product CLI `--ssh-profile ... --doctor`. Completed in `14b9239`.
+- Task 6: Remote project cache preparation. Completed in `8800c1e`.
+- Task 7: Remote Spectre/OCEAN single-candidate adapter. Completed in
+  `91f10b0`.
+- Task 8: Remote OpenBox real flow. Completed in `1f162e1` and final sync
+  hardening in `95e6bba`.
+- Task 9: Remote continuation. Completed in `ac33bc0` and final history-sync
+  hardening in `95e6bba`.
+- Task 10: Documentation, skill, and real remote acceptance. Documentation and
+  skill updates completed in `ba5de1e`; real remote acceptance is recorded as
+  blocked in `docs/REMOTE_SSH_ACCEPTANCE_2026-06-08.md` because no explicit
+  SSH profile/remote project was provided.
 
-Task 1 verification:
+Verification:
 
 - `./.venv/bin/python -m pytest tests/test_remote_ssh.py -q` passed with
   26 tests.
@@ -72,6 +82,17 @@ Task 1 verification:
 - Codex review findings fixed by Claude:
   missing tree helpers; tree transfer basename nesting; tar `--exclude`
   ordering; tree transfer stderr assertions.
+- Final C-69 acceptance found six additional offline blockers after Claude's
+  first full completion: missing remote real report sync, silent continuation
+  history sync failure, unquoted remote prepare path, unquoted inner `csh`
+  paths, missing remote failure manifest upload, and missing continuation CLI
+  assertion. Claude fixed these in `95e6bba`.
+- Final full regression passed:
+  `./.venv/bin/python -m pytest -q` -> `699 passed, 1 warning`.
+- Final ruff passed: `./.venv/bin/python -m ruff check src tests`.
+- Final cadence and whitespace gates passed:
+  `./.venv/bin/python tools/check_development_cadence.py` and
+  `git diff --check`.
 
 ## C-66 Claude `/ic-opt` Continuation Validation 2026-06-07
 

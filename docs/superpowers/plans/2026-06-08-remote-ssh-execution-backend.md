@@ -4,6 +4,8 @@
 
 **Goal:** Add a remote SSH execution mode where local `ic-opt`/OpenBox/report orchestration controls a project directory on a Linux EDA server, while Spectre/OCEAN run remotely through user-configured passwordless SSH.
 
+**Status 2026-06-08:** Implemented and reviewed for offline/product-contract readiness. Tasks 1-9 and Task 10 documentation/skill updates are implemented through commit `95e6bba`. Final full regression passed with `699 passed, 1 warning`; ruff, cadence check, and `git diff --check` passed. Task 10 real remote SSH/Spectre/OCEAN acceptance is recorded as blocked in `docs/REMOTE_SSH_ACCEPTANCE_2026-06-08.md` because no explicit SSH profile and remote project path were provided.
+
 **Architecture:** Keep local mode unchanged. Add a focused OpenSSH runner, a remote project/cache layer, a remote doctor gate, and a remote Spectre/OCEAN adapter that runs Cadence commands on Linux without requiring the full Python product environment there. Route product CLI remote commands through these new pieces and sync reports back to both local cache and remote project.
 
 **Tech Stack:** Python 3.10+, Typer CLI, existing Hermes workflow modules, system OpenSSH/`tar`, pytest, Pydantic/dataclasses, existing OpenBox ask-and-tell backend.
