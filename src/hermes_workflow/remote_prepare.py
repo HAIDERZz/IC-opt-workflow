@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shlex
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -47,11 +48,45 @@ def prepare_remote_project_cache(
         return RemotePrepareResult(status="fail", cache_dir=cache_dir, issues=report.issues)
 
     write_config_payloads(cache_dir, render_config_payloads(report.sections))
-    _download_remote_netlists(cache_dir, report.sections, runner)
+    try:
+        _download_remote_netlists(cache_dir, report.sections, runner)
+    except RuntimeError as exc:
+        return RemotePrepareResult(status="fail", cache_dir=cache_dir, issues=[str(exc)])
     netlist_report = prepare_netlist(cache_dir)
     if netlist_report.status.value != "pass":
         return RemotePrepareResult(status="fail", cache_dir=cache_dir, issues=netlist_report.issues)
     return RemotePrepareResult(status="pass", cache_dir=cache_dir, issues=[])
+
+
+def _compute_remote_history_root(maestro_point_root: PurePosixPath) -> PurePosixPath:
+    parent = maestro_point_root.parent
+    if parent.name in {"1", "psf"}:
+        return parent.parent
+    return maestro_point_root
+
+
+def _validate_remote_netlist_symlinks(
+    remote_netlist: PurePosixPath,
+    allowed_root: PurePosixPath,
+    runner: Any,
+) -> None:
+    escaped_root = shlex.quote(str(allowed_root))
+    script = (
+        f"root=$(readlink -f {escaped_root})\n"
+        f"bad=$(find {escaped_root} -type l -exec sh -c '\n"
+        f"  for f; do\n"
+        f"    r=$(readlink -f \"$f\") || {{ printf \"%s\\n\" \"$f\"; continue; }}\n"
+        f"    case $r in $root) ;; *) printf \"%s\\n\" \"$f\";; esac\n"
+        f"  done\n"
+        f"' _ {{}} +)\n"
+        f"if [ -n \"$bad\" ]; then printf '%s\\n' \"$bad\"; exit 1; fi\n"
+        f"find {escaped_root} -type l ! -exec test -f {{}} \\; -print"
+    )
+    result = runner.run(script, check=True)
+    if result.return_code != 0:
+        details = result.stderr.strip().split("symlink validation failed:\n")
+        issues = [f"  {line}" for line in (details[1] if len(details) > 1 else details[0]).strip().splitlines()]
+        raise RuntimeError("remote netlist symlink validation failed:\n" + "\n".join(issues))
 
 
 def _download_remote_netlists(cache_dir: Path, sections: dict[str, object], runner: Any) -> None:
@@ -60,12 +95,16 @@ def _download_remote_netlists(cache_dir: Path, sections: dict[str, object], runn
     maestro = _dict_section(sections, "Maestro Source")
     testbenches = _testbench_sources(maestro)
     for index, testbench in enumerate(testbenches):
-        remote_netlist = PurePosixPath(str(testbench["maestro_point_root"])) / "netlist"
+        maestro_point_root = PurePosixPath(str(testbench["maestro_point_root"]))
+        remote_netlist = maestro_point_root / "netlist"
+        allowed_root = _compute_remote_history_root(maestro_point_root)
         if "testbenches" in maestro:
             destination = cache_dir / "netlists" / "testbenches" / str(testbench["id"]) / "exported"
         else:
             destination = cache_dir / "netlists" / "exported"
+        _validate_remote_netlist_symlinks(remote_netlist, allowed_root, runner)
         runner.download_tree(remote_netlist, destination, dereference=True)
         if index == 0 and "testbenches" in maestro:
             primary = cache_dir / "netlists" / "exported"
+            _validate_remote_netlist_symlinks(remote_netlist, allowed_root, runner)
             runner.download_tree(remote_netlist, primary, dereference=True)
