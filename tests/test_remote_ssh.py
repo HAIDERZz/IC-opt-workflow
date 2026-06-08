@@ -280,7 +280,7 @@ def test_download_tree_uses_ssh_tar(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     assert local_tar_argv == ["tar", "-C", str(local_path), "-xf", "-"]
 
 
-def _make_fake_popen(popen_calls: list, returncode: int = 0):
+def _make_fake_popen(popen_calls: list, returncode: int = 0, stderr_content: bytes = b""):
     """Return a factory that creates FakePopen instances and records calls."""
 
     def factory(argv, **kw):
@@ -288,7 +288,7 @@ def _make_fake_popen(popen_calls: list, returncode: int = 0):
         instance = FakePopen.__new__(FakePopen)
         instance.argv = argv
         instance.stdout = FakePipe() if kw.get("stdout") is not None else None
-        instance.stderr = FakePipe() if kw.get("stderr") is not None else None
+        instance.stderr = FakePipe(stderr_content) if kw.get("stderr") is not None else None
         instance.stdin = kw.get("stdin")
         instance.returncode = returncode
         return instance
@@ -334,12 +334,12 @@ def test_download_tree_include_raises_not_supported(tmp_path: Path) -> None:
 
 def test_download_tree_raises_on_ssh_failure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     popen_calls: list = []
-    monkeypatch.setattr(subprocess, "Popen", _make_fake_popen(popen_calls, returncode=1))
+    monkeypatch.setattr(subprocess, "Popen", _make_fake_popen(popen_calls, returncode=1, stderr_content=b"Permission denied"))
     monkeypatch.setattr(subprocess, "run", lambda argv, **kw: FakeCompletedProcess())
 
     runner = RemoteSshRunner("lab")
 
-    with pytest.raises(RuntimeError, match="remote tar download failed"):
+    with pytest.raises(RuntimeError, match="remote tar download failed.*Permission denied"):
         runner.download_tree(PurePosixPath("/remote/data"), tmp_path / "out")
 
 
@@ -453,7 +453,7 @@ def test_upload_tree_raises_on_ssh_failure(tmp_path: Path, monkeypatch: pytest.M
         instance = FakePopen.__new__(FakePopen)
         instance.argv = argv
         instance.stdout = FakePipe() if kw.get("stdout") is not None else None
-        instance.stderr = FakePipe() if kw.get("stderr") is not None else None
+        instance.stderr = FakePipe(b"Connection refused") if kw.get("stderr") is not None else None
         instance.stdin = kw.get("stdin")
         call_count[0] += 1
         instance.returncode = 1 if call_count[0] == 2 else 0
@@ -467,7 +467,7 @@ def test_upload_tree_raises_on_ssh_failure(tmp_path: Path, monkeypatch: pytest.M
     local_path = tmp_path / "upload_data"
     local_path.mkdir()
 
-    with pytest.raises(RuntimeError, match="remote tar upload failed"):
+    with pytest.raises(RuntimeError, match="remote tar upload failed.*Connection refused"):
         runner.upload_tree(local_path, PurePosixPath("/remote/dest"))
 
 
