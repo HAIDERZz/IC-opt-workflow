@@ -92,7 +92,6 @@ def _write_remote_success_manifests(context: Any) -> AdapterRunResult:
         METRIC_RESULT_MANIFEST_NAME,
         parse_ocean_scalars,
     )
-    from hermes_workflow.package import sha256_file
 
     completed = datetime.now(UTC).replace(microsecond=0).strftime("%Y-%m-%dT%H:%M:%SZ")
     result_path = context.run_dir / "result_manifest.json"

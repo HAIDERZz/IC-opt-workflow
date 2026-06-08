@@ -119,6 +119,29 @@ Discovery order for `ic-opt`:
 `ic-opt` does not infer `.bashrc`/`.zshrc` content and does not hardcode a
 Spectre version.
 
+## Remote SSH Mode
+
+Use this when your Cadence/Spectre/OCEAN environment is on a Linux EDA server,
+but you want to run `ic-opt`, OpenBox, and report viewing from your own
+workstation.
+
+First configure passwordless SSH yourself:
+
+```bash
+ssh lab true
+```
+
+Then run:
+
+```bash
+ic-opt --ssh-profile lab /home/user/spectre_opt_prj/Mixer_opt --doctor
+ic-opt --ssh-profile lab /home/user/spectre_opt_prj/Mixer_opt --real
+ic-opt --ssh-profile lab /home/user/spectre_opt_prj/Mixer_opt --continue 40
+```
+
+The project path is the Linux server path. Reports are written on the server
+under `PROJECT/reports/` and mirrored locally under `~/.ic-opt/remote_runs/`.
+
 ## User Project Layout
 
 Recommended layout:
