@@ -1,7 +1,7 @@
 # Compact Resume Checkpoint
 
 Date: 2026-05-28
-Last updated: 2026-06-07
+Last updated: 2026-06-08
 
 This checkpoint preserves the planning state for continuing after context compaction.
 
@@ -20,12 +20,34 @@ ic-auto-opt-workflow/AGENTS.md
 
 Current execution state:
 
+- Current scope: C-69 Remote SSH Execution Backend Design.
+- current_scope: C-69 Remote SSH Execution Backend Design.
+- current_scope_exact: C-69 Remote SSH execution backend design for
+  passwordless-SSH remote Spectre/OCEAN runs.
+- Current status: design spec is written and synced as a verified-only design
+  checkpoint. Implementation has not started. The next gated action is user
+  review of the C-69 spec, then an implementation plan beginning with Remote
+  SSH Runner and remote `--doctor` MVP.
+- Active spec:
+  `docs/superpowers/specs/2026-06-08-remote-ssh-execution-backend-design.md`.
+- Next allowed action: User review C-69 remote SSH execution backend design
+  spec; if approved, write implementation plan starting with Remote SSH Runner
+  and doctor MVP.
+- C-69 design decision: the Linux EDA server project directory remains the
+  source of truth and keeps the same local-mode layout. The local workstation
+  runs the product Python environment, OpenBox/controller, agent skill, and
+  report interpretation. The remote Linux host runs Spectre/OCEAN through
+  user-configured passwordless SSH, following the `virtuoso-bridge-lite`
+  connection assumption. The tool must not manage passwords or private keys.
+- Historical C-66/C-65 notes below are retained for context; they are not the
+  active development scope.
 - Latest production acceptance note:
   `docs/PRODUCTION_LANDING_ACCEPTANCE_2026-06-07.md`.
-- Current scope: C-66 OpenBox continuation hardening.
-- current_scope: C-66 OpenBox continuation hardening.
-- current_scope_exact: C-66 OpenBox continuation hardening and resource-inheritance fix.
-- Current status: the first short Claude `/ic-opt ... --real` real validation
+- Previous scope: C-66 OpenBox continuation hardening.
+- previous_current_scope: C-66 OpenBox continuation hardening.
+- previous_current_scope_exact: C-66 OpenBox continuation hardening and
+  resource-inheritance fix.
+- Previous C-66 status: the first short Claude `/ic-opt ... --real` real validation
   on fresh project `/tmp/ic_auto_opt_c66_claude_real_e2e/Mixer_opt_muti_tb`
   completed 100 real OpenBox/Spectre/OCEAN multi-testbench evaluations and
   recommended feasible `real_066`. The follow-up short user request

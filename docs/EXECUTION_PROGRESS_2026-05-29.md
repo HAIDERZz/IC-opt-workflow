@@ -10,21 +10,15 @@ This note preserves the implementation state for continuing Plan A after context
 - Baseline commit: `885e97f docs: capture workflow planning baseline`
 - Latest C-3 code commit before docs-only cleanup: `edb107f fix: harden preflight readiness gates`; docs cleanup continues through current HEAD
 - Active plan: `docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md`
-- Current scope: C-66 OpenBox continuation hardening
-- current_scope: C-66 OpenBox continuation hardening
-- current_scope_exact: C-66 OpenBox continuation hardening and resource-inheritance fix
-- Current status: The first short Claude `/ic-opt ... --real` real validation
-  on a fresh Mixer multi-testbench project completed 100 real
-  OpenBox/Spectre/OCEAN evaluations and recommended feasible `real_066`. The
-  follow-up short user request `请再进行40个点的优化` correctly routed to
-  `continue-openbox-real` and exposed a real OpenBox continuation issue. The
-  narrow fix now allows partial unique batches, caps continuation model replay
-  at 40 prior traces, repairs missing base execution manifests, and prevents
-  generated continuation task packages from overriding project
-  `spectre.parallel_jobs`.
-- Next allowed action: finish verification, sync docs, and commit the narrow
-  continuation hardening. Then run a clean runtime-agent continuation drill
-  using generated continuation package resource inheritance.
+- Current scope: C-69 Remote SSH Execution Backend Design
+- current_scope: C-69 Remote SSH Execution Backend Design
+- current_scope_exact: C-69 Remote SSH Execution Backend Design
+- Current status: C-69 design spec is written, verified-only. It defines a
+  remote SSH execution mode where the Linux EDA server remains the source of
+  truth for the project directory, user-configured passwordless SSH is required,
+  local workstation `ic-opt` runs OpenBox/controller/report logic, and remote
+  Linux runs Spectre/OCEAN while preserving full artifacts.
+- Next allowed action: User review C-69 remote SSH execution backend design spec; if approved, write implementation plan starting with Remote SSH Runner and doctor MVP.
 - Execution method: `superpowers:subagent-driven-development`
 - Dependencies installed in active Python environment on 2026-05-29: `pytest`, `typer`, `pydantic`, `PyYAML`, `ruff`
 

@@ -4,27 +4,44 @@
 
 - Repository: `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow`
 - Branch: `plan-a-hermes-file-contract-mvp`
-- Current scope: C-66 OpenBox continuation hardening
-- current_scope: C-66 OpenBox continuation hardening
-- current_scope_exact: C-66 OpenBox continuation hardening and resource-inheritance fix
-- Current status: verified-only. The Claude `/ic-opt` follow-up route
-  correctly mapped `请再进行40个点的优化` to `continue-openbox-real`; that real
-  route exposed OpenBox unique-batch exhaustion after a 100-evaluation run.
-  The narrow hardening is now implemented: continuation can complete partial
-  unique batches, model replay is capped at 40 prior traces while the full
-  ledger remains available for reports/dedupe, missing base execution manifests
-  are repaired, and generated continuation task packages inherit project
-  Spectre resources instead of hardcoding `--parallel-jobs`.
-- Active evidence: `docs/CLAUDE_IC_OPT_CONTINUATION_VALIDATION_2026-06-07.md`
-- Active plan: `docs/superpowers/plans/2026-06-07-runtime-native-agent-adapters.md`
-- Next required action: finish verification, sync docs, and commit the narrow
-  continuation hardening. The next real product drill should use a generated
-  continuation task package without `--parallel-jobs` override so resources are
-  inherited from `config/spectre.yaml`.
-- next_allowed_action: Run the final verification suite for the C-66 continuation hardening, update progress/manual docs, and commit the narrow fix. After that, the next product task should be a clean runtime-agent continuation drill using the generated task package without parallel_jobs override.
-- next_allowed_action_exact_json: Complete C-66 continuation hardening verification and commit. Do not add broad optimizer framework work, fake-run ladders, or manual resource overrides.
-- next_allowed_action_exact: Commit the narrow continuation hardening, then use
-  generated package continuation commands that inherit project resources.
+- Current scope: C-69 Remote SSH Execution Backend Design
+- current_scope: C-69 Remote SSH Execution Backend Design
+- current_scope_exact: C-69 Remote SSH Execution Backend Design
+- Current status: verified-only. The C-69 design spec is written. It keeps the
+  optimization project directory on the Linux EDA server with the same
+  local-mode structure, assumes user-configured passwordless SSH like
+  `virtuoso-bridge-lite`, runs OpenBox/controller/report logic on the local
+  workstation, runs Spectre/OCEAN on the remote Linux server, keeps full
+  artifacts on the remote project, and mirrors reports locally.
+- Active evidence: `docs/superpowers/specs/2026-06-08-remote-ssh-execution-backend-design.md`
+- Active plan: implementation plan pending user approval of the design spec.
+- Next required action: user review C-69 remote SSH execution backend design
+  spec; if approved, write implementation plan starting with Remote SSH Runner
+  and doctor MVP.
+- next_allowed_action: User review C-69 remote SSH execution backend design spec; if approved, write implementation plan starting with Remote SSH Runner and doctor MVP.
+- next_allowed_action_exact_json: User review C-69 remote SSH execution backend design spec; if approved, write implementation plan starting with Remote SSH Runner and doctor MVP.
+- next_allowed_action_exact: User review C-69 remote SSH execution backend design
+  spec; if approved, write implementation plan starting with Remote SSH Runner
+  and doctor MVP.
+
+## C-69 Remote SSH Execution Backend Design 2026-06-08
+
+C-69 design is written, verified-only.
+
+Design summary:
+
+- SSH setup follows the `virtuoso-bridge-lite` assumption: users configure
+  passwordless SSH themselves through OpenSSH keys and `~/.ssh/config`.
+- The remote Linux project directory remains the source of truth and keeps the
+  same layout as local mode.
+- Local Mac/Windows/Linux workstation runs `ic-opt`, agent skill, OpenBox, and
+  report interpretation.
+- Remote Linux EDA server runs Spectre/OCEAN and stores complete generated
+  artifacts.
+- Local workstation may keep a mirror of `reports/`, `ledger/`, `state/`, and
+  execution manifests.
+- MVP should start with remote doctor, then a remote single-candidate
+  Spectre/OCEAN smoke, then OpenBox real remote run, then continuation.
 
 ## C-66 Claude `/ic-opt` Continuation Validation 2026-06-07
 
