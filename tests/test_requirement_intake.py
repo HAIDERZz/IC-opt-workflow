@@ -491,3 +491,44 @@ def test_cli_check_requirement_reports_failure_without_traceback(tmp_path: Path)
     assert "opt_requirement.md is missing" in result.stdout
     assert "report: reports/requirement_intake_report.json" in result.stdout
     assert "Traceback" not in result.output
+
+
+def test_parse_requirement_text_uses_injected_maestro_checker(tmp_path: Path) -> None:
+    requirement_text = (VALID_PROJECT / "opt_requirement.md").read_text(encoding="utf-8").replace(
+        "__MAESTRO_POINT_ROOT__",
+        "/remote/maestro/Interactive.1/point_1",
+    )
+    checked: list[str] = []
+
+    def remote_checker(path: str) -> bool:
+        checked.append(path)
+        return path == "/remote/maestro/Interactive.1/point_1/netlist/input.scs"
+
+    from hermes_workflow.requirement_intake import parse_requirement_text
+
+    report = parse_requirement_text(
+        requirement_text,
+        constraints_text=None,
+        maestro_input_exists=remote_checker,
+    )
+
+    assert report.status == "pass"
+    assert checked == ["/remote/maestro/Interactive.1/point_1/netlist/input.scs"]
+
+
+def test_parse_requirement_text_reports_remote_maestro_missing() -> None:
+    requirement_text = (VALID_PROJECT / "opt_requirement.md").read_text(encoding="utf-8").replace(
+        "__MAESTRO_POINT_ROOT__",
+        "/remote/missing_point",
+    )
+
+    from hermes_workflow.requirement_intake import parse_requirement_text
+
+    report = parse_requirement_text(
+        requirement_text,
+        constraints_text=None,
+        maestro_input_exists=lambda _path: False,
+    )
+
+    assert report.status == "fail"
+    assert "maestro_point_root/netlist/input.scs is missing: /remote/missing_point/netlist/input.scs" in report.issues
