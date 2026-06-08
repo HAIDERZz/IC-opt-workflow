@@ -46,14 +46,10 @@ class FakeRunner:
         self.downloads.append((remote_path, local_path))
         # Only create the file if the remote path is a plausible artifact
         # location.  This prevents unconditional file creation from masking
-        # redirect-placement bugs (e.g. files landing in the SSH session cwd
-        # instead of remote_run_dir).
+        # redirect-placement bugs.
         name = Path(remote_path).name
         parent = str(Path(remote_path).parent)
-        if name in ("spectre.stdout", "spectre.stderr") and parent.rstrip("/").endswith("real_001"):
-            local_path.parent.mkdir(parents=True, exist_ok=True)
-            local_path.write_text(f"content of {name}", encoding="utf-8")
-        elif name in ("ocean.stdout", "ocean.stderr", "ocean.log") and parent.rstrip("/").endswith("metrics"):
+        if name in ("ocean.log",) and parent.rstrip("/").endswith("metrics"):
             local_path.parent.mkdir(parents=True, exist_ok=True)
             local_path.write_text(f"content of {name}", encoding="utf-8")
 
@@ -73,8 +69,13 @@ class FailingFakeRunner(FakeRunner):
     def run(self, command: str, **kwargs: object) -> RemoteCommandResult:
         self.commands.append(command)
         if self._fail_on in command:
-            return RemoteCommandResult(1, "", "error", ["ssh", "lab", command])
-        return RemoteCommandResult(0, "", "", ["ssh", "lab", command])
+            return RemoteCommandResult(
+                1,
+                f"stdout from failing {self._fail_on} command",
+                f"stderr from failing {self._fail_on} command",
+                ["ssh", "lab", command],
+            )
+        return RemoteCommandResult(0, "stdout from successful command", "", ["ssh", "lab", command])
 
 
 def test_remote_adapter_runs_spectre_and_ocean_remotely(tmp_path: Path) -> None:
@@ -139,20 +140,12 @@ def test_remote_adapter_csh_payload_quotes_paths(tmp_path: Path) -> None:
     assert "-log" in inner_ocean
     assert "-restore" not in inner_ocean
 
-    # Redirects must be INSIDE the csh wrapper using absolute remote paths,
-    # not outside as relative paths interpreted by the outer SSH shell.
-    quoted_spectre_stdout = shlex.quote(str(remote_run_dir / "spectre.stdout"))
-    quoted_spectre_stderr = shlex.quote(str(remote_run_dir / "spectre.stderr"))
-    assert f"> {quoted_spectre_stdout}" in inner_spectre
-    assert f"2> {quoted_spectre_stderr}" in inner_spectre
-    # Outer command must not have trailing redirects
-    assert not spectre_cmd.rstrip("'").endswith("spectre.stdout")
-
-    quoted_ocean_stdout = shlex.quote(str(remote_run_dir / "metrics" / "ocean.stdout"))
-    quoted_ocean_stderr = shlex.quote(str(remote_run_dir / "metrics" / "ocean.stderr"))
-    assert f"> {quoted_ocean_stdout}" in inner_ocean
-    assert f"2> {quoted_ocean_stderr}" in inner_ocean
-    assert not ocean_cmd.rstrip("'").endswith("ocean.stdout")
+    # No shell redirects in the csh payload -- diagnostics are captured
+    # from RemoteCommandResult.stdout/stderr and written locally instead.
+    assert ">" not in inner_spectre
+    assert "2>" not in inner_spectre
+    assert ">" not in inner_ocean
+    assert "2>" not in inner_ocean
 
 
 def test_remote_adapter_spectre_failure_uploads_manifest_to_remote(tmp_path: Path) -> None:
@@ -176,6 +169,24 @@ def test_remote_adapter_spectre_failure_uploads_manifest_to_remote(tmp_path: Pat
     ]
     assert len(manifest_uploads) == 1
 
+    # Diagnostics must be written locally even on spectre failure
+    assert (run_dir / "spectre.stdout").is_file()
+    assert (run_dir / "spectre.stderr").is_file()
+    assert "failing spectre" in (run_dir / "spectre.stdout").read_text(encoding="utf-8")
+    assert "failing spectre" in (run_dir / "spectre.stderr").read_text(encoding="utf-8")
+
+    # Diagnostics must be uploaded to remote
+    spectre_stdout_uploads = [
+        (local, remote) for local, remote in runner.uploads
+        if str(remote).endswith("spectre.stdout")
+    ]
+    spectre_stderr_uploads = [
+        (local, remote) for local, remote in runner.uploads
+        if str(remote).endswith("spectre.stderr")
+    ]
+    assert len(spectre_stdout_uploads) >= 1
+    assert len(spectre_stderr_uploads) >= 1
+
 
 def test_remote_adapter_ocean_failure_uploads_manifest_to_remote(tmp_path: Path) -> None:
     project_dir = create_approved_real_project(tmp_path)
@@ -197,6 +208,68 @@ def test_remote_adapter_ocean_failure_uploads_manifest_to_remote(tmp_path: Path)
         if remote.endswith("result_manifest.json") and local == run_dir / "result_manifest.json"
     ]
     assert len(manifest_uploads) == 1
+
+    # Diagnostics must be written locally even on ocean failure
+    assert (run_dir / "metrics" / "ocean.stdout").is_file()
+    assert (run_dir / "metrics" / "ocean.stderr").is_file()
+    assert "failing ocean" in (run_dir / "metrics" / "ocean.stdout").read_text(encoding="utf-8")
+    assert "failing ocean" in (run_dir / "metrics" / "ocean.stderr").read_text(encoding="utf-8")
+
+    # Diagnostics must be uploaded to remote
+    ocean_stdout_uploads = [
+        (local, remote) for local, remote in runner.uploads
+        if str(remote).endswith("ocean.stdout")
+    ]
+    ocean_stderr_uploads = [
+        (local, remote) for local, remote in runner.uploads
+        if str(remote).endswith("ocean.stderr")
+    ]
+    assert len(ocean_stdout_uploads) >= 1
+    assert len(ocean_stderr_uploads) >= 1
+
+
+def test_result_manifest_log_file_points_to_existing_file(tmp_path: Path) -> None:
+    """result_manifest.json log_file must reference a file that actually exists."""
+    project_dir = create_approved_real_project(tmp_path)
+    run_dir = project_dir / "runs" / "real" / "real_001"
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    runner = FakeRunner()
+
+    result = run_remote_spectre_ocean_adapter(
+        project_dir,
+        run_id="real_001",
+        remote_ref=ref,
+        remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
+        runner=runner,
+    )
+
+    assert result.status == "succeeded"
+    manifest = json.loads((run_dir / "result_manifest.json").read_text(encoding="utf-8"))
+    log_file = manifest["log_file"]
+    log_path = project_dir / log_file
+    assert log_path.is_file(), f"log_file {log_file} does not exist at {log_path}"
+
+
+def test_spectre_diagnostics_written_on_success_path(tmp_path: Path) -> None:
+    """On successful spectre run, spectre.stdout and spectre.stderr must exist locally."""
+    project_dir = create_approved_real_project(tmp_path)
+    run_dir = project_dir / "runs" / "real" / "real_001"
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    runner = FakeRunner()
+
+    result = run_remote_spectre_ocean_adapter(
+        project_dir,
+        run_id="real_001",
+        remote_ref=ref,
+        remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
+        runner=runner,
+    )
+
+    assert result.status == "succeeded"
+    assert (run_dir / "spectre.stdout").is_file()
+    assert (run_dir / "spectre.stderr").is_file()
+    assert (run_dir / "metrics" / "ocean.stdout").is_file()
+    assert (run_dir / "metrics" / "ocean.stderr").is_file()
 
 
 class MultiTestbenchFakeRunner(FakeRunner):
@@ -598,140 +671,6 @@ def test_remote_adapter_fails_when_psf_artifacts_missing(tmp_path: Path) -> None
     )
 
 
-class MissingArtifactFakeRunner(FakeRunner):
-    """FakeRunner that suppresses creation of one specific artifact file.
-
-    This simulates a download that succeeds but does not produce the expected
-    file on disk (e.g. silent truncation or path mismatch).
-    """
-
-    def __init__(self, missing_name: str) -> None:
-        super().__init__()
-        self._missing = missing_name
-
-    def download_tree(self, remote_path, local_path, include=None, exclude=None) -> None:
-        super().download_tree(remote_path, local_path, include=include, exclude=exclude)
-        # Remove the suppressed artifact if download_tree created it
-        if str(remote_path).endswith("/metrics"):
-            target = Path(local_path) / self._missing
-            if target.exists():
-                target.unlink()
-
-    def download(self, remote_path: str, local_path: Path) -> None:
-        name = Path(remote_path).name
-        if name == self._missing:
-            self.downloads.append((remote_path, local_path))
-            return
-        super().download(remote_path, local_path)
-
-
-def test_remote_adapter_fails_when_spectre_stdout_missing(tmp_path: Path) -> None:
-    project_dir = create_approved_real_project(tmp_path)
-    run_dir = project_dir / "runs" / "real" / "real_001"
-    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
-    runner = MissingArtifactFakeRunner("spectre.stdout")
-
-    result = run_remote_spectre_ocean_adapter(
-        project_dir,
-        run_id="real_001",
-        remote_ref=ref,
-        remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
-        runner=runner,
-    )
-
-    assert result.status == "failed"
-    assert any("spectre.stdout" in issue for issue in result.issues)
-    manifest = json.loads((run_dir / "result_manifest.json").read_text(encoding="utf-8"))
-    assert manifest["status"] == "failed"
-
-
-def test_remote_adapter_fails_when_spectre_stderr_missing(tmp_path: Path) -> None:
-    project_dir = create_approved_real_project(tmp_path)
-    run_dir = project_dir / "runs" / "real" / "real_001"
-    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
-    runner = MissingArtifactFakeRunner("spectre.stderr")
-
-    result = run_remote_spectre_ocean_adapter(
-        project_dir,
-        run_id="real_001",
-        remote_ref=ref,
-        remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
-        runner=runner,
-    )
-
-    assert result.status == "failed"
-    assert any("spectre.stderr" in issue for issue in result.issues)
-    manifest = json.loads((run_dir / "result_manifest.json").read_text(encoding="utf-8"))
-    assert manifest["status"] == "failed"
-
-
-def test_remote_adapter_handles_missing_ocean_stdout(tmp_path: Path) -> None:
-    """Missing ocean.stdout is a diagnostic gap, not a hard failure.
-
-    The local adapter includes diagnostic files in artifact_files if they
-    exist but does not fail when they are absent.  The remote adapter must
-    match: missing ocean.stdout means the manifest omits it from
-    artifact_files, but the run still succeeds.
-    """
-    project_dir = create_approved_real_project(tmp_path)
-    run_dir = project_dir / "runs" / "real" / "real_001"
-    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
-    runner = MissingArtifactFakeRunner("ocean.stdout")
-
-    result = run_remote_spectre_ocean_adapter(
-        project_dir,
-        run_id="real_001",
-        remote_ref=ref,
-        remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
-        runner=runner,
-    )
-
-    # Diagnostic artifact gaps don't cause adapter failure
-    assert result.status == "succeeded"
-    assert (run_dir / "result_manifest.json").is_file()
-    assert (run_dir / "metrics" / "metric_result_manifest.json").is_file()
-
-
-def test_remote_adapter_handles_missing_ocean_stderr(tmp_path: Path) -> None:
-    """Missing ocean.stderr is a diagnostic gap, not a hard failure."""
-    project_dir = create_approved_real_project(tmp_path)
-    run_dir = project_dir / "runs" / "real" / "real_001"
-    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
-    runner = MissingArtifactFakeRunner("ocean.stderr")
-
-    result = run_remote_spectre_ocean_adapter(
-        project_dir,
-        run_id="real_001",
-        remote_ref=ref,
-        remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
-        runner=runner,
-    )
-
-    assert result.status == "succeeded"
-    assert (run_dir / "result_manifest.json").is_file()
-    assert (run_dir / "metrics" / "metric_result_manifest.json").is_file()
-
-
-def test_remote_adapter_handles_missing_ocean_log(tmp_path: Path) -> None:
-    """Missing ocean.log is a diagnostic gap, not a hard failure."""
-    project_dir = create_approved_real_project(tmp_path)
-    run_dir = project_dir / "runs" / "real" / "real_001"
-    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
-    runner = MissingArtifactFakeRunner("ocean.log")
-
-    result = run_remote_spectre_ocean_adapter(
-        project_dir,
-        run_id="real_001",
-        remote_ref=ref,
-        remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
-        runner=runner,
-    )
-
-    assert result.status == "succeeded"
-    assert (run_dir / "result_manifest.json").is_file()
-    assert (run_dir / "metrics" / "metric_result_manifest.json").is_file()
-
-
 class MetricFailFakeRunner(FakeRunner):
     """FakeRunner that writes ocean_scalars.tsv with a metric row marked fail."""
 
@@ -812,8 +751,13 @@ class OceanFailNoScalarsFakeRunner(FakeRunner):
     def run(self, command: str, **kwargs: object) -> RemoteCommandResult:
         self.commands.append(command)
         if "ocean" in command:
-            return RemoteCommandResult(1, "", "ocean crash", ["ssh", "lab", command])
-        return RemoteCommandResult(0, "", "", ["ssh", "lab", command])
+            return RemoteCommandResult(
+                1,
+                "ocean crash stdout output",
+                "ocean crash stderr output",
+                ["ssh", "lab", command],
+            )
+        return RemoteCommandResult(0, "spectre stdout output", "", ["ssh", "lab", command])
 
     def download_tree(self, remote_path, local_path, include=None, exclude=None) -> None:
         self.downloads.append((str(remote_path), Path(local_path)))

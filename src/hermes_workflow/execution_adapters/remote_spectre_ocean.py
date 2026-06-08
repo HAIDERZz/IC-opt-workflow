@@ -50,49 +50,47 @@ def run_remote_spectre_ocean_adapter(
     remote_input_dir = remote_run_dir / "netlist"
     spectre_argv = build_spectre_argv(context)
     spectre_cmd_body = " ".join(shlex.quote(a) for a in spectre_argv)
-    spectre_stdout_remote = remote_run_dir / SPECTRE_STDOUT_NAME
-    spectre_stderr_remote = remote_run_dir / SPECTRE_STDERR_NAME
     spectre_command = (
         "csh -fc "
         + quote_remote_path(
             f"source {quote_remote_path(remote_cadence_cshrc)}; "
             f"cd {quote_remote_path(remote_input_dir)}; "
             f"{spectre_cmd_body}"
-            f" > {quote_remote_path(spectre_stdout_remote)}"
-            f" 2> {quote_remote_path(spectre_stderr_remote)}"
         )
     )
     spectre_result = runner.run(spectre_command)
+
+    # Write spectre diagnostics locally from captured output and upload to
+    # remote so that failure paths always have diagnostic artifacts available.
+    (context.run_dir / SPECTRE_STDOUT_NAME).write_text(
+        spectre_result.stdout, encoding="utf-8",
+    )
+    (context.run_dir / SPECTRE_STDERR_NAME).write_text(
+        spectre_result.stderr, encoding="utf-8",
+    )
+    runner.upload(context.run_dir / SPECTRE_STDOUT_NAME, remote_run_dir / SPECTRE_STDOUT_NAME)
+    runner.upload(context.run_dir / SPECTRE_STDERR_NAME, remote_run_dir / SPECTRE_STDERR_NAME)
+
     if spectre_result.return_code != 0:
         return _write_remote_failure(context, "spectre command failed", runner=runner, remote_run_dir=remote_run_dir)
 
-    # Download Spectre artifacts: psf/, spectre.stdout, spectre.stderr
+    # Download Spectre artifacts: psf/
     runner.download_tree(remote_run_dir / "psf", context.psf_dir)
-    _download_remote_file(runner, remote_run_dir / SPECTRE_STDOUT_NAME, context.run_dir / SPECTRE_STDOUT_NAME)
-    _download_remote_file(runner, remote_run_dir / SPECTRE_STDERR_NAME, context.run_dir / SPECTRE_STDERR_NAME)
 
     # Validate required Spectre artifacts exist locally
     if not context.psf_dir.is_dir():
         return _write_remote_failure(context, "psf directory missing after download", runner=runner, remote_run_dir=remote_run_dir)
     if not (context.psf_dir / "spectre.out").is_file():
         return _write_remote_failure(context, "psf/spectre.out missing after download", runner=runner, remote_run_dir=remote_run_dir)
-    if not (context.run_dir / SPECTRE_STDOUT_NAME).exists():
-        return _write_remote_failure(context, f"{SPECTRE_STDOUT_NAME} missing after remote spectre", runner=runner, remote_run_dir=remote_run_dir)
-    if not (context.run_dir / SPECTRE_STDERR_NAME).exists():
-        return _write_remote_failure(context, f"{SPECTRE_STDERR_NAME} missing after remote spectre", runner=runner, remote_run_dir=remote_run_dir)
 
     ocean_argv = build_ocean_argv(context)
     ocean_cmd_body = " ".join(shlex.quote(a) for a in ocean_argv)
-    ocean_stdout_remote = remote_run_dir / "metrics" / OCEAN_STDOUT_NAME
-    ocean_stderr_remote = remote_run_dir / "metrics" / OCEAN_STDERR_NAME
     ocean_command = (
         "csh -fc "
         + quote_remote_path(
             f"source {quote_remote_path(remote_cadence_cshrc)}; "
             f"cd {quote_remote_path(remote_ref.remote_project_dir)}; "
             f"{ocean_cmd_body}"
-            f" > {quote_remote_path(ocean_stdout_remote)}"
-            f" 2> {quote_remote_path(ocean_stderr_remote)}"
         )
     )
 
@@ -107,8 +105,20 @@ def run_remote_spectre_ocean_adapter(
     # Download OCEAN artifacts regardless of return code, matching local
     # adapter behaviour where the metric manifest records the failure.
     runner.download_tree(remote_run_dir / "metrics", context.metrics_dir)
-    _download_remote_file(runner, remote_run_dir / "metrics" / OCEAN_STDOUT_NAME, context.metrics_dir / OCEAN_STDOUT_NAME)
-    _download_remote_file(runner, remote_run_dir / "metrics" / OCEAN_STDERR_NAME, context.metrics_dir / OCEAN_STDERR_NAME)
+
+    # Write ocean diagnostics locally from the LAST attempt (the one that
+    # determined success/failure) and upload to remote.  Written after
+    # download_tree so that the captured output is not overwritten by the
+    # download of remote artifacts.
+    context.metrics_dir.mkdir(parents=True, exist_ok=True)
+    (context.metrics_dir / OCEAN_STDOUT_NAME).write_text(
+        ocean_result.stdout, encoding="utf-8",
+    )
+    (context.metrics_dir / OCEAN_STDERR_NAME).write_text(
+        ocean_result.stderr, encoding="utf-8",
+    )
+    runner.upload(context.metrics_dir / OCEAN_STDOUT_NAME, remote_run_dir / "metrics" / OCEAN_STDOUT_NAME)
+    runner.upload(context.metrics_dir / OCEAN_STDERR_NAME, remote_run_dir / "metrics" / OCEAN_STDERR_NAME)
 
     started = datetime.now(UTC).replace(microsecond=0).strftime("%Y-%m-%dT%H:%M:%SZ")
     completed = started
@@ -149,11 +159,6 @@ def run_remote_spectre_ocean_adapter(
         metric_result_manifest_path=metric_result.path,
         issues=metric_result.issues,
     )
-
-
-def _download_remote_file(runner: Any, remote_path: PurePosixPath, local_path: Path) -> None:
-    """Download a single file from the remote host to *local_path*."""
-    runner.download(str(remote_path), local_path)
 
 
 def _write_remote_failure(context: Any, notes: str, *, runner: Any, remote_run_dir: PurePosixPath) -> AdapterRunResult:
