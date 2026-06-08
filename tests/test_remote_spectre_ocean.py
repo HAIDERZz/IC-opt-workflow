@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shlex
 from pathlib import Path, PurePosixPath
 
@@ -324,3 +325,72 @@ def test_remote_multi_testbench_adapter_aggregates_upload(tmp_path: Path) -> Non
         if r == f"{remote_run_dir}/metrics/metric_result_manifest.json"
     ]
     assert len(metric_uploads) >= 1
+
+
+def test_remote_adapter_writes_ocean_script_under_project_dir_not_cwd(tmp_path: Path) -> None:
+    """Regression: metric_probe.ocn must be written under project_dir, not cwd."""
+    project_dir = create_approved_real_project(tmp_path / "project")
+    separate_cwd = tmp_path / "other_cwd"
+    separate_cwd.mkdir()
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    runner = FakeRunner()
+
+    original_cwd = Path.cwd()
+    try:
+        os.chdir(separate_cwd)
+        run_remote_spectre_ocean_adapter(
+            project_dir,
+            run_id="real_001",
+            remote_ref=ref,
+            remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
+            runner=runner,
+        )
+    finally:
+        os.chdir(original_cwd)
+
+    # Script must exist under project_dir, not under separate_cwd
+    expected_script = project_dir / "runs" / "real" / "real_001" / "metrics" / "metric_probe.ocn"
+    assert expected_script.is_file(), f"metric_probe.ocn missing from project_dir: {expected_script}"
+    wrong_script = separate_cwd / "runs" / "real" / "real_001" / "metrics" / "metric_probe.ocn"
+    assert not wrong_script.exists(), f"metric_probe.ocn leaked to cwd: {wrong_script}"
+
+
+def test_remote_multi_testbench_writes_ocean_scripts_under_project_dir(tmp_path: Path) -> None:
+    """Regression: child metric_probe.ocn files must be under project_dir, not cwd."""
+    from tests.test_multi_testbench_aggregation import _create_ready_multi_testbench_project
+
+    project_dir = _create_ready_multi_testbench_project(tmp_path / "project")
+    separate_cwd = tmp_path / "other_cwd"
+    separate_cwd.mkdir()
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    runner = MultiTestbenchFakeRunner()
+    runner.child_metric_names = {
+        "cg_nf": ["MAX_GAIN"],
+        "iip3": ["IIP3"],
+    }
+
+    original_cwd = Path.cwd()
+    try:
+        os.chdir(separate_cwd)
+        run_remote_multi_testbench_adapter(
+            project_dir,
+            run_id="real_001",
+            remote_ref=ref,
+            remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
+            runner=runner,
+        )
+    finally:
+        os.chdir(original_cwd)
+
+    # Each child metric_probe.ocn must be under project_dir
+    for tb_id in ("cg_nf", "iip3"):
+        expected = (
+            project_dir / "runs" / "real" / "real_001"
+            / "testbenches" / tb_id / "metrics" / "metric_probe.ocn"
+        )
+        assert expected.is_file(), f"metric_probe.ocn missing for {tb_id}: {expected}"
+        wrong = (
+            separate_cwd / "runs" / "real" / "real_001"
+            / "testbenches" / tb_id / "metrics" / "metric_probe.ocn"
+        )
+        assert not wrong.exists(), f"metric_probe.ocn leaked to cwd for {tb_id}: {wrong}"
