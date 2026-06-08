@@ -53,3 +53,53 @@ def test_optimize_remote_project_runs_doctor_prepare_openbox_and_sync(tmp_path: 
     assert result.status == "pass"
     assert result.recommended_run_id == "real_001"
     assert calls == ["optimize_project"]
+
+
+def test_continue_remote_project_syncs_history_and_runs_additional_evals(tmp_path: Path, monkeypatch) -> None:
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    cache_dir = tmp_path / "cache"
+    calls: list[str] = []
+
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.prepare_remote_project_cache",
+        lambda *args, **kwargs: SimpleNamespace(status="pass", cache_dir=cache_dir, issues=[]),
+    )
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow._sync_remote_history_to_cache",
+        lambda *args, **kwargs: calls.append("sync_history"),
+    )
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow._sync_cache_reports_to_remote",
+        lambda *args, **kwargs: calls.append("sync_reports"),
+    )
+
+    def fake_optimize_project(project_dir: Path, **kwargs):
+        calls.append("optimize_project")
+        report_path = cache_dir / "reports" / "optimizer_flow_run_report.json"
+        report_path.parent.mkdir(parents=True)
+        report_path.write_text('{"status": "pass"}\n', encoding="utf-8")
+        return SimpleNamespace(
+            status="pass",
+            report_path=report_path,
+            recommended_run_id="real_141",
+            user_decision_required=True,
+            issues=[],
+        )
+
+    monkeypatch.setattr("hermes_workflow.remote_optimizer_flow.optimize_project", fake_optimize_project)
+
+    from hermes_workflow.remote_optimizer_flow import continue_remote_project
+
+    result = continue_remote_project(
+        ref,
+        additional_evals=40,
+        remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
+        batch_size=2,
+        parallel_jobs=2,
+        cache_root=tmp_path,
+        runner=object(),
+    )
+
+    assert result.status == "pass"
+    assert result.recommended_run_id == "real_141"
+    assert calls == ["sync_history", "optimize_project", "sync_reports"]

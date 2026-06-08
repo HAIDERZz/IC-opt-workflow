@@ -67,3 +67,28 @@ def test_ic_opt_remote_real_calls_optimize_remote_project(monkeypatch, tmp_path:
     assert calls[0]["ref"].ssh_profile == "lab"
     assert "remote optimizer flow completed" in result.output
     assert "recommended: real_001" in result.output
+
+
+def test_ic_opt_remote_continue_routes_additional_evals(monkeypatch, tmp_path: Path) -> None:
+    calls: list[dict[str, object]] = []
+
+    def fake_continue_remote_project(ref, **kwargs):
+        calls.append({"ref": ref, **kwargs})
+        return SimpleNamespace(
+            status="pass",
+            report_path=tmp_path / "reports" / "optimizer_flow_run_report.json",
+            recommended_run_id="real_141",
+            user_decision_required=True,
+            issues=[],
+        )
+
+    monkeypatch.setattr(product_cli, "continue_remote_project", fake_continue_remote_project)
+
+    result = runner.invoke(
+        product_cli.app,
+        ["--ssh-profile", "lab", "/remote/project", "--continue", "40"],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "remote continuation completed" in result.output
+    assert "recommended: real_141" in result.output
