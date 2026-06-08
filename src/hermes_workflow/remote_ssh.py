@@ -122,6 +122,7 @@ class RemoteSshRunner:
         *,
         include: str | None = None,
         exclude: str | None = None,
+        dereference: bool = False,
     ) -> None:
         if include is not None:
             raise ValueError("include is not supported for tree transfer yet")
@@ -129,6 +130,8 @@ class RemoteSshRunner:
         remote = PurePosixPath(remote_path)
 
         parts: list[str] = ["tar", "-C", str(remote)]
+        if dereference:
+            parts.append("-h")
         if exclude:
             parts.extend(["--exclude", exclude])
         parts.extend(["-cf", "-", "."])

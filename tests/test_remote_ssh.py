@@ -325,6 +325,21 @@ def test_download_tree_with_exclude(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     assert remote_cmd == "tar -C /remote/project --exclude '*.log' -cf - ."
 
 
+def test_download_tree_with_dereference(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    popen_calls: list = []
+    monkeypatch.setattr(subprocess, "Popen", _make_fake_popen(popen_calls))
+    monkeypatch.setattr(subprocess, "run", lambda argv, **kw: FakeCompletedProcess())
+
+    runner = RemoteSshRunner("lab")
+
+    local_path = tmp_path / "downloaded"
+    runner.download_tree(PurePosixPath("/remote/project"), local_path, dereference=True)
+
+    ssh_argv = popen_calls[0][0]
+    remote_cmd = ssh_argv[4]
+    assert remote_cmd == "tar -C /remote/project -h -cf - ."
+
+
 def test_download_tree_include_raises_not_supported(tmp_path: Path) -> None:
     runner = RemoteSshRunner("lab", execute=lambda *a, **kw: RemoteCommandResult(0, "", "", []))
 

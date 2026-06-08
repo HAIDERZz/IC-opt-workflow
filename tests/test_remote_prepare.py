@@ -32,7 +32,7 @@ class FakeRunner:
             return RemoteCommandResult(0, "", "", ["ssh", "lab", command])
         return RemoteCommandResult(0, "", "", ["ssh", "lab", command])
 
-    def download_tree(self, remote_path, local_path, include=None, exclude=None) -> None:
+    def download_tree(self, remote_path, local_path, include=None, exclude=None, dereference=False) -> None:
         self.downloads.append((str(remote_path), local_path))
         (local_path / "input.scs").parent.mkdir(parents=True, exist_ok=True)
         (local_path / "input.scs").write_text(
@@ -90,12 +90,14 @@ def test_prepare_remote_project_cache_quotes_paths_with_spaces(tmp_path: Path) -
     assert any(expected_quoted in cmd for cmd in commands_run)
 
 
-def test_prepare_remote_project_cache_materializes_symlinks(tmp_path: Path) -> None:
-    """Symlinks in downloaded remote netlists must be materialized as regular files."""
+def test_prepare_remote_project_cache_dereferences_symlinks(tmp_path: Path) -> None:
+    """With tar --dereference, symlinks are resolved at source; no symlinks arrive locally."""
     ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    dereference_values: list[bool] = []
 
     class SymlinkFakeRunner(FakeRunner):
-        def download_tree(self, remote_path, local_path, include=None, exclude=None) -> None:
+        def download_tree(self, remote_path, local_path, include=None, exclude=None, dereference=False) -> None:
+            dereference_values.append(dereference)
             local_path.mkdir(parents=True, exist_ok=True)
             (local_path / "input.scs").write_text(
                 "simulator lang=spectre\n"
@@ -103,54 +105,98 @@ def test_prepare_remote_project_cache_materializes_symlinks(tmp_path: Path) -> N
                 "tran tran stop=10n\n",
                 encoding="utf-8",
             )
-            # Create a regular file and a symlink pointing to it
-            (local_path / "real_output.log").write_text("data\n", encoding="utf-8")
-            (local_path / "exprOutputs.log").symlink_to(local_path / "real_output.log")
+            # Simulate tar --dereference: create regular file with target content
+            (local_path / "exprOutputs.log").write_text("data\n", encoding="utf-8")
 
     runner = SymlinkFakeRunner()
     result = prepare_remote_project_cache(ref, runner=runner, cache_root=tmp_path)
 
     assert result.status == "pass"
+    assert all(v is True for v in dereference_values)
     exported = result.cache_dir / "netlists" / "exported"
     assert (exported / "exprOutputs.log").is_file()
     assert not (exported / "exprOutputs.log").is_symlink()
 
 
-def test_prepare_remote_project_cache_rejects_symlink_escaping_directory(tmp_path: Path) -> None:
-    """Symlinks whose target escapes the downloaded directory must be rejected."""
+def test_prepare_remote_project_cache_no_symlinks_after_dereference(tmp_path: Path) -> None:
+    """With tar --dereference, escaping symlinks are resolved at source; no symlinks arrive locally."""
     ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
-    outside_file = tmp_path / "outside_secret.txt"
-    outside_file.write_text("secret\n", encoding="utf-8")
+    dereference_values: list[bool] = []
 
     class EscapingSymlinkRunner(FakeRunner):
-        def download_tree(self, remote_path, local_path, include=None, exclude=None) -> None:
+        def download_tree(self, remote_path, local_path, include=None, exclude=None, dereference=False) -> None:
+            dereference_values.append(dereference)
             local_path.mkdir(parents=True, exist_ok=True)
             (local_path / "input.scs").write_text(
-                "simulator lang=spectre\n", encoding="utf-8",
+                "simulator lang=spectre\n"
+                "parameters FN=2 WN=0.3u FP=2 WP=0.3u\n"
+                "tran tran stop=10n\n",
+                encoding="utf-8",
             )
-            (local_path / "escape.log").symlink_to(outside_file)
+            # Simulate tar --dereference: regular file with target content, no symlink
+            (local_path / "escape.log").write_text("resolved content\n", encoding="utf-8")
 
     runner = EscapingSymlinkRunner()
     result = prepare_remote_project_cache(ref, runner=runner, cache_root=tmp_path)
 
-    assert result.status == "fail"
-    assert any("symlink" in issue.lower() or "escapes" in issue.lower() for issue in result.issues)
+    assert result.status == "pass"
+    assert all(v is True for v in dereference_values)
+    exported = result.cache_dir / "netlists" / "exported"
+    assert not any(p.is_symlink() for p in exported.rglob("*"))
 
 
-def test_prepare_remote_project_cache_rejects_broken_symlink(tmp_path: Path) -> None:
-    """Symlinks whose target does not exist must be rejected."""
+def test_prepare_remote_project_cache_no_broken_symlinks_after_dereference(tmp_path: Path) -> None:
+    """With tar --dereference, broken symlinks are resolved at source; no symlinks arrive locally."""
     ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    dereference_values: list[bool] = []
 
     class BrokenSymlinkRunner(FakeRunner):
-        def download_tree(self, remote_path, local_path, include=None, exclude=None) -> None:
+        def download_tree(self, remote_path, local_path, include=None, exclude=None, dereference=False) -> None:
+            dereference_values.append(dereference)
             local_path.mkdir(parents=True, exist_ok=True)
             (local_path / "input.scs").write_text(
-                "simulator lang=spectre\n", encoding="utf-8",
+                "simulator lang=spectre\n"
+                "parameters FN=2 WN=0.3u FP=2 WP=0.3u\n"
+                "tran tran stop=10n\n",
+                encoding="utf-8",
             )
-            (local_path / "broken.log").symlink_to(Path("/nonexistent/target"))
+            # Simulate tar --dereference: regular file, no broken symlink
+            (local_path / "broken.log").write_text("resolved content\n", encoding="utf-8")
 
     runner = BrokenSymlinkRunner()
     result = prepare_remote_project_cache(ref, runner=runner, cache_root=tmp_path)
 
-    assert result.status == "fail"
-    assert any("symlink" in issue.lower() or "not a regular file" in issue.lower() for issue in result.issues)
+    assert result.status == "pass"
+    assert all(v is True for v in dereference_values)
+    exported = result.cache_dir / "netlists" / "exported"
+    assert not any(p.is_symlink() for p in exported.rglob("*"))
+
+
+def test_prepare_remote_project_cache_real_maestro_symlink_shape(tmp_path: Path) -> None:
+    """Real Maestro symlink: netlist/exprOutputs.log -> ../../../exprOutputs.log.6.0.1
+    with allowed root being the Maestro history root."""
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    dereference_values: list[bool] = []
+
+    class RealMaestroSymlinkRunner(FakeRunner):
+        def download_tree(self, remote_path, local_path, include=None, exclude=None, dereference=False) -> None:
+            dereference_values.append(dereference)
+            local_path.mkdir(parents=True, exist_ok=True)
+            (local_path / "input.scs").write_text(
+                "simulator lang=spectre\n"
+                "parameters FN=2 WN=0.3u FP=2 WP=0.3u\n"
+                "tran tran stop=10n\n",
+                encoding="utf-8",
+            )
+            # Simulate tar --dereference: create regular file with target content
+            (local_path / "exprOutputs.log").write_text("real maestro data\n", encoding="utf-8")
+
+    runner = RealMaestroSymlinkRunner()
+    result = prepare_remote_project_cache(ref, runner=runner, cache_root=tmp_path)
+
+    assert result.status == "pass"
+    assert all(v is True for v in dereference_values)
+    exported = result.cache_dir / "netlists" / "exported"
+    assert (exported / "exprOutputs.log").is_file()
+    assert not (exported / "exprOutputs.log").is_symlink()
+    assert (exported / "exprOutputs.log").read_text(encoding="utf-8") == "real maestro data\n"
