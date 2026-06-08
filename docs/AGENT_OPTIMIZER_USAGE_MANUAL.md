@@ -1,31 +1,35 @@
 # Agent Optimizer Usage Manual
 
-This guide explains how a user should ask an agent to run an IC optimization
-with `ic-auto-opt-workflow`.
+This guide explains how an AI agent should operate IC Auto Opt Workflow for a
+real Spectre/Maestro/ADE optimization project.
 
-Use this document when you want a supervisor agent to help you optimize a real
-Virtuoso/Maestro/Spectre circuit.
+Current product position:
 
-Current implementation boundary after C-65:
+- `ic-opt` is the deterministic automation core.
+- A human can run `ic-opt` directly.
+- An agent can run `ic-opt` for the user, wait for completion, read reports, and
+  explain the result.
+- Native subagent execution is optional advanced behavior, not the default
+  product route.
 
-- Implemented: shell command `ic-opt PROJECT_DIR --real`.
-- Implemented: Claude and OpenCode runtime adapter assets for
-  `/ic-opt PROJECT_DIR --real`.
-- Implemented: Hermes workflow task packages and execution-agent instructions.
-- Implemented: repo-local installer command
-  `hermes-workflow install-runtime-adapter`.
-- Historical evidence: C-64 proved a Claude subprocess handoff through
-  `--execution-agent claude`; this is not the C-65 default product target.
-- Not implemented: Codex/OpenClaw/HermesAgent adapters and a public packaged
-  installer.
+Default model:
 
-Read `docs/AGENT_INTEGRATION_STATUS.md` before claiming runtime-agent support
-for a specific agent CLI. Read `docs/USER_GUIDE_CN.md` for the Chinese user
-guide.
+```text
+User -> current agent -> ic-opt CLI -> reports -> current agent explains result
+```
 
-## 1. What You Prepare
+Optional model:
 
-Create one project directory:
+```text
+User -> current agent -> same-runtime native subagent -> ic-opt CLI
+```
+
+Do not make the normal workflow depend on one agent CLI launching another agent
+CLI.
+
+## 1. What The User Prepares
+
+The user creates one project directory:
 
 ```text
 ~/spectre_opt_prj/<project_name>/
@@ -35,9 +39,9 @@ Create one project directory:
 ```
 
 Only `opt_requirement.md` is required. `constraints.md` and `context/` are
-optional but recommended.
+optional guidance.
 
-Do not manually create these generated directories:
+Do not manually create generated directories such as:
 
 ```text
 config/
@@ -49,315 +53,212 @@ state/
 execution_package/
 ```
 
-Hermes creates them.
+`ic-opt` creates them.
 
 ## 2. What Must Be In opt_requirement.md
 
-`opt_requirement.md` is the machine-critical optimization request.
-
-It must define:
+`opt_requirement.md` is the machine-critical optimization request. It defines:
 
 - project identity;
 - one or more Maestro/ADE point roots;
 - design variables and legal ranges;
 - OCEAN metric expressions;
 - constraints;
-- objective or FoM;
+- FoM/objective;
 - Spectre settings;
 - optimizer settings;
 - approval checklist.
 
-For each Maestro/ADE testbench, first run one known-good point in Maestro. Then
-put the point-root path in `opt_requirement.md`.
+The agent must not ask the user to restate this information in chat.
 
-The point root must contain:
+For each Maestro/ADE testbench, the user should first run one known-good point
+in Maestro/ADE. The `maestro_point_root` must be the leaf run directory that
+contains:
 
 ```text
 <maestro_point_root>/netlist/input.scs
 ```
 
-For multi-testbench circuits, such as a mixer, define named testbenches:
+Usually it also contains:
 
 ```text
-cg_nf -> CG / NF / BW
-iip3  -> IIP3
-p1db  -> P1dB
+netlist/
+psf/
 ```
 
-Each metric then declares which testbench should evaluate it.
+## 3. Locate The ic-opt Command
 
-## 3. What Goes In constraints.md
-
-`constraints.md` is for human guidance to the supervisor agent.
-
-Good examples:
-
-- which metric matters most if tradeoffs appear;
-- which variable ranges are physically suspicious;
-- whether runtime or accuracy is more important;
-- what result quality is acceptable for a first pass;
-- notes about known bad bias regions or unstable simulations.
-
-Do not put machine-critical formulas only in `constraints.md`. Formulas,
-variable ranges, and resource settings belong in `opt_requirement.md`.
-
-## 4. Current Product Invocation
-
-The implemented product command is the shell CLI:
-
-```text
-ic-opt ~/spectre_opt_prj/<project_name> --real
-```
-
-The implemented runtime-native product-shaped agent request is:
-
-```text
-/ic-opt ~/spectre_opt_prj/<project_name> --real
-```
-
-after installing the matching runtime adapter. The current agent CLI should act
-as supervisor and use its own native subagent/task mechanism for execution.
-
-Install adapters from the repository root:
+Use the first available command:
 
 ```bash
-./.venv/bin/hermes-workflow install-runtime-adapter claude
-./.venv/bin/hermes-workflow install-runtime-adapter opencode
+"$IC_OPT_WORKFLOW_REPO/.venv/bin/ic-opt"
+"$PWD/.venv/bin/ic-opt"        # when PWD is the workflow repo
+ic-opt                         # when installed on PATH
 ```
 
-The user-facing request should stay short. All machine-critical information
-belongs in `opt_requirement.md`.
+If no command is available, ask the user to install IC Auto Opt Workflow or set
+`IC_OPT_WORKFLOW_REPO`.
 
-`hermes-workflow optimize` remains the lower-level developer/admin command
-behind the product entrypoint:
+Do not create a Python virtualenv inside the user project directory. The
+workflow uses one product-level Python environment.
+
+## 4. Normal Agent Commands
+
+Doctor/readiness check:
 
 ```bash
-hermes-workflow optimize ~/spectre_opt_prj/<project_name> \
-  --real \
-  --cadence-cshrc /path/to/user_env.csh
+ic-opt PROJECT_DIR --doctor
 ```
 
-The Cadence/Spectre/OCEAN environment path is still user supplied. The user may
-provide it once, for example:
+First real optimization:
 
 ```bash
-mkdir -p ~/.ic-opt
-cp /path/to/user/cadence_env.csh ~/.ic-opt/cadence_env.csh
+ic-opt PROJECT_DIR --real
 ```
 
-or by placing `cadence_env.csh` in `PROJECT_DIR`. After that, the supervisor can
-use the short shell command `ic-opt PROJECT_DIR --real`. `ic-opt` discovers the
-user-supplied cshrc in this order:
-
-1. explicit `--cadence-cshrc PATH`;
-2. `PROJECT_DIR/cadence_env.csh`;
-3. environment variable `IC_OPT_CADENCE_CSHRC`;
-4. `~/.ic-opt/cadence_env.csh`.
-
-The supervisor agent must not ask the user to restate formulas, variables,
-testbench paths, Spectre resources, or optimizer settings that are already
-present in `opt_requirement.md`.
-
-Do not validate product UX by giving the supervisor a long prompt that explains
-the manual. Install the runtime adapter and use the short
-`/ic-opt PROJECT_DIR --real` command.
-
-## 5. Product Environment Model
-
-Use one product-level Python virtualenv for `ic-auto-opt-workflow`, OpenBox,
-TuRBO, and report dependencies.
-
-From the repository root:
+Continuation:
 
 ```bash
-python3 -m venv .venv
-./.venv/bin/python -m pip install --upgrade pip setuptools wheel
-./.venv/bin/python -m pip install -r requirements-product.txt
+ic-opt PROJECT_DIR --continue M
 ```
 
-Do not create a Python virtualenv inside each user project. User project
-directories are data and artifact directories only:
+If the user says "optimize this project" and provides a project path, use
+`--real`. If the user asks to "run 40 more points", use `--continue 40`.
 
-```text
-~/spectre_opt_prj/<project_name>/
-```
+Do not expose lower-level `hermes-workflow` commands to normal users unless
+debugging the product command.
 
-The Cadence/Spectre/OCEAN setup remains user/project supplied through a shell
-setup path or the user's shell environment. Do not hardcode a Spectre version in
-agent prompts, docs, or code.
+## 5. Doctor Mode
 
-Development-only environments such as `.venv`
-must not be part of the product workflow.
-
-## 6. Agent Step 1: Intake And Readiness
-
-The agent should enter the repo:
+Run:
 
 ```bash
-cd /path/to/ic-auto-opt-workflow-v0.1
+ic-opt PROJECT_DIR --doctor
 ```
 
-Then run:
+Stop after doctor. Report pass/fail and the failing item. Doctor mode should
+not start Spectre/OCEAN.
 
-```bash
-./.venv/bin/hermes-workflow check-requirement PROJECT_DIR
-./.venv/bin/hermes-workflow prepare-from-requirement PROJECT_DIR
-./.venv/bin/hermes-workflow validate PROJECT_DIR
-./.venv/bin/hermes-workflow check-project-ready PROJECT_DIR
-```
-
-Expected state before the first optimizer run:
-
-```text
-project readiness: pass
-readiness: ready_for_first_run
-```
-
-If this fails, the agent should stop and report the exact failing item.
-
-Typical user-side fixes:
+Common user-side fixes:
 
 - wrong `maestro_point_root`;
 - missing `netlist/input.scs`;
+- invalid `opt_requirement.md` section format;
 - duplicate variable names or duplicate YAML keys;
 - metric routes point to unknown testbench ids;
-- OCEAN formula or constraint names do not match declared metrics.
+- OCEAN formula names do not match declared metrics;
+- Cadence environment path is missing.
 
-## 7. Agent Step 2: Preferred One-Command Flow
+## 6. Real Optimization Mode
 
-For direct shell/operator use, run the single orchestration command:
-
-```bash
-./.venv/bin/ic-opt PROJECT_DIR \
-  --real \
-  --max-evals 100 \
-  --batch-size 10 \
-  --parallel-jobs 10
-```
-
-This command performs the approved package/preflight/approval gate, launches the
-real OpenBox optimizer, runs the closeout report chain, and then stops for user
-acceptance. It does not record final user acceptance automatically. This is
-automation, not a two-agent product session.
-
-For shell/operator use, `ic-opt` defaults to direct execution:
+Run:
 
 ```bash
-./.venv/bin/ic-opt PROJECT_DIR \
-  --real \
-  --execution-agent direct \
-  --max-evals 100 \
-  --batch-size 10 \
-  --parallel-jobs 10
+ic-opt PROJECT_DIR --real
 ```
 
-For runtime-native agent use, `/ic-opt PROJECT_DIR --real` should prepare and
-approve the package, dispatch the current CLI's native execution subagent for
-the generated optimizer task package, then resume supervisor-side closeout.
-The historical `--execution-agent claude` subprocess route remains a
-development/acceptance fallback, not the default product model.
+The product command handles:
 
-To test the offline gates only:
+- requirement intake;
+- config rendering;
+- Maestro/ADE point-root import;
+- package/preflight/approval gates;
+- OpenBox optimization;
+- Spectre/OCEAN execution;
+- metric extraction;
+- optimizer closeout;
+- decision and insight reports.
+
+The agent should not rebuild this flow manually unless debugging.
+
+## 7. Continuation Mode
+
+Run:
 
 ```bash
-./.venv/bin/ic-opt PROJECT_DIR \
-  --real \
-  --dry-orchestration \
-  --max-evals 100 \
-  --batch-size 10 \
-  --parallel-jobs 10
+ic-opt PROJECT_DIR --continue M
 ```
 
-## 8. Manual Fallback: Build The Approved Execution Package
+Continuation adds M more evaluations to the existing optimizer history. Do not
+restart from scratch unless the user changed variables, formulas, constraints,
+objective, or Maestro point roots.
 
-Before any real optimizer execution, the supervisor agent must build and approve
-the file-contract package. Do not skip this gate.
+Do not add `--parallel-jobs` during continuation unless the user explicitly asks
+to change resources. Mixed resource settings can invalidate history audits.
 
-```bash
-./.venv/bin/hermes-workflow package PROJECT_DIR
-./.venv/bin/hermes-workflow prepare-netlist PROJECT_DIR
-./.venv/bin/hermes-workflow dry-run PROJECT_DIR
-./.venv/bin/hermes-workflow preflight-health PROJECT_DIR
-./.venv/bin/hermes-workflow approve PROJECT_DIR
-./.venv/bin/hermes-workflow package-optimizer-task PROJECT_DIR \
-  --backend openbox \
-  --max-evals 100 \
-  --parallel \
-  --cadence-cshrc /path/to/user/cadence_env.csh
-```
+## 8. Optional Native Subagent Mode
 
-`--cadence-cshrc` is the user/project Cadence environment setup script. It must
-come from the user environment or project configuration; do not hardcode a
-Spectre version in prompts, docs, or code.
+Use native subagent execution only when the user explicitly asks for it and the
+current agent runtime provides a stable native task/subagent tool.
 
-## 9. Manual Fallback: Run Optimizer
+For optional subagent mode:
 
-For OpenBox real optimization:
+1. Run dry orchestration:
 
-```bash
-./.venv/bin/hermes-workflow run-openbox-real PROJECT_DIR \
-  --max-evals 100 \
-  --batch-size 10 \
-  --parallel-jobs 10 \
-  --cadence-cshrc /path/to/user/cadence_env.csh
-```
+   ```bash
+   ic-opt PROJECT_DIR --real --dry-orchestration
+   ```
 
-The exact values should come from `opt_requirement.md` unless the user
-explicitly changes them.
+   or:
 
-Resource meanings:
+   ```bash
+   ic-opt PROJECT_DIR --continue M --dry-orchestration
+   ```
 
-- `parallel_jobs`: how many Spectre simulations may run at once.
-- `threads_per_run`: Spectre `+mt` threads per simulation.
-- `optimizer_cpu_threads`: Python/OpenBox optimizer CPU thread limit.
+2. Dispatch the same-runtime native subagent with only:
 
-The agent should not replace this with manually selected candidate points.
+   ```text
+   Read PROJECT_DIR/execution_package/OPTIMIZER_EXECUTION_TASK.md and
+   PROJECT_DIR/execution_package/optimizer_execution_manifest.json.
+   Run only the approved command from the manifest. Do not hand-pick candidates,
+   rewrite formulas, parse PSF, change resource settings, or invoke another CLI
+   agent. Report command status and artifact paths.
+   ```
 
-Status policy: after a long real optimizer starts, the execution agent should
-avoid per-batch polling. It should report start, unexpected failure, completion,
-and only low-frequency heartbeat status for long runs.
+3. The supervisor/current agent reads reports and explains the result.
 
-## 10. Manual Fallback: Close Out The Run
+If subagent dispatch is unavailable, report that clearly and use the default
+single-agent CLI route only if the user agrees or did not require subagent mode.
 
-If using `hermes-workflow optimize ... --real`, these reports are already
-generated. If running the manual fallback, after the optimizer run finishes the
-agent should run:
+## 9. What To Read After A Run
 
-```bash
-./.venv/bin/hermes-workflow check-optimizer-run PROJECT_DIR
-./.venv/bin/hermes-workflow summarize-optimizer-run PROJECT_DIR
-./.venv/bin/hermes-workflow finalize-optimizer-run PROJECT_DIR
-./.venv/bin/hermes-workflow visualize-optimizer-run PROJECT_DIR
-./.venv/bin/hermes-workflow decide-optimizer-run PROJECT_DIR
-```
-
-Then the agent should read:
+Primary reports:
 
 ```text
 PROJECT_DIR/reports/optimizer_decision_report.md
 PROJECT_DIR/reports/optimizer_insight_report.md
 ```
 
-The agent should tell the user:
+Other useful artifacts:
 
-- best observed candidate;
-- parameter values;
-- metric values;
-- feasible / constraint_failed / metric_check_failed counts;
-- bottleneck metric;
-- whether the run should be accepted, continued, or sent back for user review;
-- whether the result is only best observed.
+```text
+PROJECT_DIR/reports/optimizer_final_summary.md
+PROJECT_DIR/reports/project_readiness_report.json
+PROJECT_DIR/reports/optimizer_visuals/
+PROJECT_DIR/reports/openbox_advanced_visualization/
+```
 
-Important: `decide-optimizer-run` must not present a `constraint_failed`,
-`metric_check_failed`, or `real_check_failed` candidate as the primary
-recommended run when any feasible candidate exists.
+## 10. What To Tell The User
+
+Report concisely:
+
+- whether the flow passed;
+- evaluation count and status counts;
+- best observed feasible run id;
+- recommended action;
+- recommended parameters;
+- key metrics;
+- bottleneck and warnings;
+- whether the result is best observed only;
+- whether to accept, continue, inspect failures, revise constraints/FoM, or
+  expand the search space;
+- report paths.
+
+Do not claim a global optimum unless the run was an exhaustive sweep with proof.
 
 ## 11. User Decision Point
 
-The supervisor agent should ask for user confirmation before recording the final
-decision unless the user already gave explicit acceptance rules.
-
-Common decisions:
+Common user decisions:
 
 ```text
 accept_best_observed
@@ -367,142 +268,72 @@ change_constraints_or_fom
 expand_search_space
 ```
 
-If the user accepts the current result, run:
+If the user asks to continue, run:
 
 ```bash
-./.venv/bin/hermes-workflow record-optimizer-decision PROJECT_DIR \
-  --decision accept_best_observed \
-  --reason "User accepted the current best observed optimizer result."
-
-./.venv/bin/hermes-workflow write-optimizer-final-summary PROJECT_DIR
-./.venv/bin/hermes-workflow check-project-ready PROJECT_DIR
+ic-opt PROJECT_DIR --continue M
 ```
 
-Expected final state:
+If the user accepts the current result, the agent may record final acceptance
+only after explicit user confirmation.
+
+## 12. Failure Interpretation
+
+`constraint_failed`:
 
 ```text
-project readiness: pass
-readiness: ready_for_closeout_review
-```
-
-## 12. What The User Reads
-
-Primary final report:
-
-```text
-PROJECT_DIR/reports/optimizer_final_summary.md
-```
-
-Detailed reports:
-
-```text
-PROJECT_DIR/reports/optimizer_decision_report.md
-PROJECT_DIR/reports/optimizer_insight_report.md
-PROJECT_DIR/reports/project_readiness_report.json
-```
-
-Visual artifacts are usually under:
-
-```text
-PROJECT_DIR/reports/optimizer_visuals/
-PROJECT_DIR/reports/openbox_advanced_visualization/
-```
-
-## 13. How To Continue Optimization
-
-Only continue if the decision report or the user asks for it.
-
-Example:
-
-```bash
-./.venv/bin/ic-opt PROJECT_DIR \
-  --continue 100
-```
-
-Do not add `--parallel-jobs` during continuation unless the user explicitly
-asks to change resources. Continuation should inherit the project's
-`config/spectre.yaml` settings so one optimizer history does not mix different
-parallel execution limits.
-
-`ic-opt PROJECT_DIR --continue M` reruns the optimizer closeout chain and
-refreshes the decision and insight reports. The lower-level
-`hermes-workflow continue-openbox-real` command is for debug only.
-
-Do not restart from scratch unless the user changes variables, formulas,
-constraints, objective, or Maestro point roots.
-
-## 14. How To Interpret Failures
-
-`constraint_failed` means:
-
-```text
-Spectre/OCEAN produced scalar metrics, but the candidate did not meet the
-declared constraints.
+Spectre/OCEAN produced scalar metrics, but the candidate did not meet declared
+constraints.
 ```
 
 This is usually a valid optimizer sample.
 
-`metric_check_failed` means:
+`metric_check_failed`:
 
 ```text
-The candidate ran far enough to reach metric extraction, but one or more
-required metrics were missing, non-scalar, NaN, or invalid.
+The candidate reached metric extraction, but one or more metrics were missing,
+non-scalar, NaN, or invalid.
 ```
 
-This may be a user formula issue, an invalid candidate region, or an expected
-case where the circuit behavior makes the metric undefined.
+This may be a formula issue, invalid candidate region, or expected undefined
+behavior.
 
-`real_check_failed` means:
+`real_check_failed`:
 
 ```text
 The real tool result or manifest failed structurally.
 ```
 
-This is usually a tool, environment, netlist, license, or execution problem.
+This usually points to environment, license, netlist, tool, or execution
+problems.
 
-Few or zero feasible points usually means:
+## 13. Hard Agent Boundaries
 
-- constraints are too strict;
-- search space misses feasible regions;
-- FoM or metric formula needs review;
-- initial Maestro point roots and formulas do not match;
-- optimizer budget is too small for the space.
+The agent must not:
 
-## 15. Important Boundaries
+- hand-pick optimizer candidates;
+- rewrite approved OCEAN formulas;
+- parse PSF in Python;
+- hardcode Spectre versions;
+- create per-project Python virtualenvs;
+- silently change precision, `threads_per_run`, `parallel_jobs`, or FoM;
+- poll every optimizer batch;
+- recommend failed candidates as primary results when feasible candidates exist;
+- commit raw Cadence netlists, PSF data, protected sidecars, or full Cadence
+  logs;
+- claim global optimum.
 
-The agent must keep these rules:
-
-- The result is `best observed`, not global optimum.
-- Use OpenBox/native optimizer candidate generation, not hand-picked points.
-- Preserve each Maestro/ADE testbench bundle.
-- Do not synthesize one combined Spectre deck for multiple testbenches.
-- Do not parse PSF in Python.
-- Do not rewrite approved OCEAN formulas.
-- Do not change precision or parallel settings silently.
-- Do not commit raw Cadence netlists, protected sidecars, PSF data, or full
-  Cadence logs.
-
-## 16. Minimal Successful Session
-
-A successful runtime-native production session looks like:
+## 14. Minimal Successful Session
 
 ```text
 1. User creates PROJECT_DIR and writes opt_requirement.md.
-2. User sends `/ic-opt PROJECT_DIR --real` to Claude, OpenCode, or another
-   supported runtime after installing its adapter.
-3. Supervisor-side flow prepares/preflights/approves the package.
-4. Same-runtime execution subagent runs the generated optimizer task.
-5. Supervisor-side flow writes `optimizer_flow_run_report.json`, handoff
-   report, and closeout reports.
-6. Supervisor reports best observed feasible result and bottleneck.
+2. User sends /ic-opt PROJECT_DIR --real.
+3. Agent runs ic-opt PROJECT_DIR --real.
+4. Agent waits for completion.
+5. Agent reads optimizer_decision_report.md and optimizer_insight_report.md.
+6. Agent reports best observed feasible result and next action.
 7. User accepts or asks to continue.
-8. Supervisor records decision and writes optimizer_final_summary.md.
-9. readiness=ready_for_closeout_review.
 ```
 
-At that point, the user can use the accepted candidate as the current optimized
-design point, while remembering it is not a mathematical global optimum proof.
-
-This is the C-65 product target. C-65 provides Claude and OpenCode adapter
-assets; each runtime still needs a live native-subagent drill in the target
-environment before claiming full production support for that runtime.
+This is the product skill target: the agent uses the workflow tool well instead
+of trying to become the workflow.

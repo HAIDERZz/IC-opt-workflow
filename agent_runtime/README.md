@@ -1,19 +1,27 @@
-# Runtime-Native Agent Adapters
+# Runtime Agent Adapters
 
 These assets make `/ic-opt PROJECT_DIR --doctor`, `/ic-opt PROJECT_DIR --real`,
-and `/ic-opt PROJECT_DIR --continue M` work inside a specific agent CLI without
-requiring that CLI to launch another CLI as the execution agent.
+and `/ic-opt PROJECT_DIR --continue M` easier to use inside agent CLIs.
 
-The product model is:
+Default product model:
 
 ```text
-User -> current runtime supervisor agent -> same-runtime execution subagent
+User -> current agent -> ic-opt CLI -> reports -> current agent explains result
 ```
 
 The shell commands `ic-opt PROJECT_DIR --doctor`, `ic-opt PROJECT_DIR --real`,
-and `ic-opt PROJECT_DIR --continue M` remain the deterministic automation core
-for direct operator/debug use. Runtime adapters wrap that core with the active
-CLI's own subagent mechanism.
+and `ic-opt PROJECT_DIR --continue M` remain the deterministic automation core.
+Runtime adapters teach the active agent how to operate that core without asking
+the user to restate formulas, variables, metric routes, or Spectre settings.
+
+Optional advanced model:
+
+```text
+User -> current agent -> same-runtime native subagent -> ic-opt CLI
+```
+
+Use the optional subagent path only when the user explicitly requests it and the
+runtime has stable native subagent/task support.
 
 ## Claude
 
@@ -46,13 +54,12 @@ This copies:
 ~/.config/opencode/agents/ic-opt-execution.md
 ```
 
-OpenCode command files use the `command/` directory, and OpenCode agent files
-use the `agents/` directory. The `/ic-opt` command acts as the supervisor prompt
-and instructs OpenCode to delegate real execution to the `ic-opt-execution`
-subagent.
+The `/ic-opt` command is the default single-agent operator prompt. The
+`ic-opt-execution` subagent remains available for explicit optional subagent
+mode, not as the default route.
 
 ## Boundary
 
-The historical C-64 `--execution-agent claude` subprocess route remains useful
-for development acceptance, but it is not the default product target after
-C-65.
+Do not make a product flow depend on one agent CLI launching another agent CLI.
+The historical Claude subprocess route is development evidence and fallback
+debug tooling, not the default user experience.

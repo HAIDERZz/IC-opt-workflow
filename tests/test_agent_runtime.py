@@ -27,7 +27,9 @@ def test_install_claude_runtime_adapter(tmp_path: Path) -> None:
     assert result.target_home == target_home
     skill = target_home / "skills" / "ic-opt" / "SKILL.md"
     assert skill.is_file()
-    assert "runtime-native" in skill.read_text(encoding="utf-8").lower()
+    skill_text = skill.read_text(encoding="utf-8").lower()
+    assert "ic-opt cli" in skill_text
+    assert "optional subagent" in skill_text
     assert result.installed == [target_home / "skills" / "ic-opt"]
     assert result.skipped == []
 
@@ -47,7 +49,9 @@ def test_install_opencode_runtime_adapter(tmp_path: Path) -> None:
     agent = target_home / "agents" / "ic-opt-execution.md"
     assert command.is_file()
     assert agent.is_file()
-    assert "ic-opt-execution" in command.read_text(encoding="utf-8")
+    command_text = command.read_text(encoding="utf-8").lower()
+    assert "ic-opt project_dir --real" in command_text
+    assert "optional subagent" in command_text
     assert "mode: subagent" in agent.read_text(encoding="utf-8")
     assert result.installed == [command, agent]
     assert result.skipped == []

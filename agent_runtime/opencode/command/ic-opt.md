@@ -1,9 +1,9 @@
 ---
-description: Run IC Auto Opt using OpenCode supervisor plus native execution subagent
+description: Operate IC Auto Opt with the deterministic ic-opt CLI
 agent: build
 ---
 
-You are the IC Auto Opt supervisor agent.
+You are the IC Auto Opt operator agent.
 
 User command:
 
@@ -14,75 +14,88 @@ User command:
 Interpret `$ARGUMENTS` as:
 
 ```text
-PROJECT_DIR (--real | --continue M | --doctor) [optional ic-opt flags]
+PROJECT_DIR (--doctor | --real | --continue M) [optional ic-opt flags]
 ```
 
-If no project directory is present, stop and ask for:
+If no mode is given, use `--real`. If the user asks to add M more optimization
+points, use `--continue M`. If the user asks to check readiness, use `--doctor`.
 
-```text
-/ic-opt PROJECT_DIR --real
-```
+Do not ask the user to restate formulas, variables, metric routes, testbench
+paths, Spectre resources, or optimizer settings. They belong in
+`PROJECT_DIR/opt_requirement.md`.
 
-If flags do not include `--real`, `--continue M`, or `--doctor`, append `--real`.
-Use `--continue M` when the user asks to add M more optimizer evaluations to an
-existing run. Do not expose lower-level `hermes-workflow continue-openbox-real`
-as the user-facing command.
-Use `--doctor` when the user asks whether the project/environment is ready.
-Doctor mode must stop after the product command returns; do not dispatch an
-execution subagent.
+## Required Default Flow
 
-Do not ask the user to restate formulas, variables, testbench paths, Spectre
-resources, or optimizer settings. They belong in `opt_requirement.md`.
-
-## Required Flow
-
-1. Locate the `ic-auto-opt-workflow` repo. Prefer `IC_OPT_WORKFLOW_REPO`; if it
-   is unset, use the current working directory when it contains executable
-   `.venv/bin/ic-opt`.
-2. Make sure the flags include `--real`, `--continue M`, or `--doctor`.
-3. If flags include `--doctor`, run and report:
+1. Locate the `ic-opt` command. Prefer:
 
    ```bash
-   "$REPO/.venv/bin/ic-opt" "$PROJECT_DIR" --doctor
+   "$IC_OPT_WORKFLOW_REPO/.venv/bin/ic-opt"
+   "$PWD/.venv/bin/ic-opt"
+   ic-opt
    ```
 
-   Stop here. Do not dispatch the execution subagent.
-
-4. Run the supervisor orchestration gate:
+2. For doctor, run:
 
    ```bash
-   "$REPO/.venv/bin/ic-opt" "$PROJECT_DIR" $FLAGS --dry-orchestration
+   ic-opt PROJECT_DIR --doctor
    ```
 
-   If the user explicitly included `--dry-orchestration`, stop after this gate
-   and report the result. Do not dispatch the execution subagent for a dry
-   orchestration check.
+   Stop after doctor and report the readiness result.
 
-5. Use OpenCode's native Task/subagent mechanism to dispatch the
-   `ic-opt-execution` subagent. Give it only the repo path, project path, and
-   this instruction:
+3. For real optimization, run:
+
+   ```bash
+   ic-opt PROJECT_DIR --real [user flags]
+   ```
+
+4. For continuation, run:
+
+   ```bash
+   ic-opt PROJECT_DIR --continue M [user flags]
+   ```
+
+5. After real or continuation completion, read:
 
    ```text
-   Read PROJECT_DIR/execution_package/OPTIMIZER_EXECUTION_TASK.md and
-   PROJECT_DIR/execution_package/optimizer_execution_manifest.json. Execute the
-   approved optimizer command from the manifest from REPO with
-   REPO/.venv/bin first in PATH. Do not hand-pick candidates. Do not rewrite
-   formulas. Do not parse PSF. Report command status and artifact paths.
+   PROJECT_DIR/reports/optimizer_decision_report.md
+   PROJECT_DIR/reports/optimizer_insight_report.md
    ```
 
-6. After the subagent returns, run the supervisor closeout chain from `REPO`:
+6. Report a concise result: flow status, evaluation count, status counts,
+   recommended action/run id, parameters, metrics, bottleneck, warnings, report
+   paths, and that the result is best observed rather than global optimum proof.
 
-   ```bash
-   "$REPO/.venv/bin/hermes-workflow" check-optimizer-run "$PROJECT_DIR"
-   "$REPO/.venv/bin/hermes-workflow" summarize-optimizer-run "$PROJECT_DIR"
-   "$REPO/.venv/bin/hermes-workflow" finalize-optimizer-run "$PROJECT_DIR"
-   "$REPO/.venv/bin/hermes-workflow" visualize-optimizer-run "$PROJECT_DIR"
-   "$REPO/.venv/bin/hermes-workflow" decide-optimizer-run "$PROJECT_DIR"
-   ```
+## Optional Subagent Mode
 
-7. Read `PROJECT_DIR/reports/optimizer_decision_report.md` and report the
-   concise result to the user.
+Use OpenCode's `ic-opt-execution` subagent only when the user explicitly asks
+for native subagent execution.
 
-If OpenCode's native subagent/task tool is unavailable or denied, stop and say
-that runtime-native execution subagent dispatch is unavailable. Do not silently
-fall back to launching another agent CLI.
+For optional subagent mode, first run:
+
+```bash
+ic-opt PROJECT_DIR --real [user flags] --dry-orchestration
+```
+
+or:
+
+```bash
+ic-opt PROJECT_DIR --continue M [user flags] --dry-orchestration
+```
+
+Then dispatch `ic-opt-execution` with only the project path, repo path, and the
+instruction to read the generated execution package and run the approved
+manifest command.
+
+If subagent dispatch is unavailable, report that clearly. Do not launch another
+CLI agent as a substitute.
+
+## Boundaries
+
+- Do not hand-pick candidates.
+- Do not rewrite OCEAN formulas.
+- Do not parse PSF in Python.
+- Do not change search space, constraints, objective, precision, or resource
+  settings unless the user explicitly asks.
+- Do not poll every optimizer batch.
+- Do not recommend failed candidates as primary results when feasible candidates
+  exist.
