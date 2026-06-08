@@ -23,27 +23,35 @@ Current execution state:
 - Current scope: C-70 Remote Spectre/OCEAN Local-Parity Design.
 - current_scope: C-70 Remote Spectre/OCEAN Local-Parity Design.
 - current_scope_exact: C-70 Remote Spectre/OCEAN Local-Parity Design.
-- Current status: C-70 code is implemented by Claude and accepted by Codex for
-  local/unit parity. Remote Spectre/OCEAN now reuses canonical local argv
-  wrappers, validates required remote artifacts, delegates manifest semantics
-  to local helpers, preserves multi-testbench routing, and covers OCEAN
-  retry/failure behavior including missing scalar outputs. Real remote
-  SSH/Spectre/OCEAN parity acceptance remains pending user authorization.
+- Current status: C-70 is complete and accepted. Remote Spectre/OCEAN now
+  reuses canonical local argv wrappers, captures and uploads command
+  diagnostics from runner stdout/stderr instead of csh redirection, validates
+  required remote artifacts, delegates manifest semantics to local helpers,
+  preserves multi-testbench routing, and has passed both local/unit parity and
+  real remote SSH/Spectre/OCEAN acceptance.
 - Active spec:
   `docs/superpowers/specs/2026-06-08-remote-spectre-ocean-local-parity-design.md`.
 - Active plan:
   `docs/superpowers/plans/2026-06-08-remote-spectre-ocean-local-parity.md`.
-- Next allowed action: Run C-70 real remote parity acceptance only when the user authorizes SSH/Spectre/OCEAN: ic-opt --ssh-profile PROFILE /remote/project --doctor, then ic-opt --ssh-profile PROFILE /remote/project --real --max-evals 1 --batch-size 1 --parallel-jobs 1. Otherwise keep C-70 code accepted and do not run remote real tools.
+- Next allowed action: C-70 is complete. Keep future remote work product-narrow:
+  release/docs sync for SSH mode or the next concrete user-facing feedback item.
+  Do not expand remote mode beyond SSH wrapping of the proven local flow without
+  a new spec.
 - C-70 design decision: remote mode may change only where Spectre/OCEAN
   executes. It must not change local adapter Spectre/OCEAN argv, cwd, OCEAN
   replay mode, artifact expectations, manifest semantics, metric failure
   semantics, or multi-testbench aggregation.
-- C-70 implementation result: commits `4fb3d29` and `84afe18` replace the
-  duplicated remote Spectre/OCEAN semantic implementation with local-adapter
-  parity for local/unit coverage. Targeted C-70 tests passed with `98 passed`;
-  full pytest passed with `733 passed, 1 warning`; ruff, cadence, and
-  whitespace checks passed. Remaining gate: user-authorized real remote parity
-  acceptance.
+- C-70 implementation result: commits `4fb3d29`, `84afe18`, and `c2245d9`
+  replace the duplicated remote Spectre/OCEAN semantic implementation with
+  local-adapter parity and captured remote command diagnostics. Targeted C-70
+  tests passed with `95 passed`; full pytest passed with `730 passed, 1
+  warning`; ruff, cadence, and whitespace checks passed. Real remote acceptance
+  passed on clean project
+  `/home/zzchen/remote_opt/mixer_muti_tb_c70_accept_20260609_002` using SSH
+  profile `zzchen@10.113.216.131`: doctor passed; one real remote
+  OpenBox/Spectre/OCEAN evaluation returned flow status `pass`; remote and local
+  mirrors both contain child `spectre.stdout/stderr` and `ocean.stdout/stderr`
+  artifacts.
 - C-69 retained plumbing decision: the Linux EDA server project directory remains the
   source of truth and keeps the same local-mode layout. The local workstation
   runs the product Python environment, OpenBox/controller, agent skill, and

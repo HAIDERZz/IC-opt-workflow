@@ -9,11 +9,14 @@
 proven local Spectre/OCEAN adapter. C-70 keeps the C-69 SSH/product plumbing but
 replaces the duplicated remote command/manifest behavior.
 
-**Status 2026-06-09:** implemented and reviewed for local/unit parity in
-commits `4fb3d29` and `84afe18`. Targeted C-70 tests passed with `98 passed`;
-full pytest passed with `733 passed, 1 warning`; ruff, cadence, and
-`git diff --check` passed. Real remote SSH/Spectre/OCEAN parity acceptance is
-still pending user authorization.
+**Status 2026-06-09:** complete and accepted. Local/unit parity was implemented
+in commits `4fb3d29` and `84afe18`; the real remote diagnostic-artifact fix was
+implemented in `c2245d9`. Targeted C-70 tests passed with `95 passed`; full
+pytest passed with `730 passed, 1 warning`; ruff, cadence, and
+`git diff --check` passed. Real remote SSH/Spectre/OCEAN parity acceptance also
+passed on clean project
+`/home/zzchen/remote_opt/mixer_muti_tb_c70_accept_20260609_002` using SSH
+profile `zzchen@10.113.216.131`.
 
 **Design authority:**
 
@@ -240,6 +243,22 @@ Expected: remote multi-testbench tests pass without changing local
 aggregation.
 
 ## Task 6: Real Remote Parity Acceptance
+
+**Status 2026-06-09:** complete.
+
+Evidence:
+
+- `ic-opt --ssh-profile zzchen@10.113.216.131 /home/zzchen/remote_opt/mixer_muti_tb_c70_accept_20260609_002 --doctor`
+  passed.
+- `ic-opt --ssh-profile zzchen@10.113.216.131 /home/zzchen/remote_opt/mixer_muti_tb_c70_accept_20260609_002 --real --max-evals 1 --batch-size 1 --parallel-jobs 1`
+  returned flow status `pass`.
+- The one evaluated candidate was classified `metric_check_failed`, which is an
+  optimizer/metric outcome for that weak point, not a remote backend failure.
+- The remote project and local mirror both contain child `spectre.stdout`,
+  `spectre.stderr`, `ocean.stdout`, and `ocean.stderr` artifacts for `cg_nf`,
+  `iip3`, and `p1db`.
+- Child Spectre result manifests succeeded; OCEAN metric manifests record the
+  actual scalar/metric status for each testbench.
 
 **Purpose:** prove remote mode now follows the same Spectre/OCEAN path as the
 already accepted local RC project.

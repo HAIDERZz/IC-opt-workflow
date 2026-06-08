@@ -13,21 +13,22 @@ This note preserves the implementation state for continuing Plan A after context
 - Current scope: C-70 Remote Spectre/OCEAN Local-Parity Design
 - current_scope: C-70 Remote Spectre/OCEAN Local-Parity Design
 - current_scope_exact: C-70 Remote Spectre/OCEAN Local-Parity Design
-- Current status: C-70 code is implemented by Claude and accepted by Codex for
-  local/unit parity. Remote Spectre/OCEAN now reuses canonical local argv
-  wrappers, validates required remote artifacts, delegates manifest semantics
-  to local helpers, preserves multi-testbench routing, and covers OCEAN
-  retry/failure behavior including missing scalar outputs. Real remote
-  SSH/Spectre/OCEAN parity acceptance remains pending user authorization.
+- Current status: C-70 is complete and accepted. Remote Spectre/OCEAN now
+  reuses canonical local argv wrappers, captures and uploads command
+  diagnostics from runner stdout/stderr instead of csh redirection, validates
+  required remote artifacts, delegates manifest semantics to local helpers,
+  preserves multi-testbench routing, and has passed both local/unit parity and
+  real remote SSH/Spectre/OCEAN acceptance.
 - Active plan: `docs/superpowers/plans/2026-06-08-remote-spectre-ocean-local-parity.md`
-- Next allowed action: Run C-70 real remote parity acceptance only when the user authorizes SSH/Spectre/OCEAN: ic-opt --ssh-profile PROFILE /remote/project --doctor, then ic-opt --ssh-profile PROFILE /remote/project --real --max-evals 1 --batch-size 1 --parallel-jobs 1. Otherwise keep C-70 code accepted and do not run remote real tools.
+- Next allowed action: C-70 is complete. Keep future remote work product-narrow:
+  release/docs sync for SSH mode or the next concrete user-facing feedback item.
 - Execution method: `superpowers:subagent-driven-development`
 - Dependencies installed in active Python environment on 2026-05-29: `pytest`, `typer`, `pydantic`, `PyYAML`, `ruff`
 
 ## C-70 Remote Spectre/OCEAN Local-Parity Plan 2026-06-08
 
-C-70 is implemented and reviewed for local/unit parity. Real remote parity
-acceptance remains pending user authorization.
+C-70 is complete and accepted for local/unit parity and real remote
+SSH/Spectre/OCEAN parity.
 
 Active design and plan:
 
@@ -38,17 +39,25 @@ docs/superpowers/plans/2026-06-08-remote-spectre-ocean-local-parity.md
 
 Result:
 
-- Commits: `4fb3d29` and `84afe18`.
+- Commits: `4fb3d29`, `84afe18`, and `c2245d9`.
 - The proven local adapter remains the source of truth for Spectre/OCEAN
   command, cwd, replay, scalar parsing, and manifest semantics.
 - Remote mode now reuses local canonical argv and manifest helper semantics.
 - Remote mode downloads/validates PSF/log/scalar artifacts before manifest
-  completion.
+  completion and writes command diagnostics from captured runner stdout/stderr
+  instead of relying on csh redirection.
 - OCEAN retry and missing-scalar failure behavior now matches local semantics.
 - Multi-testbench aggregation remains unchanged.
-- Verification passed: targeted C-70 tests `98 passed`; full pytest
-  `733 passed, 1 warning`; ruff passed; cadence passed; `git diff --check`
+- Verification passed: targeted C-70 tests `95 passed`; full pytest
+  `730 passed, 1 warning`; ruff passed; cadence passed; `git diff --check`
   passed.
+- Real remote acceptance passed on clean project
+  `/home/zzchen/remote_opt/mixer_muti_tb_c70_accept_20260609_002` using SSH
+  profile `zzchen@10.113.216.131`: doctor passed; one real remote
+  OpenBox/Spectre/OCEAN evaluation returned flow status `pass`; the one
+  candidate was `metric_check_failed`, but child Spectre manifests succeeded
+  and both remote and local mirrors contain child `spectre.stdout/stderr` and
+  `ocean.stdout/stderr` diagnostics.
 - Do not change metric formulas, optimizer generation, requirement grammar,
   FoM logic, visualization, or resource settings for C-70.
 
