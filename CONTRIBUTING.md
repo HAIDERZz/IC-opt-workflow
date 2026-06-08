@@ -15,11 +15,13 @@ opt_requirement.md -> ic-opt PROJECT --real -> reports
 Use one repository-level Python environment:
 
 ```bash
-python3.11 -m venv .venv
+python3 -m venv .venv
 ./.venv/bin/python -m pip install --upgrade pip
 ./.venv/bin/python -m pip install -r requirements-product.txt
 ./.venv/bin/python -m pip install -e .
 ```
+
+Use the site's Python 3.11+ command if `python3` is older than 3.11.
 
 ## Before Sending Changes
 

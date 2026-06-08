@@ -1,6 +1,6 @@
 ---
 name: ic-opt
-description: Operate IC Auto Opt Workflow from a project directory. Trigger when the user asks to run "/ic-opt PROJECT --doctor", "/ic-opt PROJECT --real", "/ic-opt PROJECT --continue M", or asks an agent to optimize a Spectre/Maestro/ADE IC project with ic-opt. The default path is one current agent running the deterministic ic-opt CLI and explaining reports; same-runtime subagent execution is optional only when explicitly requested.
+description: Operate IC Auto Opt Workflow from a project directory. Trigger when the user asks to run "/ic-opt PROJECT --doctor", "/ic-opt PROJECT --real", "/ic-opt PROJECT --continue M", "/ic-opt --ssh-profile PROFILE PROJECT --real", or asks an agent to optimize a Spectre/Maestro/ADE IC project with ic-opt. The default path is one current agent running the deterministic ic-opt CLI and explaining reports; same-runtime subagent execution is optional only when explicitly requested.
 ---
 
 # IC Auto Opt Agent Operator
@@ -34,11 +34,18 @@ Accept these forms:
 /ic-opt PROJECT --doctor
 /ic-opt PROJECT --real [ic-opt flags]
 /ic-opt PROJECT --continue M [ic-opt flags]
+/ic-opt --ssh-profile PROFILE REMOTE_PROJECT --doctor
+/ic-opt --ssh-profile PROFILE REMOTE_PROJECT --real [ic-opt flags]
+/ic-opt --ssh-profile PROFILE REMOTE_PROJECT --continue M [ic-opt flags]
 ```
 
 If the user gives only a project path and asks to optimize, use `--real`.
 If the user says "add/run/continue M more points", use `--continue M`.
 If the user asks to check readiness, use `--doctor`.
+If the user says the project is on a remote EDA server, use remote mode with
+`--ssh-profile PROFILE`. If the SSH profile is missing, ask only for the profile
+name or tell the user to configure passwordless SSH and verify
+`ssh -o BatchMode=yes PROFILE true`.
 
 Do not ask the user to restate formulas, variables, metric routes, testbench
 paths, Spectre resources, or optimizer settings. Those belong in
@@ -79,6 +86,21 @@ For continuation:
 ```bash
 ic-opt PROJECT --continue M [user flags]
 ```
+
+For remote projects:
+
+```bash
+ic-opt --ssh-profile PROFILE REMOTE_PROJECT --doctor
+ic-opt --ssh-profile PROFILE REMOTE_PROJECT --real [user flags]
+ic-opt --ssh-profile PROFILE REMOTE_PROJECT --continue M [user flags]
+```
+
+In remote mode, `REMOTE_PROJECT` is the project directory on the Linux EDA
+server. Do not copy the project locally unless the user explicitly requests a
+backup. Do not install this Python package, OpenBox, or a virtualenv on the EDA
+server. The local CLI mirrors reports under
+`~/.ic-opt/remote_runs/<ssh-profile>/<project-hash>/reports/` and also uploads
+reports back to `REMOTE_PROJECT/reports/`.
 
 Do not translate continuation into a lower-level `hermes-workflow` command for
 normal users. Do not restart from scratch unless the user changed variables,
@@ -123,6 +145,7 @@ subagent.
 - Do not parse PSF in Python.
 - Do not hardcode a Spectre version.
 - Do not create a per-project Python virtualenv.
+- In remote mode, do not install Python packages on the remote EDA server.
 - Do not silently change `parallel_jobs`, `threads_per_run`, precision, or FoM.
 - Do not poll every optimizer batch; report start, unexpected failure,
   completion, and only low-frequency heartbeat status for long runs.
@@ -139,6 +162,10 @@ After `--real` or `--continue`, read:
 PROJECT/reports/optimizer_decision_report.md
 PROJECT/reports/optimizer_insight_report.md
 ```
+
+For remote mode, prefer the local mirrored report path printed by `ic-opt`.
+If the local mirror is unavailable, read the same files under
+`REMOTE_PROJECT/reports/` through SSH.
 
 Summarize only:
 

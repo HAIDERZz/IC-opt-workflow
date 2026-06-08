@@ -64,12 +64,14 @@ bundles, PSF databases, license server information, or machine-specific paths.
 From the package root:
 
 ```bash
-python3.11 -m venv .venv
+python3 -m venv .venv
 ./.venv/bin/python -m pip install --upgrade pip
 ./.venv/bin/python -m pip install -r requirements-product.txt
 ./.venv/bin/python -m pytest tests/test_product_cli.py tests/test_requirement_intake.py tests/test_openbox_backend.py tests/test_optimizer_task_package.py tests/test_toolchain_env.py -q
 ./.venv/bin/python -m ruff check src tools
 ```
+
+Use the site's Python 3.11+ command if `python3` is older than 3.11.
 
 Run a sensitive-path scan from the parent directory before pushing. Use markers
 that match your own workstation paths, usernames, temporary run prefixes, and

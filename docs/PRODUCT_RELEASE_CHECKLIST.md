@@ -20,8 +20,12 @@ From the repository root:
 python3 -m venv .venv
 ./.venv/bin/python -m pip install --upgrade pip setuptools wheel
 ./.venv/bin/python -m pip install -r requirements-product.txt
-./.venv/bin/python -c "import openbox, hermes_workflow, lightgbm, shap, pyrfr; print('product optimizer env ok')"
+./.venv/bin/python -c "import openbox, hermes_workflow; print('product optimizer env ok')"
 ```
+
+Optional advanced OpenBox surrogate/importance visualization can be checked
+separately with `requirements-advanced.txt`. Do not block the core product
+release on `pyrfr`, `shap`, or `lightgbm`.
 
 Expected scripts:
 
@@ -120,7 +124,38 @@ Agent acceptance additionally requires:
 - the agent reads closeout reports and explains the decision without asking the
   user to restate machine-critical information.
 
-## 6. Final User Acceptance
+## 6. Remote Product Acceptance
+
+Remote acceptance uses the same project contract, but the project directory and
+Cadence setup live on the remote Linux EDA server:
+
+```bash
+./.venv/bin/ic-opt --ssh-profile PROFILE /remote/path/to/project --doctor
+
+./.venv/bin/ic-opt --ssh-profile PROFILE /remote/path/to/project \
+  --real \
+  --max-evals 80 \
+  --batch-size 10 \
+  --parallel-jobs 10
+
+./.venv/bin/ic-opt --ssh-profile PROFILE /remote/path/to/project \
+  --continue 20 \
+  --batch-size 10 \
+  --parallel-jobs 10
+```
+
+Remote acceptance requires:
+
+- passwordless SSH passes with `ssh -o BatchMode=yes PROFILE true`;
+- remote doctor passes;
+- 80 real evaluations pass through remote Spectre/OCEAN;
+- 20 continuation evaluations reach 100 cumulative evaluations;
+- reports exist both under remote `PROJECT/reports/` and local
+  `~/.ic-opt/remote_runs/<ssh-profile>/<project-hash>/reports/`;
+- remote Spectre/OCEAN diagnostics are present for successful and failed
+  candidate paths.
+
+## 7. Final User Acceptance
 
 The optimizer flow stops before final user acceptance. Only after the user
 accepts the recommended best-observed candidate:
@@ -140,7 +175,7 @@ project readiness: pass
 readiness: ready_for_closeout_review
 ```
 
-## 7. Files That Must Not Be Released
+## 8. Files That Must Not Be Released
 
 Do not commit or publish:
 
@@ -153,7 +188,7 @@ Do not commit or publish:
 - `docs/toolchain_evidence/` unless the user explicitly approves a sanitized
   evidence release.
 
-## 8. GitHub Source Publication
+## 9. GitHub Source Publication
 
 Before pushing the source package to GitHub:
 

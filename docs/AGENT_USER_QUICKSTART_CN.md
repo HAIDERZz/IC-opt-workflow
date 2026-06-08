@@ -11,12 +11,14 @@
 ```text
 /ic-opt ~/spectre_opt_prj/项目名 --doctor
 /ic-opt ~/spectre_opt_prj/项目名 --real
+/ic-opt --ssh-profile eda-lab /remote/path/to/项目名 --real
 ```
 
 如果看完报告后想在已有 N 个点基础上继续追加 M 个点：
 
 ```text
 /ic-opt ~/spectre_opt_prj/项目名 --continue M
+/ic-opt --ssh-profile eda-lab /remote/path/to/项目名 --continue M
 ```
 
 然后 agent 自动完成：
@@ -36,6 +38,7 @@
 ic-opt PROJECT_DIR --doctor
 ic-opt PROJECT_DIR --real
 ic-opt PROJECT_DIR --continue 40
+ic-opt --ssh-profile PROFILE REMOTE_PROJECT --real
 ```
 
 这是自动化脚本入口。它可以自己跑完整流程，适合调试和命令行用户。
@@ -46,11 +49,16 @@ ic-opt PROJECT_DIR --continue 40
 /ic-opt PROJECT_DIR --doctor
 /ic-opt PROJECT_DIR --real
 /ic-opt PROJECT_DIR --continue 40
+/ic-opt --ssh-profile PROFILE REMOTE_PROJECT --real
+/ic-opt --ssh-profile PROFILE REMOTE_PROJECT --continue 40
 ```
 
 这是 agent 入口。agent 的默认职责是根据平台无关 skill 操作 `ic-opt` CLI，
 等待流程完成，读取报告并解释结果。native subagent 只是可选高级模式，不是默认
 产品路线。
+
+如果项目在远程 Linux EDA 服务器上，用户只需要提供 SSH profile 和远程项目路径。
+agent 不应该把项目复制成本地流程，也不应该在远程服务器上安装 Python 包。
 
 ## 第一次安装
 
@@ -116,6 +124,13 @@ PROJECT_DIR/cadence_env.csh
 ```
 
 本项目不会自动猜 `.bashrc` 或 `.zshrc`，也不会硬编码某个 Spectre 版本。
+
+远程模式下，`cadence_env.csh` 放在远程项目目录或用远程路径传给
+`--cadence-cshrc`。本机只需要能通过免密 SSH 登录远程服务器：
+
+```bash
+ssh -o BatchMode=yes eda-lab true
+```
 
 ## 创建一个优化项目
 

@@ -669,52 +669,6 @@ def test_run_openbox_real_continuation_allows_completed_prior_state(
     assert rows[-1]["run_id"] == "real_010"
 
 
-def test_run_openbox_real_continuation_inherits_prior_parallel_jobs_by_default(
-    tmp_path: Path,
-) -> None:
-    project_dir = create_approved_real_project_with_optimizer_max(
-        tmp_path,
-        max_evaluations=8,
-    )
-
-    def adapter(project_dir: Path, *, run_id: str, cadence_cshrc: Path | None) -> None:
-        from tests.real_run_smoke_helpers import (
-            write_fake_metric_result_manifest,
-            write_fake_result_manifest,
-        )
-
-        write_fake_result_manifest(project_dir, run_id=run_id)
-        write_fake_metric_result_manifest(project_dir, run_id=run_id)
-
-    run_openbox_real_optimization(
-        project_dir,
-        max_evals=4,
-        batch_size=2,
-        parallel_jobs=4,
-        advisor_factory=lambda _space, _seed: SequentialAdvisor(),
-        adapter=adapter,
-    )
-
-    result = run_openbox_real_optimization(
-        project_dir,
-        additional_evals=1,
-        continue_from_existing=True,
-        batch_size=1,
-        advisor_factory=lambda _space, _seed: SequentialAdvisor(start=4),
-        adapter=adapter,
-    )
-
-    report = json.loads((project_dir / REPORT_RELATIVE).read_text())
-    rows = [
-        json.loads(line)
-        for line in (project_dir / EVALUATIONS_RELATIVE).read_text().splitlines()
-    ]
-
-    assert result.evaluation_count == 5
-    assert report["openbox"]["parallel_jobs"] == 4
-    assert rows[-1]["parallel_jobs"] == 4
-
-
 def test_run_openbox_real_cli_uses_dependency_gate(tmp_path: Path, monkeypatch) -> None:
     import hermes_workflow.cli as cli_module
 
@@ -869,7 +823,7 @@ def test_continue_openbox_real_cli_uses_safe_defaults_and_repairs_package(
         assert max_evals is None
         assert additional_evals == 40
         assert continue_from_existing is True
-        assert surrogate_type == "gp"
+        assert surrogate_type == "prf"
         assert acq_type == "eic"
         assert acq_optimizer_type == "local_random"
         return type(

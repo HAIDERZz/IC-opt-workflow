@@ -25,10 +25,13 @@ belong to the user's Cadence environment.
 Use one product-level Python environment for this repository:
 
 ```bash
-python3.11 -m venv .venv
+python3 -m venv .venv
 ./.venv/bin/python -m pip install -r requirements-product.txt
 ./.venv/bin/python -m pip install -e .
 ```
+
+If `python3` is older than 3.11, use the Python 3.11+ command provided by the
+site, for example `python3.11` or `python3.12`.
 
 Do not create a separate virtualenv inside each optimization project.
 

@@ -3,6 +3,7 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
+from hermes_workflow import __version__
 from hermes_workflow.cli import app
 from tests.report_helpers import write_pass_reports
 
@@ -14,7 +15,7 @@ def test_cli_version_prints_package_version() -> None:
     result = runner.invoke(app, ["--version"])
 
     assert result.exit_code == 0
-    assert "0.1.0" in result.stdout
+    assert __version__ in result.stdout
 
 
 def test_cli_init_and_validate(tmp_path: Path) -> None:

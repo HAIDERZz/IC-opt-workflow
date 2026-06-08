@@ -3,8 +3,9 @@ from __future__ import annotations
 import hashlib
 import json
 import shutil
+from collections.abc import Callable
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 import yaml
@@ -352,26 +353,25 @@ def _prefix_import_issues(
     return [f"{testbench_id}: {issue}" for issue in issues]
 
 
-def _parse_and_validate_requirement(project_dir: Path) -> RequirementIntakeReport:
-    requirement_path = project_dir / "opt_requirement.md"
+def parse_requirement_text(
+    requirement_text: str,
+    *,
+    constraints_text: str | None = None,
+    maestro_input_exists: Callable[[str], bool] = lambda path: Path(path).expanduser().is_file(),
+) -> RequirementIntakeReport:
+    """Parse requirement text and validate its structure.
+
+    This is the public, injectable entry-point used by both the local CLI
+    (via ``_parse_and_validate_requirement``) and the remote doctor (which
+    supplies its own ``maestro_input_exists`` callable to check paths over
+    SSH).
+    """
     issues: list[str] = []
     sections: dict[str, Any] = {}
-    constraints_path = project_dir / "constraints.md"
-    constraints_sha = _sha256(constraints_path) if constraints_path.is_file() else None
 
-    if not requirement_path.exists():
-        issues.append("opt_requirement.md is missing")
-        return RequirementIntakeReport(
-            status="fail",
-            issues=issues,
-            sections=sections,
-            constraints_md_present=constraints_path.is_file(),
-            constraints_md_sha256=constraints_sha,
-        )
+    constraints_sha = hashlib.sha256(constraints_text.encode("utf-8")).hexdigest() if constraints_text is not None else None
 
-    raw_sections, section_issues = _extract_required_sections(
-        requirement_path.read_text(encoding="utf-8")
-    )
+    raw_sections, section_issues = _extract_required_sections(requirement_text)
     issues.extend(section_issues)
     if not issues:
         for name in REQUIRED_SECTIONS:
@@ -390,16 +390,42 @@ def _parse_and_validate_requirement(project_dir: Path) -> RequirementIntakeRepor
             except (KeyError, TypeError, ValueError, ValidationError) as exc:
                 issues.append(f"rendered config validation failed: {exc}")
         for maestro_root in _maestro_point_roots(sections):
-            netlist_input = Path(maestro_root).expanduser() / "netlist" / "input.scs"
-            if not netlist_input.is_file():
+            netlist_input = PurePosixPath(str(maestro_root)) / "netlist" / "input.scs"
+            if not maestro_input_exists(netlist_input.as_posix()):
                 issues.append(f"maestro_point_root/netlist/input.scs is missing: {netlist_input}")
 
     return RequirementIntakeReport(
         status="pass" if not issues else "fail",
         issues=issues,
         sections=sections,
-        constraints_md_present=constraints_path.is_file(),
+        constraints_md_present=constraints_text is not None,
         constraints_md_sha256=constraints_sha,
+    )
+
+
+def _parse_and_validate_requirement(project_dir: Path) -> RequirementIntakeReport:
+    requirement_path = project_dir / "opt_requirement.md"
+    issues: list[str] = []
+    sections: dict[str, Any] = {}
+    constraints_path = project_dir / "constraints.md"
+
+    if not requirement_path.exists():
+        issues.append("opt_requirement.md is missing")
+        return RequirementIntakeReport(
+            status="fail",
+            issues=issues,
+            sections=sections,
+            constraints_md_present=constraints_path.is_file(),
+            constraints_md_sha256=_sha256(constraints_path) if constraints_path.is_file() else None,
+        )
+
+    requirement_text = requirement_path.read_text(encoding="utf-8")
+    constraints_text = constraints_path.read_text(encoding="utf-8") if constraints_path.is_file() else None
+
+    return parse_requirement_text(
+        requirement_text,
+        constraints_text=constraints_text,
+        maestro_input_exists=lambda path: Path(path).expanduser().is_file(),
     )
 
 

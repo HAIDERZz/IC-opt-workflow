@@ -1,4 +1,4 @@
-# IC Auto Opt Workflow v0.1.3
+# IC Auto Opt Workflow v0.1.4
 
 IC Auto Opt Workflow helps analog/RF IC designers run repeatable Spectre/OCEAN
 optimization from a project folder.
@@ -13,6 +13,12 @@ The main command is:
 
 ```bash
 ic-opt /path/to/project --real
+```
+
+For a remote Linux EDA server, keep the project on the server and run:
+
+```bash
+ic-opt --ssh-profile eda-lab /remote/path/to/project --real
 ```
 
 The same command can also be called by an AI agent. The agent should operate the
@@ -42,6 +48,9 @@ hermes-workflow agent-skill-path
   advanced dependencies add HTML/JSON surrogate visualization artifacts.
 - Supports continuing an existing run, for example adding 40 more evaluations
   after the first 100.
+- Supports remote SSH execution: the Python optimizer can run on your local
+  Linux/macOS/Windows workstation while Spectre/OCEAN run on a remote Linux EDA
+  server through passwordless OpenSSH.
 - Provides a platform-neutral agent skill for any shell-capable AI agent.
 
 ## What This Tool Does Not Provide
@@ -90,6 +99,26 @@ python -m pip install -r requirements-product.txt
 
 If your server's `python3` is older than 3.11, use whatever Python 3.11+ command
 your administrator provides, such as `python3.11` or `python3.12`.
+
+On macOS, install Python 3.11+ and Git first, for example with Homebrew:
+
+```bash
+brew install python@3.11 git
+python3 -m venv .venv
+```
+
+On Windows, the recommended path is WSL2 Ubuntu because it gives you normal
+Linux shell, Python, Git, and OpenSSH behavior:
+
+```bash
+# inside WSL2 Ubuntu
+sudo apt update
+sudo apt install python3 python3-venv python3-pip git openssh-client
+python3 -m venv .venv
+```
+
+Native Windows PowerShell can work for remote mode if Python 3.11+ and OpenSSH
+are installed, but WSL2 is simpler for IC/EDA workflows.
 
 Advanced OpenBox surrogate visualization is optional. The base optimizer,
 Spectre/OCEAN execution, decision report, insight report, continuation, and
@@ -262,6 +291,75 @@ resource settings. Do not add `--parallel-jobs` unless you intentionally want to
 change resources; mixed resource settings make optimizer evidence harder to
 compare and can be rejected by the acceptance audit.
 
+### 7. Remote SSH Mode
+
+Remote mode is for the common case where your laptop or workstation can install
+Python packages, but Cadence/Spectre/OCEAN are only available on a Linux EDA
+server.
+
+The project folder stays on the remote server and keeps the same layout as local
+mode:
+
+```text
+/remote/path/to/my_mixer_opt/
+  opt_requirement.md
+  constraints.md          # optional
+  cadence_env.csh         # remote Cadence setup file
+```
+
+Configure passwordless SSH yourself, the same way you would for other EDA bridge
+tools. A typical `~/.ssh/config` entry on your local machine is:
+
+```sshconfig
+Host eda-lab
+  HostName your.eda.server
+  User your_user_name
+  IdentityFile ~/.ssh/id_ed25519
+```
+
+Verify that the connection does not ask for a password:
+
+```bash
+ssh -o BatchMode=yes eda-lab true
+```
+
+Then run the same workflow with `--ssh-profile`:
+
+```bash
+ic-opt --ssh-profile eda-lab /remote/path/to/my_mixer_opt --doctor
+
+ic-opt --ssh-profile eda-lab /remote/path/to/my_mixer_opt \
+  --real \
+  --max-evals 80 \
+  --batch-size 10 \
+  --parallel-jobs 10
+
+ic-opt --ssh-profile eda-lab /remote/path/to/my_mixer_opt \
+  --continue 20 \
+  --batch-size 10 \
+  --parallel-jobs 10
+```
+
+If the remote Cadence setup file is not
+`/remote/path/to/my_mixer_opt/cadence_env.csh`, pass the remote path:
+
+```bash
+ic-opt --ssh-profile eda-lab /remote/path/to/my_mixer_opt \
+  --real \
+  --cadence-cshrc /remote/path/to/cadence_env.csh
+```
+
+Reports are kept on the remote server under `PROJECT/reports/` and mirrored to
+your local machine under:
+
+```text
+~/.ic-opt/remote_runs/<ssh-profile>/<project-hash>/reports/
+```
+
+Remote mode does not install Cadence, OpenBox, or this Python package on the EDA
+server. It uses SSH to run the same canonical Spectre/OCEAN commands remotely
+and mirrors the resulting reports back to the local optimizer environment.
+
 ## Read The Results
 
 Start with:
@@ -361,15 +459,15 @@ pyproject.toml              package metadata and console scripts
 
 ## Version
 
-Current release: `v0.1.3`.
+Current release: `v0.1.4`.
 
-This release has been clean-installed from GitHub and validated on a real
-multi-testbench Mixer optimization flow:
+This release has been clean-installed from GitHub and validated on real
+multi-testbench Mixer optimization flows, including local continuation and
+remote SSH execution:
 
 ```text
-100 real evaluations
--> user-style continuation by 40 more evaluations
--> 140 accepted cumulative evaluations
+local: 100 real evaluations -> continuation by 40 -> 140 accepted cumulative evaluations
+remote: 80 real evaluations -> continuation by 20 -> 100 accepted cumulative evaluations
 ```
 
 ## License

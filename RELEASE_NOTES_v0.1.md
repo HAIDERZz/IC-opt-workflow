@@ -1,5 +1,45 @@
 # Release Notes v0.1.x
 
+## v0.1.4
+
+Date: 2026-06-09
+
+### Summary
+
+v0.1.4 adds the first productized remote SSH execution path. The optimizer and
+OpenBox environment can run on a local Linux/macOS/Windows workstation, while
+Spectre/OCEAN execute on a remote Linux EDA server through passwordless
+OpenSSH.
+
+### Changes
+
+- Added `ic-opt --ssh-profile PROFILE PROJECT --doctor`.
+- Added `ic-opt --ssh-profile PROFILE PROJECT --real ...`.
+- Added `ic-opt --ssh-profile PROFILE PROJECT --continue M ...`.
+- Reused the canonical local Spectre/OCEAN argv builders in remote mode so
+  remote execution does not invent a separate simulator command path.
+- Added remote artifact validation and diagnostic persistence for Spectre and
+  OCEAN stdout/stderr/log/scalar artifacts.
+- Mirrored remote reports to
+  `~/.ic-opt/remote_runs/<ssh-profile>/<project-hash>/reports/` while keeping
+  reports on the remote project under `PROJECT/reports/`.
+- Updated README and Chinese user guide with remote SSH, Windows, and macOS
+  installation guidance.
+- Updated the platform-neutral `ic-opt` agent skill with remote-mode operating
+  rules.
+
+### Verification
+
+- Remote doctor passed on a real multi-testbench Mixer project.
+- Remote real optimization passed for 80 evaluations.
+- Remote continuation passed for 20 more evaluations, reaching 100 cumulative
+  evaluations.
+- The final accepted remote run contained 17 feasible, 67 constraint-failed,
+  and 16 metric-check-failed evaluations.
+- Targeted release regression tests passed for remote SSH, remote project
+  preparation, remote Spectre/OCEAN adapter parity, product CLI remote routing,
+  optimizer flow, requirement intake, OpenBox backend, and agent skill runtime.
+
 ## v0.1.3
 
 Date: 2026-06-08
@@ -78,7 +118,7 @@ The development workspace validated:
 
 ```bash
 cd /path/to/ic-auto-opt-workflow-v0.1
-python3.11 -m venv .venv
+python3 -m venv .venv
 ./.venv/bin/python -m pip install -r requirements-product.txt
 ./.venv/bin/python -m pip install -e .
 

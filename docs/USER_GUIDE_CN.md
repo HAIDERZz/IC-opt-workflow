@@ -1,4 +1,4 @@
-# IC Auto Opt Workflow v0.1.3 使用说明
+# IC Auto Opt Workflow v0.1.4 使用说明
 
 这份说明面向集成电路方向用户，假设你会使用 Linux 和 Cadence，但不要求你熟悉
 Python 工程。
@@ -25,6 +25,15 @@ Python 工程。
 -> 聚合多 testbench 指标
 -> 生成决策报告和可视化报告
 ```
+
+如果 Cadence/Spectre/OCEAN 只能在 Linux EDA 服务器上运行，也可以用远程模式：
+
+```bash
+ic-opt --ssh-profile eda-lab /remote/path/to/project --real
+```
+
+这时 Python 优化器运行在你的本机或工作站上，Spectre/OCEAN 通过 SSH 在远程
+Linux 服务器上运行。
 
 ## 2. 安装一次产品环境
 
@@ -59,6 +68,44 @@ python -m pip install -r requirements-product.txt
 如果服务器上的 `python3` 不是 3.11 或更新版本，就使用管理员提供的 Python 3.11+
 命令，例如 `python3.11` 或 `python3.12`。重点是 Python 版本要满足要求，不是命令
 名字必须叫 `python3.11`。
+
+### macOS 推荐安装方式
+
+macOS 上可以先安装 Homebrew，然后安装 Python 3.11+ 和 Git：
+
+```bash
+brew install python@3.11 git
+git clone https://github.com/HAIDERZz/IC-opt-workflow.git
+cd IC-opt-workflow
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip setuptools wheel
+python -m pip install -r requirements-product.txt
+python -m pip install -e .
+```
+
+macOS 本机通常没有 Cadence。推荐用后面的远程 SSH 模式，让 Spectre/OCEAN 在
+Linux EDA 服务器上跑。
+
+### Windows 推荐安装方式
+
+Windows 上推荐使用 WSL2 Ubuntu，而不是直接在 PowerShell 里折腾 EDA 流程：
+
+```bash
+# 在 WSL2 Ubuntu 里执行
+sudo apt update
+sudo apt install python3 python3-venv python3-pip git openssh-client
+git clone https://github.com/HAIDERZz/IC-opt-workflow.git
+cd IC-opt-workflow
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip setuptools wheel
+python -m pip install -r requirements-product.txt
+python -m pip install -e .
+```
+
+Windows 用户同样推荐使用远程 SSH 模式：项目和 Cadence 在 Linux 服务器上，本机
+只负责运行优化器和查看报告。
 
 OpenBox 高级代理模型可视化是可选增强。基础优化、Spectre/OCEAN 执行、决策报告、
 insight report、续跑和 doctor 检查都不应该被 `pyrfr` 阻塞。如果你需要 OpenBox 的
@@ -302,7 +349,81 @@ expression: >-
 真实运行必须能访问 Cadence license 和系统进程服务。不要在限制 sandbox 里运行
 真实 Spectre/OCEAN。
 
-## 8. 查看结果
+## 8. 远程 SSH 模式
+
+远程模式适合这种情况：
+
+- 你的 Linux EDA 服务器不能随便安装 Python 包；
+- 你的 Windows/macOS/Linux 本机可以安装这个项目；
+- Cadence、PDK、license、Spectre/OCEAN 都在远程 Linux 服务器上；
+- 优化项目目录也放在远程 Linux 服务器上。
+
+远程项目目录和本地模式完全一样：
+
+```text
+/remote/path/to/Mixer_opt/
+  opt_requirement.md
+  constraints.md          # 可选
+  cadence_env.csh         # 远程服务器上的 Cadence 环境文件
+```
+
+你需要自己配置免密 SSH 登录。推荐在本机 `~/.ssh/config` 写一个 profile：
+
+```sshconfig
+Host eda-lab
+  HostName your.eda.server
+  User your_user_name
+  IdentityFile ~/.ssh/id_ed25519
+```
+
+先确认不会要求输入密码：
+
+```bash
+ssh -o BatchMode=yes eda-lab true
+```
+
+然后运行：
+
+```bash
+ic-opt --ssh-profile eda-lab /remote/path/to/Mixer_opt --doctor
+
+ic-opt --ssh-profile eda-lab /remote/path/to/Mixer_opt \
+  --real \
+  --max-evals 80 \
+  --batch-size 10 \
+  --parallel-jobs 10
+
+ic-opt --ssh-profile eda-lab /remote/path/to/Mixer_opt \
+  --continue 20 \
+  --batch-size 10 \
+  --parallel-jobs 10
+```
+
+如果远程 Cadence 环境文件不叫 `cadence_env.csh`，传入远程路径：
+
+```bash
+ic-opt --ssh-profile eda-lab /remote/path/to/Mixer_opt \
+  --real \
+  --cadence-cshrc /remote/path/to/cadence_env.csh
+```
+
+报告会保留在远程项目目录：
+
+```text
+/remote/path/to/Mixer_opt/reports/
+```
+
+同时也会镜像到本机：
+
+```text
+~/.ic-opt/remote_runs/<ssh-profile>/<project-hash>/reports/
+```
+
+远程模式不会在 EDA 服务器上安装 OpenBox 或本项目，也不会改变 Spectre/OCEAN 的
+核心调用逻辑。它只是用 SSH 把“本地已验收的 Spectre/OCEAN 流程”搬到远程服务器
+执行，并把报告同步回来。
+
+## 9. 查看结果
 
 优先看：
 
@@ -321,7 +442,7 @@ accept_best_observed_or_continue
 意思是当前有一个 best observed feasible 点，但不是全局最优证明。你可以接受，也
 可以继续增加点数。
 
-## 9. 继续追加优化
+## 10. 继续追加优化
 
 ```bash
 ./.venv/bin/ic-opt ~/spectre_opt_prj/Mixer_opt \
@@ -332,7 +453,7 @@ accept_best_observed_or_continue
 才使用项目里的 `config/spectre.yaml`。不要习惯性加 `--parallel-jobs`，除非你
 明确想改变资源；混用不同并行设置会让验收器拒绝这份优化历史。
 
-## 10. 和 Agent 配合使用
+## 11. 和 Agent 配合使用
 
 最终推荐的用户交互是短指令：
 
@@ -359,9 +480,10 @@ Agent 不应该：
 - 在用户没要求时改变并行资源
 - 把失败点当作主推荐点
 
-## 11. 当前 v0.1.3 边界
+## 12. 当前 v0.1.4 边界
 
 - 已经支持 shell 自动化的完整真实流程。
+- 已经支持远程 SSH 执行：本机运行优化器，远程 Linux EDA 服务器运行 Spectre/OCEAN。
 - 已经提供平台无关 `skills/ic-opt/SKILL.md`，任何能运行 shell 命令并读取文件的
   agent 都可以按这份 skill 操作 `ic-opt`。
 - 结果是 best observed，不是全局最优证明。

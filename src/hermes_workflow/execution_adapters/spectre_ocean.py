@@ -533,7 +533,13 @@ def parse_ocean_scalars(path: Path) -> dict[str, OceanScalarRow]:
     return rows
 
 
-def _spectre_argv(context: SpectreOceanContext) -> list[str]:
+def build_spectre_argv(context: SpectreOceanContext) -> list[str]:
+    """Build the canonical spectre command argv.
+
+    The first element is ``"spectre"``; remaining elements are the flags
+    read from *context.request.spectre*.  Callers that need a remote shell
+    string should ``shlex.quote`` each element and join them.
+    """
     preset = str(context.request.spectre["preset"])
     output_format = str(context.request.spectre["output_format"])
     threads_per_run = int(context.request.spectre["threads_per_run"])
@@ -562,7 +568,13 @@ def _spectre_argv(context: SpectreOceanContext) -> list[str]:
     ]
 
 
-def _ocean_argv(context: SpectreOceanContext) -> list[str]:
+def build_ocean_argv(context: SpectreOceanContext) -> list[str]:
+    """Build the canonical ocean command argv.
+
+    The first element is ``"ocean"``; remaining elements are the flags
+    read from *context.request.ocean*.  Callers that need a remote shell
+    string should ``shlex.quote`` each element and join them.
+    """
     return [
         "ocean",
         "-nograph",
@@ -571,6 +583,14 @@ def _ocean_argv(context: SpectreOceanContext) -> list[str]:
         "-log",
         context.request.ocean.log_file,
     ]
+
+
+def _spectre_argv(context: SpectreOceanContext) -> list[str]:
+    return build_spectre_argv(context)
+
+
+def _ocean_argv(context: SpectreOceanContext) -> list[str]:
+    return build_ocean_argv(context)
 
 
 def _write_result_manifest(
@@ -759,6 +779,50 @@ def _write_metric_result_manifest(
         path=result_path,
         status=manifest_status,
         issues=issues,
+    )
+
+
+def write_spectre_result_manifest(
+    context: SpectreOceanContext,
+    *,
+    status: str,
+    started_at_utc: str,
+    completed_at_utc: str,
+    include_metric_manifest: bool,
+    notes: str,
+) -> Path:
+    """Public wrapper around ``_write_result_manifest``.
+
+    The remote adapter calls this instead of hand-writing the result
+    manifest payload, ensuring the schema stays in sync with the local
+    adapter.
+    """
+    return _write_result_manifest(
+        context,
+        status=status,
+        started_at_utc=started_at_utc,
+        completed_at_utc=completed_at_utc,
+        include_metric_manifest=include_metric_manifest,
+        notes=notes,
+    )
+
+
+def write_metric_result_manifest(
+    context: SpectreOceanContext,
+    *,
+    ocean_return_code: int,
+    ocean_return_codes: Sequence[int] | None = None,
+) -> MetricManifestWriteResult:
+    """Public wrapper around ``_write_metric_result_manifest``.
+
+    The remote adapter calls this instead of hand-writing the metric
+    result manifest payload, ensuring the schema stays in sync with the
+    local adapter.
+    """
+    return _write_metric_result_manifest(
+        context,
+        ocean_return_code=ocean_return_code,
+        ocean_return_codes=ocean_return_codes,
     )
 
 

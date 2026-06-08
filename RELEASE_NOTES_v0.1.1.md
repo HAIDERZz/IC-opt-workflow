@@ -12,7 +12,7 @@ The intended user flow is:
 ```bash
 git clone git@github.com:HAIDERZz/IC-opt-workflow.git
 cd IC-opt-workflow
-python3.11 -m venv .venv
+python3 -m venv .venv
 ./.venv/bin/python -m pip install -r requirements-product.txt
 ./.venv/bin/python -m pip install -e .
 

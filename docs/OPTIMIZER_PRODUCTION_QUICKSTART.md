@@ -55,6 +55,16 @@ Agent invocation after giving the agent the canonical skill:
 /ic-opt ~/spectre_opt_prj/<project_name> --real
 ```
 
+Remote EDA server invocation:
+
+```bash
+ic-opt --ssh-profile eda-lab /remote/path/to/<project_name> --real
+```
+
+In remote mode, the project directory and Cadence setup file remain on the
+Linux EDA server. The product Python environment runs locally and connects
+through passwordless OpenSSH.
+
 The current agent should operate the deterministic `ic-opt` CLI, wait for
 completion, read reports, and explain the result. Native subagent execution is
 optional advanced behavior only when explicitly requested. `hermes-workflow
@@ -84,6 +94,21 @@ cshrc in this order:
 
 Do not expect `ic-opt` to infer `.bashrc`/`.zshrc` content, and do not hardcode
 a Spectre version.
+
+For remote mode, configure an OpenSSH profile first:
+
+```sshconfig
+Host eda-lab
+  HostName your.eda.server
+  User your_user_name
+  IdentityFile ~/.ssh/id_ed25519
+```
+
+Then verify:
+
+```bash
+ssh -o BatchMode=yes eda-lab true
+```
 
 ## 1. Create A User Project
 
@@ -147,6 +172,12 @@ Product-level doctor check:
 ./.venv/bin/ic-opt ~/spectre_opt_prj/<project_name> --doctor
 ```
 
+Remote doctor check:
+
+```bash
+./.venv/bin/ic-opt --ssh-profile eda-lab /remote/path/to/<project_name> --doctor
+```
+
 Doctor parses the requirement, checks the Cadence cshrc path, checks the
 OpenBox/Hermes Python environment, prepares config/netlist bundles, and writes
 `reports/ic_opt_doctor_report.json`. It does not launch Spectre/OCEAN.
@@ -157,6 +188,16 @@ Preferred one-command route:
 
 ```bash
 ./.venv/bin/ic-opt ~/spectre_opt_prj/<project_name> \
+  --real \
+  --max-evals 100 \
+  --batch-size 10 \
+  --parallel-jobs 10
+```
+
+Remote route:
+
+```bash
+./.venv/bin/ic-opt --ssh-profile eda-lab /remote/path/to/<project_name> \
   --real \
   --max-evals 100 \
   --batch-size 10 \
