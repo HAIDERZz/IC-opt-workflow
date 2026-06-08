@@ -57,7 +57,7 @@ def test_prepare_remote_project_cache_writes_local_controller_project(tmp_path: 
     assert runner.downloads == [
         ("/remote/maestro/point_1/netlist", result.cache_dir / "netlists" / "exported")
     ]
-    assert any("readlink -f /remote/maestro/point_1" in cmd for cmd in runner.commands_run)
+    assert any("readlink -f" in cmd and "netlist" in cmd for cmd in runner.commands_run)
 
 
 def test_prepare_remote_project_cache_quotes_paths_with_spaces(tmp_path: Path) -> None:
@@ -85,7 +85,7 @@ def test_prepare_remote_project_cache_quotes_paths_with_spaces(tmp_path: Path) -
 
     assert result.status == "pass"
     assert any(expected_quoted in cmd for cmd in runner.commands_run)
-    assert any("readlink -f '/remote/maestro/my point 1'" in cmd for cmd in runner.commands_run)
+    assert any(shlex.quote("/remote/maestro/my point 1/netlist") in cmd for cmd in runner.commands_run)
 
 
 def test_prepare_remote_project_cache_validates_symlinks_before_download(tmp_path: Path) -> None:
@@ -103,7 +103,7 @@ def test_prepare_remote_project_cache_validates_symlinks_before_download(tmp_pat
 
     assert result.status == "pass"
     assert all(v is True for v in dereference_values)
-    assert any("readlink -f /remote/maestro/point_1" in cmd for cmd in runner.commands_run)
+    assert any("readlink -f" in cmd and "netlist" in cmd for cmd in runner.commands_run)
 
 
 def test_prepare_remote_project_cache_real_maestro_symlink_shape(tmp_path: Path) -> None:
@@ -122,17 +122,61 @@ def test_prepare_remote_project_cache_real_maestro_symlink_shape(tmp_path: Path)
 
     assert result.status == "pass"
     assert all(v is True for v in dereference_values)
-    assert any("readlink -f /remote/maestro/point_1" in cmd for cmd in runner.commands_run)
+    # Validation must search the netlist path, not the allowed_root path
+    assert any(shlex.quote("/remote/maestro/point_1/netlist") in cmd for cmd in runner.commands_run)
+
+
+def test_prepare_remote_project_cache_validation_searches_netlist_not_allowed_root(tmp_path: Path) -> None:
+    """Validation must find symlinks under remote_netlist, not under allowed_root."""
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    runner = FakeRunner()
+
+    result = prepare_remote_project_cache(ref, runner=runner, cache_root=tmp_path)
+
+    assert result.status == "pass"
+    netlist_quoted = shlex.quote("/remote/maestro/point_1/netlist")
+    # The find command must target the netlist path
+    assert any(netlist_quoted in cmd and "find" in cmd for cmd in runner.commands_run)
+    # The readlink -f must resolve the netlist path
+    assert any(f"readlink -f {netlist_quoted}" in cmd for cmd in runner.commands_run)
+
+
+def test_prepare_remote_project_cache_boundary_rejects_prefix_trick(tmp_path: Path) -> None:
+    """Root /remote/history must reject target /remote/history_evil/file."""
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+
+    class PrefixTrickRunner(FakeRunner):
+        def run(self, command: str, **kwargs):
+            self.commands_run.append(command)
+            if "test -f" in command:
+                return RemoteCommandResult(0, "", "", ["ssh", "lab", command])
+            if command.startswith("root=$(readlink"):
+                # Simulate: a symlink under netlist resolves to /remote/history_evil/file
+                # The script should exit 1 because /remote/history_evil/file does not match
+                # root="/remote/history" or root/*="/remote/history/*"
+                return RemoteCommandResult(
+                    1,
+                    "",
+                    "/remote/maestro/point_1/netlist/evil.log\n",
+                    ["ssh", "lab", command],
+                )
+            return RemoteCommandResult(0, "", "", ["ssh", "lab", command])
+
+    runner = PrefixTrickRunner()
+    result = prepare_remote_project_cache(ref, runner=runner, cache_root=tmp_path)
+
+    assert result.status == "fail"
+    assert any("symlink" in issue.lower() for issue in result.issues)
+    assert len(runner.downloads) == 0
 
 
 def test_prepare_remote_project_cache_rejects_escaping_symlink(tmp_path: Path) -> None:
     """Symlinks whose target escapes the allowed history root must be rejected before download_tree."""
     ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
-    validation_commands: list[str] = []
 
     class EscapingSymlinkRunner(FakeRunner):
         def run(self, command: str, **kwargs):
-            validation_commands.append(command)
+            self.commands_run.append(command)
             if command.startswith("root=$(readlink"):
                 return RemoteCommandResult(
                     1, "", "/remote/maestro/point_1/netlist/escape.log\n", ["ssh", "lab", command],
@@ -150,11 +194,10 @@ def test_prepare_remote_project_cache_rejects_escaping_symlink(tmp_path: Path) -
 def test_prepare_remote_project_cache_rejects_nonregular_symlink_target(tmp_path: Path) -> None:
     """Symlinks whose target is not a regular file must be rejected before download_tree."""
     ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
-    validation_commands: list[str] = []
 
     class NonRegularSymlinkRunner(FakeRunner):
         def run(self, command: str, **kwargs):
-            validation_commands.append(command)
+            self.commands_run.append(command)
             if command.startswith("root=$(readlink"):
                 return RemoteCommandResult(
                     1, "", "/remote/maestro/point_1/netlist/bad.log\n", ["ssh", "lab", command],

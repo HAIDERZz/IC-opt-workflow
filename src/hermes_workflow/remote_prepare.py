@@ -70,17 +70,24 @@ def _validate_remote_netlist_symlinks(
     allowed_root: PurePosixPath,
     runner: Any,
 ) -> None:
+    escaped_netlist = shlex.quote(str(remote_netlist))
     escaped_root = shlex.quote(str(allowed_root))
     script = (
         f"root=$(readlink -f {escaped_root})\n"
-        f"bad=$(find {escaped_root} -type l -exec sh -c '\n"
+        f"net=$(readlink -f {escaped_netlist})\n"
+        f"bad=$(find \"$net\" -type l -exec sh -c '\n"
+        f"  root=\"$1\"; shift\n"
         f"  for f; do\n"
         f"    r=$(readlink -f \"$f\") || {{ printf \"%s\\n\" \"$f\"; continue; }}\n"
-        f"    case $r in $root) ;; *) printf \"%s\\n\" \"$f\";; esac\n"
+        f"    if [ ! -f \"$r\" ]; then printf \"%s\\n\" \"$f\"; continue; fi\n"
+        f"    case \"$r\" in\n"
+        f"      \"$root\") ;;\n"
+        f"      \"$root\"/*) ;;\n"
+        f"      *) printf \"%s\\n\" \"$f\";;\n"
+        f"    esac\n"
         f"  done\n"
-        f"' _ {{}} +)\n"
+        f"' _ \"$root\" {{}} +)\n"
         f"if [ -n \"$bad\" ]; then printf '%s\\n' \"$bad\"; exit 1; fi\n"
-        f"find {escaped_root} -type l ! -exec test -f {{}} \\; -print"
     )
     result = runner.run(script, check=True)
     if result.return_code != 0:
