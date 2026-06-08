@@ -54,7 +54,7 @@
     "alignment": "Aligned with the top-level product-landing goal: C-69 Task 1 added only the local OpenSSH wrapper primitives needed before remote doctor/cache work.",
     "drift": "Task 1 stayed no-network and did not run real SSH/Spectre/OCEAN. One spec gap was found during Codex review (missing tree transfer helpers), then Claude fixed it; one quality gap was found (tree copy tar semantics and exclude order), then Claude fixed it."
   },
-  "latest_valid_commit": "bd510ab",
+  "latest_valid_commit": "ce422a0",
   "review_evidence": {
     "spec_review": "C-69 Task 1 was reviewed against docs/superpowers/specs/2026-06-08-remote-ssh-execution-backend-design.md and docs/superpowers/plans/2026-06-08-remote-ssh-execution-backend.md. Accepted scope: no-network RemoteSshRunner primitives only; no real SSH/Cadence/Spectre/OCEAN execution.",
     "code_quality_review": "Codex review found and Claude fixed missing tree helpers, incorrect tar tree nesting semantics, stderr propagation gaps, and tar --exclude ordering. Final targeted tests, ruff, cadence check, and whitespace check passed before docs acceptance.",
