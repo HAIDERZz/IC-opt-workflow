@@ -5,17 +5,15 @@ Python 工程。
 
 ## Hermes 这个名字是什么意思
 
-本项目里的 Hermes 不再表示某个必须存在的主控 agent。
-
 Hermes 在这里指“信使层”：它把用户写在 `opt_requirement.md` 里的 IC 优化需求，
-转换成可执行、可检查、可复现的 YAML 配置、仿真任务、验收报告和图表。
+转换成可执行、可检查、可复现的 workflow contracts，包括 YAML 配置、仿真任务、
+验收报告和图表。
 
 因此：
 
 - 用户入口是 `ic-opt` 命令。
 - agent 入口也是 `ic-opt` 命令加 `skills/ic-opt/SKILL.md`。
 - `hermes_workflow` 是内部 Python 包，负责解析、校验、生成合同、调用工具和写报告。
-- 不需要 Hermes agent，也不要求两个 agent 协作。
 
 ## 1. 这个项目是做什么的
 

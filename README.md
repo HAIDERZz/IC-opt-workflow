@@ -9,10 +9,9 @@ Maestro/ADE exported netlists, runs OpenBox optimization, launches Spectre,
 extracts metrics with OCEAN, and writes reports that are easy for a human or an
 AI agent to read.
 
-In this project, **Hermes** means the contract messenger layer. The name comes
-from Hermes as a messenger: it carries a human IC optimization request from
-`opt_requirement.md` into executable, auditable workflow contracts. It is not a
-required controlling agent. The user-facing command is `ic-opt`; the internal
+In this project, **Hermes** means the contract messenger layer: it carries an IC
+optimization request from `opt_requirement.md` into executable, auditable
+workflow contracts. The user-facing command is `ic-opt`; the internal
 `hermes_workflow` package performs parsing, validation, contract generation,
 tool orchestration, and report writing.
 

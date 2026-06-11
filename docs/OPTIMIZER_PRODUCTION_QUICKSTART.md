@@ -31,8 +31,7 @@ chat. Put the request in `opt_requirement.md`, optionally put human guidance in
 
 Here, Hermes means the requirement-to-execution messenger layer: it translates
 the user's Markdown requirement into executable YAML/config contracts and
-auditable reports. It does not mean the workflow requires a Hermes agent. Humans
-and agents both use the same `ic-opt` CLI.
+auditable reports. Humans and agents both use the same `ic-opt` CLI.
 
 For common errors and fixes, especially requirement-file mistakes, OCEAN
 non-scalar metrics, Maestro point-root paths, and remote SSH failures, read
