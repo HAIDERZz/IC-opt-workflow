@@ -2,4 +2,7 @@
 
 This project is driven by the structured files under `config/`.
 
-Hermes owns the config files and approval gate. The operator agent or approved execution worker owns netlist export, variable templating, project-local metric code, dry run, and real optimization only after Hermes approval.
+Hermes is the contract messenger layer. It translates `opt_requirement.md` into
+checked config files, execution packages, and reports. The product entrypoint is
+`ic-opt`; users and agents should operate the project through `ic-opt` unless
+they are intentionally debugging lower-level workflow commands.

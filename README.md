@@ -1,4 +1,4 @@
-# IC Auto Opt Workflow v0.1.5
+# IC Auto Opt Workflow v0.1.6
 
 IC Auto Opt Workflow helps analog/RF IC designers run repeatable Spectre/OCEAN
 optimization from a project folder.
@@ -8,6 +8,13 @@ settings in `opt_requirement.md`. The tool then prepares YAML configs, imports
 Maestro/ADE exported netlists, runs OpenBox optimization, launches Spectre,
 extracts metrics with OCEAN, and writes reports that are easy for a human or an
 AI agent to read.
+
+In this project, **Hermes** means the contract messenger layer. The name comes
+from Hermes as a messenger: it carries a human IC optimization request from
+`opt_requirement.md` into executable, auditable workflow contracts. It is not a
+required controlling agent. The user-facing command is `ic-opt`; the internal
+`hermes_workflow` package performs parsing, validation, contract generation,
+tool orchestration, and report writing.
 
 The main command is:
 
@@ -247,6 +254,9 @@ Before launching real simulations, run:
 The doctor check verifies the requirement file, Cadence setup path, Python
 toolchain, generated configs, imported netlist bundles, and continuation
 artifacts. It does not launch Spectre/OCEAN.
+In v0.1.6 and later, local `--doctor` is wired directly to the product doctor
+route instead of falling through to the optimizer path, so it can be used safely
+as the first project check even before `--real`.
 
 If your Cadence setup file is somewhere else:
 
@@ -514,7 +524,7 @@ pyproject.toml              package metadata and console scripts
 
 ## Version
 
-Current release: `v0.1.5`.
+Current release: `v0.1.6`.
 
 This release has been clean-installed from GitHub and validated on real
 multi-testbench Mixer optimization flows, including local continuation and

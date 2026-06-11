@@ -194,6 +194,68 @@ def test_ic_opt_reports_missing_cadence_env(monkeypatch, tmp_path: Path) -> None
     assert "--cadence-cshrc" in result.output
 
 
+def test_ic_opt_local_doctor_invokes_product_doctor_without_optimizer(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    cadence_cshrc = project_dir / "cadence_env.csh"
+    cadence_cshrc.write_text("# test\n", encoding="utf-8")
+    report_path = project_dir / "reports" / "ic_opt_doctor_report.json"
+    calls: list[dict[str, object]] = []
+
+    def fake_run_product_doctor(project: Path, **kwargs: object) -> SimpleNamespace:
+        calls.append({"project": project, **kwargs})
+        report_path.parent.mkdir(parents=True)
+        report_path.write_text("{}\n", encoding="utf-8")
+        return SimpleNamespace(
+            status="pass",
+            report_path=report_path,
+            issues=[],
+            warnings=["no optimizer history yet"],
+        )
+
+    def fail_optimize_project(_project: Path, **_kwargs: object) -> None:
+        raise AssertionError("local doctor must not run optimizer flow")
+
+    monkeypatch.setattr(product_cli, "run_product_doctor", fake_run_product_doctor)
+    monkeypatch.setattr(product_cli, "optimize_project", fail_optimize_project)
+
+    result = runner.invoke(product_cli.app, [str(project_dir), "--doctor"])
+
+    assert result.exit_code == 0, result.output
+    assert calls == [{"project": project_dir, "cadence_cshrc": cadence_cshrc}]
+    assert "local doctor completed" in result.output
+    assert "report: reports/ic_opt_doctor_report.json" in result.output
+    assert "warning: no optimizer history yet" in result.output
+
+def test_ic_opt_local_doctor_reports_failure(monkeypatch, tmp_path: Path) -> None:
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    report_path = project_dir / "reports" / "ic_opt_doctor_report.json"
+
+    def fake_run_product_doctor(project: Path, **kwargs: object) -> SimpleNamespace:
+        assert project == project_dir
+        assert kwargs["cadence_cshrc"] is None
+        report_path.parent.mkdir(parents=True)
+        report_path.write_text("{}\n", encoding="utf-8")
+        return SimpleNamespace(
+            status="fail",
+            report_path=report_path,
+            issues=["cadence_cshrc: cadence_env.csh was not found"],
+            warnings=[],
+        )
+
+    monkeypatch.setattr(product_cli, "run_product_doctor", fake_run_product_doctor)
+
+    result = runner.invoke(product_cli.app, [str(project_dir), "--doctor"])
+
+    assert result.exit_code == 1
+    assert "local doctor failed" in result.output
+    assert "cadence_cshrc: cadence_env.csh was not found" in result.output
+    assert "report: reports/ic_opt_doctor_report.json" in result.output
+
 def test_ic_opt_reports_optimizer_flow_failure(monkeypatch, tmp_path: Path) -> None:
     project_dir = tmp_path / "project"
     project_dir.mkdir()
@@ -217,3 +279,57 @@ def test_ic_opt_reports_optimizer_flow_failure(monkeypatch, tmp_path: Path) -> N
 
     assert result.exit_code == 1
     assert "check-requirement failed: missing opt_requirement.md" in result.output
+
+
+def test_ic_opt_prints_structured_diagnostics_for_optimizer_failure(
+    monkeypatch, tmp_path: Path
+) -> None:
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    cadence_cshrc = tmp_path / "cadence_env.csh"
+    cadence_cshrc.write_text("# test\n", encoding="utf-8")
+
+    def fake_optimize_project(_project: Path, **_kwargs: object) -> object:
+        report_path = project_dir / "reports" / "optimizer_flow_run_report.json"
+        report_path.parent.mkdir(parents=True)
+        report_path.write_text("{}\n", encoding="utf-8")
+        return SimpleNamespace(
+            status="fail",
+            report_path=report_path,
+            stopped_before=None,
+            recommended_run_id=None,
+            user_decision_required=False,
+            issues=["objective expression references unknown metric P1DB; did you mean P1dB?"],
+            structured_issues=[
+                {
+                    "code": "OBJECTIVE_UNKNOWN_METRIC",
+                    "severity": "error",
+                    "stage": "requirement",
+                    "component": "requirement_intake",
+                    "message": "Objective expression references unknown metric P1DB.",
+                    "detail": "Objective references a metric not declared in the Metrics section.",
+                    "likely_cause": "Objective expression references unknown metric P1DB.",
+                    "recommended_action": "Change P1DB to P1dB.",
+                    "evidence": ["opt_requirement.md:Objective.expression"],
+                }
+            ],
+        )
+
+    monkeypatch.setattr(product_cli, "optimize_project", fake_optimize_project)
+
+    result = runner.invoke(
+        product_cli.app,
+        [
+            str(project_dir),
+            "--real",
+            "--cadence-cshrc",
+            str(cadence_cshrc),
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "optimizer flow failed" in result.output
+    assert "[ERROR] OBJECTIVE_UNKNOWN_METRIC" in result.output
+    assert "Stage: requirement" in result.output
+    assert "Action: Change P1DB to P1dB." in result.output
+    assert "Evidence: opt_requirement.md:Objective.expression" in result.output

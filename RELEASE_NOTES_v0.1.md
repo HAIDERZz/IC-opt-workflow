@@ -1,5 +1,42 @@
 # Release Notes v0.1.x
 
+## v0.1.6
+
+Date: 2026-06-12
+
+### Summary
+
+v0.1.6 hardens product readiness checks and agent-facing diagnostics. Local
+`ic-opt PROJECT --doctor` now uses the product doctor path directly, and
+unsupported objective functions no longer produce duplicate unknown-metric
+diagnostics.
+
+### Changes
+
+- Fixed local product CLI doctor routing:
+  - `ic-opt PROJECT --doctor` now runs the product doctor directly.
+  - Local doctor no longer falls through to optimizer execution or emits
+    `optimize requires --real`.
+  - Doctor remains a no-Spectre/no-OCEAN readiness check.
+- Fixed objective semantic diagnostics:
+  - unsupported function calls such as `eval(1)` now report
+    `OBJECTIVE_UNSUPPORTED_FUNCTION` only;
+  - unsupported function names are no longer also reported as unknown metrics.
+- Updated README, Chinese user guide, production quickstart, troubleshooting,
+  agent usage docs, and the platform-neutral `ic-opt` skill to clarify:
+  - local doctor is standalone;
+  - agents should prefer `structured_issues` over plain `issues`;
+  - agents should not treat doctor failures as optimizer failures.
+
+### Verification
+
+- `tests/test_requirement_intake.py tests/test_product_cli.py`: 51 passed.
+- Full test suite: 745 passed, 14 warnings.
+- Ruff checks passed.
+- `git diff --check` passed.
+- Local CLI smoke confirmed `ic-opt PROJECT --doctor` no longer enters the
+  optimizer path.
+
 ## v0.1.5
 
 Date: 2026-06-12

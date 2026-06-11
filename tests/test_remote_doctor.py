@@ -71,6 +71,52 @@ def test_remote_doctor_writes_remote_and_local_reports(tmp_path: Path) -> None:
     payload = json.loads(report.local_report_path.read_text(encoding="utf-8"))
     assert payload["checks"]["ssh"]["status"] == "pass"
     assert payload["checks"]["spectre_ocean"]["status"] == "pass"
+    assert payload["checks"]["parallel_jobs"]["status"] == "warn"
+    assert (
+        "remote parallel_jobs=10 is high; normal remote "
+        "multi-testbench runs should start around 4-8 to avoid SSH server limits"
+        in payload["checks"]["parallel_jobs"]["message"]
+    )
+    assert any(
+        issue["code"] == "REMOTE_PARALLELISM_HIGH"
+        for issue in payload["structured_issues"]
+    )
+    parallel_warning = next(
+        issue
+        for issue in payload["structured_issues"]
+        if issue["code"] == "REMOTE_PARALLELISM_HIGH"
+    )
+    assert parallel_warning["severity"] == "warn"
+    assert parallel_warning["stage"] == "remote_ssh"
+    assert parallel_warning["component"] == "remote_doctor"
+    assert any(
+        issue.code == "REMOTE_PARALLELISM_HIGH"
+        for issue in report.structured_issues
+    )
+
+
+def test_remote_doctor_reports_objective_metric_mismatch(tmp_path: Path) -> None:
+    class BadRequirementRunner(FakeRunner):
+        def read_text(self, remote_path: PurePosixPath | str) -> str:  # type: ignore[override]
+            if str(remote_path) == "/remote/project/opt_requirement.md":
+                return VALID_REQUIREMENT.replace(
+                    'expression: "(rise + fall) * DC"',
+                    'expression: "(rise + NF_3G)"',
+                )
+            return super().read_text(remote_path)
+
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+
+    report = run_remote_doctor(ref, runner=BadRequirementRunner(), cache_root=tmp_path)
+
+    assert report.status == "fail"
+    assert any(
+        "objective expression references unknown metric NF_3G" in issue
+        for issue in report.issues
+    )
+    assert any(
+        issue.code == "OBJECTIVE_UNKNOWN_METRIC" for issue in report.structured_issues
+    )
 
 
 def test_remote_doctor_fails_before_optimizer_when_ssh_is_not_ready(

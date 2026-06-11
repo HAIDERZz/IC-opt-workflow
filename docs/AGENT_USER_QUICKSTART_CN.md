@@ -61,6 +61,9 @@ ic-opt --ssh-profile PROFILE REMOTE_PROJECT --real
 
 对新的或修改过的项目，agent 应先执行 `--doctor`。doctor 不通过时，agent 应停止并
 指出具体文件、字段或路径问题，而不是继续跑真实 Spectre/OCEAN。
+本地 doctor 是独立检查命令，不需要也不应该加 `--real`。如果 doctor 或 optimizer
+JSON 报告里有 `structured_issues`，agent 应优先读取其中的 `code`、
+`likely_cause`、`recommended_action` 和 `evidence`，再回退到普通 `issues`。
 
 如果项目在远程 Linux EDA 服务器上，用户只需要提供 SSH profile 和远程项目路径。
 agent 不应该把项目复制成本地流程，也不应该在远程服务器上安装 Python 包。

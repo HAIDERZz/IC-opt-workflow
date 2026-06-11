@@ -72,11 +72,17 @@ Treat doctor as the structured requirement and project-folder check. It catches
 common `opt_requirement.md` mistakes, missing Maestro/ADE point roots, missing
 `cadence_env.csh`, broken SSH readiness, and generated-config errors before
 real Spectre/OCEAN work starts.
+For local projects, `ic-opt PROJECT --doctor` is a standalone product doctor
+route. Do not add `--real`, and do not interpret a local doctor failure as an
+optimizer-run failure.
 
 If doctor fails:
 
 - stop before `--real`;
 - report the failing item and the exact file/path involved;
+- if the JSON report has `structured_issues`, report `code`, `stage`,
+  `likely_cause`, `recommended_action`, and `evidence` before falling back to
+  plain `issues`;
 - tell the user what to fix in `opt_requirement.md`, `constraints.md`,
   `cadence_env.csh`, SSH, or Maestro/ADE point roots;
 - do not silently rewrite OCEAN formulas, variable ranges, FoM, or resource
@@ -163,7 +169,7 @@ constraints, objective, metric formulas, or Maestro point roots.
 
 If the user explicitly requests native subagent execution:
 
-1. Run the supervisor gate:
+1. Run the dry orchestration gate:
 
    ```bash
    ic-opt PROJECT --real [user flags] --dry-orchestration
@@ -239,6 +245,15 @@ continue by inventing candidates or editing formulas.
 ## Common Error Triage
 
 Use `docs/TROUBLESHOOTING_CN.md` for the full table. The short rules are:
+
+- When consuming a report, prefer `structured_issues` when present; use `issues`
+  only as fallback for older or non-updated reports. For each report item, report
+  the diagnostic `code`, `stage`, `likely_cause`, `recommended_action`, and
+  `evidence` if present.
+- If a doctor report has structured error severity (`severity: error`), do not
+  run `--real` until the reported file/path is fixed.
+- Warning diagnostics may be shown for planning (such as high `parallel_jobs`),
+  but they do not require immediate stop unless the user has resource limits.
 
 - `opt_requirement.md` parse/validation failure: run `--doctor`, point the user
   to the exact section/key, and stop before real tools.

@@ -6,11 +6,15 @@ from typing import Annotated, NoReturn
 
 import typer
 
+from hermes_workflow.diagnostics import parse_diagnostics, format_diagnostics_for_cli
 from hermes_workflow.optimizer_flow import optimize_project
+from hermes_workflow.product_doctor import run_product_doctor
 from hermes_workflow.remote_doctor import run_remote_doctor
-from hermes_workflow.remote_optimizer_flow import continue_remote_project, optimize_remote_project
+from hermes_workflow.remote_optimizer_flow import (
+    continue_remote_project,
+    optimize_remote_project,
+)
 from hermes_workflow.remote_project import RemoteProjectRef
-
 
 CADENCE_CSHRC_ENV_VAR = "IC_OPT_CADENCE_CSHRC"
 PROJECT_CADENCE_CSHRC = Path("cadence_env.csh")
@@ -24,8 +28,50 @@ app = typer.Typer(
 
 
 def _exit_with_error(exc: Exception) -> NoReturn:
-    typer.echo(str(exc))
+    message = str(exc)
+    if "Cadence cshrc was not found" in message:
+        structured = [
+            {
+                "code": "CADENCE_CSHRC_MISSING",
+                "severity": "error",
+                "stage": "requirement",
+                "component": "product_cli",
+                "message": "Cadence cshrc was not found.",
+                "detail": message,
+                "likely_cause": (
+                    "No usable Cadence environment file was found from project file "
+                    "or known locations."
+                ),
+                "recommended_action": (
+                    "Provide --cadence-cshrc PATH, set IC_OPT_CADENCE_CSHRC, or "
+                    "create ~/.ic-opt/cadence_env.csh."
+                ),
+            }
+        ]
+        for line in format_diagnostics_for_cli(parse_diagnostics(structured)):
+            typer.echo(line)
+        typer.echo(message)
+        raise typer.Exit(code=1)
+    if "remote mode requires --doctor, --real, or --continue" in message:
+        typer.echo(message)
+        typer.echo("Use --doctor, --real, or --continue to pick a valid workflow mode.")
+        raise typer.Exit(code=1)
+    typer.echo(message)
     raise typer.Exit(code=1)
+
+
+def _print_report_issues(report: object) -> None:
+    structured_issues = parse_diagnostics(getattr(report, "structured_issues", []))
+    if structured_issues:
+        for line in format_diagnostics_for_cli(structured_issues):
+            typer.echo(line)
+        return
+
+    issues = getattr(report, "issues", None)
+    if not isinstance(issues, list):
+        return
+    for issue in issues:
+        typer.echo(str(issue))
 
 
 def _resolve_cadence_cshrc(project_dir: Path, explicit: Path | None) -> Path:
@@ -43,7 +89,9 @@ def _resolve_cadence_cshrc(project_dir: Path, explicit: Path | None) -> Path:
         if resolved.is_file():
             return resolved
         if explicit is not None and source == "--cadence-cshrc":
-            raise ValueError(f"--cadence-cshrc does not exist or is not a file: {resolved}")
+            raise ValueError(
+                f"--cadence-cshrc does not exist or is not a file: {resolved}"
+            )
 
     raise ValueError(
         "Cadence cshrc was not found. Provide --cadence-cshrc PATH, create "
@@ -51,6 +99,22 @@ def _resolve_cadence_cshrc(project_dir: Path, explicit: Path | None) -> Path:
         "~/.ic-opt/cadence_env.csh."
     )
 
+
+def _resolve_cadence_cshrc_for_doctor(project_dir: Path, explicit: Path | None) -> Path | None:
+    if explicit is not None:
+        return explicit.expanduser()
+    try:
+        return _resolve_cadence_cshrc(project_dir, explicit)
+    except ValueError:
+        return None
+
+def _echo_report_path(project_dir: Path, report_path: Path | None) -> None:
+    if report_path is None:
+        return
+    try:
+        typer.echo(f"report: {report_path.relative_to(project_dir)}")
+    except ValueError:
+        typer.echo(f"report: {report_path}")
 
 @app.command()
 def main(
@@ -127,14 +191,18 @@ def main(
                 typer.echo("remote doctor completed")
                 typer.echo(f"remote report: {report.remote_report_path}")
                 typer.echo(f"local report: {report.local_report_path}")
+                _print_report_issues(report)
                 return
             typer.echo("remote doctor failed")
-            for issue in report.issues:
-                typer.echo(issue)
+            _print_report_issues(report)
             typer.echo(f"local report: {report.local_report_path}")
             raise typer.Exit(code=1)
         if real:
-            remote_cshrc = PurePosixPath(str(cadence_cshrc)) if cadence_cshrc is not None else ref.remote_project_dir / "cadence_env.csh"
+            remote_cshrc = (
+                PurePosixPath(str(cadence_cshrc))
+                if cadence_cshrc is not None
+                else ref.remote_project_dir / "cadence_env.csh"
+            )
             try:
                 report = optimize_remote_project(
                     ref,
@@ -151,11 +219,18 @@ def main(
                 if report.recommended_run_id is not None:
                     typer.echo(f"recommended: {report.recommended_run_id}")
                 typer.echo(f"local report: {report.report_path}")
-                typer.echo(f"remote report: {ref.remote_project_dir / 'reports' / 'optimizer_decision_report.md'}")
+                typer.echo(
+                    f"remote report: {ref.remote_project_dir / 'reports' / 'optimizer_decision_report.md'}"
+                )
                 return
+            _print_report_issues(report)
             raise typer.Exit(code=1)
         if continue_evals is not None:
-            remote_cshrc = PurePosixPath(str(cadence_cshrc)) if cadence_cshrc is not None else ref.remote_project_dir / "cadence_env.csh"
+            remote_cshrc = (
+                PurePosixPath(str(cadence_cshrc))
+                if cadence_cshrc is not None
+                else ref.remote_project_dir / "cadence_env.csh"
+            )
             try:
                 report = continue_remote_project(
                     ref,
@@ -172,8 +247,27 @@ def main(
                     typer.echo(f"recommended: {report.recommended_run_id}")
                 typer.echo(f"local report: {report.report_path}")
                 return
+            _print_report_issues(report)
             raise typer.Exit(code=1)
-        _exit_with_error(ValueError("remote mode requires --doctor, --real, or --continue N"))
+        _exit_with_error(
+            ValueError("remote mode requires --doctor, --real, or --continue N")
+        )
+
+    if doctor:
+        report = run_product_doctor(
+            project_dir,
+            cadence_cshrc=_resolve_cadence_cshrc_for_doctor(project_dir, cadence_cshrc),
+        )
+        if report.status == "pass":
+            typer.echo("local doctor completed")
+            _echo_report_path(project_dir, report.report_path)
+            for warning in getattr(report, "warnings", []):
+                typer.echo(f"warning: {warning}")
+            return
+        typer.echo("local doctor failed")
+        _print_report_issues(report)
+        _echo_report_path(project_dir, report.report_path)
+        raise typer.Exit(code=1)
 
     try:
         resolved_cadence_cshrc = _resolve_cadence_cshrc(project_dir, cadence_cshrc)
@@ -202,7 +296,6 @@ def main(
         return
 
     typer.echo("optimizer flow failed")
-    for issue in report.issues:
-        typer.echo(issue)
+    _print_report_issues(report)
     typer.echo("report: reports/optimizer_flow_run_report.json")
     raise typer.Exit(code=1)

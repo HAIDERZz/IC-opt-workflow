@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import shutil
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -20,6 +21,8 @@ from hermes_workflow.schemas import (
     TestbenchesConfig,
     VariablesConfig,
 )
+from hermes_workflow.requirement_semantics import validate_requirement_semantics
+from hermes_workflow.diagnostics import Diagnostic, DiagnosticSeverity
 
 REQUIRED_SECTIONS = [
     "Project",
@@ -84,6 +87,7 @@ _UniqueKeyLoader.add_constructor(
 class RequirementIntakeReport:
     status: str
     issues: list[str]
+    structured_issues: list[Diagnostic]
     sections: dict[str, Any]
     constraints_md_present: bool
     constraints_md_sha256: str | None
@@ -367,23 +371,38 @@ def parse_requirement_text(
     SSH).
     """
     issues: list[str] = []
+    structured_issues: list[Diagnostic] = []
     sections: dict[str, Any] = {}
 
     constraints_sha = hashlib.sha256(constraints_text.encode("utf-8")).hexdigest() if constraints_text is not None else None
 
-    raw_sections, section_issues = _extract_required_sections(requirement_text)
+    raw_sections, section_issues, section_diagnostics = _extract_required_sections(
+        requirement_text
+    )
     issues.extend(section_issues)
+    structured_issues.extend(section_diagnostics)
     if not issues:
         for name in REQUIRED_SECTIONS:
             payload, payload_issues = _parse_section_yaml(name, raw_sections[name])
             if payload_issues:
                 issues.extend(payload_issues)
+                structured_issues.extend(
+                    _structured_from_issue(name, payload_issue)
+                    for payload_issue in payload_issues
+                )
             else:
                 sections[name] = payload
 
     if not issues:
         issues.extend(_validate_approval_checklist(sections))
         issues.extend(_validate_required_fields(sections))
+        if not issues:
+            semantic_issues = validate_requirement_semantics(sections)
+            issues.extend(semantic_issues)
+            structured_issues.extend(
+                _structured_from_issue(_issue_context(issue), issue)
+                for issue in semantic_issues
+            )
         if not issues:
             try:
                 render_config_payloads(sections)
@@ -393,10 +412,27 @@ def parse_requirement_text(
             netlist_input = PurePosixPath(str(maestro_root)) / "netlist" / "input.scs"
             if not maestro_input_exists(netlist_input.as_posix()):
                 issues.append(f"maestro_point_root/netlist/input.scs is missing: {netlist_input}")
+                structured_issues.append(
+                    Diagnostic(
+                        code="MAESTRO_INPUT_SCS_MISSING",
+                        severity=DiagnosticSeverity.ERROR,
+                        stage="requirement",
+                        component="requirement_intake",
+                        message="Required Maestro input netlist is missing.",
+                        detail=f"Expected netlist/input.scs at {netlist_input}.",
+                        likely_cause="maestro_point_root points to an incomplete Maestro point.",
+                        recommended_action=(
+                            "Update Maestro Source.maestro_point_root to a Maestro point "
+                            "containing netlist/input.scs."
+                        ),
+                        evidence=["opt_requirement.md:Maestro Source.maestro_point_root"],
+                    )
+                )
 
     return RequirementIntakeReport(
         status="pass" if not issues else "fail",
         issues=issues,
+        structured_issues=structured_issues,
         sections=sections,
         constraints_md_present=constraints_text is not None,
         constraints_md_sha256=constraints_sha,
@@ -411,9 +447,23 @@ def _parse_and_validate_requirement(project_dir: Path) -> RequirementIntakeRepor
 
     if not requirement_path.exists():
         issues.append("opt_requirement.md is missing")
+        structured_issues = [
+            Diagnostic(
+                code="REQUIREMENT_SECTION_MISSING",
+                severity=DiagnosticSeverity.ERROR,
+                stage="requirement",
+                component="requirement_intake",
+                message="opt_requirement.md is missing.",
+                detail="The requirement file is required for project intake.",
+                likely_cause="The project is missing opt_requirement.md.",
+                recommended_action="Create opt_requirement.md before running checks.",
+                evidence=["opt_requirement.md"],
+            )
+        ]
         return RequirementIntakeReport(
             status="fail",
             issues=issues,
+            structured_issues=structured_issues,
             sections=sections,
             constraints_md_present=constraints_path.is_file(),
             constraints_md_sha256=_sha256(constraints_path) if constraints_path.is_file() else None,
@@ -429,9 +479,12 @@ def _parse_and_validate_requirement(project_dir: Path) -> RequirementIntakeRepor
     )
 
 
-def _extract_required_sections(text: str) -> tuple[dict[str, str], list[str]]:
+def _extract_required_sections(
+    text: str,
+) -> tuple[dict[str, str], list[str], list[Diagnostic]]:
     headings: list[tuple[str, int, int]] = []
     issues: list[str] = []
+    structured_issues: list[Diagnostic] = []
     lines = text.splitlines(keepends=True)
     offset = 0
     for line in lines:
@@ -448,10 +501,36 @@ def _extract_required_sections(text: str) -> tuple[dict[str, str], list[str]]:
     for name in REQUIRED_SECTIONS:
         if counts[name] == 0:
             issues.append(f"required section is missing: {name}")
+            structured_issues.append(
+                Diagnostic(
+                    code="REQUIREMENT_SECTION_MISSING",
+                    severity=DiagnosticSeverity.ERROR,
+                    stage="requirement",
+                    component="requirement_intake",
+                    message=f"Required section is missing: {name}",
+                    detail=f"opt_requirement.md must include a {name} section.",
+                    likely_cause=f"Section {name} is not present in opt_requirement.md.",
+                    recommended_action=f"Add a ## {name} section with exactly one YAML block.",
+                    evidence=[f"opt_requirement.md:{name}"],
+                )
+            )
         elif counts[name] > 1:
             issues.append(f"required section appears more than once: {name}")
+            structured_issues.append(
+                Diagnostic(
+                    code="REQUIREMENT_SECTION_MISSING",
+                    severity=DiagnosticSeverity.ERROR,
+                    stage="requirement",
+                    component="requirement_intake",
+                    message=f"Section {name} appears more than once.",
+                    detail=f"Section {name} appears {counts[name]} times.",
+                        likely_cause="Section duplication can cause parser ambiguity.",
+                    recommended_action=f"Keep a single ## {name} section.",
+                    evidence=[f"opt_requirement.md:{name}"],
+                )
+            )
     if issues:
-        return {}, issues
+        return {}, issues, structured_issues
 
     sections: dict[str, str] = {}
     for index, (name, _start, content_start) in enumerate(headings):
@@ -459,7 +538,7 @@ def _extract_required_sections(text: str) -> tuple[dict[str, str], list[str]]:
             continue
         content_end = headings[index + 1][1] if index + 1 < len(headings) else len(text)
         sections[name] = text[content_start:content_end]
-    return sections, []
+    return sections, [], structured_issues
 
 
 def _parse_section_yaml(name: str, text: str) -> tuple[Any, list[str]]:
@@ -473,6 +552,169 @@ def _parse_section_yaml(name: str, text: str) -> tuple[Any, list[str]]:
     if payload is None:
         return None, [f"YAML block in {name} must not be empty"]
     return payload, []
+
+
+def _structured_from_issue(context: str, issue: str) -> Diagnostic:
+    if context == "objective" and "unknown metric" in issue:
+        unknown_match = re.search(
+            r"objective expression references unknown metric "
+            r"([A-Za-z0-9_\-\.]+)(; did you mean (.+)\?)?",
+            issue,
+        )
+        metric_name = (
+            unknown_match.group(1) if unknown_match is not None else "the expression"
+        )
+        suggestion = unknown_match.group(3) if unknown_match is not None else None
+        return Diagnostic(
+            code="OBJECTIVE_UNKNOWN_METRIC",
+            severity=DiagnosticSeverity.ERROR,
+            stage="requirement",
+            component="requirement_intake",
+            message=f"Objective expression references unknown metric {metric_name}.",
+            detail="Objective references a metric not declared in the Metrics section.",
+            likely_cause="A metric name in the objective expression does not match the "
+            "declared metric names.",
+            recommended_action=(
+                f"Replace {metric_name} with the declared name."
+                + (f" Did you mean {suggestion}?" if suggestion else "")
+            ),
+            evidence=["opt_requirement.md:Objective.expression"],
+        )
+
+    if (
+        issue.startswith("unsupported objective function ")
+        or "unsupported objective node" in issue
+        or issue.startswith("unsupported objective function call")
+    ):
+        return Diagnostic(
+            code="OBJECTIVE_UNSUPPORTED_FUNCTION",
+            severity=DiagnosticSeverity.ERROR,
+            stage="requirement",
+            component="requirement_intake",
+            message="Objective expression uses an unsupported function or AST node.",
+            detail=issue,
+            likely_cause="The objective expression contains unsupported syntax.",
+            recommended_action="Use supported operators and functions only.",
+            evidence=["opt_requirement.md:Objective.expression"],
+        )
+
+    if (
+        "objective expression returned non-finite value" in issue
+        or issue.startswith("invalid objective expression")
+        or "division by zero" in issue
+        or "objective numeric literals must be finite" in issue
+        or issue.startswith("objective function")
+    ):
+        return Diagnostic(
+            code="OBJECTIVE_UNSAFE_EXPRESSION",
+            severity=DiagnosticSeverity.ERROR,
+            stage="requirement",
+            component="requirement_intake",
+            message="Objective expression is unsafe or invalid.",
+            detail=issue,
+            likely_cause="Expression may be mathematically invalid.",
+            recommended_action="Review and simplify the objective expression.",
+            evidence=["opt_requirement.md:Objective.expression"],
+        )
+
+    if "constraint references unknown metric" in issue:
+        metric_match = re.search(
+            r"constraint references unknown metric ([A-Za-z0-9_\-\.]+)",
+            issue,
+        )
+        metric_name = metric_match.group(1) if metric_match is not None else "it"
+        return Diagnostic(
+            code="CONSTRAINT_UNKNOWN_METRIC",
+            severity=DiagnosticSeverity.ERROR,
+            stage="requirement",
+            component="requirement_intake",
+            message=f"Constraint references unknown metric {metric_name}.",
+            detail=issue,
+            likely_cause="A constraint refers to a metric not declared in Metrics.",
+            recommended_action="Use a metric name from the Metrics section.",
+            evidence=["opt_requirement.md:Constraints"],
+        )
+
+    if (
+        "lower/upper/step must be numeric" in issue
+        or "step must be positive" in issue
+        or "lower must be <=" in issue
+        or "names must be unique" in issue
+    ):
+        return Diagnostic(
+            code="VARIABLE_RANGE_INVALID",
+            severity=DiagnosticSeverity.ERROR,
+            stage="requirement",
+            component="requirement_intake",
+            message="Design variable range is invalid.",
+            detail=issue,
+            likely_cause="Variable bounds or step are invalid or inconsistent.",
+            recommended_action=(
+                "Check lower, upper, step values and ensure variable names are unique."
+            ),
+            evidence=["opt_requirement.md:Design Variables"],
+        )
+
+    if "not a YAML mapping" in issue or "must contain exactly one fenced yaml block" in issue:
+        return Diagnostic(
+            code="REQUIREMENT_YAML_INVALID",
+            severity=DiagnosticSeverity.ERROR,
+            stage="requirement",
+            component="requirement_intake",
+            message="Requirement section YAML is invalid.",
+            detail=issue,
+            likely_cause="A required section has malformed YAML.",
+            recommended_action="Fix the section YAML syntax.",
+            evidence=[f"opt_requirement.md:{context}"],
+        )
+
+    if "invalid YAML in" in issue:
+        return Diagnostic(
+            code="REQUIREMENT_YAML_INVALID",
+            severity=DiagnosticSeverity.ERROR,
+            stage="requirement",
+            component="requirement_intake",
+            message="Requirement section YAML is invalid.",
+            detail=issue,
+            likely_cause="Malformed YAML in a required section.",
+            recommended_action="Fix the section YAML syntax.",
+            evidence=[f"opt_requirement.md:{context}"],
+        )
+
+    if "required section is missing" in issue or "appears more than once" in issue:
+        return Diagnostic(
+            code="REQUIREMENT_SECTION_MISSING",
+            severity=DiagnosticSeverity.ERROR,
+            stage="requirement",
+            component="requirement_intake",
+            message=issue,
+            detail=issue,
+            likely_cause="The section layout does not match the expected template.",
+            recommended_action="Keep required sections exactly once with proper YAML.",
+            evidence=[f"opt_requirement.md:{context}"],
+        )
+
+    return Diagnostic(
+        code="REQUIREMENT_YAML_INVALID",
+        severity=DiagnosticSeverity.ERROR,
+        stage="requirement",
+        component="requirement_intake",
+        message=issue,
+        detail="Unmapped requirement validation issue.",
+        likely_cause="The issue did not match a known diagnostic pattern.",
+        recommended_action="Check opt_requirement.md against the template and constraints.",
+        evidence=[f"opt_requirement.md:{context}"],
+    )
+
+
+def _issue_context(issue: str) -> str:
+    if issue.startswith("objective"):
+        return "objective"
+    if issue.startswith("constraint"):
+        return "constraints"
+    if issue.startswith("variable"):
+        return "design variables"
+    return "requirement"
 
 
 def _yaml_blocks(text: str) -> list[str]:
@@ -707,6 +949,7 @@ def _write_requirement_report(
         "schema_version": "1.0",
         "status": report.status,
         "issues": report.issues,
+        "structured_issues": [diagnostic.model_dump() for diagnostic in report.structured_issues],
         "sections": sorted(report.sections),
         "constraints_md_present": report.constraints_md_present,
         "constraints_md_sha256": report.constraints_md_sha256,

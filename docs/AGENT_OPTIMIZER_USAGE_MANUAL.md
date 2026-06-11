@@ -146,6 +146,13 @@ ic-opt PROJECT_DIR --doctor
 
 Stop after doctor. Report pass/fail and the failing item. Doctor mode should
 not start Spectre/OCEAN.
+For local projects, `ic-opt PROJECT_DIR --doctor` is a standalone product
+doctor route. Do not add `--real`, and do not treat a doctor failure as an
+optimizer failure.
+If the doctor or optimizer JSON report contains `structured_issues`, read those
+first and report the diagnostic `code`, `stage`, `likely_cause`,
+`recommended_action`, and `evidence` before falling back to the plain `issues`
+list.
 
 Common user-side fixes:
 

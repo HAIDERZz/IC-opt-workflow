@@ -11,6 +11,7 @@ from typer.testing import CliRunner
 from hermes_workflow.cli import app
 from hermes_workflow.dry_run import run_dry_run
 from hermes_workflow.netlists import prepare_netlist
+from hermes_workflow.diagnostics import DiagnosticSeverity
 from hermes_workflow.requirement_intake import (
     check_requirement,
     import_maestro_point_netlist,
@@ -116,6 +117,8 @@ def test_check_requirement_reports_missing_file(tmp_path: Path) -> None:
 
     assert report.status == "fail"
     assert "opt_requirement.md is missing" in report.issues
+    assert len(report.structured_issues) == 1
+    assert report.structured_issues[0].code == "REQUIREMENT_SECTION_MISSING"
     assert (tmp_path / "missing_project" / "reports" / "requirement_intake_report.json").exists()
 
 
@@ -129,6 +132,9 @@ def test_check_requirement_rejects_missing_required_heading(tmp_path: Path) -> N
 
     assert report.status == "fail"
     assert "required section is missing: Metrics" in report.issues
+    assert any(
+        issue.code == "REQUIREMENT_SECTION_MISSING" for issue in report.structured_issues
+    )
 
 
 def test_check_requirement_rejects_duplicate_required_heading(tmp_path: Path) -> None:
@@ -195,6 +201,284 @@ def test_check_requirement_rejects_unapproved_checklist(tmp_path: Path) -> None:
 
     assert report.status == "fail"
     assert "approval checklist metric_formulas_user_approved must be true" in report.issues
+
+
+def test_check_requirement_rejects_unknown_objective_metric(tmp_path: Path) -> None:
+    project_dir = _copy_requirement_project(tmp_path)
+    text = (project_dir / "opt_requirement.md").read_text(encoding="utf-8")
+    text = text.replace(
+        "expression: \"(rise + fall) * DC\"",
+        "expression: \"(rise + NF_3G)\"",
+    )
+    (project_dir / "opt_requirement.md").write_text(text, encoding="utf-8")
+
+    report = check_requirement(project_dir)
+
+    assert report.status == "fail"
+    assert "objective expression references unknown metric NF_3G" in report.issues
+    assert len(report.structured_issues) == 1
+    assert report.structured_issues[0].code == "OBJECTIVE_UNKNOWN_METRIC"
+    assert report.structured_issues[0].severity == DiagnosticSeverity.ERROR
+    assert report.structured_issues[0].message == (
+        "Objective expression references unknown metric NF_3G."
+    )
+
+def test_check_requirement_writes_structured_diagnostics_to_report_json(tmp_path: Path) -> None:
+    project_dir = _copy_requirement_project(tmp_path)
+    text = (project_dir / "opt_requirement.md").read_text(encoding="utf-8")
+    text = text.replace('name: DC', 'name: P1dB', 1)
+    text = text.replace('metric: DC', 'metric: P1dB', 1)
+    text = text.replace(
+        'expression: "(rise + fall) * DC"',
+        'expression: "(rise + P1DB)"',
+    )
+    (project_dir / "opt_requirement.md").write_text(text, encoding="utf-8")
+
+    report = check_requirement(project_dir)
+    assert report.status == "fail"
+
+    path = project_dir / "reports" / "requirement_intake_report.json"
+    state = _load_json(path)
+
+    assert report.structured_issues[0].code == state["structured_issues"][0]["code"]
+    assert state["issues"] == report.issues
+
+def test_check_requirement_reports_no_structured_issues_for_valid_requirements(tmp_path: Path) -> None:
+    project_dir = _copy_requirement_project(tmp_path)
+
+    report = check_requirement(project_dir)
+
+    assert report.status == "pass"
+    assert report.structured_issues == []
+
+
+def test_check_requirement_suggests_close_objective_metric_name(tmp_path: Path) -> None:
+    project_dir = _copy_requirement_project(tmp_path)
+    text = (project_dir / "opt_requirement.md").read_text(encoding="utf-8")
+    text = text.replace("name: DC", "name: P1dB", 1)
+    text = text.replace("metric: DC", "metric: P1dB", 1)
+    text = text.replace(
+        'expression: "(rise + fall) * DC"',
+        'expression: "P1DB + rise"',
+    )
+    (project_dir / "opt_requirement.md").write_text(text, encoding="utf-8")
+
+    report = check_requirement(project_dir)
+
+    assert report.status == "fail"
+    assert (
+        "objective expression references unknown metric P1DB; did you mean P1dB?"
+        in report.issues
+    )
+    assert any(
+        issue.code == "OBJECTIVE_UNKNOWN_METRIC"
+        and "P1DB" in issue.message
+        and issue.recommended_action is not None
+        for issue in report.structured_issues
+    )
+
+
+def test_check_requirement_handles_non_mapping_metric_item(tmp_path: Path) -> None:
+    project_dir = _copy_requirement_project(tmp_path)
+    text = (project_dir / "opt_requirement.md").read_text(encoding="utf-8")
+    text = text.replace(
+        '  - /M0/S\n```',
+        '  - /M0/S\n- BAD\n```',
+        1,
+    )
+    (project_dir / "opt_requirement.md").write_text(text, encoding="utf-8")
+
+    report = check_requirement(project_dir)
+
+    assert report.status == "fail"
+    assert any(
+        issue.startswith("rendered config validation failed")
+        or "metric names must be unique" in issue
+        or "metric names must be a YAML mapping" in issue
+        for issue in report.issues
+    )
+
+
+def test_check_requirement_rejects_unknown_constraint_metric(tmp_path: Path) -> None:
+    project_dir = _copy_requirement_project(tmp_path)
+    text = (project_dir / "opt_requirement.md").read_text(encoding="utf-8")
+    text = text.replace("metric: fall", "metric: NF_3G", 1)
+    (project_dir / "opt_requirement.md").write_text(text, encoding="utf-8")
+
+    report = check_requirement(project_dir)
+
+    assert report.status == "fail"
+    assert "constraint references unknown metric NF_3G" in report.issues
+
+
+def test_check_requirement_rejects_unknown_objective_function(tmp_path: Path) -> None:
+    project_dir = _copy_requirement_project(tmp_path)
+    text = (project_dir / "opt_requirement.md").read_text(encoding="utf-8")
+    text = text.replace(
+        'expression: "(rise + fall) * DC"',
+        "expression: \"unknown_func(rise)\"",
+    )
+    (project_dir / "opt_requirement.md").write_text(text, encoding="utf-8")
+
+    report = check_requirement(project_dir)
+
+    assert report.status == "fail"
+    assert report.issues == ["unsupported objective function unknown_func"]
+    assert [issue.code for issue in report.structured_issues] == [
+        "OBJECTIVE_UNSUPPORTED_FUNCTION"
+    ]
+
+def test_check_requirement_does_not_report_unsupported_function_as_metric(
+    tmp_path: Path,
+) -> None:
+    project_dir = _copy_requirement_project(tmp_path)
+    text = (project_dir / "opt_requirement.md").read_text(encoding="utf-8")
+    text = text.replace(
+        'expression: "(rise + fall) * DC"',
+        'expression: "eval(1)"',
+    )
+    (project_dir / "opt_requirement.md").write_text(text, encoding="utf-8")
+
+    report = check_requirement(project_dir)
+
+    assert report.status == "fail"
+    assert report.issues == ["unsupported objective function eval"]
+    assert [issue.code for issue in report.structured_issues] == [
+        "OBJECTIVE_UNSUPPORTED_FUNCTION"
+    ]
+
+
+def test_check_requirement_rejects_unsafe_objective_call(tmp_path: Path) -> None:
+    project_dir = _copy_requirement_project(tmp_path)
+    text = (project_dir / "opt_requirement.md").read_text(encoding="utf-8")
+    text = text.replace(
+        'expression: "(rise + fall) * DC"',
+        "expression: \"__import__(\\\"os\\\").system(\\\"echo bad\\\")\"",
+    )
+    (project_dir / "opt_requirement.md").write_text(text, encoding="utf-8")
+
+    report = check_requirement(project_dir)
+
+    assert report.status == "fail"
+    assert "unsupported objective function call" in report.issues
+
+
+def test_check_requirement_rejects_unsafe_objective_getattr(tmp_path: Path) -> None:
+    project_dir = _copy_requirement_project(tmp_path)
+    text = (project_dir / "opt_requirement.md").read_text(encoding="utf-8")
+    text = text.replace('expression: "(rise + fall) * DC"', "expression: \"rise.__class__\"")
+    (project_dir / "opt_requirement.md").write_text(text, encoding="utf-8")
+
+    report = check_requirement(project_dir)
+
+    assert report.status == "fail"
+    assert "unsupported objective node Attribute" in report.issues
+
+
+def test_check_requirement_rejects_divide_by_zero_in_objective(tmp_path: Path) -> None:
+    project_dir = _copy_requirement_project(tmp_path)
+    text = (project_dir / "opt_requirement.md").read_text(encoding="utf-8")
+    text = text.replace('expression: "(rise + fall) * DC"', "expression: \"rise / 0\"")
+    (project_dir / "opt_requirement.md").write_text(text, encoding="utf-8")
+
+    report = check_requirement(project_dir)
+
+    assert report.status == "fail"
+    assert any("division by zero" in issue for issue in report.issues)
+
+
+def test_check_requirement_accepts_normalized_objective_expression(tmp_path: Path) -> None:
+    project_dir = _copy_requirement_project(tmp_path)
+    text = (project_dir / "opt_requirement.md").read_text(encoding="utf-8")
+    text = text.replace(
+        'expression: "(rise + fall) * DC"',
+        "expression: \"-(0.7*min(max(0,min(1,10*(ln(rise/28e9)/ln(10))/0.6)),max(0,min(1,(DC-5.5)/2)))+0.5*(0.1*max(0,min(1,10*(ln(rise/28e9)/ln(10))/0.6))+0.9*max(0,min(1,(DC-5.5)/2))))\"",
+    )
+    (project_dir / "opt_requirement.md").write_text(text, encoding="utf-8")
+
+    report = check_requirement(project_dir)
+
+    assert report.status == "pass"
+
+
+def test_check_requirement_rejects_variable_range_lower_above_upper(tmp_path: Path) -> None:
+    project_dir = _copy_requirement_project(tmp_path)
+    text = (project_dir / "opt_requirement.md").read_text(encoding="utf-8")
+    text = text.replace(
+        '- name: WN\n  kind: continuous_step\n  lower: "0.3u"\n  upper: "3u"\n  step: "0.2u"',
+        '- name: WN\n  kind: continuous_step\n  lower: "4u"\n  upper: "3u"\n  step: "0.2u"',
+    )
+    (project_dir / "opt_requirement.md").write_text(text, encoding="utf-8")
+
+    report = check_requirement(project_dir)
+
+    assert report.status == "fail"
+    assert "variable WN lower must be <= upper" in report.issues
+
+
+def test_check_requirement_rejects_variable_range_step_nonpositive(tmp_path: Path) -> None:
+    project_dir = _copy_requirement_project(tmp_path)
+    text = (project_dir / "opt_requirement.md").read_text(encoding="utf-8")
+    text = text.replace(
+        '- name: WN\n  kind: continuous_step\n  lower: "0.3u"\n  upper: "3u"\n  step: "0.2u"',
+        '- name: WN\n  kind: continuous_step\n  lower: "0.3u"\n  upper: "3u"\n  step: "0u"',
+    )
+    (project_dir / "opt_requirement.md").write_text(text, encoding="utf-8")
+
+    report = check_requirement(project_dir)
+
+    assert report.status == "fail"
+    assert "variable WN step must be positive" in report.issues
+
+
+def test_check_requirement_rejects_variable_range_unparseable_bounds(tmp_path: Path) -> None:
+    project_dir = _copy_requirement_project(tmp_path)
+    text = (project_dir / "opt_requirement.md").read_text(encoding="utf-8")
+    text = text.replace(
+        '- name: WN\n  kind: continuous_step\n  lower: "0.3u"\n  upper: "3u"\n  step: "0.2u"',
+        '- name: WN\n  kind: continuous_step\n  lower: "n/a"\n  upper: "3u"\n  step: "0.2u"',
+    )
+    (project_dir / "opt_requirement.md").write_text(text, encoding="utf-8")
+
+    report = check_requirement(project_dir)
+
+    assert report.status == "fail"
+    assert (
+        "variable WN lower/upper/step must be numeric SPICE values for doctor range checks"
+        in report.issues
+    )
+
+
+def test_check_requirement_rejects_variable_name_collision_with_metric(tmp_path: Path) -> None:
+    project_dir = _copy_requirement_project(tmp_path)
+    text = (project_dir / "opt_requirement.md").read_text(encoding="utf-8")
+    text = text.replace(
+        '- name: FN\n  kind: integer\n  lower: "2"\n  upper: "12"\n  step: "1"',
+        '- name: rise\n  kind: integer\n  lower: "2"\n  upper: "12"\n  step: "1"',
+        1,
+    )
+    (project_dir / "opt_requirement.md").write_text(text, encoding="utf-8")
+
+    report = check_requirement(project_dir)
+
+    assert report.status == "fail"
+    assert "design variable rise collides with metric name rise" in report.issues
+
+
+def test_check_requirement_rejects_duplicate_design_variable_name(tmp_path: Path) -> None:
+    project_dir = _copy_requirement_project(tmp_path)
+    text = (project_dir / "opt_requirement.md").read_text(encoding="utf-8")
+    text = text.replace(
+        '- name: FN\n  kind: integer\n  lower: "2"\n  upper: "12"\n  step: "1"\n',
+        '- name: FN\n  kind: integer\n  lower: "2"\n  upper: "12"\n  step: "1"\n- name: FN\n  kind: integer\n  lower: "2"\n  upper: "12"\n  step: "1"\n',
+        1,
+    )
+    (project_dir / "opt_requirement.md").write_text(text, encoding="utf-8")
+
+    report = check_requirement(project_dir)
+
+    assert report.status == "fail"
+    assert "variable names must be unique" in report.issues
 
 
 def test_check_requirement_preserves_constraints_md_as_guidance_only(tmp_path: Path) -> None:

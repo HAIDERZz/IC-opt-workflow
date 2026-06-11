@@ -27,6 +27,8 @@ Cadence/OCEAN 公式、SSH/远程环境，还是 optimizer 本身的问题。
 | 报错或现象 | 常见原因 | 处理方式 |
 | --- | --- | --- |
 | `opt_requirement.md` 解析失败、缺少字段、格式不符合预期 | 需求文件是机器读取的严格结构，章节名、列表缩进、字段名或 YAML block 写错 | 先跑 `ic-opt PROJECT --doctor`，按 doctor 指出的文件和字段修。不要在聊天里补公式，要改文件。 |
+| 本地 `ic-opt PROJECT --doctor` 输出 `optimize requires --real` | 旧版本本地 doctor 没有正确接入产品级 doctor 路由，误走了 optimizer 入口 | 更新到 v0.1.6 或更新版本。本地 doctor 应直接写 `reports/ic_opt_doctor_report.json`，不会启动 optimizer。 |
+| objective 里使用 `eval(...)`、未知函数等，同时又报 unknown metric | 旧版本会把不支持的函数名重复当作 metric 名检查 | 更新到 v0.1.6 或更新版本。当前应只报 `OBJECTIVE_UNSUPPORTED_FUNCTION`。 |
 | 找不到 `opt_requirement.md` | 项目路径给错，或文件名写成了其他名字 | 项目根目录必须有 `opt_requirement.md`。如果是远程模式，确认远程路径下存在这个文件。 |
 | `maestro_point_root` 找不到 `netlist/input.scs` | 填错了 Maestro/ADE 结果目录层级 | `maestro_point_root` 必须是 leaf run 目录，里面应该有 `netlist/` 和 `psf/`，并且 `netlist/input.scs` 存在。不要填 `Interactive.N`、`Interactive.N/1`、`netlist/` 或 `psf/`。 |
 | `cadence_env.csh` 不存在或 source 失败 | Cadence 环境文件路径不对，或者环境脚本依赖当前 shell/机器 | 本地模式把 `cadence_env.csh` 放到项目目录或用 `--cadence-cshrc` 指定。远程模式传远程服务器上的路径。不要硬编码 Spectre 版本到项目代码里。 |

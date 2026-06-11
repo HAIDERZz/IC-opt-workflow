@@ -29,6 +29,11 @@ The workflow is file based. Do not describe machine-critical setup only in
 chat. Put the request in `opt_requirement.md`, optionally put human guidance in
 `constraints.md`, then let Hermes generate and check the contracts.
 
+Here, Hermes means the requirement-to-execution messenger layer: it translates
+the user's Markdown requirement into executable YAML/config contracts and
+auditable reports. It does not mean the workflow requires a Hermes agent. Humans
+and agents both use the same `ic-opt` CLI.
+
 For common errors and fixes, especially requirement-file mistakes, OCEAN
 non-scalar metrics, Maestro point-root paths, and remote SSH failures, read
 `docs/TROUBLESHOOTING_CN.md`.
@@ -130,7 +135,7 @@ Recommended layout:
 Use:
 
 - `opt_requirement.md` for the strict optimization request.
-- `constraints.md` for supervisor-agent guidance and user preferences.
+- `constraints.md` for optional human/operator/agent guidance and user preferences.
 - `context/` for notes, screenshots, prior reports, or circuit explanations.
 
 Do not hand-build `config/`, `netlists/`, `runs/`, or `reports/`.
@@ -191,6 +196,10 @@ missing `cadence_env.csh`, and SSH readiness problems.
 Doctor parses the requirement, checks the Cadence cshrc path, checks the
 OpenBox/Hermes Python environment, prepares config/netlist bundles, and writes
 `reports/ic_opt_doctor_report.json`. It does not launch Spectre/OCEAN.
+For local projects, `--doctor` is a standalone product check; it must not be
+combined with `--real`, and it must not fall through to optimizer execution.
+When a JSON report contains `structured_issues`, tools and agents should prefer
+those structured diagnostics over the older plain `issues` list.
 
 ## 4. Run The Optimizer
 

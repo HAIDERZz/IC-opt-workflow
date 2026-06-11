@@ -1,7 +1,21 @@
-# IC Auto Opt Workflow v0.1.5 使用说明
+# IC Auto Opt Workflow v0.1.6 使用说明
 
 这份说明面向集成电路方向用户，假设你会使用 Linux 和 Cadence，但不要求你熟悉
 Python 工程。
+
+## Hermes 这个名字是什么意思
+
+本项目里的 Hermes 不再表示某个必须存在的主控 agent。
+
+Hermes 在这里指“信使层”：它把用户写在 `opt_requirement.md` 里的 IC 优化需求，
+转换成可执行、可检查、可复现的 YAML 配置、仿真任务、验收报告和图表。
+
+因此：
+
+- 用户入口是 `ic-opt` 命令。
+- agent 入口也是 `ic-opt` 命令加 `skills/ic-opt/SKILL.md`。
+- `hermes_workflow` 是内部 Python 包，负责解析、校验、生成合同、调用工具和写报告。
+- 不需要 Hermes agent，也不要求两个 agent 协作。
 
 ## 1. 这个项目是做什么的
 
@@ -209,6 +223,9 @@ constraints.md
 它会检查 `opt_requirement.md`、Cadence 环境文件、OpenBox/Hermes Python
 环境、config/netlist 准备情况和 continuation 所需历史文件。它不会启动
 Spectre/OCEAN，也不会生成优化候选点。
+
+v0.1.6 之后，本地 `--doctor` 已经直接接入产品级 doctor 流程，不会误进入
+optimizer，也不需要加 `--real`。因此它适合作为每个新项目或修改后项目的第一步。
 
 如果你把任务交给 agent 做，agent 应该默认先运行 doctor。doctor 不通过时，不应
 继续真实优化，而应先告诉你哪个文件、字段或路径有问题。因为
@@ -552,6 +569,10 @@ Agent 不应该：
 docs/TROUBLESHOOTING_CN.md
 ```
 
+如果看到优化器或 doctor 的 `*.json` 报告，优先读取 `structured_issues` 字段；
+再兼容地回退到旧的 `issues` 数组。`structured_issues` 里建议按
+`code`、`stage`、`likely_cause`、`recommended_action`、`evidence` 读。
+
 里面按报错信息列出了常见原因和修复方式，包括 `opt_requirement.md` 格式错误、
 Maestro point root 层级错误、OCEAN 非标量、SSH host key、免密登录、远程高并发
 导致的 `kex_exchange_identification`，以及旧版本 manifest missing。
@@ -578,9 +599,14 @@ docs/TROUBLESHOOTING_CN.md
 - `result_manifest.json missing`：当前版本已针对 SSH/tool 异常路径补失败 manifest；
   如果仍出现，请保留 run 目录并更新到最新版本后复查。
 
-## 13. 当前 v0.1.5 边界
+## 13. 当前 v0.1.6 边界
 
 - 已经支持 shell 自动化的完整真实流程。
+- 已经支持本地和远程 doctor 检查；本地 doctor 不会启动 Spectre/OCEAN，也不会误走
+  optimizer 路径。
+- requirement 和 optimizer 报告中已经优先提供结构化诊断字段
+  `structured_issues`，agent 应优先读取其中的 `code`、`likely_cause`、
+  `recommended_action` 和 `evidence`。
 - 已经支持远程 SSH 执行：本机运行优化器，远程 Linux EDA 服务器运行 Spectre/OCEAN。
 - 已经提供平台无关 `skills/ic-opt/SKILL.md`，任何能运行 shell 命令并读取文件的
   agent 都可以按这份 skill 操作 `ic-opt`。

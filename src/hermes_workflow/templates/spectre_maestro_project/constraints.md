@@ -1,6 +1,6 @@
 # Optimization Constraints And Guidance
 
-This file is optional supervisor-agent guidance. It is not converted directly
+This file is optional human/operator/agent guidance. It is not converted directly
 into Spectre settings, OCEAN formulas, optimizer bounds, or hard constraints.
 
 Put machine-critical execution fields in `opt_requirement.md`.

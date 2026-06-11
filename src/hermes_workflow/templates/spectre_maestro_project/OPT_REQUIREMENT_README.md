@@ -8,6 +8,11 @@ optimization only in chat. Put machine-critical settings in
 `opt_requirement.md`, then let Hermes render the standard YAML contracts and
 import the Maestro/ADE netlist bundle.
 
+In this project, Hermes means the requirement-to-execution messenger layer. It
+does not mean that a separate Hermes agent is required. The normal user and
+agent entrypoint is `ic-opt`; lower-level `hermes-workflow` commands are mainly
+for debugging or advanced inspection.
+
 ## Project Directory
 
 Recommended user-created directory:
@@ -22,7 +27,7 @@ Recommended user-created directory:
 User-owned files:
 
 - `opt_requirement.md`: required, canonical optimization request.
-- `constraints.md`: optional supervisor-agent guidance.
+- `constraints.md`: optional human/operator/agent guidance.
 - `context/`: optional notes, screenshots, prior reports, or circuit context.
 
 Generated/imported files:
@@ -500,8 +505,8 @@ source path, bounds, or resource settings have not been reviewed.
 
 ## `constraints.md`
 
-`constraints.md` is optional. It is for supervisor-agent guidance, not direct
-contract generation.
+`constraints.md` is optional. It is for human/operator/agent guidance, not
+direct contract generation.
 
 Good uses:
 
