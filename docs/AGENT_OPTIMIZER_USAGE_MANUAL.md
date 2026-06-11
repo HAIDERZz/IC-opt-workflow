@@ -125,6 +125,14 @@ ic-opt PROJECT_DIR --continue M
 If the user says "optimize this project" and provides a project path, use
 `--real`. If the user asks to "run 40 more points", use `--continue 40`.
 
+For a fresh real run on a new or changed project, run doctor first and stop if
+it fails:
+
+```bash
+ic-opt PROJECT_DIR --doctor
+ic-opt PROJECT_DIR --real
+```
+
 Do not expose lower-level `hermes-workflow` commands to normal users unless
 debugging the product command.
 
@@ -149,7 +157,40 @@ Common user-side fixes:
 - OCEAN formula names do not match declared metrics;
 - Cadence environment path is missing.
 
-## 6. Real Optimization Mode
+## 6. Remote Mode
+
+If the user says the project is on a remote EDA server, use:
+
+```bash
+ic-opt --ssh-profile PROFILE REMOTE_PROJECT --doctor
+ic-opt --ssh-profile PROFILE REMOTE_PROJECT --real
+ic-opt --ssh-profile PROFILE REMOTE_PROJECT --continue M
+```
+
+The agent should not install Python packages on the remote EDA server. The
+project and Cadence setup remain remote; the local product environment runs the
+optimizer and uses SSH to execute the same canonical Spectre/OCEAN flow.
+
+Before remote `--real`, doctor is mandatory for new or changed projects. If SSH
+fails, report the exact readiness checks:
+
+```bash
+ssh PROFILE true
+ssh -o BatchMode=yes PROFILE true
+```
+
+Remote parallelism:
+
+- `parallel_jobs` is candidate concurrency, not per-testbench concurrency.
+- Multi-testbench candidates run their own testbench sequence inside each
+  candidate.
+- For normal remote multi-testbench work, prefer `parallel_jobs` around 4-8.
+- High values such as 24 or 36 can hit SSH service limits and produce
+  `kex_exchange_identification` or connection reset errors.
+- `optimizer_cpu_threads` does not limit Spectre/OCEAN process count or SSH
+  connection count.
+
+## 7. Real Optimization Mode
 
 Run:
 
@@ -171,7 +212,7 @@ The product command handles:
 
 The agent should not rebuild this flow manually unless debugging.
 
-## 7. Continuation Mode
+## 8. Continuation Mode
 
 Run:
 
@@ -186,7 +227,7 @@ objective, or Maestro point roots.
 Do not add `--parallel-jobs` during continuation unless the user explicitly asks
 to change resources. Mixed resource settings can invalidate history audits.
 
-## 8. Optional Native Subagent Mode
+## 9. Optional Native Subagent Mode
 
 Use native subagent execution only when the user explicitly asks for it and the
 current agent runtime provides a stable native task/subagent tool.
@@ -220,7 +261,7 @@ For optional subagent mode:
 If subagent dispatch is unavailable, report that clearly and use the default
 single-agent CLI route only if the user agrees or did not require subagent mode.
 
-## 9. What To Read After A Run
+## 10. What To Read After A Run
 
 Primary reports:
 
@@ -238,7 +279,7 @@ PROJECT_DIR/reports/optimizer_visuals/
 PROJECT_DIR/reports/openbox_advanced_visualization/
 ```
 
-## 10. What To Tell The User
+## 11. What To Tell The User
 
 Report concisely:
 
@@ -256,7 +297,7 @@ Report concisely:
 
 Do not claim a global optimum unless the run was an exhaustive sweep with proof.
 
-## 11. User Decision Point
+## 12. User Decision Point
 
 Common user decisions:
 
@@ -277,7 +318,7 @@ ic-opt PROJECT_DIR --continue M
 If the user accepts the current result, the agent may record final acceptance
 only after explicit user confirmation.
 
-## 12. Failure Interpretation
+## 13. Failure Interpretation
 
 `constraint_failed`:
 
@@ -307,7 +348,18 @@ The real tool result or manifest failed structurally.
 This usually points to environment, license, netlist, tool, or execution
 problems.
 
-## 13. Hard Agent Boundaries
+For detailed error mapping, read:
+
+```text
+docs/TROUBLESHOOTING_CN.md
+```
+
+Use that table before guessing. It covers requirement-file mistakes,
+Maestro/ADE point-root paths, OCEAN non-scalar metrics, optional dependency
+build errors, SSH host-key and passwordless-login failures, remote high
+parallelism errors, and manifest-related issues.
+
+## 14. Hard Agent Boundaries
 
 The agent must not:
 
@@ -323,16 +375,17 @@ The agent must not:
   logs;
 - claim global optimum.
 
-## 14. Minimal Successful Session
+## 15. Minimal Successful Session
 
 ```text
 1. User creates PROJECT_DIR and writes opt_requirement.md.
 2. User sends /ic-opt PROJECT_DIR --real.
-3. Agent runs ic-opt PROJECT_DIR --real.
-4. Agent waits for completion.
-5. Agent reads optimizer_decision_report.md and optimizer_insight_report.md.
-6. Agent reports best observed feasible result and next action.
-7. User accepts or asks to continue.
+3. Agent runs ic-opt PROJECT_DIR --doctor.
+4. If doctor passes, agent runs ic-opt PROJECT_DIR --real.
+5. Agent waits for completion.
+6. Agent reads optimizer_decision_report.md and optimizer_insight_report.md.
+7. Agent reports best observed feasible result and next action.
+8. User accepts or asks to continue.
 ```
 
 This is the product skill target: the agent uses the workflow tool well instead

@@ -1,5 +1,50 @@
 # Release Notes v0.1.x
 
+## v0.1.5
+
+Date: 2026-06-12
+
+### Summary
+
+v0.1.5 improves real-run report readability and hardens remote SSH failure
+handling. Optimizer visual reports now default to PNG, and remote users get
+clearer guidance that high `parallel_jobs` values can overload SSH before they
+improve optimization throughput.
+
+### Changes
+
+- Changed `reports/optimizer_visuals/` from SVG output to PNG output by
+  default.
+- Embedded PNG plots directly in `optimizer_insight_report.md`.
+- Improved plot readability for real IC optimization reports:
+  - all-evaluable FoM trend;
+  - bottleneck-vs-weighted normalized score;
+  - convergence and feasible convergence;
+  - status distribution;
+  - parameter-vs-objective scatter;
+  - constraint margins.
+- Added automatic cleanup of the old fixed-name SVG visual files when
+  regenerating insight reports, so old projects do not show mixed SVG/PNG
+  artifacts.
+- Added `matplotlib` to the product dependency set.
+- Hardened remote Spectre/OCEAN diagnostic and manifest behavior so SSH/tool
+  failures are recorded as inspectable run artifacts instead of leaving missing
+  manifests.
+- Documented remote SSH concurrency guidance across README, user guide,
+  troubleshooting guide, agent skill, and release checklist:
+  `parallel_jobs` is candidate-level concurrency, not per-testbench
+  concurrency; normal remote multi-testbench runs should start around 4-8.
+
+### Verification
+
+- Generated PNG reports from a real 100-evaluation Mixer multi-testbench run
+  with 18 feasible points.
+- Generated PNG reports from a real 150-evaluation remote Mixer run to confirm
+  penalty/outlier clipping keeps plots readable.
+- Targeted optimizer insight tests passed.
+- Ruff checks passed for the modified insight-reporting code.
+- Diff whitespace checks passed.
+
 ## v0.1.4
 
 Date: 2026-06-09

@@ -11,6 +11,7 @@ agent operates the deterministic CLI and explains the reports. See
 `docs/AGENT_OPTIMIZER_USAGE_MANUAL.md` before describing agent usage.
 
 For a Chinese user guide, read `docs/USER_GUIDE_CN.md`.
+For common error mapping, read `docs/TROUBLESHOOTING_CN.md`.
 
 ## 1. Product Environment
 
@@ -120,6 +121,7 @@ Shell acceptance requires:
 Agent acceptance additionally requires:
 
 - the platform-neutral skill is visible to the agent;
+- the agent runs doctor before a fresh real run on a new or changed project;
 - the agent runs the product command rather than rebuilding lower-level steps;
 - the agent reads closeout reports and explains the decision without asking the
   user to restate machine-critical information.
@@ -136,12 +138,12 @@ Cadence setup live on the remote Linux EDA server:
   --real \
   --max-evals 80 \
   --batch-size 10 \
-  --parallel-jobs 10
+  --parallel-jobs 6
 
 ./.venv/bin/ic-opt --ssh-profile PROFILE /remote/path/to/project \
   --continue 20 \
   --batch-size 10 \
-  --parallel-jobs 10
+  --parallel-jobs 6
 ```
 
 Remote acceptance requires:
@@ -163,6 +165,11 @@ Remote acceptance requires:
   `~/.ic-opt/remote_runs/<ssh-profile>/<project-hash>/reports/`;
 - remote Spectre/OCEAN diagnostics are present for successful and failed
   candidate paths.
+- remote parallel guidance is documented: `parallel_jobs` is candidate-level
+  concurrency, normal remote multi-testbench use should start around 4-8, and
+  high values may trigger SSH server limits.
+- handled SSH/tool failures produce `real_check_failed` manifests rather than
+  missing `result_manifest.json` artifacts.
 
 ## 7. Final User Acceptance
 

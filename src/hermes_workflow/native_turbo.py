@@ -21,6 +21,7 @@ from hermes_workflow.real_result_record import record_real_result
 from hermes_workflow.real_run import prepare_explicit_candidate_real_run
 from hermes_workflow.real_run_recovery import resolve_real_run_failure
 from hermes_workflow.result_handoff import check_real_run
+from hermes_workflow.reports import RealRunResultStatus
 from hermes_workflow.schemas import (
     ConstraintOp,
     MetricsConfig,
@@ -667,6 +668,22 @@ def execute_and_check_real_candidate(
             status="real_check_failed",
             issues=issues,
             result_manifest=f"runs/real/{run_id}/result_manifest.json",
+        )
+    if real_report.result_status != RealRunResultStatus.SUCCEEDED:
+        # A failed result manifest means the real tool/transport failed even if
+        # the manifest exists, so classify before metric extraction.
+        issues = real_report.issues or ([adapter_error] if adapter_error else [])
+        status_label = (
+            real_report.result_status.value
+            if real_report.result_status is not None
+            else "missing"
+        )
+        issues = issues + [f"result_status is {status_label}"]
+        _try_abandon_candidate(project_dir, run_id, "real-run check failed")
+        return NativeTurboObservation(
+            status="real_check_failed",
+            issues=issues,
+            result_manifest=real_report.result_manifest,
         )
     metric_report = check_metric_results(
         project_dir,

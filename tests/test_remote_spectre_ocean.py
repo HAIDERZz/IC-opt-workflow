@@ -78,6 +78,62 @@ class FailingFakeRunner(FakeRunner):
         return RemoteCommandResult(0, "stdout from successful command", "", ["ssh", "lab", command])
 
 
+class UploadFailingFakeRunner(FakeRunner):
+    """Runner that simulates remote upload failures after upload was attempted."""
+
+    def __init__(self, fail_on_substring: str) -> None:
+        super().__init__()
+        self._fail_on = fail_on_substring
+
+    def upload(self, local_path, remote_path) -> None:
+        self.uploads.append((Path(local_path), str(remote_path)))
+        if self._fail_on in str(remote_path):
+            raise RuntimeError(f"upload failure for {remote_path}")
+        return None
+
+
+class DownloadFailingFakeRunner(FakeRunner):
+    """Runner that raises on download to exercise local manifest fallback."""
+
+    def __init__(self, fail_on_substring: str) -> None:
+        super().__init__()
+        self._fail_on = fail_on_substring
+
+    def download_tree(self, remote_path, local_path, include=None, exclude=None) -> None:
+        remote = str(remote_path)
+        if self._fail_on in remote:
+            raise RuntimeError(f"download failure for {remote}")
+        return super().download_tree(remote_path, local_path, include=include, exclude=exclude)
+
+
+class RunExceptionFakeRunner(FakeRunner):
+    """Runner that raises an exception for commands matching a substring."""
+
+    def __init__(self, fail_on_substring: str) -> None:
+        super().__init__()
+        self._fail_on = fail_on_substring
+
+    def run(self, command: str, **kwargs: object) -> RemoteCommandResult:
+        self.commands.append(command)
+        if self._fail_on in command:
+            raise RuntimeError(f"SSH RuntimeError: {self._fail_on}")
+        return RemoteCommandResult(0, f"stdout from {command[:40]}", "", ["ssh", "lab", command])
+
+
+class RunExceptionUploadFailingFakeRunner(RunExceptionFakeRunner):
+    """Runner that fails upload for a specific remote path after the command exception path."""
+
+    def __init__(self, fail_on_substring: str, fail_upload_on_substring: str) -> None:
+        super().__init__(fail_on_substring)
+        self._fail_upload_on = fail_upload_on_substring
+
+    def upload(self, local_path, remote_path) -> None:
+        self.uploads.append((Path(local_path), str(remote_path)))
+        if self._fail_upload_on in str(remote_path):
+            raise RuntimeError(f"upload failure for {remote_path}")
+        return None
+
+
 def test_remote_adapter_runs_spectre_and_ocean_remotely(tmp_path: Path) -> None:
     project_dir = create_approved_real_project(tmp_path)
     run_dir = project_dir / "runs" / "real" / "real_001"
@@ -186,6 +242,73 @@ def test_remote_adapter_spectre_failure_uploads_manifest_to_remote(tmp_path: Pat
     ]
     assert len(spectre_stdout_uploads) >= 1
     assert len(spectre_stderr_uploads) >= 1
+
+
+def test_remote_adapter_spectre_runtime_error_still_writes_local_failure_manifest(tmp_path: Path) -> None:
+    project_dir = create_approved_real_project(tmp_path)
+    run_dir = project_dir / "runs" / "real" / "real_001"
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    runner = RunExceptionFakeRunner("spectre")
+
+    result = run_remote_spectre_ocean_adapter(
+        project_dir,
+        run_id="real_001",
+        remote_ref=ref,
+        remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
+        runner=runner,
+    )
+
+    assert result.status == "failed"
+    assert (run_dir / "result_manifest.json").is_file()
+    manifest = json.loads((run_dir / "result_manifest.json").read_text(encoding="utf-8"))
+    assert manifest["status"] == "failed"
+    assert "spectre command exception" in "\n".join(result.issues)
+    assert "spectre command failed with exception" in (run_dir / "spectre.stdout").read_text(encoding="utf-8")
+
+
+def test_remote_adapter_upload_failure_does_not_prevent_local_manifest(tmp_path: Path) -> None:
+    project_dir = create_approved_real_project(tmp_path)
+    run_dir = project_dir / "runs" / "real" / "real_001"
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    runner = RunExceptionUploadFailingFakeRunner(
+        fail_on_substring="spectre",
+        fail_upload_on_substring="result_manifest.json",
+    )
+
+    result = run_remote_spectre_ocean_adapter(
+        project_dir,
+        run_id="real_001",
+        remote_ref=ref,
+        remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
+        runner=runner,
+    )
+
+    assert result.status == "failed"
+    assert (run_dir / "result_manifest.json").is_file()
+    manifest = json.loads((run_dir / "result_manifest.json").read_text(encoding="utf-8"))
+    assert manifest["status"] == "failed"
+    assert any("failed to upload result manifest" in issue for issue in result.issues)
+
+
+def test_remote_adapter_download_exception_still_writes_local_manifest(tmp_path: Path) -> None:
+    project_dir = create_approved_real_project(tmp_path)
+    run_dir = project_dir / "runs" / "real" / "real_001"
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    runner = DownloadFailingFakeRunner("/psf")
+
+    result = run_remote_spectre_ocean_adapter(
+        project_dir,
+        run_id="real_001",
+        remote_ref=ref,
+        remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
+        runner=runner,
+    )
+
+    assert result.status == "failed"
+    assert (run_dir / "result_manifest.json").is_file()
+    manifest = json.loads((run_dir / "result_manifest.json").read_text(encoding="utf-8"))
+    assert manifest["status"] == "failed"
+    assert any("download" in issue.lower() for issue in result.issues)
 
 
 def test_remote_adapter_ocean_failure_uploads_manifest_to_remote(tmp_path: Path) -> None:

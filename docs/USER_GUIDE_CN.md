@@ -1,4 +1,4 @@
-# IC Auto Opt Workflow v0.1.4 使用说明
+# IC Auto Opt Workflow v0.1.5 使用说明
 
 这份说明面向集成电路方向用户，假设你会使用 Linux 和 Cadence，但不要求你熟悉
 Python 工程。
@@ -200,7 +200,7 @@ constraints.md
 
 ## 4. 先做 doctor 体检
 
-正式跑真实工具之前，建议先执行：
+正式跑真实工具之前，强烈建议先执行：
 
 ```bash
 ./.venv/bin/ic-opt ~/spectre_opt_prj/Mixer_opt --doctor
@@ -209,6 +209,11 @@ constraints.md
 它会检查 `opt_requirement.md`、Cadence 环境文件、OpenBox/Hermes Python
 环境、config/netlist 准备情况和 continuation 所需历史文件。它不会启动
 Spectre/OCEAN，也不会生成优化候选点。
+
+如果你把任务交给 agent 做，agent 应该默认先运行 doctor。doctor 不通过时，不应
+继续真实优化，而应先告诉你哪个文件、字段或路径有问题。因为
+`opt_requirement.md` 是严格结构化文件，很多问题都属于章节名、字段名、缩进、
+metric 名字或 Maestro point root 路径的小错误，先 doctor 能避免白跑真实工具。
 
 ## 5. 写 opt_requirement.md
 
@@ -434,13 +439,24 @@ ic-opt --ssh-profile eda-lab /remote/path/to/Mixer_opt \
   --real \
   --max-evals 80 \
   --batch-size 10 \
-  --parallel-jobs 10
+  --parallel-jobs 6
 
 ic-opt --ssh-profile eda-lab /remote/path/to/Mixer_opt \
   --continue 20 \
   --batch-size 10 \
-  --parallel-jobs 10
+  --parallel-jobs 6
 ```
+
+远程并发建议：
+
+- `parallel_jobs` 是 candidate 级别并发，不是每个 testbench 的并发数。
+- 多 testbench candidate 会在每个 candidate 内部跑它需要的 testbench。
+- 正常远程多 testbench 建议从 `--parallel-jobs 4` 到 `--parallel-jobs 8`
+  开始。
+- `--parallel-jobs 24` 或 `36` 更像压力测试，容易触发远程 SSH 服务端限制，比如
+  `kex_exchange_identification: Connection closed by remote host`。
+- `optimizer_cpu_threads` 只限制本机 optimizer/OpenBox 侧 CPU 使用，不限制远程
+  Spectre/OCEAN 进程数量，也不限制 SSH 连接数。
 
 如果远程 Cadence 环境文件不叫 `cadence_env.csh`，传入远程路径：
 
@@ -474,7 +490,11 @@ ic-opt --ssh-profile eda-lab /remote/path/to/Mixer_opt \
 reports/optimizer_decision_report.md
 reports/optimizer_insight_report.md
 reports/optimizer_final_summary.md
+reports/optimizer_visuals/
 ```
+
+`optimizer_visuals/` 默认输出 PNG 图片，包括 FoM、收敛、状态分布、约束 margin、
+瓶颈分数和变量-目标关系图，适合直接在报告、agent 窗口或普通图片预览器里查看。
 
 常见结论：
 
@@ -510,6 +530,9 @@ accept_best_observed_or_continue
 Agent 的职责：
 
 - 读取项目文件
+- 先运行 `ic-opt PROJECT --doctor`，检查 `opt_requirement.md`、point root、环境文件
+  和远程 SSH 是否准备好
+- doctor 不通过时停止，并告诉用户需要修改的具体文件、字段或路径
 - 调用 `ic-opt`
 - 等真实流程完成
 - 读取报告
@@ -523,7 +546,39 @@ Agent 不应该：
 - 在用户没要求时改变并行资源
 - 把失败点当作主推荐点
 
-## 12. 当前 v0.1.4 边界
+如果 agent 遇到报错，应先参考：
+
+```text
+docs/TROUBLESHOOTING_CN.md
+```
+
+里面按报错信息列出了常见原因和修复方式，包括 `opt_requirement.md` 格式错误、
+Maestro point root 层级错误、OCEAN 非标量、SSH host key、免密登录、远程高并发
+导致的 `kex_exchange_identification`，以及旧版本 manifest missing。
+
+## 12. 常见报错先看哪里
+
+完整排错表在：
+
+```text
+docs/TROUBLESHOOTING_CN.md
+```
+
+几个最高频问题：
+
+- `opt_requirement.md` 格式或字段错误：先跑 `--doctor`，按报告修文件，不要在聊天里
+  临时补公式。
+- `maestro_point_root` 错误：必须填到 leaf run 目录，里面能看到
+  `netlist/input.scs` 和 `psf/`。
+- OCEAN metric 非标量：公式返回了 waveform/list/空值/NaN，需要改成能返回单个数的
+  OCEAN 表达式。
+- 远程 `Host key verification failed`：先手动 `ssh PROFILE true` 并接受正确 host key。
+- 远程 `Permission denied` 或 BatchMode 失败：免密 SSH 没配好。
+- 远程高并发出现 `kex_exchange_identification`：降低 `parallel_jobs`，正常先用 4-8。
+- `result_manifest.json missing`：当前版本已针对 SSH/tool 异常路径补失败 manifest；
+  如果仍出现，请保留 run 目录并更新到最新版本后复查。
+
+## 13. 当前 v0.1.5 边界
 
 - 已经支持 shell 自动化的完整真实流程。
 - 已经支持远程 SSH 执行：本机运行优化器，远程 Linux EDA 服务器运行 Spectre/OCEAN。

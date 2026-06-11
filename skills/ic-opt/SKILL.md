@@ -53,6 +53,40 @@ Do not ask the user to restate formulas, variables, metric routes, testbench
 paths, Spectre resources, or optimizer settings. Those belong in
 `PROJECT/opt_requirement.md` and optional `PROJECT/constraints.md`.
 
+## Mandatory Preflight Gate
+
+Before any fresh `--real` run, run doctor first unless the user explicitly says
+doctor already passed for the same unchanged project:
+
+```bash
+ic-opt PROJECT --doctor
+```
+
+For remote projects:
+
+```bash
+ic-opt --ssh-profile PROFILE REMOTE_PROJECT --doctor
+```
+
+Treat doctor as the structured requirement and project-folder check. It catches
+common `opt_requirement.md` mistakes, missing Maestro/ADE point roots, missing
+`cadence_env.csh`, broken SSH readiness, and generated-config errors before
+real Spectre/OCEAN work starts.
+
+If doctor fails:
+
+- stop before `--real`;
+- report the failing item and the exact file/path involved;
+- tell the user what to fix in `opt_requirement.md`, `constraints.md`,
+  `cadence_env.csh`, SSH, or Maestro/ADE point roots;
+- do not silently rewrite OCEAN formulas, variable ranges, FoM, or resource
+  settings.
+
+For continuation, doctor is optional when the existing run history is already
+accepted and the user only asks to add points. Run doctor again if the user
+changed variables, constraints, FoM, metric formulas, testbench paths, or remote
+profile.
+
 ## Locate The CLI
 
 Use the first available command:
@@ -80,6 +114,7 @@ Stop after doctor and report pass/fail plus the failing item if any.
 For real optimization:
 
 ```bash
+ic-opt PROJECT --doctor
 ic-opt PROJECT --real [user flags]
 ```
 
@@ -106,6 +141,19 @@ reports back to `REMOTE_PROJECT/reports/`.
 Before a remote real run, prefer `ic-opt --ssh-profile PROFILE REMOTE_PROJECT
 --doctor`. If SSH fails, report the exact SSH readiness command the user should
 fix first instead of changing optimizer settings.
+
+Remote parallelism guidance:
+
+- `parallel_jobs` is candidate-level concurrency, not per-testbench concurrency.
+- Multi-testbench candidates run their configured testbenches inside each
+  candidate; increasing `parallel_jobs` multiplies total remote tool pressure.
+- For normal remote multi-testbench use, prefer conservative values such as
+  `--parallel-jobs 4` to `--parallel-jobs 8`.
+- High values such as 24 or 36 can trigger SSH server limits, for example
+  `kex_exchange_identification: Connection closed by remote host`. Treat those
+  as remote transport/tool failures, not circuit-performance failures.
+- `optimizer_cpu_threads` limits optimizer-side Python/OpenBox CPU use; it does
+  not limit Spectre/OCEAN process count or SSH connection count.
 
 Do not translate continuation into a lower-level `hermes-workflow` command for
 normal users. Do not restart from scratch unless the user changed variables,
@@ -152,6 +200,7 @@ subagent.
 - Do not create a per-project Python virtualenv.
 - In remote mode, do not install Python packages on the remote EDA server.
 - Do not silently change `parallel_jobs`, `threads_per_run`, precision, or FoM.
+- Do not skip doctor before a fresh real run on a new or changed project.
 - Do not poll every optimizer batch; report start, unexpected failure,
   completion, and only low-frequency heartbeat status for long runs.
 - Do not present failed candidates as the primary recommendation when feasible
@@ -186,3 +235,24 @@ Summarize only:
 
 If a step fails, report the failed step and relevant artifact path. Do not
 continue by inventing candidates or editing formulas.
+
+## Common Error Triage
+
+Use `docs/TROUBLESHOOTING_CN.md` for the full table. The short rules are:
+
+- `opt_requirement.md` parse/validation failure: run `--doctor`, point the user
+  to the exact section/key, and stop before real tools.
+- `maestro_point_root` errors: the path must be the leaf Maestro/ADE run
+  directory containing `netlist/input.scs` and `psf/`.
+- OCEAN metric `non_scalar` or non-finite scalar: the formula returned a
+  waveform/list/undefined value for that candidate; ask the user to fix the
+  OCEAN scalar expression or metric definition.
+- `Host key verification failed`: ask the user to run `ssh PROFILE true` once
+  and accept the correct host key.
+- `Permission denied` or BatchMode SSH failure: passwordless SSH is not ready;
+  ask the user to fix `authorized_keys` or `~/.ssh/config`.
+- `kex_exchange_identification` / remote SSH connection closed under high
+  parallelism: lower `parallel_jobs` to 4-8 for normal remote runs.
+- `result_manifest.json missing`: with current versions this should not happen
+  for handled tool/SSH failures. If it appears, tell the user to update the
+  package and preserve the run directory for debugging.

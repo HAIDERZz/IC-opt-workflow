@@ -1,4 +1,4 @@
-# IC Auto Opt Workflow v0.1.4
+# IC Auto Opt Workflow v0.1.5
 
 IC Auto Opt Workflow helps analog/RF IC designers run repeatable Spectre/OCEAN
 optimization from a project folder.
@@ -15,6 +15,13 @@ The main command is:
 ic-opt /path/to/project --real
 ```
 
+Before a fresh real run, especially when an AI agent is operating the tool, run
+a doctor check first:
+
+```bash
+ic-opt /path/to/project --doctor
+```
+
 For a remote Linux EDA server, keep the project on the server and run:
 
 ```bash
@@ -22,8 +29,8 @@ ic-opt --ssh-profile eda-lab /remote/path/to/project --real
 ```
 
 The same command can also be called by an AI agent. The agent should operate the
-tool and explain the reports; the deterministic optimization work is done by the
-CLI.
+tool, run doctor before fresh real optimization, and explain the reports; the
+deterministic optimization work is done by the CLI.
 
 The platform-neutral agent skill is available in the source tree at
 `skills/ic-opt/SKILL.md`. If you installed the package with `pip`, locate the
@@ -44,7 +51,8 @@ hermes-workflow agent-skill-path
 - Uses the same model for one or more testbenches. A single testbench is a valid
   special case; multiple testbenches are only needed when one candidate's
   metrics come from different Maestro/ADE setups.
-- Generates decision reports, insight reports, and FoM plots. Optional OpenBox
+- Generates decision reports, insight reports, and PNG FoM/diagnostic plots.
+  Optional OpenBox
   advanced dependencies add HTML/JSON surrogate visualization artifacts.
 - Supports continuing an existing run, for example adding 40 more evaluations
   after the first 100.
@@ -371,13 +379,19 @@ ic-opt --ssh-profile eda-lab /remote/path/to/my_mixer_opt \
   --real \
   --max-evals 80 \
   --batch-size 10 \
-  --parallel-jobs 10
+  --parallel-jobs 6
 
 ic-opt --ssh-profile eda-lab /remote/path/to/my_mixer_opt \
   --continue 20 \
   --batch-size 10 \
-  --parallel-jobs 10
+  --parallel-jobs 6
 ```
+
+For remote multi-testbench projects, start conservatively with
+`--parallel-jobs 4` to `--parallel-jobs 8`. `parallel_jobs` is candidate-level
+concurrency, not per-testbench concurrency. High values such as 24 or 36 can
+hit SSH server limits and produce transport errors like
+`kex_exchange_identification: Connection closed by remote host`.
 
 If the remote Cadence setup file is not
 `/remote/path/to/my_mixer_opt/cadence_env.csh`, pass the remote path:
@@ -445,6 +459,7 @@ The project requirements should live in files, not in a long chat message. The
 agent should:
 
 - read the project files,
+- run `ic-opt PROJECT --doctor` before a fresh real run,
 - run `ic-opt`,
 - wait for completion,
 - read the reports,
@@ -489,6 +504,7 @@ pyproject.toml              package metadata and console scripts
 - `docs/USER_GUIDE_CN.md`: beginner-friendly Chinese user guide.
 - `docs/OPTIMIZER_PRODUCTION_QUICKSTART.md`: product quickstart.
 - `docs/TOOLCHAIN_EXECUTION_REFERENCE.md`: known-good tool execution rules.
+- `docs/TROUBLESHOOTING_CN.md`: common errors, likely causes, and fixes.
 - `examples/spectre_maestro_project/OPT_REQUIREMENT_README.md`: requirement file
   format.
 - `docs/AGENT_OPTIMIZER_USAGE_MANUAL.md`: platform-neutral agent operating
@@ -498,7 +514,7 @@ pyproject.toml              package metadata and console scripts
 
 ## Version
 
-Current release: `v0.1.4`.
+Current release: `v0.1.5`.
 
 This release has been clean-installed from GitHub and validated on real
 multi-testbench Mixer optimization flows, including local continuation and
@@ -508,6 +524,10 @@ remote SSH execution:
 local: 100 real evaluations -> continuation by 40 -> 140 accepted cumulative evaluations
 remote: 80 real evaluations -> continuation by 20 -> 100 accepted cumulative evaluations
 ```
+
+Remote SSH users should keep `--parallel-jobs` conservative. For normal
+multi-testbench work, start around 4-8; higher values can hit SSH server limits
+before they improve optimizer quality.
 
 ## License
 

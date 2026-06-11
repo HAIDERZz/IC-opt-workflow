@@ -1,12 +1,25 @@
 from __future__ import annotations
 
+import ast
 import html
 import json
 import math
+import os
+import tempfile
 from collections import Counter
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
+
+os.environ.setdefault(
+    "MPLCONFIGDIR",
+    str(Path(tempfile.gettempdir()) / "ic_auto_opt_matplotlib"),
+)
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+from matplotlib.axes import Axes
 
 import yaml
 
@@ -17,15 +30,24 @@ from hermes_workflow.validate import evaluate_objective
 REPORT_RELATIVE = Path("reports/optimizer_insight_report.json")
 MARKDOWN_RELATIVE = Path("reports/optimizer_insight_report.md")
 VISUALS_DIR_RELATIVE = Path("reports/optimizer_visuals")
-ALL_EVALUABLE_FOM_RELATIVE = VISUALS_DIR_RELATIVE / "all_evaluable_fom.svg"
+ALL_EVALUABLE_FOM_RELATIVE = VISUALS_DIR_RELATIVE / "all_evaluable_fom.png"
 BOTTLENECK_WEIGHTED_SCORE_RELATIVE = (
-    VISUALS_DIR_RELATIVE / "bottleneck_weighted_score.svg"
+    VISUALS_DIR_RELATIVE / "bottleneck_weighted_score.png"
 )
-CONVERGENCE_RELATIVE = VISUALS_DIR_RELATIVE / "convergence.svg"
-FEASIBLE_CONVERGENCE_RELATIVE = VISUALS_DIR_RELATIVE / "feasible_convergence.svg"
-STATUS_DISTRIBUTION_RELATIVE = VISUALS_DIR_RELATIVE / "status_distribution.svg"
-PARAMETER_OBJECTIVE_RELATIVE = VISUALS_DIR_RELATIVE / "parameter_objective_scatter.svg"
-CONSTRAINT_MARGINS_RELATIVE = VISUALS_DIR_RELATIVE / "constraint_margins.svg"
+CONVERGENCE_RELATIVE = VISUALS_DIR_RELATIVE / "convergence.png"
+FEASIBLE_CONVERGENCE_RELATIVE = VISUALS_DIR_RELATIVE / "feasible_convergence.png"
+STATUS_DISTRIBUTION_RELATIVE = VISUALS_DIR_RELATIVE / "status_distribution.png"
+PARAMETER_OBJECTIVE_RELATIVE = VISUALS_DIR_RELATIVE / "parameter_objective_scatter.png"
+CONSTRAINT_MARGINS_RELATIVE = VISUALS_DIR_RELATIVE / "constraint_margins.png"
+LEGACY_SVG_VISUALS = (
+    "all_evaluable_fom.svg",
+    "bottleneck_weighted_score.svg",
+    "constraint_margins.svg",
+    "convergence.svg",
+    "feasible_convergence.svg",
+    "parameter_objective_scatter.svg",
+    "status_distribution.svg",
+)
 
 
 @dataclass(frozen=True)
@@ -91,7 +113,10 @@ def generate_optimizer_insight_report(project_dir: str | Path) -> OptimizerInsig
         _string_value(metric_contract.get("objective_direction")),
     )
     configured_ranking = _configured_objective_ranking(traces, all_evaluable_fom)
-    bottleneck_weighted = _bottleneck_weighted_score_summary(traces)
+    bottleneck_weighted = _bottleneck_weighted_score_summary(
+        traces,
+        _string_value(metric_contract.get("objective_expression")),
+    )
     top_feasible = _top_feasible_candidates(traces)
     constraint_margins = _constraint_margin_summary(traces, metric_contract)
     ic_summary = _ic_metric_summary(top_feasible, traces)
@@ -130,33 +155,35 @@ def _write_outputs(
 ) -> None:
     visuals_dir = project_root / VISUALS_DIR_RELATIVE
     visuals_dir.mkdir(parents=True, exist_ok=True)
-    (project_root / ALL_EVALUABLE_FOM_RELATIVE).write_text(
-        _all_evaluable_fom_svg(report.all_evaluable_fom_summary),
-        encoding="utf-8",
+    _remove_legacy_svg_visuals(visuals_dir)
+    _write_all_evaluable_fom_png(
+        project_root / ALL_EVALUABLE_FOM_RELATIVE,
+        report.all_evaluable_fom_summary,
     )
-    (project_root / BOTTLENECK_WEIGHTED_SCORE_RELATIVE).write_text(
-        _bottleneck_weighted_score_svg(report.bottleneck_weighted_score_summary),
-        encoding="utf-8",
+    _write_bottleneck_weighted_score_png(
+        project_root / BOTTLENECK_WEIGHTED_SCORE_RELATIVE,
+        report.bottleneck_weighted_score_summary,
     )
-    (project_root / CONVERGENCE_RELATIVE).write_text(
-        _convergence_svg(traces),
-        encoding="utf-8",
+    _write_convergence_png(
+        project_root / CONVERGENCE_RELATIVE,
+        traces,
     )
-    (project_root / FEASIBLE_CONVERGENCE_RELATIVE).write_text(
-        _feasible_convergence_svg(traces),
-        encoding="utf-8",
+    _write_feasible_convergence_png(
+        project_root / FEASIBLE_CONVERGENCE_RELATIVE,
+        traces,
     )
-    (project_root / STATUS_DISTRIBUTION_RELATIVE).write_text(
-        _status_distribution_svg(report.status_counts),
-        encoding="utf-8",
+    _write_status_distribution_png(
+        project_root / STATUS_DISTRIBUTION_RELATIVE,
+        report.status_counts,
     )
-    (project_root / PARAMETER_OBJECTIVE_RELATIVE).write_text(
-        _parameter_objective_svg(traces),
-        encoding="utf-8",
+    _write_parameter_objective_png(
+        project_root / PARAMETER_OBJECTIVE_RELATIVE,
+        traces,
     )
-    (project_root / CONSTRAINT_MARGINS_RELATIVE).write_text(
-        _constraint_margins_svg(traces, report.constraint_margin_summary),
-        encoding="utf-8",
+    _write_constraint_margins_png(
+        project_root / CONSTRAINT_MARGINS_RELATIVE,
+        traces,
+        report.constraint_margin_summary,
     )
 
     if report.report_path is not None:
@@ -174,6 +201,423 @@ def _write_outputs(
             _markdown_report(report),
             encoding="utf-8",
         )
+
+
+def _remove_legacy_svg_visuals(visuals_dir: Path) -> None:
+    for filename in LEGACY_SVG_VISUALS:
+        path = visuals_dir / filename
+        if path.is_file():
+            path.unlink()
+
+
+STATUS_COLORS = {
+    "feasible": "#2f9e44",
+    "constraint_failed": "#e08b2d",
+    "metric_check_failed": "#d64545",
+    "real_check_failed": "#6b7280",
+    "pending": "#5a6ff0",
+}
+
+
+def _configure_matplotlib() -> None:
+    plt.rcParams.update(
+        {
+            "font.family": "sans-serif",
+            "font.sans-serif": ["Arial", "Helvetica", "DejaVu Sans", "sans-serif"],
+            "font.size": 9,
+            "axes.spines.right": False,
+            "axes.spines.top": False,
+            "axes.linewidth": 0.8,
+            "axes.grid": True,
+            "grid.color": "#d8dde8",
+            "grid.linewidth": 0.7,
+            "grid.alpha": 0.75,
+            "legend.frameon": False,
+            "figure.facecolor": "white",
+            "axes.facecolor": "white",
+        }
+    )
+
+
+def _save_png(fig: Any, path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(path, dpi=180, bbox_inches="tight", facecolor="white")
+    plt.close(fig)
+
+
+def _write_empty_png(path: Path, title: str, message: str) -> None:
+    _configure_matplotlib()
+    fig, ax = plt.subplots(figsize=(8, 3.2))
+    ax.axis("off")
+    ax.text(0.02, 0.85, title, fontsize=13, fontweight="bold", transform=ax.transAxes)
+    ax.text(0.02, 0.48, message, fontsize=10, color="#374151", transform=ax.transAxes)
+    _save_png(fig, path)
+
+
+def _status_color(status: str) -> str:
+    return STATUS_COLORS.get(status, "#5a6ff0")
+
+
+def _plot_status_legend(ax: Axes, statuses: set[str]) -> None:
+    handles = [
+        plt.Line2D(
+            [0],
+            [0],
+            marker="o",
+            linestyle="",
+            markersize=5,
+            color=_status_color(status),
+            label=status,
+        )
+        for status in sorted(statuses)
+    ]
+    if handles:
+        ax.legend(handles=handles, loc="best", fontsize=8)
+
+
+def _readable_ylim(values: list[float]) -> tuple[float, float, int]:
+    finite = [value for value in values if math.isfinite(value)]
+    if not finite:
+        return (0.0, 1.0, 0)
+    display_values = finite
+    non_penalty = [value for value in finite if abs(value) < 1e5]
+    if len(non_penalty) >= 3:
+        max_non_penalty = max(abs(value) for value in non_penalty) or 1.0
+        if max(abs(value) for value in finite) > max_non_penalty * 100:
+            display_values = non_penalty
+    low = min(display_values)
+    high = max(display_values)
+    if low == high:
+        pad = max(abs(low) * 0.05, 1e-12)
+        low -= pad
+        high += pad
+    else:
+        pad = (high - low) * 0.08
+        low -= pad
+        high += pad
+    clipped = sum(1 for value in finite if value < low or value > high)
+    return low, high, clipped
+
+
+def _apply_readable_ylim(ax: Axes, values: list[float]) -> None:
+    low, high, clipped = _readable_ylim(values)
+    ax.set_ylim(low, high)
+    if clipped:
+        ax.text(
+            0.99,
+            0.02,
+            f"{clipped} outlier/penalty values clipped",
+            ha="right",
+            va="bottom",
+            fontsize=8,
+            color="#6b7280",
+            transform=ax.transAxes,
+        )
+
+
+def _write_all_evaluable_fom_png(path: Path, summary: dict[str, Any]) -> None:
+    rows = [
+        (
+            _int_value(point.get("evaluation_index")),
+            float(point["fom"]),
+        )
+        for point in summary.get("series", [])
+        if isinstance(point, dict) and _finite_float(point.get("fom")) is not None
+    ]
+    rows = [(x, y) for x, y in rows if x is not None]
+    if not rows:
+        _write_empty_png(path, "All Evaluable FoM", "No finite FoM values")
+        return
+    _configure_matplotlib()
+    xs = [int(x) for x, _y in rows]
+    ys = [y for _x, y in rows]
+    fig, ax = plt.subplots(figsize=(10, 4.8))
+    ax.plot(xs, ys, color="#5a6ff0", linewidth=1.4, alpha=0.85)
+    ax.scatter(xs, ys, color="#5a6ff0", s=14, alpha=0.75)
+    direction = _string_value(summary.get("direction")) or "minimize"
+    best_index = _int_value(summary.get("best_evaluation_index"))
+    best_fom = _finite_float(summary.get("best_fom"))
+    if best_index is not None and best_fom is not None:
+        ax.scatter([best_index], [best_fom], color="#111827", s=42, marker="*", zorder=4)
+        ax.annotate(
+            f"best {summary.get('best_run_id')}",
+            (best_index, best_fom),
+            textcoords="offset points",
+            xytext=(8, 8),
+            fontsize=8,
+        )
+    ax.set_title("All evaluable FoM")
+    ax.set_xlabel("Evaluation")
+    ax.set_ylabel(f"FoM ({direction})")
+    _apply_readable_ylim(ax, ys)
+    _save_png(fig, path)
+
+
+def _write_convergence_png(path: Path, traces: list[dict[str, Any]]) -> None:
+    rows = [
+        (index + 1, objective, _string_value(row.get("status")))
+        for index, row in enumerate(traces)
+        if (objective := _finite_float(row.get("objective"))) is not None
+    ]
+    if not rows:
+        _write_empty_png(path, "Objective Convergence", "No finite objective values")
+        return
+    best_rows: list[tuple[int, float]] = []
+    best = math.inf
+    for index, objective, _status in rows:
+        best = min(best, objective)
+        best_rows.append((index, best))
+    _configure_matplotlib()
+    fig, ax = plt.subplots(figsize=(10, 4.8))
+    xs = [index for index, _objective, _status in rows]
+    ys = [objective for _index, objective, _status in rows]
+    ax.plot(xs, ys, color="#9ca3af", linewidth=1.0, alpha=0.55, label="objective")
+    for status in sorted({status for _index, _objective, status in rows}):
+        status_rows = [(x, y) for x, y, s in rows if s == status]
+        ax.scatter(
+            [x for x, _y in status_rows],
+            [y for _x, y in status_rows],
+            s=18,
+            alpha=0.8,
+            color=_status_color(status),
+            label=status,
+        )
+    ax.plot(
+        [x for x, _y in best_rows],
+        [y for _x, y in best_rows],
+        color="#111827",
+        linewidth=1.5,
+        label="best objective so far",
+    )
+    ax.set_title("Objective convergence")
+    ax.set_xlabel("Evaluation")
+    ax.set_ylabel("Objective")
+    _apply_readable_ylim(ax, ys)
+    ax.legend(loc="best", fontsize=8)
+    _save_png(fig, path)
+
+
+def _write_feasible_convergence_png(path: Path, traces: list[dict[str, Any]]) -> None:
+    rows = [
+        (index + 1, objective)
+        for index, row in enumerate(traces)
+        if row.get("status") == "feasible"
+        and (objective := _finite_float(row.get("objective"))) is not None
+    ]
+    if not rows:
+        _write_empty_png(path, "Feasible Objective Convergence", "No feasible objective values")
+        return
+    best_rows: list[tuple[int, float]] = []
+    best = math.inf
+    for index, objective in rows:
+        best = min(best, objective)
+        best_rows.append((index, best))
+    _configure_matplotlib()
+    fig, ax = plt.subplots(figsize=(10, 4.8))
+    xs = [x for x, _y in rows]
+    ys = [y for _x, y in rows]
+    ax.plot(xs, ys, color="#5a6ff0", linewidth=1.2, label="feasible objective")
+    ax.scatter(xs, ys, color="#5a6ff0", s=24)
+    ax.plot(
+        [x for x, _y in best_rows],
+        [y for _x, y in best_rows],
+        color="#138a4d",
+        linewidth=1.6,
+        label="best feasible so far",
+    )
+    ax.set_title("Feasible objective convergence")
+    ax.set_xlabel("Evaluation")
+    ax.set_ylabel("Objective (feasible only)")
+    _apply_readable_ylim(ax, ys)
+    ax.legend(loc="best", fontsize=8)
+    _save_png(fig, path)
+
+
+def _write_status_distribution_png(path: Path, status_counts: dict[str, int]) -> None:
+    if not status_counts:
+        _write_empty_png(path, "Status Distribution", "No status rows")
+        return
+    order = ["feasible", "constraint_failed", "metric_check_failed", "real_check_failed"]
+    items = [(status, status_counts[status]) for status in order if status in status_counts]
+    items.extend(
+        (status, count)
+        for status, count in sorted(status_counts.items())
+        if status not in {status for status, _count in items}
+    )
+    _configure_matplotlib()
+    fig, ax = plt.subplots(figsize=(8.5, 4.5))
+    statuses = [status for status, _count in items]
+    counts = [count for _status, count in items]
+    ax.bar(statuses, counts, color=[_status_color(status) for status in statuses])
+    for index, count in enumerate(counts):
+        ax.text(index, count, str(count), ha="center", va="bottom", fontsize=9)
+    ax.set_title("Evaluation status distribution")
+    ax.set_ylabel("Count")
+    ax.tick_params(axis="x", rotation=20)
+    _save_png(fig, path)
+
+
+def _write_bottleneck_weighted_score_png(path: Path, summary: dict[str, Any]) -> None:
+    points = [
+        point
+        for point in summary.get("series", [])
+        if isinstance(point, dict)
+        and _finite_float(point.get("weighted_score")) is not None
+        and _finite_float(point.get("bottleneck_score")) is not None
+    ]
+    if not points:
+        _write_empty_png(
+            path,
+            "Normalized Margin Bottleneck Plot",
+            "No complete normalized score points",
+        )
+        return
+    _configure_matplotlib()
+    fig, ax = plt.subplots(figsize=(7.2, 6.2))
+    for score, color in [(0.2, "#5a6ff0"), (0.4, "#e08b2d"), (0.6, "#2f9e44"), (0.8, "#d64545")]:
+        line = _score_line_segment(score)
+        if line is None:
+            continue
+        (x_start, y_start), (x_end, y_end) = line
+        ax.plot([x_start, x_end], [y_start, y_end], color=color, linewidth=1.1, alpha=0.7)
+        ax.text(x_end, y_end, f"score={score:.1f}", fontsize=8, color=color)
+    best_run_id = _string_value(summary.get("best_run_id"))
+    statuses = {_string_value(point.get("status")) for point in points}
+    for status in sorted(statuses):
+        status_points = [point for point in points if _string_value(point.get("status")) == status]
+        ax.scatter(
+            [float(point["weighted_score"]) for point in status_points],
+            [float(point["bottleneck_score"]) for point in status_points],
+            s=22,
+            alpha=0.75,
+            color=_status_color(status),
+            label=status,
+        )
+    best = next((point for point in points if _string_value(point.get("run_id")) == best_run_id), None)
+    if best is not None:
+        ax.scatter(
+            [float(best["weighted_score"])],
+            [float(best["bottleneck_score"])],
+            s=90,
+            marker="*",
+            color="#111827",
+            label=f"best {best_run_id}",
+            zorder=5,
+        )
+    ax.set_xlim(-0.02, 1.02)
+    ax.set_ylim(-0.02, 1.02)
+    ax.set_title("Normalized margin bottleneck vs weighted score")
+    ax.set_xlabel("Weighted-sum score")
+    ax.set_ylabel("Bottleneck score min(z_i)")
+    ax.legend(loc="best", fontsize=8)
+    _save_png(fig, path)
+
+
+def _write_parameter_objective_png(path: Path, traces: list[dict[str, Any]]) -> None:
+    parameter_names = sorted(
+        {
+            key
+            for row in traces
+            for key in _dict_value(row.get("parameters"), default={}).keys()
+        }
+    )
+    panels: list[tuple[str, list[tuple[float, float, str]]]] = []
+    for parameter in parameter_names:
+        points: list[tuple[float, float, str]] = []
+        for row in traces:
+            parameters = _dict_value(row.get("parameters"), default={})
+            x_value = _parse_number(parameters.get(parameter))
+            y_value = _finite_float(row.get("objective"))
+            if x_value is None or y_value is None:
+                continue
+            points.append((x_value, y_value, _string_value(row.get("status"))))
+        if points:
+            panels.append((parameter, points))
+    if not panels:
+        _write_empty_png(path, "Parameter vs Objective", "No numeric parameter/objective pairs")
+        return
+    _configure_matplotlib()
+    ncols = 3 if len(panels) > 4 else 2
+    nrows = math.ceil(len(panels) / ncols)
+    fig, axes = plt.subplots(
+        nrows,
+        ncols,
+        figsize=(4.2 * ncols, 2.8 * nrows),
+        squeeze=False,
+        sharey=False,
+    )
+    for ax in axes.flat:
+        ax.axis("off")
+    for ax, (parameter, points) in zip(axes.flat, panels, strict=False):
+        ax.axis("on")
+        statuses = {status for _x, _y, status in points}
+        for status in sorted(statuses):
+            status_points = [(x, y) for x, y, s in points if s == status]
+            ax.scatter(
+                [x for x, _y in status_points],
+                [y for _x, y in status_points],
+                s=16,
+                alpha=0.72,
+                color=_status_color(status),
+                label=status,
+            )
+        ax.set_title(parameter, fontsize=10)
+        ax.set_xlabel(parameter)
+        ax.set_ylabel("Objective")
+        _apply_readable_ylim(ax, [y for _x, y, _s in points])
+    _plot_status_legend(axes.flat[0], {status for _p, points in panels for _x, _y, status in points})
+    fig.suptitle("Parameter vs objective", fontsize=13, fontweight="bold", y=1.0)
+    fig.tight_layout()
+    _save_png(fig, path)
+
+
+def _write_constraint_margins_png(
+    path: Path,
+    traces: list[dict[str, Any]],
+    summary: dict[str, Any],
+) -> None:
+    del traces
+    panels: list[tuple[str, list[tuple[int, float]]]] = []
+    for metric, metric_summary in sorted(summary.items()):
+        points = [
+            (
+                _int_value(point.get("evaluation_index")),
+                float(point.get("normalized_margin", 0.0)),
+            )
+            for point in metric_summary.get("series", [])
+            if isinstance(point, dict) and _int_value(point.get("evaluation_index")) is not None
+        ]
+        if points:
+            panels.append((metric, points))
+    if not panels:
+        _write_empty_png(path, "Constraint Margins", "No configured constraint margins")
+        return
+    _configure_matplotlib()
+    ncols = 2 if len(panels) > 1 else 1
+    nrows = math.ceil(len(panels) / ncols)
+    fig, axes = plt.subplots(
+        nrows,
+        ncols,
+        figsize=(5.4 * ncols, 2.8 * nrows),
+        squeeze=False,
+    )
+    for ax in axes.flat:
+        ax.axis("off")
+    for ax, (metric, points) in zip(axes.flat, panels, strict=False):
+        ax.axis("on")
+        xs = [int(x) for x, _y in points]
+        ys = [y for _x, y in points]
+        colors = ["#2f9e44" if value >= 0 else "#d64545" for value in ys]
+        ax.axhline(0, color="#111827", linewidth=0.9, alpha=0.8)
+        ax.plot(xs, ys, color="#9ca3af", linewidth=1.0, alpha=0.65)
+        ax.scatter(xs, ys, color=colors, s=18, alpha=0.8)
+        ax.set_title(metric, fontsize=10)
+        ax.set_xlabel("Evaluation")
+        ax.set_ylabel("Normalized margin")
+        _apply_readable_ylim(ax, ys)
+    fig.suptitle("Constraint margins (positive = pass)", fontsize=13, fontweight="bold", y=1.0)
+    fig.tight_layout()
+    _save_png(fig, path)
 
 
 def _load_metric_contract(project_root: Path) -> dict[str, Any]:
@@ -586,20 +1030,28 @@ def _configured_objective_ranking(
     }
 
 
-def _bottleneck_weighted_score_summary(traces: list[dict[str, Any]]) -> dict[str, Any]:
+def _bottleneck_weighted_score_summary(
+    traces: list[dict[str, Any]],
+    objective_expression: str = "",
+) -> dict[str, Any]:
+    score_model = _normalized_score_model_from_objective(objective_expression)
     series: list[dict[str, Any]] = []
     for row_index, row in enumerate(traces):
-        scores = _normalized_mixer_metric_scores(
-            _dict_value(row.get("metrics"), default={})
+        metrics = _numeric_metrics(row)
+        scores = (
+            _normalized_scores_from_model(score_model, metrics)
+            if score_model is not None
+            else _normalized_mixer_metric_scores(metrics)
         )
         if scores is None:
             continue
-        weighted_score = (
-            0.15 * scores["BW"]
-            + 0.10 * scores["MAX_GAIN"]
-            + 0.25 * scores["NF_3G"]
-            + 0.30 * scores["IIP3"]
-            + 0.20 * scores["P1DB"]
+        weights = (
+            score_model["weights"]
+            if score_model is not None
+            else _legacy_mixer_score_weights()
+        )
+        weighted_score = sum(
+            float(weights.get(name, 0.0)) * value for name, value in scores.items()
         )
         bottleneck_score = min(scores.values())
         combined_score = 0.7 * bottleneck_score + 0.3 * weighted_score
@@ -618,7 +1070,11 @@ def _bottleneck_weighted_score_summary(traces: list[dict[str, Any]]) -> dict[str
         )
     best = max(series, key=lambda point: point["combined_score"]) if series else {}
     return {
-        "source": "normalized_margin_components",
+        "source": (
+            "objective_expression_components"
+            if score_model is not None
+            else "normalized_margin_components"
+        ),
         "sample_count": len(series),
         "best_run_id": best.get("run_id"),
         "best_evaluation_index": best.get("evaluation_index"),
@@ -626,13 +1082,16 @@ def _bottleneck_weighted_score_summary(traces: list[dict[str, Any]]) -> dict[str
         "best_combined_objective": best.get("combined_objective"),
         "series": series,
         "formula": "score = 0.7*bottleneck + 0.3*weighted",
-        "weights": {
-            "BW": 0.15,
-            "MAX_GAIN": 0.10,
-            "NF_3G": 0.25,
-            "IIP3": 0.30,
-            "P1DB": 0.20,
-        },
+        "weights": (
+            score_model["weights"]
+            if score_model is not None
+            else _legacy_mixer_score_weights()
+        ),
+        "component_expressions": (
+            score_model["component_expressions"]
+            if score_model is not None
+            else {}
+        ),
     }
 
 
@@ -641,7 +1100,7 @@ def _normalized_mixer_metric_scores(metrics: dict[str, Any]) -> dict[str, float]
     max_gain = _parse_number(metrics.get("MAX_GAIN"))
     nf_3g = _parse_number(metrics.get("NF_3G"))
     iip3 = _parse_number(metrics.get("IIP3"))
-    p1db = _parse_number(metrics.get("P1DB"))
+    p1db = _parse_number(metrics.get("P1dB", metrics.get("P1DB")))
     if None in {bw, max_gain, nf_3g, iip3, p1db} or bw is None or bw <= 0:
         return None
     return {
@@ -649,8 +1108,183 @@ def _normalized_mixer_metric_scores(metrics: dict[str, Any]) -> dict[str, float]
         "MAX_GAIN": _clamp01((max_gain - 4) / 0.5),
         "NF_3G": _clamp01((12 - nf_3g) / 0.1),
         "IIP3": _clamp01(iip3 / 0.5),
-        "P1DB": _clamp01((p1db + 2) / 0.5),
+        "P1dB": _clamp01((p1db + 2) / 0.5),
     }
+
+
+def _legacy_mixer_score_weights() -> dict[str, float]:
+    return {
+        "BW": 0.15,
+        "MAX_GAIN": 0.10,
+        "NF_3G": 0.25,
+        "IIP3": 0.30,
+        "P1dB": 0.20,
+    }
+
+
+def _numeric_metrics(row: dict[str, Any]) -> dict[str, float]:
+    metrics: dict[str, float] = {}
+    for name, value in _dict_value(row.get("metrics"), default={}).items():
+        numeric = _parse_number(value)
+        if numeric is not None:
+            metrics[str(name)] = numeric
+    return metrics
+
+
+def _normalized_scores_from_model(
+    score_model: dict[str, Any],
+    metrics: dict[str, float],
+) -> dict[str, float] | None:
+    if not metrics:
+        return None
+    scores: dict[str, float] = {}
+    for label, expression in score_model["component_expressions"].items():
+        try:
+            value = evaluate_objective(str(expression), metrics)
+        except (KeyError, ValueError, ZeroDivisionError, OverflowError):
+            return None
+        if not math.isfinite(value):
+            return None
+        scores[str(label)] = _clamp01(value)
+    return scores or None
+
+
+def _normalized_score_model_from_objective(expression: str) -> dict[str, Any] | None:
+    if not expression:
+        return None
+    try:
+        root = ast.parse(expression, mode="eval").body
+    except SyntaxError:
+        return None
+    if isinstance(root, ast.UnaryOp) and isinstance(root.op, ast.USub):
+        root = root.operand
+
+    min_call = _find_min_call(root)
+    if min_call is None or len(min_call.args) < 2:
+        return None
+
+    component_by_key: dict[str, tuple[str, ast.AST]] = {}
+    component_expressions: dict[str, str] = {}
+    for index, node in enumerate(min_call.args, start=1):
+        label = _component_label(node) or f"component_{index}"
+        if label in component_expressions:
+            label = f"{label}_{index}"
+        component_by_key[_canonical_ast(node)] = (label, node)
+        component_expressions[label] = ast.unparse(node)
+
+    weighted_root = _weighted_sum_root(
+        root,
+        component_by_key,
+        _canonical_ast(min_call),
+    )
+    if weighted_root is None:
+        return None
+
+    weights: dict[str, float] = {}
+    for term in _flatten_add(weighted_root):
+        weight = _weighted_component_term(term, component_by_key)
+        if weight is None:
+            return None
+        label, coefficient = weight
+        weights[label] = weights.get(label, 0.0) + coefficient
+    if set(weights) != set(component_expressions):
+        return None
+
+    return {
+        "component_expressions": component_expressions,
+        "weights": weights,
+    }
+
+
+def _find_min_call(node: ast.AST) -> ast.Call | None:
+    candidates: list[ast.Call] = []
+    for child in ast.walk(node):
+        if (
+            isinstance(child, ast.Call)
+            and isinstance(child.func, ast.Name)
+            and child.func.id == "min"
+        ):
+            candidates.append(child)
+    if not candidates:
+        return None
+    return max(candidates, key=lambda call: len(call.args))
+
+
+def _weighted_sum_root(
+    root: ast.AST,
+    component_by_key: dict[str, tuple[str, ast.AST]],
+    bottleneck_key: str,
+) -> ast.AST | None:
+    for term in _flatten_add(root):
+        _coefficient, payload = _split_numeric_product(term)
+        if payload is None:
+            payload = term
+        if _contains_ast(payload, bottleneck_key):
+            continue
+        if any(_contains_ast(payload, key) for key in component_by_key):
+            return payload
+    return None
+
+
+def _weighted_component_term(
+    node: ast.AST,
+    component_by_key: dict[str, tuple[str, ast.AST]],
+) -> tuple[str, float] | None:
+    coefficient, payload = _split_numeric_product(node)
+    if coefficient is None or payload is None:
+        return None
+    component = component_by_key.get(_canonical_ast(payload))
+    if component is None:
+        return None
+    return component[0], coefficient
+
+
+def _split_numeric_product(node: ast.AST) -> tuple[float | None, ast.AST | None]:
+    if not isinstance(node, ast.BinOp) or not isinstance(node.op, ast.Mult):
+        return None, None
+    left = _numeric_constant(node.left)
+    if left is not None:
+        return left, node.right
+    right = _numeric_constant(node.right)
+    if right is not None:
+        return right, node.left
+    return None, None
+
+
+def _numeric_constant(node: ast.AST) -> float | None:
+    if isinstance(node, ast.Constant) and isinstance(node.value, int | float):
+        return float(node.value)
+    if (
+        isinstance(node, ast.UnaryOp)
+        and isinstance(node.op, ast.USub)
+        and isinstance(node.operand, ast.Constant)
+        and isinstance(node.operand.value, int | float)
+    ):
+        return -float(node.operand.value)
+    return None
+
+
+def _flatten_add(node: ast.AST) -> list[ast.AST]:
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+        return [*_flatten_add(node.left), *_flatten_add(node.right)]
+    return [node]
+
+
+def _canonical_ast(node: ast.AST) -> str:
+    return ast.dump(node, annotate_fields=False, include_attributes=False)
+
+
+def _contains_ast(node: ast.AST, canonical: str) -> bool:
+    return any(_canonical_ast(child) == canonical for child in ast.walk(node))
+
+
+def _component_label(node: ast.AST) -> str | None:
+    names = []
+    for child in ast.walk(node):
+        if isinstance(child, ast.Name) and child.id not in {"min", "max", "ln"}:
+            names.append(child.id)
+    unique = list(dict.fromkeys(names))
+    return unique[0] if len(unique) == 1 else None
 
 
 def _clamp01(value: float) -> float:
@@ -688,7 +1322,7 @@ def _bottleneck_weighted_score_svg(summary: dict[str, Any]) -> str:
     if not points:
         return _empty_svg(
             "Normalized Margin Bottleneck Plot",
-            "No complete BW/MAX_GAIN/NF_3G/IIP3/P1DB score points",
+            "No complete BW/MAX_GAIN/NF_3G/IIP3/P1dB score points",
         )
     width = 820
     height = 520
@@ -1029,6 +1663,7 @@ def _markdown_report(report: OptimizerInsightReport) -> str:
         f"- Best FoM: `{report.all_evaluable_fom_summary.get('best_fom_display') or 'n/a'}`",
         f"- Internal objective: `{report.all_evaluable_fom_summary['best_objective_display'] or 'n/a'}`",
         f"- Plot: `{report.plots['all_evaluable_fom']}`",
+        f"![All evaluable FoM]({report.plots['all_evaluable_fom']})",
         "",
         "## Configured Objective Ranking",
         "",
@@ -1068,6 +1703,7 @@ def _markdown_report(report: OptimizerInsightReport) -> str:
             f"- Best run: `{bottleneck['best_run_id'] or 'n/a'}`",
             f"- Best score: `{_format_scientific(_finite_float(bottleneck.get('best_combined_score')))}`",
             f"- Plot: `{report.plots['bottleneck_weighted_score']}`",
+            f"![Normalized Margin Bottleneck Plot]({report.plots['bottleneck_weighted_score']})",
         ]
     )
     lines.extend(
@@ -1133,12 +1769,13 @@ def _markdown_report(report: OptimizerInsightReport) -> str:
     lines.extend(
         [
             "",
-        "## Plots",
-        "",
+            "## Plots",
+            "",
         ]
     )
     for name, path in sorted(report.plots.items()):
         lines.append(f"- {name}: `{path}`")
+        lines.append(f"  ![{name}]({path})")
     lines.extend(["", "## Observed Relationships", ""])
     for parameter, targets in sorted(report.observed_relationships.items()):
         lines.append(f"### {parameter}")

@@ -12,3 +12,4 @@
 -e .
 -e vendor/open-box
 -r vendor/open-box/requirements/main.txt
+matplotlib>=3.7

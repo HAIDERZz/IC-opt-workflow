@@ -29,6 +29,10 @@ The workflow is file based. Do not describe machine-critical setup only in
 chat. Put the request in `opt_requirement.md`, optionally put human guidance in
 `constraints.md`, then let Hermes generate and check the contracts.
 
+For common errors and fixes, especially requirement-file mistakes, OCEAN
+non-scalar metrics, Maestro point-root paths, and remote SSH failures, read
+`docs/TROUBLESHOOTING_CN.md`.
+
 ## 0. Product Environment Model
 
 Use one product-level Python virtualenv for the `ic-auto-opt-workflow`
@@ -66,8 +70,10 @@ Linux EDA server. The product Python environment runs locally and connects
 through passwordless OpenSSH.
 
 The current agent should operate the deterministic `ic-opt` CLI, wait for
-completion, read reports, and explain the result. Native subagent execution is
-optional advanced behavior only when explicitly requested. `hermes-workflow
+completion, read reports, and explain the result. For a fresh real run on a new
+or changed project, the agent should run doctor before `--real`. Native
+subagent execution is optional advanced behavior only when explicitly
+requested. `hermes-workflow
 optimize ... --real` is the lower-level implementation command behind the shell
 route.
 
@@ -178,6 +184,10 @@ Remote doctor check:
 ./.venv/bin/ic-opt --ssh-profile eda-lab /remote/path/to/<project_name> --doctor
 ```
 
+Do not skip doctor before a fresh remote `--real`. It is the cheapest way to
+catch strict `opt_requirement.md` mistakes, wrong remote point-root paths,
+missing `cadence_env.csh`, and SSH readiness problems.
+
 Doctor parses the requirement, checks the Cadence cshrc path, checks the
 OpenBox/Hermes Python environment, prepares config/netlist bundles, and writes
 `reports/ic_opt_doctor_report.json`. It does not launch Spectre/OCEAN.
@@ -201,8 +211,14 @@ Remote route:
   --real \
   --max-evals 100 \
   --batch-size 10 \
-  --parallel-jobs 10
+  --parallel-jobs 6
 ```
+
+For remote multi-testbench work, start conservatively. `parallel_jobs` is
+candidate-level concurrency, not per-testbench concurrency. Values around 4-8
+are usually safer for SSH and license pressure; much higher values can hit
+remote SSH limits and produce `kex_exchange_identification` / connection reset
+errors.
 
 This wraps intake, preparation, validation, readiness, package, netlist
 preparation, dry run, preflight health, approval, optimizer task packaging, real

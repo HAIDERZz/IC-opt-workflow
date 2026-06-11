@@ -24,11 +24,13 @@
 然后 agent 自动完成：
 
 1. 读取你的 `opt_requirement.md`；
-2. 生成 optimizer 所需 YAML 配置；
-3. 复制 Maestro/ADE 已经跑通过的 netlist bundle；
-4. 检查项目是否可以真实运行；
-5. 调用 `ic-opt` 跑 Spectre/OCEAN/OpenBox 优化流程；
-6. 读取报告，并告诉你最佳已观察点、指标、约束通过情况和下一步建议。
+2. 先运行 doctor，检查 `opt_requirement.md`、Maestro/ADE point root、环境文件和
+   SSH 是否准备好；
+3. 生成 optimizer 所需 YAML 配置；
+4. 复制 Maestro/ADE 已经跑通过的 netlist bundle；
+5. 检查项目是否可以真实运行；
+6. 调用 `ic-opt` 跑 Spectre/OCEAN/OpenBox 优化流程；
+7. 读取报告，并告诉你最佳已观察点、指标、约束通过情况和下一步建议。
 
 ## 先分清两个入口
 
@@ -56,6 +58,9 @@ ic-opt --ssh-profile PROFILE REMOTE_PROJECT --real
 这是 agent 入口。agent 的默认职责是根据平台无关 skill 操作 `ic-opt` CLI，
 等待流程完成，读取报告并解释结果。native subagent 只是可选高级模式，不是默认
 产品路线。
+
+对新的或修改过的项目，agent 应先执行 `--doctor`。doctor 不通过时，agent 应停止并
+指出具体文件、字段或路径问题，而不是继续跑真实 Spectre/OCEAN。
 
 如果项目在远程 Linux EDA 服务器上，用户只需要提供 SSH profile 和远程项目路径。
 agent 不应该把项目复制成本地流程，也不应该在远程服务器上安装 Python 包。
@@ -206,7 +211,7 @@ testbench。项目会保留每个 testbench 的原生 Maestro/ADE 文件结构�
 
 正常情况下，agent 会：
 
-1. 检查 `opt_requirement.md`；
+1. 运行 doctor 检查 `opt_requirement.md`、point root、环境文件和 SSH；
 2. 生成配置；
 3. 生成执行包；
 4. 调用 `ic-opt` CLI 真实运行；
@@ -244,6 +249,9 @@ PROJECT_DIR/reports/optimizer_visuals/
 PROJECT_DIR/reports/openbox_advanced_visualization/
 ```
 
+`optimizer_visuals/` 默认是 PNG 图片。agent 汇报结果时应优先引用这些图片路径，
+不要要求用户打开 SVG。
+
 ## 常见状态是什么意思
 
 `feasible`：
@@ -279,9 +287,21 @@ PROJECT_DIR/reports/openbox_advanced_visualization/
 - Maestro point root 路径不对；
 - OCEAN 公式在已知正确点上都算不出标量；
 - 约束过严，几乎没有 feasible 点；
+- 远程 SSH 免密登录或 host key 没准备好；
+- 远程高并发触发 SSH 连接限制，需要降低 `parallel_jobs`；
 - agent 问你是否接受当前 best observed；
 - 你想继续追加更多 evaluations；
 - 你想改搜索范围、FoM 或约束。
+
+遇到报错时，先看：
+
+```text
+docs/TROUBLESHOOTING_CN.md
+```
+
+常见情况包括 `opt_requirement.md` 格式错误、Maestro point root 层级错误、OCEAN
+非标量、SSH `Host key verification failed`、`Permission denied`、远程高并发
+`kex_exchange_identification` 和旧版本 manifest missing。
 
 当前边界：agent skill 的默认路线是单 agent 操作 `ic-opt` CLI。用户说“请再进行
 40 个点的优化”时，agent 应转换成 `ic-opt PROJECT --continue 40`。续跑时 agent

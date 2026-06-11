@@ -13,7 +13,7 @@ from tests.test_optimizer_completion import _trace_row, _write_accepted_optimize
 runner = CliRunner()
 
 
-def test_generate_optimizer_insight_report_writes_json_markdown_and_svgs(
+def test_generate_optimizer_insight_report_writes_json_markdown_and_pngs(
     tmp_path: Path,
 ) -> None:
     project_dir = _write_accepted_optimizer_project(tmp_path)
@@ -34,17 +34,17 @@ def test_generate_optimizer_insight_report_writes_json_markdown_and_svgs(
     assert "FN" in payload["observed_relationships"]
     assert "objective" in payload["observed_relationships"]["FN"]
     assert payload["plots"] == {
-        "all_evaluable_fom": "reports/optimizer_visuals/all_evaluable_fom.svg",
+        "all_evaluable_fom": "reports/optimizer_visuals/all_evaluable_fom.png",
         "bottleneck_weighted_score": (
-            "reports/optimizer_visuals/bottleneck_weighted_score.svg"
+            "reports/optimizer_visuals/bottleneck_weighted_score.png"
         ),
-        "constraint_margins": "reports/optimizer_visuals/constraint_margins.svg",
-        "convergence": "reports/optimizer_visuals/convergence.svg",
-        "feasible_convergence": "reports/optimizer_visuals/feasible_convergence.svg",
+        "constraint_margins": "reports/optimizer_visuals/constraint_margins.png",
+        "convergence": "reports/optimizer_visuals/convergence.png",
+        "feasible_convergence": "reports/optimizer_visuals/feasible_convergence.png",
         "parameter_objective_scatter": (
-            "reports/optimizer_visuals/parameter_objective_scatter.svg"
+            "reports/optimizer_visuals/parameter_objective_scatter.png"
         ),
-        "status_distribution": "reports/optimizer_visuals/status_distribution.svg",
+        "status_distribution": "reports/optimizer_visuals/status_distribution.png",
     }
 
     markdown = report.markdown_path.read_text(encoding="utf-8")
@@ -54,8 +54,8 @@ def test_generate_optimizer_insight_report_writes_json_markdown_and_svgs(
     assert "all_evaluable_fom" in markdown
 
     for relative_plot in payload["plots"].values():
-        plot_text = (project_dir / relative_plot).read_text(encoding="utf-8")
-        assert plot_text.startswith("<svg")
+        plot_bytes = (project_dir / relative_plot).read_bytes()
+        assert plot_bytes.startswith(b"\x89PNG\r\n\x1a\n")
 
 
 def test_generate_optimizer_insight_report_records_metric_relationships(
@@ -181,10 +181,10 @@ objective:
     assert payload["constraint_margin_summary"]["rise"]["best_margin_display"] == "12 ps"
     assert payload["constraint_margin_summary"]["DC"]["best_margin_display"] == "80 uW"
     assert payload["plots"]["feasible_convergence"] == (
-        "reports/optimizer_visuals/feasible_convergence.svg"
+        "reports/optimizer_visuals/feasible_convergence.png"
     )
     assert payload["plots"]["constraint_margins"] == (
-        "reports/optimizer_visuals/constraint_margins.svg"
+        "reports/optimizer_visuals/constraint_margins.png"
     )
     markdown = report.markdown_path.read_text(encoding="utf-8")
     assert "IC-native Summary" in markdown
@@ -247,10 +247,8 @@ objective:
     assert ranking["best_candidate"]["objective"] == pytest.approx(math.log(20))
     assert ranking["top_candidates"][0]["run_id"] == "real_001"
     assert ranking["top_candidates"][1]["run_id"] == "real_002"
-    svg = (project_dir / payload["plots"]["all_evaluable_fom"]).read_text(
-        encoding="utf-8"
-    )
-    assert "All Evaluable FoM" in svg
+    png = (project_dir / payload["plots"]["all_evaluable_fom"]).read_bytes()
+    assert png.startswith(b"\x89PNG\r\n\x1a\n")
     markdown = report.markdown_path.read_text(encoding="utf-8")
     assert "Source: `configured_objective`" in markdown
     assert "Configured Objective Ranking" in markdown
@@ -334,7 +332,7 @@ def test_generate_optimizer_insight_report_writes_bottleneck_weighted_plot(
         "MAX_GAIN": 4.5,
         "NF_3G": 11.9,
         "IIP3": 0.5,
-        "P1DB": -1.5,
+        "P1dB": -1.5,
     }
     project_dir = _write_accepted_optimizer_project(tmp_path, rows=rows)
 
@@ -348,13 +346,10 @@ def test_generate_optimizer_insight_report_writes_bottleneck_weighted_plot(
     assert summary["series"][0]["bottleneck_score"] == pytest.approx(0.5)
     assert summary["series"][0]["combined_score"] == pytest.approx(0.5)
     assert payload["plots"]["bottleneck_weighted_score"] == (
-        "reports/optimizer_visuals/bottleneck_weighted_score.svg"
+        "reports/optimizer_visuals/bottleneck_weighted_score.png"
     )
-    svg = (
-        project_dir / payload["plots"]["bottleneck_weighted_score"]
-    ).read_text(encoding="utf-8")
-    assert "Normalized Margin Bottleneck Plot" in svg
-    assert "real_002" in svg
+    png = (project_dir / payload["plots"]["bottleneck_weighted_score"]).read_bytes()
+    assert png.startswith(b"\x89PNG\r\n\x1a\n")
     markdown = report.markdown_path.read_text(encoding="utf-8")
     assert "Normalized Margin Bottleneck Plot" in markdown
 

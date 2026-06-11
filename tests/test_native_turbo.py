@@ -873,6 +873,46 @@ def test_real_candidate_evaluator_classifies_written_metric_failure(
     )
 
 
+def test_real_candidate_evaluator_classifies_failed_result_manifest_as_real_failure(
+    tmp_path: Path,
+) -> None:
+    project_dir = create_approved_real_project(tmp_path)
+    import shutil
+
+    shutil.rmtree(project_dir / "runs")
+
+    def adapter(project: Path, *, run_id: str, cadence_cshrc: Path | None) -> None:
+        write_fake_result_manifest(
+            project,
+            run_id=run_id,
+            status="failed",
+        )
+        write_fake_metric_result_manifest(
+            project,
+            run_id=run_id,
+            values={"rise": 1.0, "fall": 1.0, "DC": 1.0},
+        )
+
+    observation = evaluate_real_candidate(
+        project_dir,
+        candidate_id="candidate_000001",
+        parameters={"FN": "4", "WN": "0.5u", "FP": "4", "WP": "1.1u"},
+        run_id="real_001",
+        adapter=adapter,
+    )
+
+    assert observation.status == "real_check_failed"
+    assert observation.metrics is None
+    assert any("result_status is failed" in issue for issue in observation.issues or [])
+    assert observation.result_manifest == "runs/real/real_001/result_manifest.json"
+    assert (
+        load_json(project_dir / "runs" / "real" / "real_001" / "recovery_decision.json")[
+            "decision"
+        ]
+        == "abandon_candidate"
+    )
+
+
 def test_run_native_turbo_cli_uses_fake_runner(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     project_dir = tmp_path / "bridge_test_inv"
     project_dir.mkdir()
