@@ -158,6 +158,35 @@ def test_remote_adapter_runs_spectre_and_ocean_remotely(tmp_path: Path) -> None:
     assert "spectre command completed" in manifest.get("notes", "")
 
 
+def test_remote_adapter_runs_corner_aware_child_run(tmp_path: Path) -> None:
+    from tests.test_spectre_ocean_adapter import _create_ready_corner_project
+
+    project_dir = _create_ready_corner_project(tmp_path)
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    runner = MultiTestbenchFakeRunner()
+    runner.set_project_dir(project_dir)
+    runner.child_metric_names = {
+        "cg_nf": ["MAX_GAIN"],
+    }
+
+    result = run_remote_spectre_ocean_adapter(
+        project_dir,
+        run_id="real_001",
+        remote_ref=ref,
+        remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
+        runner=runner,
+        testbench_id="cg_nf",
+        corner_id="ss",
+    )
+
+    assert result.status == "succeeded"
+    corner_remote = "/remote/project/runs/real/real_001/testbenches/cg_nf/corners/ss"
+    assert any(str(upload[1]).startswith(corner_remote) for upload in runner.uploads)
+    manifest = json.loads(result.result_manifest_path.read_text(encoding="utf-8"))
+    assert manifest.get("testbench_id") == "cg_nf"
+    assert manifest.get("corner_id") == "ss"
+
+
 def test_remote_adapter_csh_payload_quotes_paths(tmp_path: Path) -> None:
     project_dir = create_approved_real_project(tmp_path)
     remote_project = PurePosixPath("/remote/my project")

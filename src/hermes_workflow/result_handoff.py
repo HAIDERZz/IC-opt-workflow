@@ -58,6 +58,8 @@ class ResultManifest(BaseModel):
     schema_version: str
     run_id: str
     candidate_id: str
+    testbench_id: str | None = None
+    corner_id: str | None = None
     status: RealRunResultStatus
     started_at_utc: str
     completed_at_utc: str

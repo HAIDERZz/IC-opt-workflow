@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 
 import pytest
@@ -22,6 +23,7 @@ from hermes_workflow.package import (
     create_project_from_template,
     sha256_file,
 )
+from hermes_workflow.netlists import prepare_netlist
 from hermes_workflow.real_run import prepare_real_run
 from hermes_workflow.reports import MetricResultCheckStatus, RealRunCheckStatus
 from hermes_workflow.requirement_intake import prepare_from_requirement
@@ -76,6 +78,70 @@ def _create_ready_multi_testbench_project(tmp_path: Path) -> Path:
     )
     assert instruction["decision"] == "approve_first_real_run"
     prepare_real_run(project_dir, created_at_utc="2026-06-06T00:20:00Z")
+    return project_dir
+
+
+def _create_ready_corner_project(tmp_path: Path) -> Path:
+    project_dir = _copy_multi_testbench_requirement_project(tmp_path)
+
+    assert prepare_from_requirement(project_dir).status == "pass"
+    assert run_dry_run(project_dir).status.value == "pass"
+
+    # Overwrite the default nominal-only corner config with real corners
+    corners_yaml = """\
+schema_version: "1.0"
+objective_policy: nominal
+constraint_policy: nominal
+corners:
+  - id: ss
+    description: slow-slow corner
+  - id: ff
+    description: fast-fast corner
+"""
+    corner_config_path = project_dir / "config" / "process_corners.yaml"
+    corner_config_path.write_text(corners_yaml, encoding="utf-8")
+
+    # Regenerate netlist templates with the new corner config
+    netlist_report = prepare_netlist(project_dir)
+    assert netlist_report.status.value == "pass", netlist_report.issues
+
+    build_execution_package(project_dir, created_at_utc="2026-06-06T00:00:00Z")
+    write_pass_reports(project_dir)
+    instruction = decide_first_real_run(
+        project_dir,
+        created_at_utc="2026-06-06T00:10:00Z",
+    )
+    assert instruction["decision"] == "approve_first_real_run"
+    prepare_real_run(project_dir, created_at_utc="2026-06-06T00:20:00Z")
+
+    for testbench_id in ("cg_nf", "iip3"):
+        source = (
+            project_dir
+            / "runs"
+            / "dry_run"
+            / "testbenches"
+            / testbench_id
+            / "input.scs"
+        )
+        target = (
+            project_dir
+            / "runs"
+            / "real"
+            / "real_001"
+            / "testbenches"
+            / testbench_id
+            / "netlist"
+            / "input.scs"
+        )
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, target)
+
+    prepare_real_run(
+        project_dir,
+        testbench_id="cg_nf",
+        corner_id="ss",
+        created_at_utc="2026-06-06T00:20:00Z",
+    )
     return project_dir
 
 
@@ -860,6 +926,80 @@ def test_run_spectre_ocean_adapter_accepts_multi_testbench_child_run(
     assert [metric["name"] for metric in metric_manifest["metrics"]] == ["IIP3"]
 
 
+def test_load_adapter_context_accepts_corner_aware_child_run(tmp_path: Path) -> None:
+    project_dir = _create_ready_corner_project(tmp_path)
+
+    context = load_adapter_context(
+        project_dir, testbench_id="cg_nf", corner_id="ss"
+    )
+
+    corner_relative = "runs/real/real_001/testbenches/cg_nf/corners/ss"
+    assert context.run_id == "real_001"
+    assert context.run_relative == corner_relative
+    assert context.run_dir == (
+        project_dir
+        / "runs"
+        / "real"
+        / "real_001"
+        / "testbenches"
+        / "cg_nf"
+        / "corners"
+        / "ss"
+    )
+    assert context.input_scs == context.run_dir / "netlist" / "input.scs"
+    assert context.psf_dir == context.run_dir / "psf"
+    assert context.metrics_dir == context.run_dir / "metrics"
+    assert context.testbench_id == "cg_nf"
+    assert context.corner_id == "ss"
+    assert context.request.expected_psf_dir == f"{corner_relative}/psf"
+
+
+def test_run_spectre_ocean_adapter_accepts_corner_aware_child_run(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_corner_project(tmp_path)
+    runner = FakeSuccessRunner()
+
+    result = run_spectre_ocean_adapter(
+        project_dir,
+        testbench_id="cg_nf",
+        corner_id="ss",
+        runner=runner,
+    )
+
+    corner_relative = "runs/real/real_001/testbenches/cg_nf/corners/ss"
+    assert result.status == "succeeded"
+    assert result.result_manifest_path == (
+        project_dir
+        / "runs"
+        / "real"
+        / "real_001"
+        / "testbenches"
+        / "cg_nf"
+        / "corners"
+        / "ss"
+        / "result_manifest.json"
+    )
+    assert result.metric_result_manifest_path == (
+        project_dir
+        / "runs"
+        / "real"
+        / "real_001"
+        / "testbenches"
+        / "cg_nf"
+        / "corners"
+        / "ss"
+        / "metrics"
+        / "metric_result_manifest.json"
+    )
+    manifest = _load_json(result.result_manifest_path)
+    assert manifest.get("testbench_id") == "cg_nf"
+    assert manifest.get("corner_id") == "ss"
+    assert runner.commands[1][runner.commands[1].index("-replay") + 1] == (
+        f"{corner_relative}/metrics/metric_probe.ocn"
+    )
+
+
 def test_run_spectre_ocean_adapter_records_actual_spectre_settings(
     tmp_path: Path,
 ) -> None:
@@ -905,6 +1045,7 @@ def test_tool_entrypoint_reports_success_without_real_tools(
         assert kwargs == {
             "run_id": "real_001",
             "testbench_id": None,
+            "corner_id": None,
             "allow_overwrite": False,
         }
         return type(

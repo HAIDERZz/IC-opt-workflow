@@ -34,8 +34,11 @@ def run_remote_spectre_ocean_adapter(
     remote_cadence_cshrc: PurePosixPath,
     runner: Any,
     testbench_id: str | None = None,
+    corner_id: str | None = None,
 ) -> AdapterRunResult:
-    context = load_adapter_context(project_dir, run_id=run_id, testbench_id=testbench_id)
+    context = load_adapter_context(
+        project_dir, run_id=run_id, testbench_id=testbench_id, corner_id=corner_id
+    )
     script_path = _project_relative_path(context.project_dir, context.request.ocean.script_file)
     script_path.parent.mkdir(parents=True, exist_ok=True)
     script_path.write_text(render_ocean_replay_script(context), encoding="utf-8")
@@ -43,6 +46,8 @@ def run_remote_spectre_ocean_adapter(
     remote_run_base = remote_ref.remote_project_dir / "runs" / "real" / run_id
     if testbench_id is not None:
         remote_run_dir = remote_run_base / "testbenches" / testbench_id
+        if corner_id is not None:
+            remote_run_dir = remote_run_dir / "corners" / corner_id
     else:
         remote_run_dir = remote_run_base
     try:

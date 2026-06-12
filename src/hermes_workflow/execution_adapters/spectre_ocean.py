@@ -66,6 +66,8 @@ class SpectreOceanContext:
     metric_request_path: Path
     prepared: PreparedRealRunManifest
     request: MetricExtractionRequest
+    testbench_id: str | None = None
+    corner_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -150,6 +152,7 @@ def run_spectre_ocean_adapter(
     *,
     run_id: str | None = None,
     testbench_id: str | None = None,
+    corner_id: str | None = None,
     runner: CommandRunner | None = None,
     allow_overwrite: bool = False,
 ) -> AdapterRunResult:
@@ -157,6 +160,7 @@ def run_spectre_ocean_adapter(
         project_dir,
         run_id=run_id,
         testbench_id=testbench_id,
+        corner_id=corner_id,
     )
     _reject_symlinks(context.project_dir, context.metrics_dir, "metrics directory")
     _reject_symlinks(context.project_dir, context.psf_dir, "psf directory")
@@ -246,10 +250,12 @@ def load_adapter_context(
     *,
     run_id: str | None = None,
     testbench_id: str | None = None,
+    corner_id: str | None = None,
 ) -> SpectreOceanContext:
     project_dir = Path(project_dir)
     selected_run_id = _validate_run_id(run_id or DEFAULT_RUN_ID)
     selected_testbench_id = _validate_testbench_id(testbench_id)
+    selected_corner_id = _validate_corner_id(corner_id)
     try:
         bundle = assert_valid_project(project_dir)
     except ValueError as exc:
@@ -258,6 +264,8 @@ def load_adapter_context(
     run_relative = f"{REAL_RUN_ROOT}/{selected_run_id}"
     if selected_testbench_id is not None:
         run_relative = f"{run_relative}/testbenches/{selected_testbench_id}"
+    if selected_corner_id is not None:
+        run_relative = f"{run_relative}/corners/{selected_corner_id}"
     run_dir = _safe_project_path(project_dir, run_relative, "run directory")
     _reject_symlinks(project_dir, run_dir, "run directory")
     if not run_dir.is_dir():
@@ -390,6 +398,8 @@ def load_adapter_context(
         metric_request_path=request_path,
         prepared=prepared,
         request=request,
+        testbench_id=selected_testbench_id,
+        corner_id=selected_corner_id,
     )
 
 
@@ -610,6 +620,8 @@ def _write_result_manifest(
         "schema_version": "1.0",
         "run_id": context.run_id,
         "candidate_id": context.prepared.candidate_id,
+        "testbench_id": context.testbench_id,
+        "corner_id": context.corner_id,
         "status": status,
         "started_at_utc": started_at_utc,
         "completed_at_utc": completed_at_utc,
@@ -983,6 +995,14 @@ def _validate_testbench_id(testbench_id: str | None) -> str | None:
     if not RESULT_SELECTOR_RE.match(testbench_id):
         raise AdapterPreconditionError(f"testbench_id is unsafe: {testbench_id}")
     return testbench_id
+
+
+def _validate_corner_id(corner_id: str | None) -> str | None:
+    if corner_id is None:
+        return None
+    if not RESULT_SELECTOR_RE.match(corner_id):
+        raise AdapterPreconditionError(f"corner_id is unsafe: {corner_id}")
+    return corner_id
 
 
 def _load_model(path: Path, model_class: type[ModelT], label: str) -> ModelT:

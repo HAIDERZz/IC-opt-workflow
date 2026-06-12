@@ -48,6 +48,8 @@ class RealRunPackage:
     candidate_payload: dict
     manifest_payload: dict
     metric_request_payload: dict
+    testbench_id: str | None = None
+    corner_id: str | None = None
 
 
 class CandidateInjectionRequest(BaseModel):
@@ -84,6 +86,8 @@ def prepare_real_run(
     project_dir: Path,
     *,
     run_id: str | None = None,
+    testbench_id: str | None = None,
+    corner_id: str | None = None,
     created_at_utc: str | None = None,
 ) -> RealRunPackage:
     project_dir = Path(project_dir)
@@ -104,6 +108,8 @@ def prepare_real_run(
         instruction,
         approved_hashes,
         manifest_extra={},
+        testbench_id=testbench_id,
+        corner_id=corner_id,
     )
 
 
@@ -111,6 +117,8 @@ def prepare_next_real_run(
     project_dir: Path,
     *,
     run_id: str | None = None,
+    testbench_id: str | None = None,
+    corner_id: str | None = None,
     created_at_utc: str | None = None,
 ) -> RealRunPackage:
     project_dir = Path(project_dir)
@@ -153,6 +161,8 @@ def prepare_next_real_run(
             "optimizer_state_sha256": sha256_file(project_dir / OPTIMIZER_STATE_PATH),
             "previous_evaluations": len(ledger_rows),
         },
+        testbench_id=testbench_id,
+        corner_id=corner_id,
     )
 
 
@@ -161,6 +171,8 @@ def prepare_candidate_real_run(
     *,
     candidate_file: Path,
     run_id: str | None = None,
+    testbench_id: str | None = None,
+    corner_id: str | None = None,
     created_at_utc: str | None = None,
 ) -> RealRunPackage:
     project_dir = Path(project_dir)
@@ -214,6 +226,8 @@ def prepare_candidate_real_run(
             "previous_evaluations": len(ledger_rows),
         },
         candidate_request_text=request_text,
+        testbench_id=testbench_id,
+        corner_id=corner_id,
     )
 
 
@@ -224,6 +238,8 @@ def prepare_explicit_candidate_real_run(
     source: str,
     parameters: dict[str, str],
     run_id: str | None = None,
+    testbench_id: str | None = None,
+    corner_id: str | None = None,
     metadata: dict[str, object] | None = None,
     created_at_utc: str | None = None,
     allow_unresolved_batch_runs: bool = False,
@@ -295,6 +311,8 @@ def prepare_explicit_candidate_real_run(
             "previous_evaluations": len(ledger_rows),
         },
         candidate_request_text=request_text,
+        testbench_id=testbench_id,
+        corner_id=corner_id,
     )
 
 
@@ -750,9 +768,86 @@ def _write_real_run_package(
     manifest_extra: dict,
     rendered_text_override: str | None = None,
     candidate_request_text: str | None = None,
+    testbench_id: str | None = None,
+    corner_id: str | None = None,
 ) -> RealRunPackage:
+    if corner_id is not None and testbench_id is None:
+        raise ValueError("corner_id requires testbench_id")
+
     _assert_real_run_parent_dirs_are_not_symlinks(bundle.project_dir)
     run_dir = _project_path(bundle, f"{REAL_RUN_ROOT}/{selected_run_id}")
+
+    if testbench_id is not None:
+        child_prefix = f"{REAL_RUN_ROOT}/{selected_run_id}/testbenches/{testbench_id}"
+        if corner_id is not None:
+            child_prefix = f"{child_prefix}/corners/{corner_id}"
+        child_dir = _project_path(bundle, child_prefix)
+        _assert_run_dir_is_not_symlink(child_dir)
+        manifest_path = child_dir / "real_run_manifest.json"
+        if manifest_path.exists():
+            raise FileExistsError(f"real run package already exists: {manifest_path}")
+        if child_dir.exists() and any(child_dir.iterdir()):
+            raise FileExistsError(f"real run directory is not empty: {child_dir}")
+
+        candidate_relative = f"{REAL_RUN_ROOT}/{selected_run_id}/candidate.json"
+        candidate_path = _project_path(bundle, candidate_relative)
+        candidate_for_write = dict(candidate)
+        if not candidate_path.exists():
+            if candidate_request_text is not None:
+                candidate_request_relative = (
+                    f"{REAL_RUN_ROOT}/{selected_run_id}/candidate_request.json"
+                )
+                candidate_request_path = _project_path(
+                    bundle, candidate_request_relative
+                )
+                candidate_request_path.write_text(
+                    candidate_request_text, encoding="utf-8"
+                )
+                candidate_for_write["candidate_request_file"] = (
+                    candidate_request_relative
+                )
+                candidate_for_write["candidate_request_sha256"] = sha256_file(
+                    candidate_request_path
+                )
+            candidate_path.write_text(
+                _json_text(candidate_for_write), encoding="utf-8"
+            )
+        else:
+            existing = _load_json_object(candidate_path, "prepared candidate")
+            candidate_for_write.update(existing)
+
+        candidate_id = str(candidate_for_write.get("candidate_id", candidate["candidate_id"]))
+        child_dir, child_manifest, metric_request_payload = _write_single_testbench_package(
+            bundle,
+            selected_run_id,
+            candidate,
+            candidate_id,
+            created_at_utc,
+            instruction,
+            approved_hashes,
+            candidate_relative,
+            manifest_extra,
+            testbench_id,
+            corner_id,
+        )
+
+        rendered_relative = f"{child_prefix}/{SPECTRE_NETLIST_DIR}/input.scs"
+        metric_request_relative = f"{child_prefix}/metric_extraction_request.json"
+
+        return RealRunPackage(
+            run_id=selected_run_id,
+            run_dir=child_dir,
+            rendered_input_scs=_project_path(bundle, rendered_relative),
+            candidate_path=candidate_path,
+            manifest_path=manifest_path,
+            metric_request_path=_project_path(bundle, metric_request_relative),
+            candidate_payload=candidate_for_write,
+            manifest_payload=child_manifest,
+            metric_request_payload=metric_request_payload,
+            testbench_id=testbench_id,
+            corner_id=corner_id,
+        )
+
     _assert_run_dir_is_not_symlink(run_dir)
     manifest_path = run_dir / "real_run_manifest.json"
     if manifest_path.exists():
@@ -870,6 +965,8 @@ def _write_real_run_package(
         candidate_payload=candidate_for_write,
         manifest_payload=manifest_payload,
         metric_request_payload=metric_request_payload,
+        testbench_id=None,
+        corner_id=None,
     )
 
 
@@ -914,6 +1011,93 @@ def _copy_exported_netlist_bundle_from_relative(
         shutil.copy2(source, destination)
 
 
+def _write_single_testbench_package(
+    bundle: ContractBundle,
+    selected_run_id: str,
+    candidate: dict,
+    candidate_id: str,
+    created_at_utc: str,
+    instruction: dict,
+    approved_hashes: dict[str, str],
+    candidate_relative: str,
+    manifest_extra: dict,
+    testbench_id: str,
+    corner_id: str | None = None,
+) -> tuple[Path, dict, dict]:
+    child_prefix = f"{REAL_RUN_ROOT}/{selected_run_id}/testbenches/{testbench_id}"
+    if corner_id is not None:
+        child_prefix = f"{child_prefix}/corners/{corner_id}"
+        template_relative = f"netlists/testbenches/{testbench_id}/corners/{corner_id}/template.scs"
+    else:
+        template_relative = f"netlists/testbenches/{testbench_id}/templates/template.scs"
+    exported_input_relative = f"netlists/testbenches/{testbench_id}/exported/input.scs"
+    rendered_relative = f"{child_prefix}/{SPECTRE_NETLIST_DIR}/input.scs"
+    metric_request_relative = f"{child_prefix}/metric_extraction_request.json"
+
+    template_path = _project_path(bundle, template_relative)
+    if not template_path.exists():
+        raise FileNotFoundError(f"template.scs is missing: {template_relative}")
+
+    child_dir = _project_path(bundle, child_prefix)
+    child_netlist_dir = child_dir / SPECTRE_NETLIST_DIR
+    child_netlist_dir.mkdir(parents=True, exist_ok=True)
+    _copy_exported_netlist_bundle_from_relative(
+        bundle,
+        exported_input_relative,
+        child_netlist_dir,
+    )
+
+    rendered_path = _project_path(bundle, rendered_relative)
+    rendered_path.write_text(
+        _render_template(
+            template_path.read_text(encoding="utf-8"),
+            candidate["parameters"],
+        ),
+        encoding="utf-8",
+    )
+    metrics_subset = [
+        metric for metric in bundle.metrics.metrics if metric.testbench == testbench_id
+    ]
+    metric_request_path = _project_path(bundle, metric_request_relative)
+    metric_request_payload = build_metric_extraction_request(
+        bundle,
+        run_id=selected_run_id,
+        candidate_id=candidate_id,
+        prepared_input_scs=rendered_relative,
+        prepared_input_sha256=sha256_file(rendered_path),
+        run_prefix=child_prefix,
+        metrics_subset=metrics_subset,
+    )
+    metric_request_path.write_text(
+        json.dumps(metric_request_payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    child_manifest = _build_manifest(
+        bundle,
+        selected_run_id,
+        candidate_id,
+        created_at_utc,
+        instruction,
+        approved_hashes,
+        template_relative,
+        rendered_relative,
+        candidate_relative,
+        metric_request_relative,
+        template_path,
+        rendered_path,
+        metric_request_path,
+    )
+    child_manifest.update(manifest_extra)
+    child_manifest["testbench_id"] = testbench_id
+    if corner_id is not None:
+        child_manifest["corner_id"] = corner_id
+    (child_dir / "real_run_manifest.json").write_text(
+        json.dumps(child_manifest, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return child_dir, child_manifest, metric_request_payload
+
+
 def _write_multi_testbench_real_run_packages(
     bundle: ContractBundle,
     selected_run_id: str,
@@ -924,76 +1108,28 @@ def _write_multi_testbench_real_run_packages(
     approved_hashes: dict[str, str],
     candidate_relative: str,
     manifest_extra: dict,
+    testbench_id: str | None = None,
+    corner_id: str | None = None,
 ) -> None:
     if bundle.testbenches is None:
         return
 
     for testbench in bundle.testbenches.testbenches:
-        testbench_id = testbench.id
-        child_prefix = f"{REAL_RUN_ROOT}/{selected_run_id}/testbenches/{testbench_id}"
-        template_relative = f"netlists/testbenches/{testbench_id}/templates/template.scs"
-        exported_input_relative = f"netlists/testbenches/{testbench_id}/exported/input.scs"
-        rendered_relative = f"{child_prefix}/{SPECTRE_NETLIST_DIR}/input.scs"
-        metric_request_relative = f"{child_prefix}/metric_extraction_request.json"
-
-        template_path = _project_path(bundle, template_relative)
-        if not template_path.exists():
-            raise FileNotFoundError(f"template.scs is missing: {template_relative}")
-
-        child_dir = _project_path(bundle, child_prefix)
-        child_netlist_dir = child_dir / SPECTRE_NETLIST_DIR
-        child_netlist_dir.mkdir(parents=True, exist_ok=True)
-        _copy_exported_netlist_bundle_from_relative(
-            bundle,
-            exported_input_relative,
-            child_netlist_dir,
-        )
-
-        rendered_path = _project_path(bundle, rendered_relative)
-        rendered_path.write_text(
-            _render_template(
-                template_path.read_text(encoding="utf-8"),
-                candidate["parameters"],
-            ),
-            encoding="utf-8",
-        )
-        metrics_subset = [
-            metric for metric in bundle.metrics.metrics if metric.testbench == testbench_id
-        ]
-        metric_request_path = _project_path(bundle, metric_request_relative)
-        metric_request_payload = build_metric_extraction_request(
-            bundle,
-            run_id=selected_run_id,
-            candidate_id=candidate_id,
-            prepared_input_scs=rendered_relative,
-            prepared_input_sha256=sha256_file(rendered_path),
-            run_prefix=child_prefix,
-            metrics_subset=metrics_subset,
-        )
-        metric_request_path.write_text(
-            json.dumps(metric_request_payload, indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
-        )
-        child_manifest = _build_manifest(
+        tb_id = testbench.id
+        if testbench_id is not None and tb_id != testbench_id:
+            continue
+        _write_single_testbench_package(
             bundle,
             selected_run_id,
+            candidate,
             candidate_id,
             created_at_utc,
             instruction,
             approved_hashes,
-            template_relative,
-            rendered_relative,
             candidate_relative,
-            metric_request_relative,
-            template_path,
-            rendered_path,
-            metric_request_path,
-        )
-        child_manifest.update(manifest_extra)
-        child_manifest["testbench_id"] = testbench_id
-        (child_dir / "real_run_manifest.json").write_text(
-            json.dumps(child_manifest, indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
+            manifest_extra,
+            tb_id,
+            corner_id,
         )
 
 

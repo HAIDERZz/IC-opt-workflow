@@ -18,6 +18,7 @@ from hermes_workflow.real_run import prepare_real_run
 from hermes_workflow.requirement_intake import prepare_from_requirement
 from tests.report_helpers import write_pass_reports
 from tests.test_requirement_intake import _copy_multi_testbench_requirement_project
+from tests.test_spectre_ocean_adapter import _create_ready_corner_project
 
 
 TEMPLATE_TEXT = """simulator lang=spectre
@@ -635,3 +636,61 @@ def test_prepare_real_run_cleans_partial_run_directory_on_manifest_write_failure
         prepare_real_run(project_dir, created_at_utc="2026-05-31T00:20:00Z")
 
     assert not (project_dir / "runs" / "real" / "real_001").exists()
+
+
+def test_prepare_real_run_produces_corner_aware_package(tmp_path: Path) -> None:
+    project_dir = _create_ready_corner_project(tmp_path)
+
+    package = prepare_real_run(
+        project_dir,
+        testbench_id="iip3",
+        corner_id="ff",
+        created_at_utc="2026-06-06T00:20:00Z",
+    )
+
+    corner_dir = (
+        project_dir
+        / "runs"
+        / "real"
+        / "real_001"
+        / "testbenches"
+        / "iip3"
+        / "corners"
+        / "ff"
+    )
+    assert package.run_id == "real_001"
+    assert package.run_dir == corner_dir
+    assert package.testbench_id == "iip3"
+    assert package.corner_id == "ff"
+    assert package.rendered_input_scs == corner_dir / "netlist" / "input.scs"
+    assert package.manifest_path == corner_dir / "real_run_manifest.json"
+    assert package.metric_request_path == corner_dir / "metric_extraction_request.json"
+    assert (corner_dir / "netlist" / "input.scs").exists()
+    assert (corner_dir / "real_run_manifest.json").exists()
+    manifest = _load_json(corner_dir / "real_run_manifest.json")
+    assert manifest["testbench_id"] == "iip3"
+    assert manifest["corner_id"] == "ff"
+
+
+def test_prepare_real_run_corner_without_testbench_raises(tmp_path: Path) -> None:
+    project_dir = _create_ready_corner_project(tmp_path)
+
+    with pytest.raises(ValueError, match="corner_id requires testbench_id"):
+        prepare_real_run(
+            project_dir,
+            corner_id="ff",
+            created_at_utc="2026-06-06T00:20:00Z",
+        )
+
+
+def test_real_run_package_defaults_testbench_and_corner_to_none(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_project(tmp_path)
+    _approve_project(project_dir)
+    _write_template(project_dir)
+
+    package = prepare_real_run(project_dir, created_at_utc="2026-06-02T00:20:00Z")
+
+    assert package.testbench_id is None
+    assert package.corner_id is None
