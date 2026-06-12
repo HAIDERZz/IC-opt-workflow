@@ -746,6 +746,39 @@ def _project_path(bundle: ContractBundle, relative_path: str) -> Path:
     return bundle.project_dir / Path(*path.parts)
 
 
+def _load_existing_real_run_package(
+    bundle: ContractBundle,
+    selected_run_id: str,
+    *,
+    run_dir: Path,
+    manifest_path: Path,
+    metric_request_path: Path,
+    rendered_path: Path,
+    testbench_id: str | None,
+    corner_id: str | None,
+) -> RealRunPackage:
+    candidate_path = _project_path(
+        bundle,
+        f"{REAL_RUN_ROOT}/{selected_run_id}/candidate.json",
+    )
+    return RealRunPackage(
+        run_id=selected_run_id,
+        run_dir=run_dir,
+        rendered_input_scs=rendered_path,
+        candidate_path=candidate_path,
+        manifest_path=manifest_path,
+        metric_request_path=metric_request_path,
+        candidate_payload=_load_json_object(candidate_path, "candidate payload"),
+        manifest_payload=_load_json_object(manifest_path, "real-run manifest"),
+        metric_request_payload=_load_json_object(
+            metric_request_path,
+            "metric extraction request",
+        ),
+        testbench_id=testbench_id,
+        corner_id=corner_id,
+    )
+
+
 def _lower_bound_candidate(bundle: ContractBundle, run_id: str) -> dict:
     return {
         "schema_version": "1.0",
@@ -785,9 +818,18 @@ def _write_real_run_package(
         _assert_run_dir_is_not_symlink(child_dir)
         manifest_path = child_dir / "real_run_manifest.json"
         if manifest_path.exists():
-            raise FileExistsError(f"real run package already exists: {manifest_path}")
+            return _load_existing_real_run_package(
+                bundle,
+                selected_run_id,
+                run_dir=child_dir,
+                manifest_path=manifest_path,
+                metric_request_path=child_dir / "metric_extraction_request.json",
+                rendered_path=child_dir / SPECTRE_NETLIST_DIR / "input.scs",
+                testbench_id=testbench_id,
+                corner_id=corner_id,
+            )
         if child_dir.exists() and any(child_dir.iterdir()):
-            raise FileExistsError(f"real run directory is not empty: {child_dir}")
+            raise FileExistsError(f"real run package directory is not empty: {child_dir}")
 
         candidate_relative = f"{REAL_RUN_ROOT}/{selected_run_id}/candidate.json"
         candidate_path = _project_path(bundle, candidate_relative)

@@ -21,8 +21,6 @@ from hermes_workflow.requirement_intake import prepare_from_requirement
 from tests.report_helpers import write_pass_reports
 from tests.real_run_smoke_helpers import (
     create_approved_real_project,
-    write_fake_metric_result_manifest,
-    write_fake_result_manifest,
 )
 from tests.test_requirement_intake import _copy_multi_testbench_requirement_project
 

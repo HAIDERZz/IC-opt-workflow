@@ -6,7 +6,6 @@ import yaml
 
 from hermes_workflow.netlists import (
     prepare_netlist,
-    prepare_corner_netlist_templates,
     render_corner_netlist_template,
 )
 from hermes_workflow.package import create_project_from_template
