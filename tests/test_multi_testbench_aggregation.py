@@ -49,6 +49,67 @@ def _create_ready_multi_testbench_project(tmp_path: Path) -> Path:
     return project_dir
 
 
+def _inject_three_corner_section(
+    project_dir: Path,
+    *,
+    objective_policy: str = "worst_case",
+    constraint_policy: str = "all_corners",
+) -> None:
+    requirement_path = project_dir / "opt_requirement.md"
+    text = requirement_path.read_text(encoding="utf-8")
+    corners_section = f"""
+## Process Corners
+
+```yaml
+objective_policy: {objective_policy}
+constraint_policy: {constraint_policy}
+corners:
+  - id: tt
+    model_section: Post_simu_top_tt
+    variables:
+      temperature: "27"
+  - id: ff
+    model_section: Post_simu_top_ff
+    variables:
+      temperature: "0"
+  - id: ss
+    model_section: Post_simu_top_ss
+    variables:
+      temperature: "125"
+```
+"""
+    requirement_path.write_text(
+        text.replace("## Approval Checklist", corners_section + "\n## Approval Checklist"),
+        encoding="utf-8",
+    )
+
+
+def _create_ready_multi_corner_multi_testbench_project(
+    tmp_path: Path,
+    *,
+    objective_policy: str = "worst_case",
+    constraint_policy: str = "all_corners",
+) -> Path:
+    project_dir = _copy_multi_testbench_requirement_project(tmp_path)
+    _inject_three_corner_section(
+        project_dir,
+        objective_policy=objective_policy,
+        constraint_policy=constraint_policy,
+    )
+    assert prepare_from_requirement(project_dir).status == "pass"
+    assert run_dry_run(project_dir).status.value == "pass"
+    build_execution_package(project_dir, created_at_utc="2026-06-12T00:00:00Z")
+    write_pass_reports(project_dir)
+    instruction = decide_first_real_run(
+        project_dir,
+        created_at_utc="2026-06-12T00:10:00Z",
+    )
+    assert instruction["decision"] == "approve_first_real_run"
+    prepare_real_run(project_dir, created_at_utc="2026-06-12T00:20:00Z")
+    _copy_corner_child_inputs(project_dir)
+    return project_dir
+
+
 def _copy_child_inputs(project_dir: Path) -> None:
     for testbench_id in ("cg_nf", "iip3"):
         source = (
@@ -73,11 +134,60 @@ def _copy_child_inputs(project_dir: Path) -> None:
         shutil.copy2(source, target)
 
 
+def _copy_corner_child_inputs(project_dir: Path) -> None:
+    for testbench_id in ("cg_nf", "iip3"):
+        source = (
+            project_dir
+            / "runs"
+            / "dry_run"
+            / "testbenches"
+            / testbench_id
+            / "input.scs"
+        )
+        for corner_id in ("tt", "ff", "ss"):
+            target = (
+                project_dir
+                / "runs"
+                / "real"
+                / "real_001"
+                / "testbenches"
+                / testbench_id
+                / "corners"
+                / corner_id
+                / "netlist"
+                / "input.scs"
+            )
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, target)
+
+
 def _request_metric(project_dir: Path, metric_name: str) -> dict:
     request = _load_json(
         project_dir / "runs" / "real" / "real_001" / "metric_extraction_request.json"
     )
     return next(metric for metric in request["metrics"] if metric["name"] == metric_name)
+
+
+def _child_metric_request(
+    project_dir: Path,
+    testbench_id: str,
+    corner_id: str,
+    *,
+    run_id: str = "real_001",
+) -> dict:
+    request = _load_json(
+        project_dir
+        / "runs"
+        / "real"
+        / run_id
+        / "testbenches"
+        / testbench_id
+        / "corners"
+        / corner_id
+        / "metric_extraction_request.json"
+    )
+    assert request is not None
+    return request
 
 
 def _write_child_handoff(
@@ -218,6 +328,126 @@ def _child_request_payload(
     return payload
 
 
+def _write_corner_child_handoff(
+    project_dir: Path,
+    *,
+    testbench_id: str,
+    corner_id: str,
+    metric_name: str,
+    run_id: str = "real_001",
+    value: float | None = 7.5,
+    metric_status: str = "succeeded",
+    result_status: str = "succeeded",
+) -> None:
+    run_dir = project_dir / "runs" / "real" / run_id
+    child_dir = run_dir / "testbenches" / testbench_id / "corners" / corner_id
+    child_psf = child_dir / "psf"
+    child_metrics = child_dir / "metrics"
+    child_psf.mkdir(parents=True, exist_ok=True)
+    child_metrics.mkdir(parents=True, exist_ok=True)
+    child_input = child_dir / "netlist" / "input.scs"
+    child_log = child_dir / "spectre.log"
+    child_script = child_metrics / "metric_probe.ocn"
+    child_ocean_log = child_metrics / "ocean.log"
+    child_scalars = child_metrics / "ocean_scalars.tsv"
+    child_spectre_out = child_psf / "spectre.out"
+    child_request = _child_metric_request(
+        project_dir,
+        testbench_id,
+        corner_id,
+        run_id=run_id,
+    )
+    request_metric = next(
+        metric for metric in child_request["metrics"] if metric["name"] == metric_name
+    )
+    child_request_path = child_dir / "metric_extraction_request.json"
+
+    child_log.write_text("spectre log\n", encoding="utf-8")
+    child_script.write_text("metric probe\n", encoding="utf-8")
+    child_ocean_log.write_text("ocean log\n", encoding="utf-8")
+    child_spectre_out.write_text("spectre output\n", encoding="utf-8")
+    child_scalars.write_text(
+        "metric\tstatus\tvalue_text\n"
+        f"{metric_name}\t{metric_status}\t"
+        f"{'' if value is None else f'{value:.12g}'}\n",
+        encoding="utf-8",
+    )
+
+    child_prefix = f"runs/real/{run_id}/testbenches/{testbench_id}/corners/{corner_id}"
+    result_payload = {
+        "schema_version": "1.0",
+        "run_id": run_id,
+        "candidate_id": run_id,
+        "testbench_id": testbench_id,
+        "status": result_status,
+        "started_at_utc": "2026-06-12T00:30:00Z",
+        "completed_at_utc": "2026-06-12T00:31:00Z",
+        "simulator": {
+            "engine": "spectre_x",
+            "preset": "ax",
+            "output_format": "psfxl",
+            "threads_per_run": 10,
+            "timeout_s": 3600,
+            "command_label": "external_spectre_run",
+        },
+        "prepared_input_scs": f"{child_prefix}/netlist/input.scs",
+        "prepared_input_sha256": sha256_file(child_input),
+        "log_file": f"{child_prefix}/spectre.log",
+        "artifact_files": [
+            f"{child_prefix}/psf",
+            f"{child_prefix}/psf/spectre.out",
+            f"{child_prefix}/metrics/ocean.log",
+            f"{child_prefix}/metrics/ocean_scalars.tsv",
+        ],
+        "result_data": {
+            "kind": "spectre_psf",
+            "psf_dir": f"{child_prefix}/psf",
+            "spectre_out": f"{child_prefix}/psf/spectre.out",
+        },
+        "metric_result_manifest": f"{child_prefix}/metrics/metric_result_manifest.json",
+        "notes": "" if result_status == "succeeded" else "child result failed",
+    }
+    metric_payload = {
+        "schema_version": "1.0",
+        "run_id": run_id,
+        "candidate_id": run_id,
+        "backend": "spectre_ocean_batch",
+        "status": metric_status,
+        "request_file": f"{child_prefix}/metric_extraction_request.json",
+        "request_sha256": sha256_file(child_request_path),
+        "psf_dir": f"{child_prefix}/psf",
+        "ocean": {
+            "mode": "nograph_replay",
+            "return_code": 0 if metric_status == "succeeded" else 1,
+            "attempts": 1,
+            "return_codes": [0 if metric_status == "succeeded" else 1],
+            "script_file": f"{child_prefix}/metrics/metric_probe.ocn",
+            "script_sha256": sha256_file(child_script),
+            "log_file": f"{child_prefix}/metrics/ocean.log",
+            "scalar_output_file": f"{child_prefix}/metrics/ocean_scalars.tsv",
+        },
+        "metrics": [
+            {
+                "name": metric_name,
+                "status": metric_status,
+                "value": value if metric_status == "succeeded" else None,
+                "value_text": (f"{value:.12g}" if metric_status == "succeeded" else "nil"),
+                "unit": request_metric["unit"],
+                "result": request_metric.get("result"),
+                "expression": request_metric["expression"],
+                "expression_sha256": request_metric["expression_sha256"],
+                "expression_source": request_metric["expression_source"],
+                "issues": [] if metric_status == "succeeded" else ["nil metric"],
+            }
+        ],
+        "child_metric_results": [],
+        "issues": [] if metric_status == "succeeded" else ["ocean failed"],
+    }
+
+    _write_json(child_dir / "result_manifest.json", result_payload)
+    _write_json(child_metrics / "metric_result_manifest.json", metric_payload)
+
+
 def test_aggregate_multi_testbench_child_manifests_pass_existing_checks(
     tmp_path: Path,
 ) -> None:
@@ -280,7 +510,7 @@ def test_aggregate_multi_testbench_metric_failure_fails_metric_check_only(
     assert aggregate_result["status"] == RealRunResultStatus.SUCCEEDED
     assert real_report.status == RealRunCheckStatus.PASS
     assert metric_report.status == MetricResultCheckStatus.FAIL
-    assert "metric IIP3 did not succeed" in metric_report.issues
+    assert any("IIP3" in issue for issue in metric_report.issues)
 
 
 def test_aggregate_multi_testbench_real_failure_marks_candidate_result_failed(
@@ -307,3 +537,178 @@ def test_aggregate_multi_testbench_real_failure_marks_candidate_result_failed(
     assert real_report.status == RealRunCheckStatus.PASS
     assert metric_report.status == MetricResultCheckStatus.FAIL
     assert "simulator result is not succeeded" in metric_report.issues
+
+
+def test_aggregate_multi_corner_feasible_uses_worst_case_corner_metrics(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_multi_corner_multi_testbench_project(tmp_path)
+    for corner_id, gain, iip3 in (
+        ("tt", 10.0, 20.0),
+        ("ff", 6.0, 4.0),
+        ("ss", 8.0, 16.0),
+    ):
+        _write_corner_child_handoff(
+            project_dir,
+            testbench_id="cg_nf",
+            corner_id=corner_id,
+            metric_name="MAX_GAIN",
+            value=gain,
+        )
+        _write_corner_child_handoff(
+            project_dir,
+            testbench_id="iip3",
+            corner_id=corner_id,
+            metric_name="IIP3",
+            value=iip3,
+        )
+
+    report = aggregate_multi_testbench_run(project_dir, run_id="real_001")
+    aggregate_metrics = _load_json(
+        project_dir / "runs" / "real" / "real_001" / "metrics" / "metric_result_manifest.json"
+    )
+
+    assert report.status == "succeeded"
+    assert report.constraint_policy == "all_corners"
+    assert report.objective_policy == "worst_case"
+    assert report.worst_corner == "ff"
+    assert report.selected_corner == "ff"
+    assert report.corner_status_counts["feasible"] == 3
+    assert {
+        metric["name"]: metric["value"]
+        for metric in aggregate_metrics["metrics"]
+    } == {"MAX_GAIN": 6.0, "IIP3": 4.0}
+
+
+def test_aggregate_multi_corner_constraint_failure_tracks_worst_corner(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_multi_corner_multi_testbench_project(tmp_path)
+    for corner_id, gain, iip3 in (
+        ("tt", 10.0, 20.0),
+        ("ff", 4.0, 4.0),
+        ("ss", 8.0, 16.0),
+    ):
+        _write_corner_child_handoff(
+            project_dir,
+            testbench_id="cg_nf",
+            corner_id=corner_id,
+            metric_name="MAX_GAIN",
+            value=gain,
+        )
+        _write_corner_child_handoff(
+            project_dir,
+            testbench_id="iip3",
+            corner_id=corner_id,
+            metric_name="IIP3",
+            value=iip3,
+        )
+
+    report = aggregate_multi_testbench_run(project_dir, run_id="real_001")
+    aggregate_metrics = _load_json(
+        project_dir / "runs" / "real" / "real_001" / "metrics" / "metric_result_manifest.json"
+    )
+
+    assert report.status == "constraint_failed"
+    assert report.worst_corner == "ff"
+    assert report.corner_status_counts["constraint_failed"] == 1
+    assert {
+        metric["name"]: metric["value"]
+        for metric in aggregate_metrics["metrics"]
+    } == {"MAX_GAIN": 4.0, "IIP3": 4.0}
+
+
+def test_aggregate_multi_corner_metric_failure_propagates(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_multi_corner_multi_testbench_project(tmp_path)
+    for corner_id in ("tt", "ff", "ss"):
+        _write_corner_child_handoff(
+            project_dir,
+            testbench_id="cg_nf",
+            corner_id=corner_id,
+            metric_name="MAX_GAIN",
+            value=8.0,
+        )
+        _write_corner_child_handoff(
+            project_dir,
+            testbench_id="iip3",
+            corner_id=corner_id,
+            metric_name="IIP3",
+            value=None if corner_id == "ff" else 10.0,
+            metric_status="failed" if corner_id == "ff" else "succeeded",
+        )
+
+    report = aggregate_multi_testbench_run(project_dir, run_id="real_001")
+
+    assert report.status == "metric_check_failed"
+    assert any("ff" in issue for issue in report.issues)
+
+
+def test_aggregate_multi_corner_real_failure_propagates(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_multi_corner_multi_testbench_project(tmp_path)
+    for corner_id in ("tt", "ff", "ss"):
+        _write_corner_child_handoff(
+            project_dir,
+            testbench_id="cg_nf",
+            corner_id=corner_id,
+            metric_name="MAX_GAIN",
+            value=8.0,
+            result_status="failed" if corner_id == "ss" else "succeeded",
+        )
+        _write_corner_child_handoff(
+            project_dir,
+            testbench_id="iip3",
+            corner_id=corner_id,
+            metric_name="IIP3",
+            value=10.0,
+        )
+
+    report = aggregate_multi_testbench_run(project_dir, run_id="real_001")
+
+    assert report.status == "real_check_failed"
+    assert any("ss" in issue for issue in report.issues)
+
+
+def test_aggregate_multi_corner_nominal_policy_ignores_non_nominal_constraint_failure(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_multi_corner_multi_testbench_project(
+        tmp_path,
+        objective_policy="nominal",
+        constraint_policy="nominal",
+    )
+    for corner_id, gain, iip3 in (
+        ("tt", 8.0, 10.0),
+        ("ff", 4.0, 10.0),
+        ("ss", 9.0, 11.0),
+    ):
+        _write_corner_child_handoff(
+            project_dir,
+            testbench_id="cg_nf",
+            corner_id=corner_id,
+            metric_name="MAX_GAIN",
+            value=gain,
+        )
+        _write_corner_child_handoff(
+            project_dir,
+            testbench_id="iip3",
+            corner_id=corner_id,
+            metric_name="IIP3",
+            value=iip3,
+        )
+
+    report = aggregate_multi_testbench_run(project_dir, run_id="real_001")
+    aggregate_metrics = _load_json(
+        project_dir / "runs" / "real" / "real_001" / "metrics" / "metric_result_manifest.json"
+    )
+
+    assert report.status == "succeeded"
+    assert report.selected_corner == "tt"
+    assert report.worst_corner is None
+    assert {
+        metric["name"]: metric["value"]
+        for metric in aggregate_metrics["metrics"]
+    } == {"MAX_GAIN": 8.0, "IIP3": 10.0}

@@ -8,6 +8,7 @@ from typer.testing import CliRunner
 
 from hermes_workflow.approvals import decide_first_real_run
 from hermes_workflow.cli import app
+from hermes_workflow.multi_testbench_aggregation import aggregate_multi_testbench_run
 from hermes_workflow.openbox_backend import (
     OPENBOX_ADVANCED_VISUALIZATION_MANIFEST_RELATIVE,
     _build_openbox_space,
@@ -23,6 +24,10 @@ from tests.real_run_smoke_helpers import (
     create_approved_real_project,
 )
 from tests.report_helpers import write_pass_reports
+from tests.test_multi_testbench_aggregation import (
+    _create_ready_multi_corner_multi_testbench_project,
+    _write_corner_child_handoff,
+)
 
 
 class FakeAdvisor:
@@ -614,6 +619,59 @@ def test_run_openbox_real_optimization_uses_existing_real_candidate_path(
     assert rows[0]["metric_result_manifest"]
     assert first_candidate["requested_source"] == "openbox_optimizer"
     assert first_candidate["metadata"]["optimizer"] == "openbox"
+
+
+def test_run_openbox_real_optimization_uses_multi_corner_aggregate_metrics(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_multi_corner_multi_testbench_project(tmp_path)
+
+    def adapter(project: Path, *, run_id: str, cadence_cshrc: Path | None = None) -> None:
+        assert project == project_dir
+        assert cadence_cshrc is None
+        for corner_id, gain, iip3 in (
+            ("tt", 10.0, 20.0),
+            ("ff", 6.0, 4.0),
+            ("ss", 8.0, 16.0),
+        ):
+            _write_corner_child_handoff(
+                project_dir,
+                testbench_id="cg_nf",
+                corner_id=corner_id,
+                run_id=run_id,
+                metric_name="MAX_GAIN",
+                value=gain,
+            )
+            _write_corner_child_handoff(
+                project_dir,
+                testbench_id="iip3",
+                corner_id=corner_id,
+                run_id=run_id,
+                metric_name="IIP3",
+                value=iip3,
+            )
+        aggregate_multi_testbench_run(project_dir, run_id=run_id)
+
+    result = run_openbox_real_optimization(
+        project_dir,
+        max_evals=1,
+        batch_size=1,
+        parallel_jobs=1,
+        advisor_factory=lambda _space, _seed: FakeAdvisor(),
+        adapter=adapter,
+    )
+
+    report = json.loads((project_dir / REPORT_RELATIVE).read_text())
+    rows = [
+        json.loads(line)
+        for line in (project_dir / EVALUATIONS_RELATIVE).read_text().splitlines()
+    ]
+
+    assert result.evaluation_count == 1
+    assert report["best_candidate"]["status"] == "feasible"
+    assert report["best_candidate"]["metrics"] == {"MAX_GAIN": 6.0, "IIP3": 4.0}
+    assert rows[0]["status"] == "feasible"
+    assert rows[0]["metrics"] == {"MAX_GAIN": 6.0, "IIP3": 4.0}
 
 
 def test_run_openbox_real_continuation_allows_completed_prior_state(

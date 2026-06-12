@@ -375,10 +375,14 @@ def run_remote_multi_testbench_adapter(
             metric_result_manifest_path=run_dir / "metrics" / "metric_result_manifest.json",
             issues=issues,
         )
+    aggregate_failed = aggregate_report.status in {
+        "real_check_failed",
+        "metric_check_failed",
+    }
     return AdapterRunResult(
-        status=aggregate_report.status if aggregate_report.status == "succeeded" else "failed",
+        status="failed" if aggregate_failed else "succeeded",
         run_id=run_id,
         result_manifest_path=run_dir / "result_manifest.json",
         metric_result_manifest_path=run_dir / "metrics" / "metric_result_manifest.json",
-        issues=list(aggregate_report.issues),
+        issues=list(aggregate_report.issues) if aggregate_failed else [],
     )
