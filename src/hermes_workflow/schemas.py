@@ -136,6 +136,33 @@ class TestbenchesConfig(StrictModel):
         return self
 
 
+class ProcessCorner(StrictModel):
+    id: str
+    model_section: str | None = None
+    model_file: str | None = None
+    variables: dict[str, str] | None = None
+    description: str | None = None
+
+    @field_validator("id")
+    @classmethod
+    def _id_is_identifier(cls, value: str) -> str:
+        return validate_name(value, "corner id")
+
+
+class ProcessCornerConfig(StrictModel):
+    schema_version: Literal["1.0"]
+    objective_policy: Literal["nominal", "worst_case"]
+    constraint_policy: Literal["nominal", "all_corners"]
+    corners: list[ProcessCorner] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def _corner_ids_are_unique(self) -> "ProcessCornerConfig":
+        ids = [corner.id for corner in self.corners]
+        if len(ids) != len(set(ids)):
+            raise ValueError("corner ids must be unique")
+        return self
+
+
 class NetlistConfig(StrictModel):
     source: Literal["existing_maestro_setup"]
     export_method: Literal["maeCreateNetlistForCorner"]

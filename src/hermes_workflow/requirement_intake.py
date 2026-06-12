@@ -16,6 +16,7 @@ from hermes_workflow.netlists import prepare_netlist
 from hermes_workflow.schemas import (
     MetricsConfig,
     OptimizerConfig,
+    ProcessCornerConfig,
     ProjectConfig,
     SpectreConfig,
     TestbenchesConfig,
@@ -35,6 +36,9 @@ REQUIRED_SECTIONS = [
     "Optimizer Settings",
     "Approval Checklist",
 ]
+OPTIONAL_SECTIONS = [
+    "Process Corners",
+]
 APPROVAL_FIELDS = [
     "metric_formulas_user_approved",
     "maestro_source_user_approved",
@@ -50,6 +54,7 @@ CONFIG_FILE_MODELS: dict[str, type[BaseModel]] = {
 }
 OPTIONAL_CONFIG_FILE_MODELS: dict[str, type[BaseModel]] = {
     "testbenches.yaml": TestbenchesConfig,
+    "process_corners.yaml": ProcessCornerConfig,
 }
 
 
@@ -205,6 +210,24 @@ def render_config_payloads(sections: dict[str, Any]) -> dict[str, dict[str, Any]
         payloads["testbenches.yaml"] = {
             "schema_version": "1.0",
             "testbenches": testbenches,
+        }
+    if "Process Corners" in sections:
+        process_corners = _dict_section(sections, "Process Corners")
+        corners = process_corners.get("corners", [])
+        if not isinstance(corners, list):
+            raise TypeError("Process Corners.corners must be a YAML list")
+        payloads["process_corners.yaml"] = {
+            "schema_version": "1.0",
+            "objective_policy": process_corners.get("objective_policy", "worst_case"),
+            "constraint_policy": process_corners.get("constraint_policy", "all_corners"),
+            "corners": corners,
+        }
+    else:
+        payloads["process_corners.yaml"] = {
+            "schema_version": "1.0",
+            "objective_policy": "nominal",
+            "constraint_policy": "nominal",
+            "corners": [{"id": "nominal"}],
         }
     _validate_config_payloads(payloads)
     return payloads
@@ -382,7 +405,9 @@ def parse_requirement_text(
     issues.extend(section_issues)
     structured_issues.extend(section_diagnostics)
     if not issues:
-        for name in REQUIRED_SECTIONS:
+        for name in REQUIRED_SECTIONS + OPTIONAL_SECTIONS:
+            if name not in raw_sections:
+                continue
             payload, payload_issues = _parse_section_yaml(name, raw_sections[name])
             if payload_issues:
                 issues.extend(payload_issues)
@@ -524,7 +549,24 @@ def _extract_required_sections(
                     component="requirement_intake",
                     message=f"Section {name} appears more than once.",
                     detail=f"Section {name} appears {counts[name]} times.",
-                        likely_cause="Section duplication can cause parser ambiguity.",
+                    likely_cause="Section duplication can cause parser ambiguity.",
+                    recommended_action=f"Keep a single ## {name} section.",
+                    evidence=[f"opt_requirement.md:{name}"],
+                )
+            )
+    for name in OPTIONAL_SECTIONS:
+        count = sum(1 for n, _s, _e in headings if n == name)
+        if count > 1:
+            issues.append(f"optional section appears more than once: {name}")
+            structured_issues.append(
+                Diagnostic(
+                    code="REQUIREMENT_SECTION_MISSING",
+                    severity=DiagnosticSeverity.ERROR,
+                    stage="requirement",
+                    component="requirement_intake",
+                    message=f"Optional section {name} appears more than once.",
+                    detail=f"Section {name} appears {count} times.",
+                    likely_cause="Section duplication can cause parser ambiguity.",
                     recommended_action=f"Keep a single ## {name} section.",
                     evidence=[f"opt_requirement.md:{name}"],
                 )
@@ -534,7 +576,7 @@ def _extract_required_sections(
 
     sections: dict[str, str] = {}
     for index, (name, _start, content_start) in enumerate(headings):
-        if name not in REQUIRED_SECTIONS:
+        if name not in REQUIRED_SECTIONS and name not in OPTIONAL_SECTIONS:
             continue
         content_end = headings[index + 1][1] if index + 1 < len(headings) else len(text)
         sections[name] = text[content_start:content_end]

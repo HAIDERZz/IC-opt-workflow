@@ -489,6 +489,31 @@ Rules:
 - `deduplicate_candidates` must be `true`.
 - Use a fixed `random_seed` for reproducibility.
 
+### Process Corners (Optional)
+
+```yaml
+objective_policy: worst_case
+constraint_policy: all_corners
+corners:
+  - id: tt
+    model_section: Post_simu_top_tt
+    variables:
+      temperature: "27"
+  - id: ss
+    model_section: Post_simu_top_ss
+    variables:
+      temperature: "125"
+```
+
+Rules:
+
+- `id` must be a simple identifier: letters, numbers, underscore, not starting with a number.
+- `objective_policy` must be `nominal` or `worst_case`. Defaults to `worst_case` when corners are explicitly defined.
+- `constraint_policy` must be `nominal` or `all_corners`. Defaults to `all_corners` when corners are explicitly defined.
+- `model_section` is the name of the model section to use for this corner.
+- `variables` are corner-specific variable overrides.
+- When `Process Corners` is omitted, a single implicit `nominal` corner is used with `objective_policy: nominal` and `constraint_policy: nominal`.
+
 ### Approval Checklist
 
 ```yaml

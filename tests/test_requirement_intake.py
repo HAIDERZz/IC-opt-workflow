@@ -18,6 +18,7 @@ from hermes_workflow.requirement_intake import (
     prepare_from_requirement,
 )
 from hermes_workflow.reports import PassFail
+from hermes_workflow.schemas import ProcessCornerConfig
 from hermes_workflow.validate import validate_project_files
 
 FIXTURE_ROOT = Path(__file__).parent / "fixtures" / "requirement_intake"
@@ -816,3 +817,148 @@ def test_parse_requirement_text_reports_remote_maestro_missing() -> None:
 
     assert report.status == "fail"
     assert "maestro_point_root/netlist/input.scs is missing: /remote/missing_point/netlist/input.scs" in report.issues
+
+
+def test_prepare_from_requirement_renders_implicit_nominal_corner(tmp_path: Path) -> None:
+    project_dir = _copy_requirement_project(tmp_path)
+
+    report = prepare_from_requirement(project_dir)
+
+    assert report.status == "pass"
+    corner_path = project_dir / "config" / "process_corners.yaml"
+    assert corner_path.exists()
+    corner_yaml = yaml.safe_load(corner_path.read_text(encoding="utf-8"))
+    corner_config = ProcessCornerConfig.model_validate(corner_yaml)
+    assert corner_config.corners[0].id == "nominal"
+    assert corner_config.objective_policy == "nominal"
+    assert corner_config.constraint_policy == "nominal"
+
+
+def test_prepare_from_requirement_renders_explicit_process_corners(tmp_path: Path) -> None:
+    project_dir = _copy_requirement_project(tmp_path)
+    text = (project_dir / "opt_requirement.md").read_text(encoding="utf-8")
+    corners_section = """
+
+## Process Corners
+
+```yaml
+objective_policy: worst_case
+constraint_policy: all_corners
+corners:
+  - id: tt
+    model_section: Post_simu_top_tt
+    variables:
+      temperature: "27"
+  - id: ss
+    model_section: Post_simu_top_ss
+    variables:
+      temperature: "125"
+```
+"""
+    text = text.replace("## Approval Checklist", corners_section + "\n## Approval Checklist")
+    (project_dir / "opt_requirement.md").write_text(text, encoding="utf-8")
+
+    report = prepare_from_requirement(project_dir)
+
+    assert report.status == "pass"
+    corner_path = project_dir / "config" / "process_corners.yaml"
+    assert corner_path.exists()
+    corner_yaml = yaml.safe_load(corner_path.read_text(encoding="utf-8"))
+    corner_config = ProcessCornerConfig.model_validate(corner_yaml)
+    assert [c.id for c in corner_config.corners] == ["tt", "ss"]
+    assert corner_config.corners[0].model_section == "Post_simu_top_tt"
+    assert corner_config.corners[0].variables == {"temperature": "27"}
+    assert corner_config.corners[1].model_section == "Post_simu_top_ss"
+    assert corner_config.corners[1].variables == {"temperature": "125"}
+    assert corner_config.objective_policy == "worst_case"
+    assert corner_config.constraint_policy == "all_corners"
+
+
+def test_check_requirement_rejects_invalid_corner_id(tmp_path: Path) -> None:
+    project_dir = _copy_requirement_project(tmp_path)
+    text = (project_dir / "opt_requirement.md").read_text(encoding="utf-8")
+    corners_section = """
+
+## Process Corners
+
+```yaml
+corners:
+  - id: tt/bad
+    model_section: Post_simu_top_tt
+```
+"""
+    text = text.replace("## Approval Checklist", corners_section + "\n## Approval Checklist")
+    (project_dir / "opt_requirement.md").write_text(text, encoding="utf-8")
+
+    report = check_requirement(project_dir)
+
+    assert report.status == "fail"
+    assert any("corner id must match" in issue for issue in report.issues)
+
+
+def test_check_requirement_rejects_empty_corner_list(tmp_path: Path) -> None:
+    project_dir = _copy_requirement_project(tmp_path)
+    text = (project_dir / "opt_requirement.md").read_text(encoding="utf-8")
+    corners_section = """
+
+## Process Corners
+
+```yaml
+corners: []
+```
+"""
+    text = text.replace("## Approval Checklist", corners_section + "\n## Approval Checklist")
+    (project_dir / "opt_requirement.md").write_text(text, encoding="utf-8")
+
+    report = check_requirement(project_dir)
+
+    assert report.status == "fail"
+    assert any("at least 1 item" in issue for issue in report.issues)
+
+
+def test_check_requirement_rejects_invalid_policy_values(tmp_path: Path) -> None:
+    project_dir = _copy_requirement_project(tmp_path)
+    text = (project_dir / "opt_requirement.md").read_text(encoding="utf-8")
+    corners_section = """
+
+## Process Corners
+
+```yaml
+objective_policy: invalid_policy
+constraint_policy: all_corners
+corners:
+  - id: tt
+    model_section: Post_simu_top_tt
+```
+"""
+    text = text.replace("## Approval Checklist", corners_section + "\n## Approval Checklist")
+    (project_dir / "opt_requirement.md").write_text(text, encoding="utf-8")
+
+    report = check_requirement(project_dir)
+
+    assert report.status == "fail"
+    assert any("objective_policy" in issue for issue in report.issues)
+
+
+def test_check_requirement_rejects_duplicate_corner_ids(tmp_path: Path) -> None:
+    project_dir = _copy_requirement_project(tmp_path)
+    text = (project_dir / "opt_requirement.md").read_text(encoding="utf-8")
+    corners_section = """
+
+## Process Corners
+
+```yaml
+corners:
+  - id: tt
+    model_section: Post_simu_top_tt
+  - id: tt
+    model_section: Post_simu_top_ss
+```
+"""
+    text = text.replace("## Approval Checklist", corners_section + "\n## Approval Checklist")
+    (project_dir / "opt_requirement.md").write_text(text, encoding="utf-8")
+
+    report = check_requirement(project_dir)
+
+    assert report.status == "fail"
+    assert any("corner ids must be unique" in issue for issue in report.issues)
