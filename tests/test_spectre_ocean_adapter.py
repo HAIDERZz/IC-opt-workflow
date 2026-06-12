@@ -188,13 +188,24 @@ def test_load_adapter_context_accepts_multi_testbench_child_run(
 ) -> None:
     project_dir = _create_ready_multi_testbench_project(tmp_path)
 
-    context = load_adapter_context(project_dir, testbench_id="cg_nf")
+    context = load_adapter_context(
+        project_dir,
+        testbench_id="cg_nf",
+        corner_id="nominal",
+    )
 
-    child_relative = "runs/real/real_001/testbenches/cg_nf"
+    child_relative = "runs/real/real_001/testbenches/cg_nf/corners/nominal"
     assert context.run_id == "real_001"
     assert context.run_relative == child_relative
     assert context.run_dir == (
-        project_dir / "runs" / "real" / "real_001" / "testbenches" / "cg_nf"
+        project_dir
+        / "runs"
+        / "real"
+        / "real_001"
+        / "testbenches"
+        / "cg_nf"
+        / "corners"
+        / "nominal"
     )
     assert context.input_scs == context.run_dir / "netlist" / "input.scs"
     assert context.psf_dir == context.run_dir / "psf"
@@ -907,10 +918,11 @@ def test_run_spectre_ocean_adapter_accepts_multi_testbench_child_run(
     result = run_spectre_ocean_adapter(
         project_dir,
         testbench_id="iip3",
+        corner_id="nominal",
         runner=runner,
     )
 
-    child_relative = "runs/real/real_001/testbenches/iip3"
+    child_relative = "runs/real/real_001/testbenches/iip3/corners/nominal"
     assert result.status == "succeeded"
     assert result.result_manifest_path == (
         project_dir
@@ -919,6 +931,8 @@ def test_run_spectre_ocean_adapter_accepts_multi_testbench_child_run(
         / "real_001"
         / "testbenches"
         / "iip3"
+        / "corners"
+        / "nominal"
         / "result_manifest.json"
     )
     assert result.metric_result_manifest_path == (
@@ -928,6 +942,8 @@ def test_run_spectre_ocean_adapter_accepts_multi_testbench_child_run(
         / "real_001"
         / "testbenches"
         / "iip3"
+        / "corners"
+        / "nominal"
         / "metrics"
         / "metric_result_manifest.json"
     )

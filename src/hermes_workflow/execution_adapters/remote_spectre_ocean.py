@@ -30,10 +30,7 @@ def _configured_corner_ids(bundle: Any) -> list[str | None]:
     process_corners = getattr(bundle, "process_corners", None)
     if process_corners is None:
         return [None]
-    corners = process_corners.corners
-    if len(corners) == 1:
-        return [None]
-    return [corner.id for corner in corners]
+    return [corner.id for corner in process_corners.corners]
 
 
 def run_remote_spectre_ocean_adapter(
@@ -56,10 +53,10 @@ def run_remote_spectre_ocean_adapter(
     remote_run_base = remote_ref.remote_project_dir / "runs" / "real" / run_id
     if testbench_id is not None:
         remote_run_dir = remote_run_base / "testbenches" / testbench_id
-        if corner_id is not None:
-            remote_run_dir = remote_run_dir / "corners" / corner_id
     else:
         remote_run_dir = remote_run_base
+    if corner_id is not None:
+        remote_run_dir = remote_run_dir / "corners" / corner_id
     try:
         runner.upload_tree(context.run_dir, remote_run_dir)
     except Exception as exc:
@@ -329,12 +326,14 @@ def run_remote_multi_testbench_adapter(
     from hermes_workflow.validate import assert_valid_project
 
     bundle = assert_valid_project(project_dir)
-    if bundle.testbenches is None:
-        raise RuntimeError("run_remote_multi_testbench_adapter called without testbenches config")
-
     issues: list[str] = []
     corner_ids = _configured_corner_ids(bundle)
-    for testbench in bundle.testbenches.testbenches:
+    testbench_ids = (
+        [testbench.id for testbench in bundle.testbenches.testbenches]
+        if bundle.testbenches is not None
+        else [None]
+    )
+    for testbench_id in testbench_ids:
         for corner_id in corner_ids:
             result = run_remote_spectre_ocean_adapter(
                 project_dir,
@@ -342,12 +341,20 @@ def run_remote_multi_testbench_adapter(
                 remote_ref=remote_ref,
                 remote_cadence_cshrc=remote_cadence_cshrc,
                 runner=runner,
-                testbench_id=testbench.id,
+                testbench_id=testbench_id,
                 corner_id=corner_id,
             )
             if result.status != "succeeded":
                 message = "; ".join(result.issues) or result.status
-                label = testbench.id if corner_id is None else f"{testbench.id}/{corner_id}"
+                label = (
+                    (testbench_id or "default_testbench")
+                    if corner_id is None
+                    else (
+                        f"{testbench_id}/{corner_id}"
+                        if testbench_id is not None
+                        else corner_id
+                    )
+                )
                 issues.append(f"{label}: {message}")
 
     aggregate_report = aggregate_multi_testbench_run(project_dir, run_id=run_id)

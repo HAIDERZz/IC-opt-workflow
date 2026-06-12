@@ -16,6 +16,7 @@ from hermes_workflow.validate import assert_valid_project
 
 REAL_RUN_ROOT = "runs/real"
 DEFAULT_RUN_ID = "real_001"
+DEFAULT_TESTBENCH_ID = "default_testbench"
 REPORT_RELATIVE = "reports/multi_testbench_aggregation_report.json"
 AGGREGATE_TIMESTAMP = "2026-06-06T00:40:00Z"
 
@@ -78,8 +79,6 @@ def aggregate_multi_testbench_run(
     project_dir = Path(project_dir)
     selected_run_id = run_id or DEFAULT_RUN_ID
     bundle = assert_valid_project(project_dir)
-    if bundle.testbenches is None:
-        raise ValueError("multi-testbench aggregation requires config/testbenches.yaml")
 
     corner_ids, objective_policy, constraint_policy = _configured_corner_ids(bundle)
     nominal_corner = _nominal_corner_key(corner_ids)
@@ -105,16 +104,14 @@ def aggregate_multi_testbench_run(
         corner_real_failed = False
         corner_metric_failed = False
 
-        for testbench in bundle.testbenches.testbenches:
-            expected_metric_names = [
-                metric.name
-                for metric in bundle.metrics.metrics
-                if metric.testbench == testbench.id
-            ]
+        for testbench_id, testbench_label, expected_metric_names in _aggregation_testbench_specs(
+            bundle
+        ):
             child = _load_child_handoff(
                 project_dir,
                 run_id=selected_run_id,
-                testbench_id=testbench.id,
+                testbench_id=testbench_id,
+                testbench_label=testbench_label,
                 corner_id=corner_id,
                 expected_metric_names=expected_metric_names,
             )
@@ -258,14 +255,17 @@ def _load_child_handoff(
     project_dir: Path,
     *,
     run_id: str,
-    testbench_id: str,
+    testbench_id: str | None,
+    testbench_label: str,
     corner_id: str | None,
     expected_metric_names: list[str],
 ) -> _LoadedChild:
-    child_prefix = f"{REAL_RUN_ROOT}/{run_id}/testbenches/{testbench_id}"
+    child_prefix = f"{REAL_RUN_ROOT}/{run_id}"
+    if testbench_id is not None:
+        child_prefix = f"{child_prefix}/testbenches/{testbench_id}"
     if corner_id is not None:
         child_prefix = f"{child_prefix}/corners/{corner_id}"
-    label = _child_label(testbench_id, corner_id)
+    label = _child_label(testbench_label, corner_id)
     result_relative = f"{child_prefix}/result_manifest.json"
     result_payload = _load_json(project_dir / result_relative)
     issues: list[str] = []
@@ -331,7 +331,7 @@ def _load_child_handoff(
     )
     child_metric_names = [str(metric.get("name", "")) for metric in metrics]
     result_reference = {
-        "testbench": testbench_id,
+        "testbench": testbench_label,
         "result_manifest": result_relative,
         "status": result_status,
         "metric_result_manifest": metric_relative,
@@ -339,7 +339,7 @@ def _load_child_handoff(
     }
     metric_reference = (
         {
-            "testbench": testbench_id,
+            "testbench": testbench_label,
             "metric_result_manifest": metric_relative,
             "status": manifest.status,
             "metrics": child_metric_names,
@@ -350,7 +350,7 @@ def _load_child_handoff(
     )
     return _LoadedChild(
         status=ChildAggregationStatus(
-            testbench=testbench_id,
+            testbench=testbench_label,
             corner=corner_id,
             result_status=result_status,
             metric_status=metric_status,
@@ -477,9 +477,30 @@ def _scalar_output_text(metrics: list[dict]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _aggregation_testbench_specs(
+    bundle,
+) -> list[tuple[str | None, str, list[str]]]:
+    if bundle.testbenches is None:
+        return [
+            (
+                None,
+                DEFAULT_TESTBENCH_ID,
+                [metric.name for metric in bundle.metrics.metrics if metric.testbench is None],
+            )
+        ]
+    return [
+        (
+            testbench.id,
+            testbench.id,
+            [metric.name for metric in bundle.metrics.metrics if metric.testbench == testbench.id],
+        )
+        for testbench in bundle.testbenches.testbenches
+    ]
+
+
 def _configured_corner_ids(bundle) -> tuple[list[str | None], str, str]:
     process_corners = getattr(bundle, "process_corners", None)
-    if process_corners is None or len(process_corners.corners) <= 1:
+    if process_corners is None:
         return [None], "nominal", "nominal"
     return (
         [corner.id for corner in process_corners.corners],

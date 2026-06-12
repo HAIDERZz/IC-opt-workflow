@@ -13,7 +13,7 @@ from hermes_workflow.execution_adapters.remote_spectre_ocean import (
     run_remote_spectre_ocean_adapter,
 )
 from hermes_workflow.execution_adapters.spectre_ocean import load_adapter_context
-from hermes_workflow.package import build_execution_package
+from hermes_workflow.package import build_execution_package, create_project_from_template
 from hermes_workflow.real_run import prepare_real_run
 from hermes_workflow.remote_project import RemoteProjectRef
 from hermes_workflow.remote_ssh import RemoteCommandResult
@@ -69,6 +69,91 @@ def _create_ready_multi_corner_multi_testbench_project(tmp_path: Path) -> Path:
     assert instruction["decision"] == "approve_first_real_run"
     prepare_real_run(project_dir, created_at_utc="2026-06-12T00:20:00Z")
     return project_dir
+
+
+def _write_process_corners_config(
+    project_dir: Path,
+    corner_ids: list[str],
+    *,
+    objective_policy: str = "worst_case",
+    constraint_policy: str = "all_corners",
+) -> None:
+    lines = [
+        'schema_version: "1.0"',
+        f"objective_policy: {objective_policy}",
+        f"constraint_policy: {constraint_policy}",
+        "corners:",
+    ]
+    for corner_id in corner_ids:
+        lines.extend(
+            [
+                f"  - id: {corner_id}",
+                f"    description: {corner_id} corner",
+            ]
+        )
+    (project_dir / "config" / "process_corners.yaml").write_text(
+        "\n".join(lines) + "\n",
+        encoding="utf-8",
+    )
+
+
+def _create_ready_multi_corner_single_testbench_project(
+    tmp_path: Path,
+    *,
+    corner_ids: list[str],
+    objective_policy: str = "worst_case",
+    constraint_policy: str = "all_corners",
+) -> Path:
+    project_dir = tmp_path / "bridge_test_inv"
+    create_project_from_template(project_dir)
+    _write_process_corners_config(
+        project_dir,
+        corner_ids,
+        objective_policy=objective_policy,
+        constraint_policy=constraint_policy,
+    )
+    template_path = project_dir / "netlists" / "templates" / "template.scs"
+    template_path.parent.mkdir(parents=True, exist_ok=True)
+    template_path.write_text(
+        "simulator lang=spectre\n"
+        "parameters FN={{FN}} WN={{WN}} FP={{FP}} WP={{WP}}\n"
+        "tran tran stop=10n\n",
+        encoding="utf-8",
+    )
+    template_text = template_path.read_text(encoding="utf-8")
+    for corner_id in corner_ids:
+        corner_template = (
+            project_dir / "netlists" / "corners" / corner_id / "template.scs"
+        )
+        corner_template.parent.mkdir(parents=True, exist_ok=True)
+        corner_template.write_text(template_text, encoding="utf-8")
+    build_execution_package(project_dir, created_at_utc="2026-06-13T00:00:00Z")
+    write_pass_reports(project_dir)
+    instruction = decide_first_real_run(
+        project_dir,
+        created_at_utc="2026-06-13T00:10:00Z",
+    )
+    assert instruction["decision"] == "approve_first_real_run"
+    prepare_real_run(project_dir, created_at_utc="2026-06-13T00:20:00Z")
+    return project_dir
+
+
+def _prepared_testbench_child_dir(
+    project_dir: Path,
+    testbench_id: str,
+    *,
+    run_id: str = "real_001",
+    corner_id: str | None = None,
+) -> Path:
+    child_dir = project_dir / "runs" / "real" / run_id / "testbenches" / testbench_id
+    if corner_id is not None:
+        return child_dir / "corners" / corner_id
+    if (child_dir / "metric_extraction_request.json").is_file():
+        return child_dir
+    corner_requests = sorted(child_dir.glob("corners/*/metric_extraction_request.json"))
+    if len(corner_requests) == 1:
+        return corner_requests[0].parent
+    return child_dir
 
 
 class FakeRunner:
@@ -528,8 +613,8 @@ class MultiTestbenchFakeRunner(FakeRunner):
         if testbench_id in self.child_expression_sha256 and testbench_id in self.child_metric_units:
             return
         request_path = (
-            self._project_dir / "runs" / "real" / "real_001"
-            / "testbenches" / testbench_id / "metric_extraction_request.json"
+            _prepared_testbench_child_dir(self._project_dir, testbench_id)
+            / "metric_extraction_request.json"
         )
         if request_path.is_file():
             import json as _json
@@ -626,12 +711,7 @@ def test_remote_multi_testbench_adapter_runs_each_child(tmp_path: Path) -> None:
     runner.child_expression_sha256 = {}
     for testbench_id in ("cg_nf", "iip3"):
         request_path = (
-            project_dir
-            / "runs"
-            / "real"
-            / "real_001"
-            / "testbenches"
-            / testbench_id
+            _prepared_testbench_child_dir(project_dir, testbench_id)
             / "metric_extraction_request.json"
         )
         request = json.loads(request_path.read_text(encoding="utf-8"))
@@ -784,6 +864,70 @@ def test_remote_multi_testbench_adapter_runs_multi_corner_children_serially(
     ]
     assert [path for path in expected_order if any(path in cmd for cmd in spectre_cmds)] == expected_order
     assert [path for path in expected_order if any(path in cmd for cmd in ocean_cmds)] == expected_order
+
+
+def test_remote_multi_testbench_adapter_runs_single_testbench_multi_corner_children_serially(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_multi_corner_single_testbench_project(
+        tmp_path,
+        corner_ids=["tt", "ff", "ss"],
+    )
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    runner = FakeRunner()
+
+    result = run_remote_multi_testbench_adapter(
+        project_dir,
+        run_id="real_001",
+        remote_ref=ref,
+        remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
+        runner=runner,
+    )
+
+    assert result.status == "succeeded"
+    for corner_id in ("tt", "ff", "ss"):
+        child_dir = project_dir / "runs" / "real" / "real_001" / "corners" / corner_id
+        assert (child_dir / "result_manifest.json").is_file()
+        assert (child_dir / "metrics" / "metric_result_manifest.json").is_file()
+    assert any("/remote/project/runs/real/real_001/corners/tt" in cmd for cmd in runner.commands)
+    assert any("/remote/project/runs/real/real_001/corners/ff" in cmd for cmd in runner.commands)
+    assert any("/remote/project/runs/real/real_001/corners/ss" in cmd for cmd in runner.commands)
+
+
+def test_remote_multi_testbench_adapter_preserves_explicit_single_corner_id(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_multi_corner_single_testbench_project(
+        tmp_path,
+        corner_ids=["ss"],
+    )
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    runner = FakeRunner()
+
+    result = run_remote_multi_testbench_adapter(
+        project_dir,
+        run_id="real_001",
+        remote_ref=ref,
+        remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
+        runner=runner,
+    )
+
+    assert result.status == "succeeded"
+    report = json.loads(
+        (
+            project_dir
+            / "runs"
+            / "real"
+            / "real_001"
+            / "multi_testbench_aggregation_report.json"
+        ).read_text(encoding="utf-8")
+    )
+    assert report["objective_policy"] == "worst_case"
+    assert report["constraint_policy"] == "all_corners"
+    assert report["selected_corner"] == "ss"
+    assert report["worst_corner"] == "ss"
+    assert any("/remote/project/runs/real/real_001/corners/ss" in cmd for cmd in runner.commands)
+    assert not any("/corners/nominal" in cmd for cmd in runner.commands)
 
 
 def test_remote_multi_testbench_adapter_child_failure_reports_issues(tmp_path: Path) -> None:
@@ -1184,14 +1328,12 @@ def test_remote_multi_testbench_writes_ocean_scripts_under_project_dir(tmp_path:
     # Each child metric_probe.ocn must be under project_dir
     for tb_id in ("cg_nf", "iip3"):
         expected = (
-            project_dir / "runs" / "real" / "real_001"
-            / "testbenches" / tb_id / "metrics" / "metric_probe.ocn"
+            _prepared_testbench_child_dir(project_dir, tb_id)
+            / "metrics"
+            / "metric_probe.ocn"
         )
         assert expected.is_file(), f"metric_probe.ocn missing for {tb_id}: {expected}"
-        wrong = (
-            separate_cwd / "runs" / "real" / "real_001"
-            / "testbenches" / tb_id / "metrics" / "metric_probe.ocn"
-        )
+        wrong = separate_cwd / expected.relative_to(project_dir)
         assert not wrong.exists(), f"metric_probe.ocn leaked to cwd for {tb_id}: {wrong}"
 
 

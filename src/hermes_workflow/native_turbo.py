@@ -1167,10 +1167,7 @@ def _default_batch_turbo_factory(**kwargs):
 def _configured_corner_ids(bundle: ContractBundle) -> list[str | None]:
     if bundle.process_corners is None:
         return [None]
-    corners = bundle.process_corners.corners
-    if len(corners) == 1:
-        return [None]
-    return [corner.id for corner in corners]
+    return [corner.id for corner in bundle.process_corners.corners]
 
 
 def _run_default_adapter(
@@ -1180,13 +1177,18 @@ def _run_default_adapter(
     cadence_cshrc: Path | None,
 ) -> None:
     bundle = assert_valid_project(project_dir)
-    if bundle.testbenches is not None:
+    corner_ids = _configured_corner_ids(bundle)
+    if bundle.testbenches is not None or corner_ids != [None]:
         _run_multi_testbench_default_adapter(
             project_dir,
             run_id=run_id,
             cadence_cshrc=cadence_cshrc,
-            testbench_ids=[testbench.id for testbench in bundle.testbenches.testbenches],
-            corner_ids=_configured_corner_ids(bundle),
+            testbench_ids=(
+                [testbench.id for testbench in bundle.testbenches.testbenches]
+                if bundle.testbenches is not None
+                else [None]
+            ),
+            corner_ids=corner_ids,
         )
         return
 
@@ -1226,7 +1228,7 @@ def _run_multi_testbench_default_adapter(
     *,
     run_id: str,
     cadence_cshrc: Path | None,
-    testbench_ids: list[str],
+    testbench_ids: list[str | None],
     corner_ids: list[str | None],
 ) -> None:
     issues: list[str] = []
@@ -1245,7 +1247,15 @@ def _run_multi_testbench_default_adapter(
                 )
                 if result.status != "succeeded":
                     message = "; ".join(result.issues) or result.status
-                    label = testbench_id if corner_id is None else f"{testbench_id}/{corner_id}"
+                    label = (
+                        (testbench_id or "default_testbench")
+                        if corner_id is None
+                        else (
+                            f"{testbench_id}/{corner_id}"
+                            if testbench_id is not None
+                            else corner_id
+                        )
+                    )
                     issues.append(f"{label}: {message}")
     else:
         repo_root = Path(__file__).resolve().parents[2]
@@ -1256,9 +1266,10 @@ def _run_multi_testbench_default_adapter(
                     f"source {shlex.quote(str(cadence_cshrc))}; "
                     f"cd {shlex.quote(str(repo_root))}; "
                     f"{shlex.quote(sys.executable)} {shlex.quote(str(tool_path))} "
-                    f"{shlex.quote(str(project_dir))} --run-id {shlex.quote(run_id)} "
-                    f"--testbench-id {shlex.quote(testbench_id)}"
+                    f"{shlex.quote(str(project_dir))} --run-id {shlex.quote(run_id)}"
                 )
+                if testbench_id is not None:
+                    command += f" --testbench-id {shlex.quote(testbench_id)}"
                 if corner_id is not None:
                     command += f" --corner-id {shlex.quote(corner_id)}"
                 completed = subprocess.run(
@@ -1267,13 +1278,21 @@ def _run_multi_testbench_default_adapter(
                     capture_output=True,
                     check=False,
                 )
-                if completed.returncode != 0:
-                    message = (completed.stdout + "\n" + completed.stderr).strip()
-                    label = testbench_id if corner_id is None else f"{testbench_id}/{corner_id}"
-                    issues.append(
-                        f"{label}: "
-                        + (message or f"adapter failed with return code {completed.returncode}")
+            if completed.returncode != 0:
+                message = (completed.stdout + "\n" + completed.stderr).strip()
+                label = (
+                    (testbench_id or "default_testbench")
+                    if corner_id is None
+                    else (
+                        f"{testbench_id}/{corner_id}"
+                        if testbench_id is not None
+                        else corner_id
                     )
+                )
+                issues.append(
+                    f"{label}: "
+                    + (message or f"adapter failed with return code {completed.returncode}")
+                )
 
     from hermes_workflow.multi_testbench_aggregation import aggregate_multi_testbench_run
 

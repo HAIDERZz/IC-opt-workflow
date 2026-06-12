@@ -804,14 +804,26 @@ def _write_real_run_package(
     testbench_id: str | None = None,
     corner_id: str | None = None,
 ) -> RealRunPackage:
-    if corner_id is not None and testbench_id is None:
+    if corner_id is not None and testbench_id is None and bundle.testbenches is not None:
         raise ValueError("corner_id requires testbench_id")
-
     _assert_real_run_parent_dirs_are_not_symlinks(bundle.project_dir)
     run_dir = _project_path(bundle, f"{REAL_RUN_ROOT}/{selected_run_id}")
+    root_manifest_path = run_dir / "real_run_manifest.json"
 
-    if testbench_id is not None:
-        child_prefix = f"{REAL_RUN_ROOT}/{selected_run_id}/testbenches/{testbench_id}"
+    if testbench_id is not None or corner_id is not None:
+        if not root_manifest_path.exists():
+            _write_real_run_package(
+                bundle,
+                selected_run_id,
+                candidate,
+                created_at_utc,
+                instruction,
+                approved_hashes,
+                manifest_extra=manifest_extra,
+            )
+        child_prefix = f"{REAL_RUN_ROOT}/{selected_run_id}"
+        if testbench_id is not None:
+            child_prefix = f"{child_prefix}/testbenches/{testbench_id}"
         if corner_id is not None:
             child_prefix = f"{child_prefix}/corners/{corner_id}"
         child_dir = _project_path(bundle, child_prefix)
@@ -891,7 +903,7 @@ def _write_real_run_package(
         )
 
     _assert_run_dir_is_not_symlink(run_dir)
-    manifest_path = run_dir / "real_run_manifest.json"
+    manifest_path = root_manifest_path
     if manifest_path.exists():
         raise FileExistsError(f"real run package already exists: {manifest_path}")
     if run_dir.exists() and any(run_dir.iterdir()):
@@ -1065,16 +1077,34 @@ def _write_single_testbench_package(
     approved_hashes: dict[str, str],
     candidate_relative: str,
     manifest_extra: dict,
-    testbench_id: str,
+    testbench_id: str | None,
     corner_id: str | None = None,
 ) -> tuple[Path, dict, dict]:
-    child_prefix = f"{REAL_RUN_ROOT}/{selected_run_id}/testbenches/{testbench_id}"
+    child_prefix = f"{REAL_RUN_ROOT}/{selected_run_id}"
+    if testbench_id is not None:
+        child_prefix = f"{child_prefix}/testbenches/{testbench_id}"
     if corner_id is not None:
         child_prefix = f"{child_prefix}/corners/{corner_id}"
-        template_relative = f"netlists/testbenches/{testbench_id}/corners/{corner_id}/template.scs"
+    if testbench_id is not None:
+        if corner_id is not None:
+            template_relative = (
+                f"netlists/testbenches/{testbench_id}/corners/{corner_id}/template.scs"
+            )
+        else:
+            template_relative = f"netlists/testbenches/{testbench_id}/templates/template.scs"
+        exported_input_relative = f"netlists/testbenches/{testbench_id}/exported/input.scs"
+        metrics_subset = [
+            metric for metric in bundle.metrics.metrics if metric.testbench == testbench_id
+        ]
     else:
-        template_relative = f"netlists/testbenches/{testbench_id}/templates/template.scs"
-    exported_input_relative = f"netlists/testbenches/{testbench_id}/exported/input.scs"
+        if corner_id is not None:
+            template_relative = f"netlists/corners/{corner_id}/template.scs"
+        else:
+            template_relative = bundle.project_config.netlist.template_scs
+        exported_input_relative = bundle.project_config.netlist.exported_input_scs
+        metrics_subset = [
+            metric for metric in bundle.metrics.metrics if metric.testbench is None
+        ]
     rendered_relative = f"{child_prefix}/{SPECTRE_NETLIST_DIR}/input.scs"
     metric_request_relative = f"{child_prefix}/metric_extraction_request.json"
 
@@ -1099,9 +1129,6 @@ def _write_single_testbench_package(
         ),
         encoding="utf-8",
     )
-    metrics_subset = [
-        metric for metric in bundle.metrics.metrics if metric.testbench == testbench_id
-    ]
     metric_request_path = _project_path(bundle, metric_request_relative)
     metric_request_payload = build_metric_extraction_request(
         bundle,
@@ -1145,10 +1172,7 @@ def _write_single_testbench_package(
 def _configured_corner_ids(bundle: ContractBundle) -> list[str | None]:
     if bundle.process_corners is None:
         return [None]
-    corners = bundle.process_corners.corners
-    if len(corners) == 1:
-        return [None]
-    return [corner.id for corner in corners]
+    return [corner.id for corner in bundle.process_corners.corners]
 
 
 def _write_multi_testbench_real_run_packages(
@@ -1165,6 +1189,23 @@ def _write_multi_testbench_real_run_packages(
     corner_id: str | None = None,
 ) -> None:
     if bundle.testbenches is None:
+        corner_ids = [corner_id] if corner_id is not None else _configured_corner_ids(bundle)
+        if corner_ids == [None]:
+            return
+        for selected_corner_id in corner_ids:
+            _write_single_testbench_package(
+                bundle,
+                selected_run_id,
+                candidate,
+                candidate_id,
+                created_at_utc,
+                instruction,
+                approved_hashes,
+                candidate_relative,
+                manifest_extra,
+                None,
+                selected_corner_id,
+            )
         return
 
     corner_ids = [corner_id] if corner_id is not None else _configured_corner_ids(bundle)

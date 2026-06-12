@@ -63,7 +63,7 @@ def optimize_remote_project(
         bundle = assert_valid_project(project_dir)
 
         def selected_adapter(local_project: Path, run_id: str, cadence_cshrc: Path) -> object:
-            if bundle.testbenches is not None:
+            if bundle.testbenches is not None or getattr(bundle, "process_corners", None) is not None:
                 return run_remote_multi_testbench_adapter(
                     local_project,
                     run_id=run_id,

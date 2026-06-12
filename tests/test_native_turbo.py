@@ -102,6 +102,72 @@ def _create_ready_multi_corner_multi_testbench_project(tmp_path: Path) -> Path:
     return project_dir
 
 
+def _write_process_corners_config(
+    project_dir: Path,
+    corner_ids: list[str],
+    *,
+    objective_policy: str = "worst_case",
+    constraint_policy: str = "all_corners",
+) -> None:
+    lines = [
+        'schema_version: "1.0"',
+        f"objective_policy: {objective_policy}",
+        f"constraint_policy: {constraint_policy}",
+        "corners:",
+    ]
+    for corner_id in corner_ids:
+        lines.extend(
+            [
+                f"  - id: {corner_id}",
+                f"    description: {corner_id} corner",
+            ]
+        )
+    (project_dir / "config" / "process_corners.yaml").write_text(
+        "\n".join(lines) + "\n",
+        encoding="utf-8",
+    )
+
+
+def _create_ready_multi_corner_single_testbench_project(
+    tmp_path: Path,
+    *,
+    corner_ids: list[str],
+    objective_policy: str = "worst_case",
+    constraint_policy: str = "all_corners",
+) -> Path:
+    project_dir = tmp_path / "bridge_test_inv"
+    create_project_from_template(project_dir)
+    _write_process_corners_config(
+        project_dir,
+        corner_ids,
+        objective_policy=objective_policy,
+        constraint_policy=constraint_policy,
+    )
+    template_path = project_dir / "netlists" / "templates" / "template.scs"
+    template_path.parent.mkdir(parents=True, exist_ok=True)
+    template_path.write_text(
+        "simulator lang=spectre\n"
+        "parameters FN={{FN}} WN={{WN}} FP={{FP}} WP={{WP}}\n"
+        "tran tran stop=10n\n",
+        encoding="utf-8",
+    )
+    template_text = template_path.read_text(encoding="utf-8")
+    for corner_id in corner_ids:
+        corner_template = (
+            project_dir / "netlists" / "corners" / corner_id / "template.scs"
+        )
+        corner_template.parent.mkdir(parents=True, exist_ok=True)
+        corner_template.write_text(template_text, encoding="utf-8")
+    build_execution_package(project_dir, created_at_utc="2026-06-13T00:00:00Z")
+    write_pass_reports(project_dir)
+    instruction = decide_first_real_run(
+        project_dir,
+        created_at_utc="2026-06-13T00:10:00Z",
+    )
+    assert instruction["decision"] == "approve_first_real_run"
+    return project_dir
+
+
 class _FakeTurbo:
     instances: list["_FakeTurbo"] = []
 
@@ -1050,6 +1116,121 @@ def test_default_adapter_runs_multi_corner_children_serially(
         ("real_007", "iip3", "ff"),
         ("real_007", "iip3", "ss"),
     ]
+    assert aggregate_calls == ["real_007"]
+
+
+def test_default_adapter_runs_single_testbench_multi_corner_children_serially(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    project_dir = _create_ready_multi_corner_single_testbench_project(
+        tmp_path,
+        corner_ids=["tt", "ff", "ss"],
+    )
+    calls: list[tuple[str, str | None, str | None]] = []
+    aggregate_calls: list[str] = []
+
+    def fake_run_spectre_ocean_adapter(
+        project: Path,
+        *,
+        run_id: str,
+        testbench_id: str | None = None,
+        corner_id: str | None = None,
+    ):
+        assert project == project_dir
+        calls.append((run_id, testbench_id, corner_id))
+        return type(
+            "Result",
+            (),
+            {
+                "status": "succeeded",
+                "issues": [],
+            },
+        )()
+
+    def fake_aggregate(project: Path, *, run_id: str):
+        assert project == project_dir
+        aggregate_calls.append(run_id)
+        return object()
+
+    import hermes_workflow.execution_adapters.spectre_ocean as adapter_module
+    import hermes_workflow.multi_testbench_aggregation as aggregation_module
+    import hermes_workflow.native_turbo as native_turbo_module
+
+    monkeypatch.setattr(
+        adapter_module,
+        "run_spectre_ocean_adapter",
+        fake_run_spectre_ocean_adapter,
+    )
+    monkeypatch.setattr(
+        aggregation_module,
+        "aggregate_multi_testbench_run",
+        fake_aggregate,
+    )
+
+    native_turbo_module._run_default_adapter(
+        project_dir,
+        run_id="real_007",
+        cadence_cshrc=None,
+    )
+
+    assert calls == [
+        ("real_007", None, "tt"),
+        ("real_007", None, "ff"),
+        ("real_007", None, "ss"),
+    ]
+    assert aggregate_calls == ["real_007"]
+
+
+def test_default_adapter_preserves_explicit_single_corner_id(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    project_dir = _create_ready_multi_corner_single_testbench_project(
+        tmp_path,
+        corner_ids=["ss"],
+    )
+    calls: list[tuple[str, str | None, str | None]] = []
+    aggregate_calls: list[str] = []
+
+    def fake_run_spectre_ocean_adapter(
+        project: Path,
+        *,
+        run_id: str,
+        testbench_id: str | None = None,
+        corner_id: str | None = None,
+    ):
+        assert project == project_dir
+        calls.append((run_id, testbench_id, corner_id))
+        return type("Result", (), {"status": "succeeded", "issues": []})()
+
+    def fake_aggregate(project: Path, *, run_id: str):
+        assert project == project_dir
+        aggregate_calls.append(run_id)
+        return object()
+
+    import hermes_workflow.execution_adapters.spectre_ocean as adapter_module
+    import hermes_workflow.multi_testbench_aggregation as aggregation_module
+    import hermes_workflow.native_turbo as native_turbo_module
+
+    monkeypatch.setattr(
+        adapter_module,
+        "run_spectre_ocean_adapter",
+        fake_run_spectre_ocean_adapter,
+    )
+    monkeypatch.setattr(
+        aggregation_module,
+        "aggregate_multi_testbench_run",
+        fake_aggregate,
+    )
+
+    native_turbo_module._run_default_adapter(
+        project_dir,
+        run_id="real_007",
+        cadence_cshrc=None,
+    )
+
+    assert calls == [("real_007", None, "ss")]
     assert aggregate_calls == ["real_007"]
 
 
