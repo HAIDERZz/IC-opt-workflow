@@ -152,12 +152,19 @@ Remote parallelism guidance:
 
 - `parallel_jobs` is candidate-level concurrency, not per-testbench concurrency.
 - Multi-testbench candidates run their configured testbenches inside each
-  candidate; increasing `parallel_jobs` multiplies total remote tool pressure.
-- For normal remote multi-testbench use, prefer conservative values such as
-  `--parallel-jobs 4` to `--parallel-jobs 8`.
+  candidate; if `Process Corners` is enabled, each candidate also walks corners
+  serially inside that same candidate. Increasing `parallel_jobs` multiplies
+  total remote tool pressure.
+- For normal remote multi-testbench or multi-corner use, prefer conservative
+  values such as `--parallel-jobs 4` to `--parallel-jobs 8`.
 - High values such as 24 or 36 can trigger SSH server limits, for example
   `kex_exchange_identification: Connection closed by remote host`. Treat those
   as remote transport/tool failures, not circuit-performance failures.
+- Multi-corner is enabled only from `opt_requirement.md` / generated config.
+  There is no `--multi-corner` CLI switch. If the section is absent, preserve
+  legacy single-corner behavior.
+- Monte Carlo is not part of this real-run optimization loop. Treat it as a
+  follow-up validation step, not a replacement for `Process Corners`.
 - `optimizer_cpu_threads` limits optimizer-side Python/OpenBox CPU use; it does
   not limit Spectre/OCEAN process count or SSH connection count.
 
@@ -234,6 +241,8 @@ Summarize only:
 - recommended action and run id;
 - recommended parameters and metrics;
 - bottleneck and warnings;
+- when present, the `Process Corner Summary` policy, selected/worst corner, and
+  any corner-clustered failures from `optimizer_insight_report.md`;
 - whether the result is best observed only;
 - whether to accept, continue, inspect failures, revise constraints/FoM, or
   expand the search space;

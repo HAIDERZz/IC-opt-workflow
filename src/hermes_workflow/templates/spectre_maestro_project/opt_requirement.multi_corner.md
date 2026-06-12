@@ -1,10 +1,19 @@
-# Optimization Requirement
+# Multi-Corner Optimization Requirement
+
+Use this reference when one optimizer candidate should be evaluated across
+multiple process corners from the same Maestro/ADE testbench. Multi-corner is
+enabled only from `Process Corners` below; there is no `--multi-corner` CLI
+switch. Inside one candidate, corner execution remains serial, so
+`parallel_jobs` still means candidate-level concurrency only.
+
+Monte Carlo is intentionally not part of this real-run loop. Run Monte Carlo as
+post-optimization validation after you have a best observed candidate.
 
 ## Project
 
 ```yaml
-project_name: bridge_test_inv
-description: Optimize inverter sizing from an existing Maestro testbench
+project_name: inverter_multi_corner_opt
+description: Optimize inverter sizing across TT/SS/FF corners
 backend: maestro_exported_spectre_deck
 ```
 
@@ -16,33 +25,28 @@ virtuoso_library: Virtuoso_Bridge_test
 cell: bridge_test_inv
 design_view: schematic
 maestro_view: maestro
-test_name: tran_dc_test  # optional metadata
-corner: Nominal          # optional metadata
+test_name: tran_dc_test
+corner: Nominal  # optional metadata for the source point
 ```
 
-## Process Corners (optional)
-
-Leave this section out for the legacy single-corner flow. To enable
-multi-corner evaluation, define it here; there is no `--multi-corner` CLI
-switch. Candidate-internal testbench/corner execution remains serial, so
-`parallel_jobs` still means candidate-level concurrency only. For complete
-examples, see `opt_requirement.multi_corner.md` and
-`opt_requirement.multi_tb_corner.md`. Monte Carlo is not configured here; treat
-it as a separate post-optimization validation step.
+## Process Corners
 
 ```yaml
-# Process Corners:
-#   objective_policy: worst_case
-#   constraint_policy: all_corners
-#   corners:
-#     - id: tt
-#       model_section: Post_simu_top_tt
-#       variables:
-#         temperature: "27"
-#     - id: ss
-#       model_section: Post_simu_top_ss
-#       variables:
-#         temperature: "125"
+objective_policy: worst_case
+constraint_policy: all_corners
+corners:
+  - id: tt
+    model_section: Post_simu_top_tt
+    variables:
+      temperature: "27"
+  - id: ss
+    model_section: Post_simu_top_ss
+    variables:
+      temperature: "125"
+  - id: ff
+    model_section: Post_simu_top_ff
+    variables:
+      temperature: "-40"
 ```
 
 ## Design Variables
@@ -76,22 +80,22 @@ it as a separate post-optimization validation step.
 - name: rise
   unit: s
   ocean_expression: riseTime(VT("/VOUT") 0 nil 0.9 nil 10 90 nil "time")
-  result: tran           # optional selectResult hint
+  result: tran
   required_signals:
-    - /VOUT              # optional diagnostic hint
+    - /VOUT
 - name: fall
   unit: s
   ocean_expression: fallTime(VT("/VOUT") 0.9 nil 0 nil 10 90 nil "time")
-  result: tran           # optional selectResult hint
+  result: tran
   required_signals:
-    - /VOUT              # optional diagnostic hint
+    - /VOUT
 - name: DC
   unit: W
   ocean_expression: VDC("/VDD") * IDC("/M0/S")
-  result: tran           # optional selectResult hint
+  result: tran
   required_signals:
-    - /VDD               # optional diagnostic hint
-    - /M0/S              # optional diagnostic hint
+    - /VDD
+    - /M0/S
 ```
 
 ## Constraints
@@ -122,15 +126,12 @@ engine: spectre_x
 preset: ax
 output_format: psfxl
 threads_per_run: 10
-parallel_jobs: 10
+parallel_jobs: 8
 timeout_s: 3600
 require_license_check: true
 keep_failed_runs: true
 keep_successful_runs: true
 ```
-
-`parallel_jobs` is candidate-level concurrency. Enabling multiple testbenches or
-multiple process corners does not add inner parallelism inside one candidate.
 
 ## Optimizer Settings
 
@@ -140,6 +141,7 @@ initialization: sobol
 max_evaluations: 100
 batch_size: 10
 random_seed: 20260528
+optimizer_cpu_threads: 4
 failure_penalty: 1000000.0
 deduplicate_candidates: true
 ```

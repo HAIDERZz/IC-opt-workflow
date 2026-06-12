@@ -52,6 +52,7 @@ Cadence/OCEAN 公式、SSH/远程环境，还是 optimizer 本身的问题。
 ## 远程并发怎么理解
 
 `parallel_jobs` 是 candidate 级别并发，不是每个 testbench 的并发数。
+开启多 corner 后，这个语义也不变，不会额外变成每个 corner 的并发数。
 
 例如一个 Mixer candidate 有 CG/NF、IIP3、P1dB 三个 testbench：
 
@@ -59,12 +60,17 @@ Cadence/OCEAN 公式、SSH/远程环境，还是 optimizer 本身的问题。
 parallel_jobs = 8
 ```
 
-表示最多同时评估 8 个 candidate。每个 candidate 内部会按项目定义跑它需要的
-testbench。实际远程压力包括 SSH 连接、Spectre/OCEAN 进程、license、磁盘 IO 和
-testbench 数量。
+表示最多同时评估 8 个 candidate。每个 candidate 内部会按项目定义串行跑它需要的
+testbench；如果启用了 `Process Corners`，则继续串行跑对应的 corner。实际远程
+压力包括 SSH 连接、Spectre/OCEAN 进程、license、磁盘 IO、testbench 数量和
+corner 数量。
 
-正常远程多 testbench 建议从 4 到 8 开始。只有在你确认 SSH 服务端、license 和
-服务器资源都允许时，再提高并发。
+正常远程多 testbench 或多 corner 项目，建议从 4 到 8 开始。只有在你确认 SSH
+服务端、license 和服务器资源都允许时，再提高并发。
+
+多 corner 只通过 `opt_requirement.md` 的 `Process Corners` section 启用，没有
+`--multi-corner` 命令行开关。Monte Carlo 也不在这条 real-run 主流程里，建议作为
+后优化验证步骤单独执行。
 
 `optimizer_cpu_threads` 只限制本机 optimizer/OpenBox 侧的 CPU 线程，不限制远程
 Spectre/OCEAN 进程数量，也不限制 SSH 连接数。

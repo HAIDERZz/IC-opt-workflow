@@ -466,12 +466,18 @@ ic-opt --ssh-profile eda-lab /remote/path/to/Mixer_opt \
 
 - `parallel_jobs` 是 candidate 级别并发，不是每个 testbench 的并发数。
 - 多 testbench candidate 会在每个 candidate 内部跑它需要的 testbench。
-- 正常远程多 testbench 建议从 `--parallel-jobs 4` 到 `--parallel-jobs 8`
-  开始。
+- 开启多 corner 后，这个语义也不变；单个 candidate 内部仍然按
+  `testbench x corner` 串行执行。
+- 正常远程多 testbench 或多 corner 项目，建议从 `--parallel-jobs 4`
+  到 `--parallel-jobs 8` 开始。
 - `--parallel-jobs 24` 或 `36` 更像压力测试，容易触发远程 SSH 服务端限制，比如
   `kex_exchange_identification: Connection closed by remote host`。
 - `optimizer_cpu_threads` 只限制本机 optimizer/OpenBox 侧 CPU 使用，不限制远程
   Spectre/OCEAN 进程数量，也不限制 SSH 连接数。
+
+多 corner 只通过 `opt_requirement.md` 里的 `Process Corners` 配置启用，
+没有 `--multi-corner` 命令行开关；如果不写这个 section，就保持原来的单 corner
+行为。Monte Carlo 仍然不在这条 real-run 优化主流程里，建议作为后优化验证步骤。
 
 如果远程 Cadence 环境文件不叫 `cadence_env.csh`，传入远程路径：
 

@@ -54,9 +54,13 @@ hermes-workflow agent-skill-path
 - Runs real Spectre simulations and OCEAN metric extraction.
 - Supports multi-testbench evaluation, for example one Mixer candidate measured
   by CG/NF, IIP3, and P1dB testbenches.
+- Supports optional multi-corner evaluation through `Process Corners` in
+  `opt_requirement.md`; single-corner projects remain the default special case.
 - Uses the same model for one or more testbenches. A single testbench is a valid
   special case; multiple testbenches are only needed when one candidate's
   metrics come from different Maestro/ADE setups.
+- Within one candidate, testbench and corner evaluations remain serial.
+  `parallel_jobs` stays candidate-level concurrency only.
 - Generates decision reports, insight reports, and PNG FoM/diagnostic plots.
   Optional OpenBox
   advanced dependencies add HTML/JSON surrogate visualization artifacts.
@@ -225,6 +229,25 @@ multi-testbench optimization, list each Maestro/ADE point root and map each
 metric to the correct testbench. There is no fixed maximum number of
 testbenches in the file format; simulation time, license availability, disk
 space, and `parallel_jobs` are the real limits.
+
+Multi-corner evaluation is enabled only from `opt_requirement.md` via a
+`Process Corners` section or the generated `config/process_corners.yaml`.
+There is no `--multi-corner` CLI mode. If `Process Corners` is omitted, the
+workflow behaves like the legacy single-corner flow. For enabled multi-corner
+runs, constraint/objective policy is configured per project, and each
+candidate's testbench-by-corner matrix is executed serially inside that
+candidate.
+
+Reference templates:
+
+- `src/hermes_workflow/templates/spectre_maestro_project/opt_requirement.md`
+- `src/hermes_workflow/templates/spectre_maestro_project/opt_requirement.multi_testbench.md`
+- `src/hermes_workflow/templates/spectre_maestro_project/opt_requirement.multi_corner.md`
+- `src/hermes_workflow/templates/spectre_maestro_project/opt_requirement.multi_tb_corner.md`
+
+Monte Carlo is still outside this real-run optimization loop. Use it as a
+follow-up validation or post-optimization analysis step rather than trying to
+encode it into `Process Corners`.
 
 Each `maestro_point_root` must be the leaf Maestro/ADE run directory that
 contains both `netlist/` and `psf/`, and
@@ -396,10 +419,10 @@ ic-opt --ssh-profile eda-lab /remote/path/to/my_mixer_opt \
   --parallel-jobs 6
 ```
 
-For remote multi-testbench projects, start conservatively with
+For remote multi-testbench or multi-corner projects, start conservatively with
 `--parallel-jobs 4` to `--parallel-jobs 8`. `parallel_jobs` is candidate-level
-concurrency, not per-testbench concurrency. High values such as 24 or 36 can
-hit SSH server limits and produce transport errors like
+concurrency, not per-testbench or per-corner concurrency. High values such as
+24 or 36 can hit SSH server limits and produce transport errors like
 `kex_exchange_identification: Connection closed by remote host`.
 
 If the remote Cadence setup file is not
