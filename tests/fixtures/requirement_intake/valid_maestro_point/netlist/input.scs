@@ -1,0 +1,5 @@
+simulator lang=spectre
+include "ade_e.scs" section=Post_simu_top_tt
+parameters temperature=27 FN=4 WN=0.9u FP=5 WP=0.7u
+tran tran stop=10n
+dc dc

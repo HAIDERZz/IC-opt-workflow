@@ -1,9 +1,17 @@
 import json
 from pathlib import Path
 
-from hermes_workflow.netlists import prepare_netlist
+import pytest
+import yaml
+
+from hermes_workflow.netlists import (
+    prepare_netlist,
+    prepare_corner_netlist_templates,
+    render_corner_netlist_template,
+)
 from hermes_workflow.package import create_project_from_template
 from hermes_workflow.reports import NetlistPreparationReport, PassFail
+from hermes_workflow.schemas import ProcessCorner, ProcessCornerConfig
 
 
 def _project_with_input(tmp_path: Path, deck_text: str) -> Path:
@@ -212,3 +220,235 @@ tran tran stop=10n
     assert "approved variable FN was not found in top-level parameters" in report.issues
     assert "approved variable WN was not found in top-level parameters" in report.issues
     assert not (project_dir / "netlists" / "templates" / "template.scs").exists()
+
+
+def _project_with_testbench_input_and_corners(
+    tmp_path: Path,
+    deck_text: str,
+    corner_config: ProcessCornerConfig | None,
+) -> Path:
+    project_dir = tmp_path / "bridge_test_inv"
+    create_project_from_template(project_dir)
+    testbenches_yaml = """
+schema_version: "1.0"
+testbenches:
+  - id: tb1
+    maestro_point_root: /tmp/maestro_point
+    virtuoso_library: TestLib
+    cell: TestCell
+    design_view: schematic
+    maestro_view: maestro
+    test_name: test1
+    corner: Nominal
+"""
+    (project_dir / "config" / "testbenches.yaml").write_text(
+        testbenches_yaml, encoding="utf-8"
+    )
+    metrics_text = (project_dir / "config" / "metrics.yaml").read_text(encoding="utf-8")
+    metrics_text = metrics_text.replace(
+        "    maestro_formula: riseTime",
+        "    testbench: tb1\n    maestro_formula: riseTime",
+    )
+    metrics_text = metrics_text.replace(
+        "    maestro_formula: fallTime",
+        "    testbench: tb1\n    maestro_formula: fallTime",
+    )
+    metrics_text = metrics_text.replace(
+        "    maestro_formula: VDC",
+        "    testbench: tb1\n    maestro_formula: VDC",
+    )
+    (project_dir / "config" / "metrics.yaml").write_text(metrics_text, encoding="utf-8")
+    input_path = project_dir / "netlists" / "testbenches" / "tb1" / "exported" / "input.scs"
+    input_path.parent.mkdir(parents=True, exist_ok=True)
+    input_path.write_text(deck_text, encoding="utf-8")
+    legacy_input = project_dir / "netlists" / "exported" / "input.scs"
+    legacy_input.parent.mkdir(parents=True, exist_ok=True)
+    legacy_input.write_text(deck_text, encoding="utf-8")
+    if corner_config is not None:
+        corner_path = project_dir / "config" / "process_corners.yaml"
+        corner_path.write_text(
+            yaml.safe_dump(corner_config.model_dump(mode="json")),
+            encoding="utf-8",
+        )
+    return project_dir
+
+
+def test_render_corner_netlist_template_generates_two_corners() -> None:
+    source_text = """simulator lang=spectre
+include "/path/to/toplevel.scs" section=Post_simu_top_tt
+parameters temperature=27 F=20 W=1.8u
+tran tran stop=10n
+"""
+    corner_config = ProcessCornerConfig(
+        schema_version="1.0",
+        objective_policy="worst_case",
+        constraint_policy="all_corners",
+        corners=[
+            ProcessCorner(id="tt", model_section="Post_simu_top_tt", variables={"temperature": "27"}),
+            ProcessCorner(id="ss", model_section="Post_simu_top_ss", variables={"temperature": "125"}),
+        ],
+    )
+
+    tt_text = render_corner_netlist_template(source_text, corner_config.corners[0], "tt")
+    ss_text = render_corner_netlist_template(source_text, corner_config.corners[1], "tt")
+
+    assert tt_text == source_text
+    assert 'section=Post_simu_top_ss' in ss_text
+    assert 'section=Post_simu_top_tt' not in ss_text
+    assert 'temperature=125' in ss_text
+    assert 'temperature=27' not in ss_text
+    assert 'F=20' in ss_text
+    assert 'W=1.8u' in ss_text
+    assert 'tran tran stop=10n' in ss_text
+
+
+def test_render_corner_netlist_template_safe_replacement() -> None:
+    source_text = """simulator lang=spectre
+// include "commented.scs" section=Post_simu_top_tt
+include "/path/to/toplevel.scs" section=Post_simu_top_tt
+parameters temperature=27 F=20 W=1.8u
+// OCEAN: section=Post_simu_top_tt should not be replaced
+"""
+    corner = ProcessCorner(id="ss", model_section="Post_simu_top_ss")
+
+    result = render_corner_netlist_template(source_text, corner, "tt")
+
+    assert 'include "/path/to/toplevel.scs" section=Post_simu_top_ss' in result
+    assert '// include "commented.scs" section=Post_simu_top_tt' in result
+    assert '// OCEAN: section=Post_simu_top_tt should not be replaced' in result
+
+
+def test_render_corner_netlist_template_updates_variables() -> None:
+    source_text = """simulator lang=spectre
+include "/path/to/toplevel.scs" section=Post_simu_top_tt
+parameters temperature=27 F=20 W=1.8u
+"""
+    corner = ProcessCorner(id="ss", model_section="Post_simu_top_ss", variables={"temperature": "125", "F": "40"})
+
+    result = render_corner_netlist_template(source_text, corner, "tt")
+
+    assert 'temperature=125' in result
+    assert 'F=40' in result
+    assert 'W=1.8u' in result
+
+
+def test_render_corner_netlist_template_replaces_model_file() -> None:
+    source_text = """simulator lang=spectre
+include /path/to/old_model.scs section=Post_simu_top_tt
+parameters temperature=27
+"""
+    corner = ProcessCorner(
+        id="ss",
+        model_file="/path/to/new_model.scs",
+        model_section="Post_simu_top_ss",
+    )
+
+    result = render_corner_netlist_template(source_text, corner, "tt")
+
+    assert "include /path/to/new_model.scs section=Post_simu_top_ss" in result
+    assert "/path/to/old_model.scs" not in result
+    assert "section=Post_simu_top_tt" not in result
+
+
+def test_render_corner_netlist_template_model_file_replaces_file_path() -> None:
+    source_text = """simulator lang=spectre
+include /old/path/model.scs section=Post_simu_top_tt
+"""
+    corner = ProcessCorner(id="ss", model_file="/new/path/model.scs")
+
+    result = render_corner_netlist_template(source_text, corner, "tt")
+
+    assert "include /new/path/model.scs section=Post_simu_top_tt" in result
+    assert "/old/path/model.scs" not in result
+
+
+def test_render_corner_netlist_template_model_file_without_section_silently_noop() -> None:
+    source_text = """simulator lang=spectre
+include /path/to/old_model.scs
+parameters temperature=27
+"""
+    corner = ProcessCorner(
+        id="ss",
+        model_file="/path/to/new_model.scs",
+    )
+
+    result = render_corner_netlist_template(source_text, corner, "tt")
+
+    assert "include /path/to/old_model.scs" in result
+    assert "/path/to/new_model.scs" not in result
+
+
+def test_render_corner_netlist_template_model_file_preserves_quotes() -> None:
+    source_text = """simulator lang=spectre
+include "/path/to/old_model.scs" section=Post_simu_top_tt
+"""
+    corner = ProcessCorner(id="ss", model_file="/path/to/new_model.scs")
+
+    result = render_corner_netlist_template(source_text, corner, "tt")
+
+    assert 'include "/path/to/new_model.scs" section=Post_simu_top_tt' in result
+
+
+def test_render_corner_netlist_template_raises_when_model_section_missing() -> None:
+    source_text = """simulator lang=spectre
+parameters temperature=27 F=20 W=1.8u
+"""
+    corner = ProcessCorner(id="ss", model_section="Post_simu_top_ss")
+
+    with pytest.raises(ValueError, match="model_section"):
+        render_corner_netlist_template(source_text, corner, "tt")
+
+
+def test_prepare_netlist_generates_corner_templates_for_multi_testbench(
+    tmp_path: Path,
+) -> None:
+    corner_config = ProcessCornerConfig(
+        schema_version="1.0",
+        objective_policy="worst_case",
+        constraint_policy="all_corners",
+        corners=[
+            ProcessCorner(id="tt", model_section="Post_simu_top_tt", variables={"temperature": "27"}),
+            ProcessCorner(id="ss", model_section="Post_simu_top_ss", variables={"temperature": "125"}),
+        ],
+    )
+    project_dir = _project_with_testbench_input_and_corners(
+        tmp_path,
+        """simulator lang=spectre
+include "/path/to/toplevel.scs" section=Post_simu_top_tt
+parameters temperature=27 FN=4 FP=4 WN=0.6u WP=1.2u
+tran tran stop=10n
+""",
+        corner_config,
+    )
+
+    report = prepare_netlist(project_dir)
+
+    assert report.status == PassFail.PASS
+    tt_template = project_dir / "netlists" / "testbenches" / "tb1" / "corners" / "tt" / "template.scs"
+    ss_template = project_dir / "netlists" / "testbenches" / "tb1" / "corners" / "ss" / "template.scs"
+    assert tt_template.exists()
+    assert ss_template.exists()
+    ss_text = ss_template.read_text(encoding="utf-8")
+    assert 'section=Post_simu_top_ss' in ss_text
+    assert 'temperature=125' in ss_text
+    assert 'FN={{FN}}' in ss_text
+    assert 'WN={{WN}}' in ss_text
+
+
+def test_prepare_netlist_skips_corner_templates_when_no_corners_configured(
+    tmp_path: Path,
+) -> None:
+    project_dir = _project_with_testbench_input_and_corners(
+        tmp_path,
+        """simulator lang=spectre
+include "/path/to/toplevel.scs" section=Post_simu_top_tt
+parameters temperature=27 FN=4 FP=4 WN=0.6u WP=1.2u
+tran tran stop=10n
+""",
+        None,
+    )
+
+    report = prepare_netlist(project_dir)
+
+    assert report.status == PassFail.PASS
+    assert not (project_dir / "netlists" / "testbenches" / "tb1" / "corners").exists()

@@ -4,12 +4,17 @@ import json
 import re
 from pathlib import Path, PurePosixPath
 
+import yaml
+
 from hermes_workflow.reports import NetlistPreparationReport, PassFail
+from hermes_workflow.schemas import ProcessCorner, ProcessCornerConfig
 from hermes_workflow.validate import ContractBundle, assert_valid_project
 
 
 ANALYSIS_NAMES = {"tran", "dc", "dcOp", "ac", "pss", "pac", "pnoise", "stb", "sp"}
 ASSIGNMENT_TOKEN_RE = re.compile(r"(?<![A-Za-z0-9_])(?P<name>[A-Za-z_][A-Za-z0-9_]*)=")
+INCLUDE_SECTION_RE = re.compile(r"^(include\s+\S+\s+section=)\S+", re.MULTILINE)
+INCLUDE_FILE_RE = re.compile(r'^(include\s+)("?)[^"\s]+("?\s+section=\S+)', re.MULTILINE)
 
 
 def prepare_netlist(project_dir: Path) -> NetlistPreparationReport:
@@ -35,6 +40,7 @@ def _prepare_one_netlist(
     exported_relative: str,
     template_relative: str,
     variable_names: list[str],
+    testbench_id: str | None = None,
 ) -> NetlistPreparationReport:
     exported_path = _project_path(bundle, exported_relative)
     template_path = _project_path(bundle, template_relative)
@@ -69,6 +75,15 @@ def _prepare_one_netlist(
     if status == PassFail.PASS:
         template_path.parent.mkdir(parents=True, exist_ok=True)
         template_path.write_text(template_text, encoding="utf-8")
+        corner_issues = prepare_corner_netlist_templates(
+            bundle,
+            testbench_id,
+            template_text,
+        )
+        issues.extend(corner_issues)
+        if corner_issues:
+            status = PassFail.FAIL
+            template_path.unlink()
     elif template_path.exists():
         template_path.unlink()
 
@@ -101,6 +116,7 @@ def _prepare_multi_testbench_netlists(
                     _testbench_exported_input(testbench_id),
                     _testbench_template(testbench_id),
                     variable_names,
+                    testbench_id,
                 ),
             )
         )
@@ -349,6 +365,134 @@ def _split_rewritten_statement(
     if original.count("\n") != rewritten.count("\n"):
         return [rewritten]
     return rewritten.splitlines(keepends=True)
+
+
+def render_corner_netlist_template(
+    source_text: str,
+    corner: ProcessCorner,
+    base_corner_id: str,
+) -> str:
+    if corner.id == base_corner_id:
+        return source_text
+
+    result = source_text
+    if corner.model_section is not None:
+        if not INCLUDE_SECTION_RE.search(result):
+            raise ValueError(
+                f"corner {corner.id} requests model_section={corner.model_section!r} "
+                "but no include ... section=... line was found"
+            )
+        result = INCLUDE_SECTION_RE.sub(
+            r"\g<1>" + corner.model_section,
+            result,
+        )
+
+    if corner.model_file is not None:
+        result = INCLUDE_FILE_RE.sub(
+            r"\g<1>\g<2>" + corner.model_file + r"\g<3>",
+            result,
+        )
+
+    if corner.variables is not None:
+        result = _rewrite_corner_variables(result, corner.variables)
+
+    return result
+
+
+def _rewrite_corner_variables(
+    source_text: str,
+    corner_variables: dict[str, str],
+) -> str:
+    lines = source_text.splitlines(keepends=True)
+    output_lines = list(lines)
+    subckt_depth = 0
+
+    for statement in _logical_statements(lines):
+        statement_text = "".join(lines[index] for index in statement)
+        first_token = _first_token(statement_text)
+
+        if first_token == "subckt":
+            subckt_depth += 1
+            continue
+        elif first_token == "ends" and subckt_depth > 0:
+            subckt_depth -= 1
+            continue
+
+        if first_token != "parameters" or subckt_depth > 0:
+            continue
+
+        rewritten = _rewrite_parameter_values(statement_text, corner_variables)
+        rewritten_lines = _split_rewritten_statement(rewritten, statement_text)
+        if len(rewritten_lines) != len(statement):
+            continue
+        for index, rewritten_line in zip(statement, rewritten_lines, strict=True):
+            output_lines[index] = rewritten_line
+
+    return "".join(output_lines)
+
+
+def _rewrite_parameter_values(
+    statement_text: str,
+    corner_variables: dict[str, str],
+) -> str:
+    matches = list(ASSIGNMENT_TOKEN_RE.finditer(statement_text))
+    pieces: list[str] = []
+    cursor = 0
+
+    for index, match in enumerate(matches):
+        name = match.group("name")
+        value_start = match.end()
+        value_end = _assignment_value_end(statement_text, matches, index)
+        pieces.append(statement_text[cursor:value_start])
+        if name in corner_variables:
+            pieces.append(corner_variables[name])
+        else:
+            pieces.append(statement_text[value_start:value_end])
+        cursor = value_end
+
+    pieces.append(statement_text[cursor:])
+    return "".join(pieces)
+
+
+def prepare_corner_netlist_templates(
+    bundle: ContractBundle,
+    testbench_id: str | None,
+    base_template_text: str,
+) -> list[str]:
+    corner_path = bundle.project_dir / "config" / "process_corners.yaml"
+    if not corner_path.exists():
+        return []
+
+    payload = yaml.safe_load(corner_path.read_text(encoding="utf-8"))
+    corner_config = ProcessCornerConfig.model_validate(payload)
+
+    issues: list[str] = []
+    for corner in corner_config.corners:
+        try:
+            corner_text = render_corner_netlist_template(
+                base_template_text,
+                corner,
+                bundle.project_config.testbench.corner,
+            )
+        except ValueError as exc:
+            issues.append(str(exc))
+            continue
+
+        if testbench_id is not None:
+            corner_template_path = _project_path(
+                bundle,
+                f"netlists/testbenches/{testbench_id}/corners/{corner.id}/template.scs",
+            )
+        else:
+            corner_template_path = _project_path(
+                bundle,
+                f"netlists/corners/{corner.id}/template.scs",
+            )
+
+        corner_template_path.parent.mkdir(parents=True, exist_ok=True)
+        corner_template_path.write_text(corner_text, encoding="utf-8")
+
+    return issues
 
 
 def _build_report(
