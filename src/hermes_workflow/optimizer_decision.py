@@ -31,6 +31,7 @@ class OptimizerDecisionReport:
     boundaries: dict[str, Any]
     next_steps: list[str]
     reports: dict[str, str]
+    process_corner_summary: dict[str, Any]
     issues: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     report_path: Path | None = None
@@ -105,6 +106,7 @@ def generate_optimizer_decision_report(
         boundaries=boundaries,
         next_steps=next_steps,
         reports=_report_paths(project_root),
+        process_corner_summary=insight.process_corner_summary,
         issues=issues,
         warnings=warnings,
         report_path=project_root / REPORT_RELATIVE,
@@ -295,6 +297,7 @@ def _markdown_report(report: OptimizerDecisionReport) -> str:
     candidate = report.recommended_candidate
     parameters = _dict_value(candidate.get("parameters"), default={})
     metrics = _dict_value(candidate.get("metrics"), default={})
+    process_corner_summary = _dict_value(report.process_corner_summary, default={})
     lines = [
         "# Optimizer Decision Report",
         "",
@@ -313,9 +316,41 @@ def _markdown_report(report: OptimizerDecisionReport) -> str:
         f"- Parameters: {json.dumps(parameters, sort_keys=True)}",
         f"- Metrics: {json.dumps(metrics, sort_keys=True)}",
         "",
-        "## Bottleneck",
-        "",
     ]
+    if process_corner_summary.get("enabled"):
+        objective_policy = (
+            _string_value(process_corner_summary.get("objective_policy")) or "nominal"
+        )
+        constraint_policy = (
+            _string_value(process_corner_summary.get("constraint_policy")) or "nominal"
+        )
+        selected_corner = (
+            _string_value(process_corner_summary.get("selected_corner")) or "n/a"
+        )
+        worst_corner = (
+            _string_value(process_corner_summary.get("worst_corner")) or "n/a"
+        )
+        lines.extend(
+            [
+                "## Worst-Case Objective Basis",
+                "",
+                (
+                    "- This recommendation is the best observed feasible candidate "
+                    f"under {objective_policy} corner objective."
+                ),
+                f"- Constraint policy: `{constraint_policy}`",
+                f"- Objective policy: `{objective_policy}`",
+                f"- Selected corner: `{selected_corner}`",
+                f"- Worst corner: `{worst_corner}`",
+                "",
+            ]
+        )
+    lines.extend(
+        [
+            "## Bottleneck",
+            "",
+        ]
+    )
     if report.bottleneck.get("status") == "available":
         lines.extend(
             [

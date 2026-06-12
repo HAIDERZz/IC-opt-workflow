@@ -89,6 +89,46 @@ objective:
     return project_dir
 
 
+def _write_process_corner_aggregation_report(
+    project_dir: Path,
+    *,
+    run_id: str,
+    status: str,
+    constraint_policy: str = "all_corners",
+    objective_policy: str = "worst_case",
+    selected_corner: str = "ff",
+    worst_corner: str | None = None,
+    corner_objectives: dict[str, float] | None = None,
+    corner_status_counts: dict[str, int] | None = None,
+    corner_metrics: dict[str, dict[str, float]] | None = None,
+) -> None:
+    payload = {
+        "schema_version": "1.0",
+        "status": status,
+        "run_id": run_id,
+        "constraint_policy": constraint_policy,
+        "objective_policy": objective_policy,
+        "selected_corner": selected_corner,
+        "worst_corner": worst_corner or selected_corner,
+        "corner_objectives": corner_objectives or {},
+        "corner_status_counts": corner_status_counts or {},
+        "corner_metrics": corner_metrics or {},
+        "child_statuses": [],
+    }
+    report_path = (
+        project_dir
+        / "runs"
+        / "real"
+        / run_id
+        / "multi_testbench_aggregation_report.json"
+    )
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
 def test_generate_optimizer_decision_report_writes_supervisor_decision(
     tmp_path: Path,
 ) -> None:
@@ -204,3 +244,58 @@ objective:
         "configured objective best candidate is not feasible" in warning
         for warning in report.warnings
     )
+
+
+def test_generate_optimizer_decision_report_describes_worst_case_corner_basis(
+    tmp_path: Path,
+) -> None:
+    rows = [
+        _trace_row(
+            evaluation_index=1,
+            run_id="real_001",
+            status="constraint_failed",
+            objective=3.0,
+        ),
+        _trace_row(
+            evaluation_index=2,
+            run_id="real_002",
+            status="feasible",
+            objective=1.0,
+        ),
+        _trace_row(
+            evaluation_index=3,
+            run_id="real_003",
+            status="feasible",
+            objective=2.0,
+        ),
+    ]
+    rows[1]["parameters"] = {"F": "20", "W": "1.4u", "L": "30n", "VB_LO": "310m"}
+    project_dir = _write_accepted_optimizer_project(tmp_path, rows=rows)
+    _write_process_corner_aggregation_report(
+        project_dir,
+        run_id="real_002",
+        status="succeeded",
+        selected_corner="ff",
+        worst_corner="ff",
+        corner_objectives={"tt": 1.0, "ff": 2.5, "ss": 1.5},
+        corner_status_counts={"succeeded": 3},
+        corner_metrics={
+            "tt": {"MAX_GAIN": 8.0, "NF_3G": 11.9},
+            "ff": {"MAX_GAIN": 4.0, "NF_3G": 12.4},
+            "ss": {"MAX_GAIN": 9.0, "NF_3G": 11.7},
+        },
+    )
+
+    report = generate_optimizer_decision_report(project_dir)
+
+    payload = json.loads(report.report_path.read_text(encoding="utf-8"))
+    assert payload["process_corner_summary"]["objective_policy"] == "worst_case"
+    assert payload["process_corner_summary"]["worst_corner"] == "ff"
+
+    markdown = report.markdown_path.read_text(encoding="utf-8")
+    assert (
+        "best observed feasible candidate under worst_case corner objective"
+        in markdown
+    )
+    assert "- Selected corner: `ff`" in markdown
+    assert "- Worst corner: `ff`" in markdown

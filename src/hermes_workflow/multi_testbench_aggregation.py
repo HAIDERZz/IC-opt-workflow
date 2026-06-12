@@ -247,6 +247,10 @@ def aggregate_multi_testbench_run(
         issues=issues,
     )
     _write_json(project_dir / REPORT_RELATIVE, report.model_dump(mode="json"))
+    _write_json(
+        project_dir / "runs" / "real" / selected_run_id / "multi_testbench_aggregation_report.json",
+        report.model_dump(mode="json"),
+    )
     return report
 
 

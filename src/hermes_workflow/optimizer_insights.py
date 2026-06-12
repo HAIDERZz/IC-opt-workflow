@@ -66,6 +66,7 @@ class OptimizerInsightReport:
     observed_relationships: dict[str, dict[str, dict[str, Any]]]
     openbox_parameter_importance: dict[str, Any]
     advanced_surrogate_visualization: dict[str, str]
+    process_corner_summary: dict[str, Any]
     issues: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     report_path: Path | None = None
@@ -123,6 +124,7 @@ def generate_optimizer_insight_report(project_dir: str | Path) -> OptimizerInsig
     relationships = _observed_relationships(traces, warnings)
     advanced = _advanced_visualization_payload(report_payload)
     openbox_importance = _openbox_parameter_importance(project_root, advanced, metric_contract)
+    process_corner_summary = _process_corner_summary(project_root, traces, best_observed)
 
     report = OptimizerInsightReport(
         status="fail" if issues else "pass",
@@ -139,6 +141,7 @@ def generate_optimizer_insight_report(project_dir: str | Path) -> OptimizerInsig
         observed_relationships=relationships,
         openbox_parameter_importance=openbox_importance,
         advanced_surrogate_visualization=advanced,
+        process_corner_summary=process_corner_summary,
         issues=issues,
         warnings=warnings,
         report_path=project_root / REPORT_RELATIVE,
@@ -146,6 +149,70 @@ def generate_optimizer_insight_report(project_dir: str | Path) -> OptimizerInsig
     )
     _write_outputs(project_root, report, traces)
     return report
+
+
+def _process_corner_summary(
+    project_root: Path,
+    traces: list[dict[str, Any]],
+    best_observed: dict[str, Any] | None,
+) -> dict[str, Any]:
+    reports_by_run: dict[str, dict[str, Any]] = {}
+    for row in traces:
+        run_id = _string_value(row.get("run_id"))
+        if not run_id:
+            continue
+        report_path = (
+            project_root
+            / "runs"
+            / "real"
+            / run_id
+            / "multi_testbench_aggregation_report.json"
+        )
+        if not report_path.is_file():
+            continue
+        try:
+            payload = json.loads(report_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            continue
+        reports_by_run[run_id] = payload
+
+    if not reports_by_run:
+        return {}
+
+    best_run_id = _string_value((best_observed or {}).get("run_id"))
+    reference_report = reports_by_run.get(best_run_id) or next(iter(reports_by_run.values()))
+    failure_distribution = Counter()
+    for row in traces:
+        status = _string_value(row.get("status"))
+        if status in {"", "feasible"}:
+            continue
+        run_id = _string_value(row.get("run_id"))
+        report = reports_by_run.get(run_id)
+        if not report:
+            continue
+        corner = (
+            _string_value(report.get("worst_corner"))
+            or _string_value(report.get("selected_corner"))
+            or "nominal"
+        )
+        failure_distribution[corner] += 1
+
+    return {
+        "enabled": True,
+        "constraint_policy": _string_value(reference_report.get("constraint_policy")) or "nominal",
+        "objective_policy": _string_value(reference_report.get("objective_policy")) or "nominal",
+        "selected_corner": _string_value(reference_report.get("selected_corner")),
+        "worst_corner": _string_value(reference_report.get("worst_corner")),
+        "best_candidate_run_id": best_run_id,
+        "best_candidate_corner_metrics": _dict_value(
+            reference_report.get("corner_metrics")
+        )
+        or {},
+        "corner_objectives": _dict_value(reference_report.get("corner_objectives")) or {},
+        "corner_status_counts": _dict_value(reference_report.get("corner_status_counts"))
+        or {},
+        "failure_distribution": dict(failure_distribution),
+    }
 
 
 def _write_outputs(
@@ -1706,6 +1773,48 @@ def _markdown_report(report: OptimizerInsightReport) -> str:
             f"![Normalized Margin Bottleneck Plot]({report.plots['bottleneck_weighted_score']})",
         ]
     )
+    if report.process_corner_summary.get("enabled"):
+        summary = report.process_corner_summary
+        lines.extend(
+            [
+                "",
+                "## Process Corner Summary",
+                "",
+                f"- Constraint policy: `{summary.get('constraint_policy') or 'nominal'}`",
+                f"- Objective policy: `{summary.get('objective_policy') or 'nominal'}`",
+                f"- Selected corner: `{summary.get('selected_corner') or 'n/a'}`",
+                f"- Worst corner: `{summary.get('worst_corner') or 'n/a'}`",
+            ]
+        )
+        lines.extend(
+            [
+                "",
+                "## Best Candidate Corner Metrics",
+                "",
+            ]
+        )
+        corner_metrics = summary.get("best_candidate_corner_metrics") or {}
+        if corner_metrics:
+            for corner_name, metrics in sorted(corner_metrics.items()):
+                lines.append(
+                    "- "
+                    f"{corner_name}: {json.dumps(metrics, sort_keys=True)}"
+                )
+        else:
+            lines.append("- No corner metrics were recorded.")
+        lines.extend(
+            [
+                "",
+                "## Corner Failure Distribution",
+                "",
+            ]
+        )
+        failure_distribution = summary.get("failure_distribution") or {}
+        if failure_distribution:
+            for corner_name, count in sorted(failure_distribution.items()):
+                lines.append(f"- {corner_name}: {count}")
+        else:
+            lines.append("- No corner-attributed failures were recorded.")
     lines.extend(
         [
             "",
@@ -1813,6 +1922,7 @@ def _markdown_report(report: OptimizerInsightReport) -> str:
         ]
     )
     return "\n".join(lines)
+
 
 
 def _advanced_visualization_payload(report_payload: dict[str, Any]) -> dict[str, Any]:
