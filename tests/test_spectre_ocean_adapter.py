@@ -136,12 +136,24 @@ corners:
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, target)
 
-    prepare_real_run(
-        project_dir,
-        testbench_id="cg_nf",
-        corner_id="ss",
-        created_at_utc="2026-06-06T00:20:00Z",
+    corner_manifest = (
+        project_dir
+        / "runs"
+        / "real"
+        / "real_001"
+        / "testbenches"
+        / "cg_nf"
+        / "corners"
+        / "ss"
+        / "real_run_manifest.json"
     )
+    if not corner_manifest.exists():
+        prepare_real_run(
+            project_dir,
+            testbench_id="cg_nf",
+            corner_id="ss",
+            created_at_utc="2026-06-06T00:20:00Z",
+        )
     return project_dir
 
 

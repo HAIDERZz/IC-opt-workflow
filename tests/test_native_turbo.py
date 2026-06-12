@@ -8,7 +8,9 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
+from hermes_workflow.approvals import decide_first_real_run
 from hermes_workflow.cli import app
+from hermes_workflow.dry_run import run_dry_run
 from hermes_workflow.native_turbo import (
     NativeTurboObservation,
     NativeTurboBatchCandidate,
@@ -27,7 +29,7 @@ from hermes_workflow.native_turbo import (
     run_native_turbo_optimization,
     write_native_turbo_reports,
 )
-from hermes_workflow.package import create_project_from_template
+from hermes_workflow.package import build_execution_package, create_project_from_template
 from hermes_workflow.real_run import prepare_explicit_candidate_real_run
 from hermes_workflow.requirement_intake import prepare_from_requirement
 from hermes_workflow.schemas import (
@@ -45,6 +47,7 @@ from hermes_workflow.schemas import (
     VariableSpec,
     VariablesConfig,
 )
+from tests.report_helpers import write_pass_reports
 from tests.real_run_smoke_helpers import (
     create_approved_real_project,
     load_json,
@@ -52,6 +55,51 @@ from tests.real_run_smoke_helpers import (
     write_fake_result_manifest,
 )
 from tests.test_requirement_intake import _copy_multi_testbench_requirement_project
+
+
+def _inject_three_corner_section(project_dir: Path) -> None:
+    requirement_path = project_dir / "opt_requirement.md"
+    text = requirement_path.read_text(encoding="utf-8")
+    corners_section = """
+## Process Corners
+
+```yaml
+objective_policy: worst_case
+constraint_policy: all_corners
+corners:
+  - id: tt
+    model_section: Post_simu_top_tt
+    variables:
+      temperature: "27"
+  - id: ff
+    model_section: Post_simu_top_ff
+    variables:
+      temperature: "0"
+  - id: ss
+    model_section: Post_simu_top_ss
+    variables:
+      temperature: "125"
+```
+"""
+    requirement_path.write_text(
+        text.replace("## Approval Checklist", corners_section + "\n## Approval Checklist"),
+        encoding="utf-8",
+    )
+
+
+def _create_ready_multi_corner_multi_testbench_project(tmp_path: Path) -> Path:
+    project_dir = _copy_multi_testbench_requirement_project(tmp_path)
+    _inject_three_corner_section(project_dir)
+    assert prepare_from_requirement(project_dir).status == "pass"
+    assert run_dry_run(project_dir).status.value == "pass"
+    build_execution_package(project_dir, created_at_utc="2026-06-12T00:00:00Z")
+    write_pass_reports(project_dir)
+    instruction = decide_first_real_run(
+        project_dir,
+        created_at_utc="2026-06-12T00:10:00Z",
+    )
+    assert instruction["decision"] == "approve_first_real_run"
+    return project_dir
 
 
 class _FakeTurbo:
@@ -780,6 +828,113 @@ def test_real_batch_evaluator_caps_parallel_adapter_calls(tmp_path: Path) -> Non
     ] == ["real_001", "real_002", "real_003", "real_004"]
 
 
+def test_batch_evaluator_limits_parallel_candidates_without_inner_child_parallelism(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import threading
+    import time
+
+    project_dir = _create_ready_multi_corner_multi_testbench_project(tmp_path)
+    active_candidates: set[str] = set()
+    active_child_calls: dict[str, int] = {}
+    max_active_candidates = 0
+    max_child_calls_per_candidate = 0
+    lock = threading.Lock()
+
+    def fake_run_spectre_ocean_adapter(
+        project: Path,
+        *,
+        run_id: str | None,
+        testbench_id: str | None,
+        corner_id: str | None,
+    ):
+        nonlocal max_active_candidates, max_child_calls_per_candidate
+
+        assert project == project_dir
+        assert run_id is not None
+        assert testbench_id is not None
+        assert corner_id is not None
+        with lock:
+            active_candidates.add(run_id)
+            active_child_calls[run_id] = active_child_calls.get(run_id, 0) + 1
+            max_active_candidates = max(max_active_candidates, len(active_candidates))
+            max_child_calls_per_candidate = max(
+                max_child_calls_per_candidate,
+                active_child_calls[run_id],
+            )
+        time.sleep(0.01)
+        with lock:
+            active_child_calls[run_id] -= 1
+            if active_child_calls[run_id] == 0:
+                active_child_calls.pop(run_id)
+                active_candidates.remove(run_id)
+        return type(
+            "Result",
+            (),
+            {
+                "status": "succeeded",
+                "issues": [],
+            },
+        )()
+
+    def fake_aggregate(project: Path, *, run_id: str):
+        assert project == project_dir
+        write_fake_result_manifest(project, run_id=run_id)
+        write_fake_metric_result_manifest(
+            project,
+            run_id=run_id,
+            values={"MAX_GAIN": 1.0, "IIP3": 1.0},
+        )
+        return object()
+
+    import hermes_workflow.execution_adapters.spectre_ocean as adapter_module
+    import hermes_workflow.multi_testbench_aggregation as aggregation_module
+
+    monkeypatch.setattr(
+        adapter_module,
+        "run_spectre_ocean_adapter",
+        fake_run_spectre_ocean_adapter,
+    )
+    monkeypatch.setattr(
+        aggregation_module,
+        "aggregate_multi_testbench_run",
+        fake_aggregate,
+    )
+
+    candidates = [
+        NativeTurboBatchCandidate(
+            evaluation_index=index,
+            run_id=f"real_{index:03d}",
+            candidate_id=f"candidate_{index:06d}",
+            batch_id="batch_001",
+            batch_slot=index,
+            batch_size=4,
+            selection_phase="initialization",
+            raw_x=[4.0, 0.5, 4.0, 1.1],
+            parameters={
+                "FN": str(3 + index),
+                "WN": "0.5u",
+                "FP": "4",
+                "WP": "1.1u",
+            },
+            replacement_issues=[],
+        )
+        for index in range(1, 5)
+    ]
+
+    evaluator = make_real_candidate_batch_evaluator(
+        project_dir,
+        cadence_cshrc=None,
+        max_workers=2,
+    )
+    observations = evaluator(candidates)
+
+    assert len(observations) == 4
+    assert max_active_candidates == 2
+    assert max_child_calls_per_candidate == 1
+
+
 def test_default_adapter_runs_and_aggregates_multi_testbench_children(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -794,6 +949,7 @@ def test_default_adapter_runs_and_aggregates_multi_testbench_children(
         *,
         run_id: str | None,
         testbench_id: str | None,
+        corner_id: str | None = None,
     ):
         assert project == project_dir
         calls.append((str(run_id), testbench_id))
@@ -830,6 +986,69 @@ def test_default_adapter_runs_and_aggregates_multi_testbench_children(
     assert calls == [
         ("real_007", "cg_nf"),
         ("real_007", "iip3"),
+    ]
+    assert aggregate_calls == ["real_007"]
+
+
+def test_default_adapter_runs_multi_corner_children_serially(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    project_dir = _copy_multi_testbench_requirement_project(tmp_path)
+    _inject_three_corner_section(project_dir)
+    assert prepare_from_requirement(project_dir).status == "pass"
+    calls: list[tuple[str, str, str]] = []
+    aggregate_calls: list[str] = []
+
+    def fake_run_spectre_ocean_adapter(
+        project: Path,
+        *,
+        run_id: str | None,
+        testbench_id: str | None,
+        corner_id: str | None,
+    ):
+        assert project == project_dir
+        assert run_id is not None
+        assert testbench_id is not None
+        assert corner_id is not None
+        calls.append((run_id, testbench_id, corner_id))
+        return type(
+            "Result",
+            (),
+            {
+                "status": "succeeded",
+                "issues": [],
+            },
+        )()
+
+    def fake_aggregate(project: Path, *, run_id: str):
+        assert project == project_dir
+        aggregate_calls.append(run_id)
+        return object()
+
+    import hermes_workflow.execution_adapters.spectre_ocean as adapter_module
+    import hermes_workflow.multi_testbench_aggregation as aggregation_module
+
+    monkeypatch.setattr(
+        adapter_module,
+        "run_spectre_ocean_adapter",
+        fake_run_spectre_ocean_adapter,
+    )
+    monkeypatch.setattr(
+        aggregation_module,
+        "aggregate_multi_testbench_run",
+        fake_aggregate,
+    )
+
+    _run_default_adapter(project_dir, run_id="real_007", cadence_cshrc=None)
+
+    assert calls == [
+        ("real_007", "cg_nf", "tt"),
+        ("real_007", "cg_nf", "ff"),
+        ("real_007", "cg_nf", "ss"),
+        ("real_007", "iip3", "tt"),
+        ("real_007", "iip3", "ff"),
+        ("real_007", "iip3", "ss"),
     ]
     assert aggregate_calls == ["real_007"]
 

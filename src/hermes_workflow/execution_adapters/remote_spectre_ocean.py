@@ -26,6 +26,16 @@ from hermes_workflow.remote_project import RemoteProjectRef
 from hermes_workflow.remote_ssh import RemoteCommandResult, quote_remote_path
 
 
+def _configured_corner_ids(bundle: Any) -> list[str | None]:
+    process_corners = getattr(bundle, "process_corners", None)
+    if process_corners is None:
+        return [None]
+    corners = process_corners.corners
+    if len(corners) == 1:
+        return [None]
+    return [corner.id for corner in corners]
+
+
 def run_remote_spectre_ocean_adapter(
     project_dir: Path,
     *,
@@ -323,18 +333,22 @@ def run_remote_multi_testbench_adapter(
         raise RuntimeError("run_remote_multi_testbench_adapter called without testbenches config")
 
     issues: list[str] = []
+    corner_ids = _configured_corner_ids(bundle)
     for testbench in bundle.testbenches.testbenches:
-        result = run_remote_spectre_ocean_adapter(
-            project_dir,
-            run_id=run_id,
-            remote_ref=remote_ref,
-            remote_cadence_cshrc=remote_cadence_cshrc,
-            runner=runner,
-            testbench_id=testbench.id,
-        )
-        if result.status != "succeeded":
-            message = "; ".join(result.issues) or result.status
-            issues.append(f"{testbench.id}: {message}")
+        for corner_id in corner_ids:
+            result = run_remote_spectre_ocean_adapter(
+                project_dir,
+                run_id=run_id,
+                remote_ref=remote_ref,
+                remote_cadence_cshrc=remote_cadence_cshrc,
+                runner=runner,
+                testbench_id=testbench.id,
+                corner_id=corner_id,
+            )
+            if result.status != "succeeded":
+                message = "; ".join(result.issues) or result.status
+                label = testbench.id if corner_id is None else f"{testbench.id}/{corner_id}"
+                issues.append(f"{label}: {message}")
 
     aggregate_report = aggregate_multi_testbench_run(project_dir, run_id=run_id)
 

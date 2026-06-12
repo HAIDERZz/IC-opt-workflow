@@ -4,15 +4,73 @@ import json
 import os
 import shlex
 from pathlib import Path, PurePosixPath
+from types import SimpleNamespace
 
+from hermes_workflow.approvals import decide_first_real_run
+from hermes_workflow.dry_run import run_dry_run
 from hermes_workflow.execution_adapters.remote_spectre_ocean import (
     run_remote_multi_testbench_adapter,
     run_remote_spectre_ocean_adapter,
 )
 from hermes_workflow.execution_adapters.spectre_ocean import load_adapter_context
+from hermes_workflow.package import build_execution_package
+from hermes_workflow.real_run import prepare_real_run
 from hermes_workflow.remote_project import RemoteProjectRef
 from hermes_workflow.remote_ssh import RemoteCommandResult
-from tests.real_run_smoke_helpers import create_approved_real_project
+from hermes_workflow.requirement_intake import prepare_from_requirement
+from tests.report_helpers import write_pass_reports
+from tests.real_run_smoke_helpers import (
+    create_approved_real_project,
+    write_fake_metric_result_manifest,
+    write_fake_result_manifest,
+)
+from tests.test_requirement_intake import _copy_multi_testbench_requirement_project
+
+
+def _inject_three_corner_section(project_dir: Path) -> None:
+    requirement_path = project_dir / "opt_requirement.md"
+    text = requirement_path.read_text(encoding="utf-8")
+    corners_section = """
+## Process Corners
+
+```yaml
+objective_policy: worst_case
+constraint_policy: all_corners
+corners:
+  - id: tt
+    model_section: Post_simu_top_tt
+    variables:
+      temperature: "27"
+  - id: ff
+    model_section: Post_simu_top_ff
+    variables:
+      temperature: "0"
+  - id: ss
+    model_section: Post_simu_top_ss
+    variables:
+      temperature: "125"
+```
+"""
+    requirement_path.write_text(
+        text.replace("## Approval Checklist", corners_section + "\n## Approval Checklist"),
+        encoding="utf-8",
+    )
+
+
+def _create_ready_multi_corner_multi_testbench_project(tmp_path: Path) -> Path:
+    project_dir = _copy_multi_testbench_requirement_project(tmp_path)
+    _inject_three_corner_section(project_dir)
+    assert prepare_from_requirement(project_dir).status == "pass"
+    assert run_dry_run(project_dir).status.value == "pass"
+    build_execution_package(project_dir, created_at_utc="2026-06-12T00:00:00Z")
+    write_pass_reports(project_dir)
+    instruction = decide_first_real_run(
+        project_dir,
+        created_at_utc="2026-06-12T00:10:00Z",
+    )
+    assert instruction["decision"] == "approve_first_real_run"
+    prepare_real_run(project_dir, created_at_utc="2026-06-12T00:20:00Z")
+    return project_dir
 
 
 class FakeRunner:
@@ -167,6 +225,31 @@ def test_remote_adapter_runs_corner_aware_child_run(tmp_path: Path) -> None:
     runner.set_project_dir(project_dir)
     runner.child_metric_names = {
         "cg_nf": ["MAX_GAIN"],
+    }
+    request = json.loads(
+        (
+            project_dir
+            / "runs"
+            / "real"
+            / "real_001"
+            / "testbenches"
+            / "cg_nf"
+            / "corners"
+            / "ss"
+            / "metric_extraction_request.json"
+        ).read_text(encoding="utf-8")
+    )
+    runner.child_metric_units = {
+        "cg_nf": {
+            metric["name"]: metric["unit"]
+            for metric in request["metrics"]
+        }
+    }
+    runner.child_expression_sha256 = {
+        "cg_nf": {
+            metric["name"]: metric["expression_sha256"]
+            for metric in request["metrics"]
+        }
     }
 
     result = run_remote_spectre_ocean_adapter(
@@ -541,6 +624,27 @@ def test_remote_multi_testbench_adapter_runs_each_child(tmp_path: Path) -> None:
         "cg_nf": ["MAX_GAIN"],
         "iip3": ["IIP3"],
     }
+    runner.child_metric_units = {}
+    runner.child_expression_sha256 = {}
+    for testbench_id in ("cg_nf", "iip3"):
+        request_path = (
+            project_dir
+            / "runs"
+            / "real"
+            / "real_001"
+            / "testbenches"
+            / testbench_id
+            / "metric_extraction_request.json"
+        )
+        request = json.loads(request_path.read_text(encoding="utf-8"))
+        runner.child_metric_units[testbench_id] = {
+            metric["name"]: metric["unit"]
+            for metric in request["metrics"]
+        }
+        runner.child_expression_sha256[testbench_id] = {
+            metric["name"]: metric["expression_sha256"]
+            for metric in request["metrics"]
+        }
 
     result = run_remote_multi_testbench_adapter(
         project_dir,
@@ -604,6 +708,84 @@ def test_remote_multi_testbench_adapter_child_metric_probe_paths(tmp_path: Path)
         assert "metric_probe.ocn" in inner
         # Verify child testbench path, not top-level metrics path
         assert "/real/real_001/metrics/metric_probe.ocn" not in inner.replace("testbenches/", "")
+
+
+def test_remote_multi_testbench_adapter_runs_multi_corner_children_serially(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    project_dir = _create_ready_multi_corner_multi_testbench_project(tmp_path)
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    runner = MultiTestbenchFakeRunner()
+    runner.set_project_dir(project_dir)
+    runner.child_metric_names = {
+        "cg_nf": ["MAX_GAIN"],
+        "iip3": ["IIP3"],
+    }
+    runner.child_metric_units = {}
+    runner.child_expression_sha256 = {}
+    for testbench_id in ("cg_nf", "iip3"):
+        request_path = (
+            project_dir
+            / "runs"
+            / "real"
+            / "real_001"
+            / "testbenches"
+            / testbench_id
+            / "corners"
+            / "tt"
+            / "metric_extraction_request.json"
+        )
+        request = json.loads(request_path.read_text(encoding="utf-8"))
+        runner.child_metric_units[testbench_id] = {
+            metric["name"]: metric["unit"]
+            for metric in request["metrics"]
+        }
+        runner.child_expression_sha256[testbench_id] = {
+            metric["name"]: metric["expression_sha256"]
+            for metric in request["metrics"]
+        }
+
+    def fake_aggregate(project: Path, *, run_id: str):
+        result_path = project / "runs" / "real" / run_id / "result_manifest.json"
+        metric_path = (
+            project / "runs" / "real" / run_id / "metrics" / "metric_result_manifest.json"
+        )
+        result_path.parent.mkdir(parents=True, exist_ok=True)
+        metric_path.parent.mkdir(parents=True, exist_ok=True)
+        result_path.write_text("{\"status\": \"succeeded\"}\n", encoding="utf-8")
+        metric_path.write_text("{\"status\": \"succeeded\"}\n", encoding="utf-8")
+        return SimpleNamespace(status="succeeded", issues=[])
+
+    monkeypatch.setattr(
+        "hermes_workflow.multi_testbench_aggregation.aggregate_multi_testbench_run",
+        fake_aggregate,
+        raising=False,
+    )
+
+    result = run_remote_multi_testbench_adapter(
+        project_dir,
+        run_id="real_001",
+        remote_ref=ref,
+        remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
+        runner=runner,
+    )
+
+    assert result.status == "succeeded"
+    spectre_cmds = [cmd for cmd in runner.commands if "spectre " in cmd]
+    ocean_cmds = [cmd for cmd in runner.commands if "ocean " in cmd]
+    assert len(spectre_cmds) == 6
+    assert len(ocean_cmds) == 6
+    expected_order = [
+        "testbenches/cg_nf/corners/tt",
+        "testbenches/cg_nf/corners/ff",
+        "testbenches/cg_nf/corners/ss",
+        "testbenches/iip3/corners/tt",
+        "testbenches/iip3/corners/ff",
+        "testbenches/iip3/corners/ss",
+    ]
+    assert [path for path in expected_order if any(path in cmd for cmd in spectre_cmds)] == expected_order
+    assert [path for path in expected_order if any(path in cmd for cmd in ocean_cmds)] == expected_order
 
 
 def test_remote_multi_testbench_adapter_child_failure_reports_issues(tmp_path: Path) -> None:

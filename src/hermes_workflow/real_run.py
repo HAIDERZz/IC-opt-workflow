@@ -939,17 +939,19 @@ def _write_real_run_package(
             json.dumps(manifest_payload, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
-        _write_multi_testbench_real_run_packages(
-            bundle,
-            selected_run_id,
-            candidate,
-            candidate_id,
-            created_at_utc,
-            instruction,
-            approved_hashes,
-            candidate_relative,
-            manifest_extra,
-        )
+        if testbench_id is None:
+            _write_multi_testbench_real_run_packages(
+                bundle,
+                selected_run_id,
+                candidate,
+                candidate_id,
+                created_at_utc,
+                instruction,
+                approved_hashes,
+                candidate_relative,
+                manifest_extra,
+                corner_id=corner_id,
+            )
     except Exception:
         if created_run_dir and run_dir.exists():
             shutil.rmtree(run_dir, ignore_errors=True)
@@ -1098,6 +1100,15 @@ def _write_single_testbench_package(
     return child_dir, child_manifest, metric_request_payload
 
 
+def _configured_corner_ids(bundle: ContractBundle) -> list[str | None]:
+    if bundle.process_corners is None:
+        return [None]
+    corners = bundle.process_corners.corners
+    if len(corners) == 1:
+        return [None]
+    return [corner.id for corner in corners]
+
+
 def _write_multi_testbench_real_run_packages(
     bundle: ContractBundle,
     selected_run_id: str,
@@ -1114,23 +1125,25 @@ def _write_multi_testbench_real_run_packages(
     if bundle.testbenches is None:
         return
 
+    corner_ids = [corner_id] if corner_id is not None else _configured_corner_ids(bundle)
     for testbench in bundle.testbenches.testbenches:
         tb_id = testbench.id
         if testbench_id is not None and tb_id != testbench_id:
             continue
-        _write_single_testbench_package(
-            bundle,
-            selected_run_id,
-            candidate,
-            candidate_id,
-            created_at_utc,
-            instruction,
-            approved_hashes,
-            candidate_relative,
-            manifest_extra,
-            tb_id,
-            corner_id,
-        )
+        for selected_corner_id in corner_ids:
+            _write_single_testbench_package(
+                bundle,
+                selected_run_id,
+                candidate,
+                candidate_id,
+                created_at_utc,
+                instruction,
+                approved_hashes,
+                candidate_relative,
+                manifest_extra,
+                tb_id,
+                selected_corner_id,
+            )
 
 
 def _render_template(template_text: str, candidate: dict[str, str]) -> str:

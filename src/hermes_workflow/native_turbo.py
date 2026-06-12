@@ -1164,6 +1164,15 @@ def _default_batch_turbo_factory(**kwargs):
     return BatchTurbo1(f_batch=f_batch, **kwargs)
 
 
+def _configured_corner_ids(bundle: ContractBundle) -> list[str | None]:
+    if bundle.process_corners is None:
+        return [None]
+    corners = bundle.process_corners.corners
+    if len(corners) == 1:
+        return [None]
+    return [corner.id for corner in corners]
+
+
 def _run_default_adapter(
     project_dir: Path,
     *,
@@ -1177,6 +1186,7 @@ def _run_default_adapter(
             run_id=run_id,
             cadence_cshrc=cadence_cshrc,
             testbench_ids=[testbench.id for testbench in bundle.testbenches.testbenches],
+            corner_ids=_configured_corner_ids(bundle),
         )
         return
 
@@ -1217,6 +1227,7 @@ def _run_multi_testbench_default_adapter(
     run_id: str,
     cadence_cshrc: Path | None,
     testbench_ids: list[str],
+    corner_ids: list[str | None],
 ) -> None:
     issues: list[str] = []
     if cadence_cshrc is None:
@@ -1225,37 +1236,44 @@ def _run_multi_testbench_default_adapter(
         )
 
         for testbench_id in testbench_ids:
-            result = run_spectre_ocean_adapter(
-                project_dir,
-                run_id=run_id,
-                testbench_id=testbench_id,
-            )
-            if result.status != "succeeded":
-                message = "; ".join(result.issues) or result.status
-                issues.append(f"{testbench_id}: {message}")
+            for corner_id in corner_ids:
+                result = run_spectre_ocean_adapter(
+                    project_dir,
+                    run_id=run_id,
+                    testbench_id=testbench_id,
+                    corner_id=corner_id,
+                )
+                if result.status != "succeeded":
+                    message = "; ".join(result.issues) or result.status
+                    label = testbench_id if corner_id is None else f"{testbench_id}/{corner_id}"
+                    issues.append(f"{label}: {message}")
     else:
         repo_root = Path(__file__).resolve().parents[2]
         tool_path = repo_root / "tools" / "run_spectre_ocean_adapter.py"
         for testbench_id in testbench_ids:
-            command = (
-                f"source {shlex.quote(str(cadence_cshrc))}; "
-                f"cd {shlex.quote(str(repo_root))}; "
-                f"{shlex.quote(sys.executable)} {shlex.quote(str(tool_path))} "
-                f"{shlex.quote(str(project_dir))} --run-id {shlex.quote(run_id)} "
-                f"--testbench-id {shlex.quote(testbench_id)}"
-            )
-            completed = subprocess.run(
-                ["csh", "-fc", command],
-                text=True,
-                capture_output=True,
-                check=False,
-            )
-            if completed.returncode != 0:
-                message = (completed.stdout + "\n" + completed.stderr).strip()
-                issues.append(
-                    f"{testbench_id}: "
-                    + (message or f"adapter failed with return code {completed.returncode}")
+            for corner_id in corner_ids:
+                command = (
+                    f"source {shlex.quote(str(cadence_cshrc))}; "
+                    f"cd {shlex.quote(str(repo_root))}; "
+                    f"{shlex.quote(sys.executable)} {shlex.quote(str(tool_path))} "
+                    f"{shlex.quote(str(project_dir))} --run-id {shlex.quote(run_id)} "
+                    f"--testbench-id {shlex.quote(testbench_id)}"
                 )
+                if corner_id is not None:
+                    command += f" --corner-id {shlex.quote(corner_id)}"
+                completed = subprocess.run(
+                    ["csh", "-fc", command],
+                    text=True,
+                    capture_output=True,
+                    check=False,
+                )
+                if completed.returncode != 0:
+                    message = (completed.stdout + "\n" + completed.stderr).strip()
+                    label = testbench_id if corner_id is None else f"{testbench_id}/{corner_id}"
+                    issues.append(
+                        f"{label}: "
+                        + (message or f"adapter failed with return code {completed.returncode}")
+                    )
 
     from hermes_workflow.multi_testbench_aggregation import aggregate_multi_testbench_run
 
