@@ -131,13 +131,17 @@ Acceptance requires:
 
 ## 7. Supported Optimizer Modes
 
-Release-supported product modes are:
+Production strategy choices are peers:
 
-- `algorithm: openbox`, `strategy: openbox_auto`
 - `algorithm: openbox`, `strategy: openbox_gp_eic`
 - `algorithm: openbox`, `strategy: openbox_prf_eic`
 - `algorithm: turbo`, `strategy: turbo_trust_region`
-- `algorithm: random`, `strategy: random_baseline` for diagnostic baseline use
+
+`openbox_auto` is the default automatic mode when the user has not
+selected a strategy. `random_baseline` is diagnostic only. Use TuRBO only
+when legal variable steps are fine enough that snapping is a small
+perturbation, for example about `0.1u`; avoid it for coarse steps,
+finger-count-like integers, and categorical choices.
 
 Read `docs/OPTIMIZER_ALGORITHM_MODES.md` before recommending a mode.
 

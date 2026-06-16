@@ -1,163 +1,111 @@
 # Optimizer Algorithm Modes For IC Optimization
 
-Date: 2026-06-13
+Date: 2026-06-16
 
-## Purpose
+This document explains the optimizer strategy choices exposed through
+`opt_requirement.md`. Product CLI flags must not override algorithm, strategy,
+budget, batch size, Spectre parallelism, or optimizer CPU limits.
 
-This note records the optimizer algorithm choices available to the IC
-optimization workflow and the problem shapes where each choice is appropriate.
-It is the algorithm background for C-77 Optimizer Algorithm Modes +
-Effectiveness Audit.
+## Strategy Model
 
-The project should not expose raw optimizer internals first and explain them
-later. Users need a small set of clear strategy presets, and runtime reports
-must show what strategy was requested and what settings actually ran.
+The production strategy choices are peers:
 
-## Release-Supported Product Modes
-
-Product users select optimizer behavior only in `opt_requirement.md`.
-The product CLI must not be used to override strategy, budget, batch size, or
-parallelism.
-
-The release-supported OpenBox strategy combinations are:
-
-- `algorithm: openbox`, `strategy: openbox_auto`
 - `algorithm: openbox`, `strategy: openbox_gp_eic`
 - `algorithm: openbox`, `strategy: openbox_prf_eic`
+- `algorithm: turbo`, `strategy: turbo_trust_region`
 
-Native TuRBO is also supported as `algorithm: turbo`,
-`strategy: turbo_trust_region` for mostly continuous trust-region search.
-`algorithm: random`, `strategy: random_baseline` is a diagnostic baseline for
-pipeline sanity checks and algorithm comparisons, not a production default.
+`openbox_auto` is the default automatic mode when the user has not chosen a
+strategy. `random_baseline` is a diagnostic baseline for pipeline checks and
+algorithm comparison; it is not the production optimization default.
 
-## OpenBox Terminology
+OpenBox is the backend for the `openbox_*` strategies. TuRBO is a separate
+native backend. TuRBO should not be described as an OpenBox mode, and OpenBox
+should not be described as the umbrella for all production strategies.
 
-`openbox-gp`, `openbox-prf`, and `openbox-eic` are not peer algorithms.
-OpenBox Bayesian optimization is configured by three main parts:
+## Strategy Choices
 
-- Surrogate model: `gp`, `prf`, `lightgbm`, and related model choices.
-- Acquisition function: `ei`, `eic`, `pi`, `lcb`, and related acquisition
-  choices.
-- Acquisition optimizer: `random_scipy`, `local_random`, and related search
-  choices for maximizing the acquisition function.
+| Strategy | Backend | Best Fit | Avoid When |
+| --- | --- | --- | --- |
+| `openbox_gp_eic` | OpenBox GP surrogate plus constrained expected improvement | Smooth, low-to-medium-dimensional IC spaces with important constraints and mostly continuous variables | Many failed points, rough metrics, higher dimensions, or coarse/mixed discrete grids |
+| `openbox_prf_eic` | OpenBox probabilistic random forest surrogate plus constrained expected improvement | Coarse-step, integer-heavy, mixed, high-failure, or non-smooth spaces; multi-corner and constraint-heavy cases where GP is brittle | Very smooth continuous spaces where GP or TuRBO can model local behavior more precisely |
+| `turbo_trust_region` | Native TuRBO trust-region optimizer | Variables have fine legal step sizes, so snapping a continuous candidate to the legal grid is a small perturbation; for example widths or lengths with about `0.1u` step size across a broad range | Coarse step grids, small integer choices such as finger counts, category switches, model-section choices, or any case where many TuRBO suggestions collapse to duplicate snapped points |
+| `openbox_auto` | OpenBox automatic preset resolution | Default when the user does not know which strategy to select | When acceptance requires a reproducible, explicitly chosen algorithm mode |
+| `random_baseline` | Random/Sobol-style baseline | Sanity checks, simulator pipeline debugging, and measuring whether model-based optimization is adding value | Production optimization where sample efficiency matters |
 
-`eic` means constrained expected improvement. It is an acquisition function,
-not a standalone optimizer backend.
+## TuRBO Step-Size Rule
 
-The user-facing strategy names should therefore be combinations such as:
+TuRBO proposes candidates in a continuous trust region. The workflow can snap
+those candidates to the legal IC variable grid before simulation, but that is
+only a good approximation when the grid is fine.
 
-- `openbox_auto`
-- `openbox_gp_eic`
-- `openbox_prf_eic`
+Good TuRBO fit:
 
-## Strategy Summary
+- width/length/bias/passive values with many legal values;
+- step size is small relative to the total range, such as about `0.1u`;
+- snapped candidate remains close to the continuous candidate;
+- duplicate snapped points are rare.
 
-| Strategy | Principle | Strength | Risk | Good IC Fit |
-| --- | --- | --- | --- | --- |
-| `turbo_trust_region` | Trust-region Bayesian optimization. Search stays inside a local trust region; successes expand it and failures shrink it. | Strong for medium/high-dimensional mostly continuous variables; fast local improvement for expensive simulations. | Native geometry is continuous. Coarse step grids, integer-only variables, categorical choices, or narrow feasible regions can distort the trust region, produce duplicates, or require heavy penalty handling for constraints. | Mostly continuous IC variables, fine step sizes, not too many hard failures, and a need for fast local improvement. |
-| `openbox_gp_eic` | Gaussian process surrogate for objective and constraints plus constrained expected improvement. | Good sample efficiency for small, smooth, continuous design spaces; explicit constraint handling. | Can become slow or brittle with higher dimensions, many failed points, rough metrics, or coarse mixed grids. | Roughly 8 to 15 mostly continuous IC parameters, smooth metrics, and important hard constraints. |
-| `openbox_prf_eic` | Probabilistic random forest surrogate for objective and constraints plus constrained expected improvement. | Robust for integer, discrete, mixed, higher-dimensional, and non-smooth spaces; usually lower CPU cost than GP. | Less precise local modeling on smooth continuous functions than GP or TuRBO. | Coarse steps, finger/integer parameters, many failed points, many variables, or non-smooth/corner-heavy behavior. |
-| `openbox_auto` | Let OpenBox choose surrogate, acquisition, and acquisition optimizer from problem dimensions and types. | Safe default when users do not know optimizer internals. | Not IC-specific. OpenBox can choose PRF for dimensions where a smooth analog circuit problem might still benefit from GP. | Default baseline for production use, as long as reports show the resolved settings. |
-| `random_baseline` | No surrogate model. Use random or Sobol-style exploration only. | Simple, robust, and useful for sanity checks and failure triage. | Low optimization efficiency. It should not be the production default. | Validate the simulation/evaluation pipeline, debug constraints, or compare whether BO is doing better than uninformed sampling. |
+Poor TuRBO fit:
 
-## TuRBO With Stepped IC Variables
+- transistor finger count or multiplier has only a few legal values;
+- step size is large relative to the range;
+- categorical or architecture variables are present;
+- snapping causes many duplicate candidates;
+- local continuous distance no longer reflects the real design-space distance.
 
-TuRBO generates candidate points in a continuous normalized space. IC variables
-usually have legal step grids, so the workflow must snap a continuous candidate
-to the nearest approved grid value before simulation.
+For poor TuRBO-fit spaces, prefer `openbox_prf_eic`. PRF handles coarse,
+integer, mixed, and failure-heavy behavior more naturally.
 
-This can still work when the step grid is fine. Examples include widths,
-voltages, passive values, or bias parameters where each range has many legal
-values. Snapping then behaves like a small quantization error.
+## Requirement Examples
 
-It becomes weaker when the grid is coarse. Examples include transistor finger
-counts with only a few legal values, discrete architecture switches, category
-variables, or process section choices. In those cases the trust-region distance
-is no longer a natural distance in the legal design space, duplicate candidates
-become more likely, and the local region can be misleading. OpenBox PRF + EIC
-is usually a better fit for those mixed or coarse spaces.
-
-The current workflow already adapts TuRBO through:
-
-- grid quantization;
-- duplicate handling;
-- finite penalties for failed or constraint-violating candidates;
-- batch candidate evaluation.
-
-That is enough to keep TuRBO as an optional strategy. It should not be the only
-production route for stepped or mixed IC parameter spaces.
-
-## Recommended Defaults
-
-Default:
-
-```yaml
-optimizer:
-  algorithm: openbox
-  strategy: openbox_auto
-```
-
-Recommended choices:
-
-- Use `openbox_auto` when the user does not know the algorithm details.
-- Use `openbox_gp_eic` for mostly continuous, smooth, low-to-medium-dimensional
-  IC optimization with important constraints.
-- Use `openbox_prf_eic` for coarse-step, integer-heavy, mixed, high-failure, or
-  non-smooth spaces.
-- Use `turbo_trust_region` for experimental high-dimensional mostly continuous
-  optimization with fine steps.
-- Use `random_baseline` only for sanity checks and comparison.
-
-Advanced users may override OpenBox internals:
+GP + EIC:
 
 ```yaml
 optimizer:
   algorithm: openbox
   strategy: openbox_gp_eic
-  openbox:
-    surrogate_type: gp
-    acq_type: eic
-    acq_optimizer_type: random_scipy
-    initial_trials: auto
 ```
 
-Advanced TuRBO settings should remain explicit:
+PRF + EIC:
+
+```yaml
+optimizer:
+  algorithm: openbox
+  strategy: openbox_prf_eic
+```
+
+TuRBO:
 
 ```yaml
 optimizer:
   algorithm: turbo
   strategy: turbo_trust_region
-  turbo:
-    snap_to_step: true
-    duplicate_handling: resample
 ```
 
-## Required Runtime Audit
+Diagnostic baseline:
 
-Exposing strategy selection is not enough. Every optimizer run must report
-whether the optimizer actually moved beyond initialization/random sampling and
-whether continuation history was replayed into the model.
+```yaml
+optimizer:
+  algorithm: random
+  strategy: random_baseline
+```
 
-Each batch should record:
+## Audit Expectations
+
+Every optimizer run should report whether the requested strategy actually took
+effect. Reports should expose:
 
 - requested strategy;
 - resolved backend;
-- resolved surrogate model;
-- resolved acquisition function;
-- resolved acquisition optimizer;
-- initial trials;
+- surrogate model and acquisition function where applicable;
+- initial-design mode;
 - phase: `initialization`, `bo`, `turbo_trust_region`, or `random_baseline`;
 - history size before and after suggestion;
 - successful observation count;
 - feasible count;
-- best objective so far;
-- best feasible objective so far;
-- replay history count for continuation;
-- duplicate replacement count.
+- best observed objective and best feasible objective;
+- duplicate replacement count;
+- continuation replay count when applicable.
 
-This audit is what lets the project answer practical questions:
-
-- Did OpenBox actually enter BO, or is the run still initialization?
-- Was history replayed during continuation?
-- Did the run feed useful observations back to the model?
-- Is GP, PRF, TuRBO, or random baseline more effective on a real IC case?
+These fields are required because tests and static code review alone are not
+enough to prove that requirement variables reached the optimizer loop.

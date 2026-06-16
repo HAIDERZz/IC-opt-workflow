@@ -58,14 +58,16 @@ OCEAN formulas.
   adds `N` more evaluations. All other values are inherited from the project
   requirement/generated config.
 - Multi-corner optimization is configured in `opt_requirement.md` through
-  `Process Corners`; there is no `--multi-corner` switch. See
+  `Process Corners`; no `--multi-corner` switch exists. See
   `examples/spectre_maestro_project/opt_requirement.multi_corner.md` and
   `examples/spectre_maestro_project/opt_requirement.multi_tb_corner.md`.
-- The production OpenBox strategy combinations are `openbox_auto`,
-  `openbox_gp_eic`, and `openbox_prf_eic`. Native TuRBO
-  `turbo_trust_region` is also supported for mostly continuous trust-region
-  search. See `docs/OPTIMIZER_ALGORITHM_MODES.md` for when to choose each mode.
-- Current release changes and fixed bugs are summarized in
+- Production strategy choices are peers: `openbox_gp_eic`,
+  `openbox_prf_eic`, and `turbo_trust_region`. `openbox_auto` is the
+  default automatic mode, and `random_baseline` is diagnostic only. Use
+  `turbo_trust_region` when legal variable steps are fine enough that
+  snapping continuous TuRBO candidates is a small perturbation, for example
+  about `0.1u`; avoid it for coarse steps, finger-count-like integers, and
+  categorical choices. See `docs/OPTIMIZER_ALGORITHM_MODES.md`.
   `RELEASE_NOTES_v0.1.7.md`.
 
 ## Install
@@ -280,8 +282,9 @@ same-CLI subagent delegation.
 - `docs/OPTIMIZER_PRODUCTION_QUICKSTART.md`: shortest production workflow.
 - `docs/AGENT_OPTIMIZER_USAGE_MANUAL.md`: supervisor/execution-agent operating
   manual.
-- `docs/OPTIMIZER_ALGORITHM_MODES.md`: supported optimizer strategies and when
-  to use OpenBox auto, GP+EIC, PRF+EIC, TuRBO, or random baseline.
+- `docs/OPTIMIZER_ALGORITHM_MODES.md`: supported optimizer strategy selection,
+  including peer production choices `openbox_gp_eic`, `openbox_prf_eic`, and
+  `turbo_trust_region`.
 - `docs/PROCESS_CORNER_OPTIMIZATION_FLOW_CN.md`: multi-corner aggregation flow
   and what the optimizer sees.
 - `docs/AGENT_INTEGRATION_STATUS.md`: current implemented agent boundary and
