@@ -1201,8 +1201,8 @@ Current release documentation contract:
   process corners, output format, retention policy, metrics, and constraints.
 - Product CLI continuation keeps exactly one budget delta:
   `ic-opt PROJECT_DIR --real --continue N`.
-- Multi-corner is configured only in `opt_requirement.md` under
-  `Process Corners`; no `--multi-corner` product switch exists.
+- Multi-corner is configured in `opt_requirement.md` under `Process Corners`,
+  where corners, objective policy, and constraint policy are declared.
 - Release examples include:
   - `examples/spectre_maestro_project/opt_requirement.multi_corner.md`
   - `examples/spectre_maestro_project/opt_requirement.multi_tb_corner.md`

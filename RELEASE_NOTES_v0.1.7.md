@@ -18,7 +18,8 @@ Date: 2026-06-16
 ## Capabilities
 
 - Multi-corner real optimization is configured in `opt_requirement.md` under
-  `Process Corners`; no `--multi-corner` CLI switch exists.
+  `Process Corners`, using `corners`, `objective_policy`, and
+  `constraint_policy`.
 - Release examples include:
   - `examples/spectre_maestro_project/opt_requirement.multi_corner.md`
   - `examples/spectre_maestro_project/opt_requirement.multi_tb_corner.md`

@@ -71,8 +71,7 @@ corner 数量。
 正常远程多 testbench 或多 corner 项目，建议从 4 到 8 开始。只有在你确认 SSH
 服务端、license 和服务器资源都允许时，再提高并发。
 
-多 corner 只通过 `opt_requirement.md` 的 `Process Corners` section 启用，没有
-`--multi-corner` 命令行开关。Monte Carlo 也不在这条 real-run 主流程里，建议作为
+多 corner 通过 `opt_requirement.md` 的 `Process Corners` section 启用。Monte Carlo 建议作为
 后优化验证步骤单独执行。
 
 `optimizer_cpu_threads` 只限制本机 optimizer/OpenBox 侧的 CPU 线程，不限制远程

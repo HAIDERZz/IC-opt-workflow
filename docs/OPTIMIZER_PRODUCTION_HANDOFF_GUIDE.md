@@ -75,8 +75,9 @@ Use `docs/OPTIMIZER_ALGORITHM_MODES.md` when explaining tradeoffs.
 
 ## Multi-Corner Handoff
 
-Multi-corner execution is configured only in `opt_requirement.md` under
-`Process Corners`. There is no product `--multi-corner` switch.
+Multi-corner execution is configured in `opt_requirement.md` under
+`Process Corners`, where corners, objective policy, and constraint policy are
+declared.
 
 Use these release examples:
 

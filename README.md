@@ -58,9 +58,10 @@ OCEAN formulas.
   adds `N` more evaluations. All other values are inherited from the project
   requirement/generated config.
 - Multi-corner optimization is configured in `opt_requirement.md` through
-  `Process Corners`; no `--multi-corner` switch exists. See
+  `Process Corners`. See
   `examples/spectre_maestro_project/opt_requirement.multi_corner.md` and
-  `examples/spectre_maestro_project/opt_requirement.multi_tb_corner.md`.
+  `examples/spectre_maestro_project/opt_requirement.multi_tb_corner.md` for
+  the expected `corners`, `objective_policy`, and `constraint_policy` fields.
 - Production strategy choices are peers: `openbox_gp_eic`,
   `openbox_prf_eic`, and `turbo_trust_region`. `openbox_auto` is the
   default automatic mode, and `random_baseline` is diagnostic only. Use

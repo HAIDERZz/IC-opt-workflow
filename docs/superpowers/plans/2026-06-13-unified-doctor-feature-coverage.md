@@ -13,7 +13,7 @@
 - Development happens in `ic-auto-opt-workflow`.
 - Do not develop directly in `ic-auto-opt-workflow-v0.1`.
 - Do not run Spectre, OCEAN, Virtuoso, OpenBox, or TuRBO from doctor tests.
-- Do not add `--multi-corner`, `--local-doctor`, or `--remote-doctor`.
+- Configure multi-corner coverage through `Process Corners`; keep doctor entrypoints on the existing product doctor flow.
 - Do not change real optimizer adapter semantics.
 - Do not change candidate/testbench/corner execution concurrency.
 - Do not rewrite formulas, objective expressions, or PDK corner data.

@@ -2,9 +2,8 @@
 
 Use this reference when one optimizer candidate needs metrics from multiple
 Maestro/ADE testbenches and each candidate should also be checked across
-multiple process corners. Multi-corner is configured only from
-`Process Corners`; there is no `--multi-corner` CLI switch. Inside one
-candidate, the workflow runs `testbench x corner` serially, so `parallel_jobs`
+multiple process corners. Multi-corner is configured in `Process Corners`. Inside one candidate, the
+workflow runs `testbench x corner` serially, so `parallel_jobs`
 still means candidate-level concurrency only.
 
 Monte Carlo is intentionally deferred from this flow. Use it after optimization

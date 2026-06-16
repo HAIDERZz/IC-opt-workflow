@@ -15,7 +15,7 @@ C-76 multi-corner implementation from `ic-auto-opt-workflow-v0.1` has been merge
 
 Verification run in `ic-auto-opt-workflow`: C-76 targeted pytest suite exit code 0; C-77 targeted pytest suite exit code 0; full pytest exit code 0; `rtk proxy ./.venv/bin/python -m ruff check src tests` passed; `rtk proxy ./.venv/bin/python tools/check_development_cadence.py` passed; `rtk proxy git diff --check` passed; stale fail-closed `process_corners` guard search over `src tests tools` returned no matches.
 
-Remaining gap: no fresh live Cadence/Spectre/OCEAN multi-corner practice run has been executed after this alignment. Do not report real multi-corner optimizer effectiveness until that development-package real route is run and inspected.
+Remaining gap: report real multi-corner optimizer effectiveness only after a fresh live Cadence/Spectre/OCEAN multi-corner practice run has completed and its artifacts have been inspected.
 
 ## C-77 Optimizer Algorithm Modes + Effectiveness Audit Implementation 2026-06-13
 

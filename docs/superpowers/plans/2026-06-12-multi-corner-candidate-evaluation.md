@@ -27,7 +27,7 @@ docs/superpowers/specs/2026-06-12-multi-corner-candidate-evaluation-design.md
 
 ## Hard Constraints
 
-- Do not add `--multi-corner`.
+- Configure multi-corner coverage through `Process Corners` in `opt_requirement.md`.
 - Do not change the meaning of `parallel_jobs`.
 - Do not add inner testbench/corner parallelism.
 - Do not require live Virtuoso/Maestro during optimizer execution.
@@ -462,7 +462,7 @@ Instruct agents:
 - inspect `structured_issues`;
 - do not invent corner names;
 - ask user for exact model section names if missing;
-- do not add `--multi-corner`;
+- configure multi-corner coverage through `Process Corners`;
 - explain worst-case vs nominal objective policy.
 
 **Step 3: Add templates**
@@ -594,7 +594,7 @@ Required process:
 - Do not use 5.5 as coding/review subagent.
 
 Hard constraints:
-- Do not add --multi-corner.
+- Configure multi-corner coverage through `Process Corners` in `opt_requirement.md`.
 - Do not change parallel_jobs semantics.
 - Do not add inner testbench/corner parallelism.
 - Do not require live Virtuoso/Maestro.

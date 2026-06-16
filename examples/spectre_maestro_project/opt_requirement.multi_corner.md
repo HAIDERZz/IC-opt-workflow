@@ -1,9 +1,8 @@
 # Multi-Corner Optimization Requirement
 
 Use this reference when one optimizer candidate should be evaluated across
-multiple process corners from the same Maestro/ADE testbench. Multi-corner is
-enabled only from `Process Corners` below; there is no `--multi-corner` CLI
-switch. Inside one candidate, corner execution remains serial, so
+multiple process corners from the same Maestro/ADE testbench. Multi-corner is configured in `Process Corners` below. Inside one candidate,
+corner execution remains serial, so
 `parallel_jobs` still means candidate-level concurrency only.
 
 Monte Carlo is intentionally not part of this real-run loop. Run Monte Carlo as
