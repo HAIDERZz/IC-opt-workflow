@@ -465,3 +465,86 @@ def test_product_cli_remote_real_dispatches_to_remote_fix_run(
     assert result.exit_code == 0, result.output
     assert "fix-run" in result.output.lower()
     assert len(remote_fix_run_calls) == 1
+
+
+def test_remote_fix_run_report_collects_waveform_artifacts(tmp_path: Path) -> None:
+    """Remote parent report must list downloaded waveform manifests and CSV files."""
+    from hermes_workflow.remote_fix_run_flow import run_remote_fix_run_project
+
+    project_dir = tmp_path / "remote_fix_run_artifacts"
+    config_dir = project_dir / "config"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    (config_dir / "workflow.yaml").write_text(
+        json.dumps(
+            {"schema_version": "1.0", "mode": "fix_run", "starting_run_id": "real_001"}
+        ),
+        encoding="utf-8",
+    )
+    (config_dir / "fixed_points.yaml").write_text(
+        json.dumps(
+            {
+                "schema_version": "1.0",
+                "points": [
+                    {
+                        "candidate_id": "user_point_001",
+                        "parameters": {"FN": "2", "WN": "0.3u"},
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    run_dir = project_dir / "runs" / "real" / "real_001"
+    metrics_dir = run_dir / "testbenches" / "cg_nf" / "corners" / "tt" / "metrics"
+    waveforms_dir = metrics_dir / "waveforms"
+
+    def _adapter_side_effect(*args: object, **kwargs: object) -> MagicMock:
+        waveforms_dir.mkdir(parents=True, exist_ok=True)
+        (metrics_dir / "waveform_export_manifest.json").write_text(
+            json.dumps({"schema_version": "1.0"}),
+            encoding="utf-8",
+        )
+        (waveforms_dir / "nf_pnoise.csv").write_text("x,y\n1,2\n", encoding="utf-8")
+        return _mock_adapter_result(project_dir, run_id="real_001")
+
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    mock_runner = MagicMock()
+    mock_runner.run.return_value = MagicMock(return_code=0)
+
+    with (
+        patch("hermes_workflow.remote_fix_run_flow.run_remote_doctor") as mock_doctor,
+        patch("hermes_workflow.remote_fix_run_flow.prepare_remote_project_cache") as mock_prep,
+        patch("hermes_workflow.remote_fix_run_flow.check_requirement") as mock_check,
+        patch("hermes_workflow.remote_fix_run_flow.prepare_from_requirement") as mock_prep_req,
+        patch("hermes_workflow.remote_fix_run_flow.build_execution_package") as mock_build,
+        patch("hermes_workflow.remote_fix_run_flow.prepare_explicit_candidate_real_run"),
+        patch("hermes_workflow.remote_fix_run_flow._collect_child_runs") as mock_children,
+        patch(
+            "hermes_workflow.remote_fix_run_flow.run_remote_spectre_ocean_adapter"
+        ) as mock_adapter,
+    ):
+        mock_doctor.return_value = MagicMock(status="pass", issues=[])
+        mock_prep.return_value = _mock_preparation(project_dir)
+        mock_check.return_value = _mock_intake(project_dir)
+        mock_prep_req.return_value = MagicMock(status="pass", issues=[])
+        mock_build.return_value = MagicMock(status="pass")
+        mock_children.return_value = [{"testbench_id": "cg_nf", "corner_id": "tt"}]
+        mock_adapter.side_effect = _adapter_side_effect
+
+        report = run_remote_fix_run_project(
+            ref,
+            remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
+            real=True,
+            runner=mock_runner,
+        )
+
+    point = report.points[0]
+    assert point.waveform_export_manifest_paths == [
+        "runs/real/real_001/testbenches/cg_nf/corners/tt/metrics/"
+        "waveform_export_manifest.json"
+    ]
+    assert point.csv_artifact_paths == [
+        "runs/real/real_001/testbenches/cg_nf/corners/tt/metrics/waveforms/"
+        "nf_pnoise.csv"
+    ]

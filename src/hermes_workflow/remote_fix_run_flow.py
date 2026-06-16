@@ -119,6 +119,34 @@ def _collect_child_runs(
     return children
 
 
+def _relative_artifact_path(project_dir: Path, path: Path) -> str:
+    try:
+        return path.relative_to(project_dir).as_posix()
+    except ValueError:
+        return str(path)
+
+
+def _collect_waveform_artifacts(
+    project_dir: Path,
+    run_id: str,
+) -> tuple[list[str], list[str]]:
+    run_root = project_dir / "runs" / "real" / run_id
+    if not run_root.is_dir():
+        return [], []
+
+    manifest_paths = [
+        _relative_artifact_path(project_dir, path)
+        for path in sorted(run_root.rglob("metrics/waveform_export_manifest.json"))
+        if path.is_file()
+    ]
+    csv_paths = [
+        _relative_artifact_path(project_dir, path)
+        for path in sorted(run_root.rglob("metrics/waveforms/*.csv"))
+        if path.is_file()
+    ]
+    return manifest_paths, csv_paths
+
+
 def run_remote_fix_run_project(
     remote_ref: RemoteProjectRef,
     *,
@@ -274,6 +302,11 @@ def run_remote_fix_run_project(
                         scalar_manifest_paths.append(
                             str(adapter_result.metric_result_manifest_path)
                         )
+
+            waveform_manifest_paths, csv_paths = _collect_waveform_artifacts(
+                project_dir,
+                run_id,
+            )
 
             point_reports.append(
                 FixRunPointReport(

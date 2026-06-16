@@ -394,7 +394,56 @@ def test_fix_run_returns_fix_run_report(tmp_path: Path) -> None:
         assert report.status == "pass"
         assert len(report.points) == 1
         assert isinstance(report.points[0], FixRunPointReport)
-        assert report.points[0].candidate_id == "user_point_001"
-        assert report.points[0].run_id == "real_001"
-        assert report.optimizer_state_created is False
-        assert report.optimizer_decision_report_created is False
+    assert report.points[0].candidate_id == "user_point_001"
+    assert report.points[0].run_id == "real_001"
+    assert report.optimizer_state_created is False
+    assert report.optimizer_decision_report_created is False
+
+
+def test_fix_run_report_collects_waveform_artifacts(tmp_path: Path) -> None:
+    """Parent fix-run report must list child waveform manifests and CSV files."""
+    from hermes_workflow.fix_run_flow import run_fix_run_project
+
+    project_dir = _create_fix_run_project(tmp_path)
+
+    run_dir = project_dir / "runs" / "real" / "real_001"
+    metrics_dir = run_dir / "testbenches" / "cg_nf" / "corners" / "tt" / "metrics"
+    waveforms_dir = metrics_dir / "waveforms"
+
+    def _adapter_side_effect(*args: object, **kwargs: object) -> MagicMock:
+        waveforms_dir.mkdir(parents=True, exist_ok=True)
+        (metrics_dir / "waveform_export_manifest.json").write_text(
+            json.dumps({"schema_version": "1.0"}),
+            encoding="utf-8",
+        )
+        (waveforms_dir / "nf_pnoise.csv").write_text("x,y\n1,2\n", encoding="utf-8")
+        return _mock_adapter_result(project_dir, run_id="real_001")
+
+    with (
+        patch("hermes_workflow.fix_run_flow.check_requirement") as mock_check,
+        patch("hermes_workflow.fix_run_flow.prepare_from_requirement") as mock_prep,
+        patch("hermes_workflow.fix_run_flow.run_product_doctor") as mock_doctor,
+        patch("hermes_workflow.fix_run_flow.build_execution_package") as mock_build,
+        patch("hermes_workflow.fix_run_flow.decide_first_real_run"),
+        patch("hermes_workflow.fix_run_flow.prepare_explicit_candidate_real_run"),
+        patch("hermes_workflow.fix_run_flow._collect_child_runs") as mock_children,
+        patch("hermes_workflow.fix_run_flow.run_spectre_ocean_adapter") as mock_adapter,
+    ):
+        mock_check.return_value = _mock_intake(project_dir)
+        mock_prep.return_value = SimpleNamespace(status="pass", issues=[])
+        mock_doctor.return_value = SimpleNamespace(status="pass", issues=[])
+        mock_build.return_value = SimpleNamespace(status="pass")
+        mock_children.return_value = [{"testbench_id": "cg_nf", "corner_id": "tt"}]
+        mock_adapter.side_effect = _adapter_side_effect
+
+        report = run_fix_run_project(project_dir, real=True, cadence_cshrc=None)
+
+    point = report.points[0]
+    assert point.waveform_export_manifest_paths == [
+        "runs/real/real_001/testbenches/cg_nf/corners/tt/metrics/"
+        "waveform_export_manifest.json"
+    ]
+    assert point.csv_artifact_paths == [
+        "runs/real/real_001/testbenches/cg_nf/corners/tt/metrics/waveforms/"
+        "nf_pnoise.csv"
+    ]

@@ -1537,3 +1537,12 @@ Verification:
 - Release full test: `PYTHONPATH=src ../ic-auto-opt-workflow/.venv/bin/python -m pytest -q` exited 0.
 - Release lint: `PYTHONPATH=src ../ic-auto-opt-workflow/.venv/bin/python -m ruff check src tests` passed.
 - Release/dev whitespace check: `git diff --check -- . ':!vendor' ':!.serena'` passed.
+
+## 2026-06-16 Fix-Run Post-Report Audit
+
+- Reviewed the fix-run final report against dev source before treating it as accepted.
+- Found a code-level gap: local and remote `fix_run_report.json` initialized `waveform_export_manifest_paths` and `csv_artifact_paths` but did not populate them.
+- Added local and remote RED/GREEN tests proving parent reports include child `metrics/waveform_export_manifest.json` and `metrics/waveforms/*.csv` paths.
+- Implemented artifact scanning under each `runs/real/<run_id>` tree in local and remote fix-run flows.
+- Verification after fix: focused fix-run suite passed, changed-file ruff passed, changed-file `git diff --check` passed.
+- Real local/remote Spectre/OCEAN workflow acceptance is still pending and must not be reported as final acceptance.

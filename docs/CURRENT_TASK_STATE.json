@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "updated_at": "2026-06-16T22:00:00+08:00",
+  "updated_at": "2026-06-16T22:35:00+08:00",
   "current_scope": "Fix-Run Simulation Workflow implementation",
   "current_status": "Code-level verification complete. 8 implementation tasks + verification passed (1164 tests, ruff clean, whitespace clean). Workflow-level acceptance (Task 10) pending real Spectre/OCEAN execution.",
   "development_package": "/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow",
@@ -10,6 +10,7 @@
     "tasks_completed": 8,
     "code_verification": "PASSED",
     "workflow_acceptance": "PENDING",
+    "post_report_fix": "Added parent fix_run_report aggregation for waveform_export_manifest.json and metrics/waveforms/*.csv in local and remote fix-run flows.",
     "commits": [
       "161d9bb feat: add fix-run config models",
       "e855cc5 feat: support fix-run requirement intake",
@@ -20,7 +21,7 @@
       "91cfa73 feat: add remote fix-run workflow",
       "b162140 docs: add fix-run requirement example"
     ],
-    "focused_test_count": 257,
+    "focused_test_count": 259,
     "full_test_count": 1164,
     "test_failures": "1 pre-existing unrelated failure in test_agent_skill.py"
   },
