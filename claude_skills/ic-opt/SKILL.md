@@ -10,12 +10,21 @@ This skill is the Claude-facing `/ic-opt` entrypoint.
 User command:
 
 ```text
-/ic-opt PROJECT_DIR --real [optional ic-opt flags]
+/ic-opt PROJECT_DIR --real [--continue N] [--cadence-cshrc PATH] [--dry-orchestration]
 ```
 
 The user should not need to write a long prompt. Machine-critical setup belongs
 in `PROJECT_DIR/opt_requirement.md`, and optional human guidance belongs in
-`PROJECT_DIR/constraints.md`.
+`PROJECT_DIR/constraints.md`. Do not accept workload, resource, algorithm,
+strategy, initialization, corner, or metric overrides from the command line.
+
+When explaining optimizer modes, treat `openbox_gp_eic`, `openbox_prf_eic`, and
+`turbo_trust_region` as peer production strategy choices. `openbox_auto` is the
+default automatic mode, and `random_baseline` is diagnostic only. TuRBO is a fit
+when legal variable steps are fine enough that snapping continuous candidates to
+the legal grid is a small perturbation, for example about `0.1u`; avoid it for
+coarse steps, finger-count-like integers, categorical choices, and
+duplicate-heavy snapped spaces.
 
 ## Hard Boundaries
 
@@ -36,7 +45,7 @@ in `PROJECT_DIR/opt_requirement.md`, and optional human guidance belongs in
 Parse `$ARGUMENTS` as:
 
 ```text
-PROJECT_DIR --real [optional ic-opt flags]
+PROJECT_DIR --real [--continue N] [--cadence-cshrc PATH] [--dry-orchestration]
 ```
 
 If `PROJECT_DIR` is empty, stop and ask for:

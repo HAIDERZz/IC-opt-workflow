@@ -55,6 +55,16 @@ flags such as `--max-evals`, `--batch-size`, `--parallel-jobs`, `--threads`,
 Those values come from `opt_requirement.md` / generated config. Low-level
 `hermes-workflow` commands are development/debugging tools only.
 
+When explaining optimizer modes, treat the three production strategy choices as
+peers: `algorithm: openbox` with `strategy: openbox_gp_eic`,
+`algorithm: openbox` with `strategy: openbox_prf_eic`, and `algorithm: turbo`
+with `strategy: turbo_trust_region`. `openbox_auto` is the default automatic
+mode, and `random_baseline` is diagnostic only. Use TuRBO when legal variable
+steps are fine enough that snapping continuous candidates to the legal grid is a
+small perturbation, for example about `0.1u`; avoid it for coarse steps,
+finger-count-like integers, categorical choices, and duplicate-heavy snapped
+spaces.
+
 Do not ask the user to restate formulas, variables, metric routes, testbench
 paths, Spectre resources, or optimizer settings. Those belong in
 `PROJECT/opt_requirement.md` and optional `PROJECT/constraints.md`.
