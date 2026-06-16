@@ -26,7 +26,7 @@ should not be described as the umbrella for all production strategies.
 
 | Strategy | Backend | Best Fit | Avoid When |
 | --- | --- | --- | --- |
-| `openbox_gp_eic` | OpenBox GP surrogate plus constrained expected improvement | Smooth, low-to-medium-dimensional IC spaces with important constraints and mostly continuous variables | Many failed points, rough metrics, higher dimensions, or coarse/mixed discrete grids |
+| `openbox_gp_eic` | OpenBox GP surrogate plus constrained expected improvement | Smooth, low-to-medium-dimensional IC spaces with important constraints and fine-grained numeric variables | Many failed points, rough metrics, higher dimensions, or coarse/mixed discrete grids |
 | `openbox_prf_eic` | OpenBox probabilistic random forest surrogate plus constrained expected improvement | Coarse-step, integer-heavy, mixed, high-failure, or non-smooth spaces; multi-corner and constraint-heavy cases where GP is brittle | Very smooth continuous spaces where GP or TuRBO can model local behavior more precisely |
 | `turbo_trust_region` | Native TuRBO trust-region optimizer | Variables have fine legal step sizes, so snapping a continuous candidate to the legal grid is a small perturbation; for example widths or lengths with about `0.1u` step size across a broad range | Coarse step grids, small integer choices such as finger counts, category switches, model-section choices, or any case where many TuRBO suggestions collapse to duplicate snapped points |
 | `openbox_auto` | OpenBox automatic preset resolution | Default when the user does not know which strategy to select | When acceptance requires a reproducible, explicitly chosen algorithm mode |
@@ -34,9 +34,10 @@ should not be described as the umbrella for all production strategies.
 
 ## TuRBO Step-Size Rule
 
-TuRBO proposes candidates in a continuous trust region. The workflow can snap
-those candidates to the legal IC variable grid before simulation, but that is
-only a good approximation when the grid is fine.
+TuRBO proposes candidates in a continuous trust region; that is an
+implementation mechanism, not the main product selection rule. In this workflow,
+choose TuRBO only when the legal IC variable grid is fine enough that snapping
+the continuous candidate is a small perturbation.
 
 Good TuRBO fit:
 

@@ -14,7 +14,7 @@ User command:
 Interpret `$ARGUMENTS` as:
 
 ```text
-PROJECT_DIR --real [optional ic-opt flags]
+PROJECT_DIR --real [--continue N] [--cadence-cshrc PATH] [--dry-orchestration]
 ```
 
 If no project directory is present, stop and ask for:
@@ -24,7 +24,17 @@ If no project directory is present, stop and ask for:
 ```
 
 Do not ask the user to restate formulas, variables, testbench paths, Spectre
-resources, or optimizer settings. They belong in `opt_requirement.md`.
+resources, or optimizer settings. They belong in `opt_requirement.md`. Do not
+accept workload, resource, algorithm, strategy, initialization, corner, or
+metric overrides from the command line.
+
+When explaining optimizer modes, treat `openbox_gp_eic`, `openbox_prf_eic`, and
+`turbo_trust_region` as peer production strategy choices. `openbox_auto` is the
+default automatic mode, and `random_baseline` is diagnostic only. TuRBO is a fit
+when legal variable steps are fine enough that snapping continuous candidates to
+the legal grid is a small perturbation, for example about `0.1u`; avoid it for
+coarse steps, finger-count-like integers, categorical choices, and
+duplicate-heavy snapped spaces.
 
 ## Required Flow
 
@@ -35,7 +45,7 @@ resources, or optimizer settings. They belong in `opt_requirement.md`.
 3. Run the supervisor orchestration gate:
 
    ```bash
-   "$REPO/.venv/bin/ic-opt" "$PROJECT_DIR" --real --dry-orchestration [optional flags]
+   "$REPO/.venv/bin/ic-opt" "$PROJECT_DIR" --real --dry-orchestration [allowed product flags only]
    ```
 
    If the user explicitly included `--dry-orchestration`, stop after this gate
