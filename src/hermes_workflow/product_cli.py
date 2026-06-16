@@ -13,6 +13,7 @@ from hermes_workflow.optimizer_flow import optimize_project
 from hermes_workflow.product_doctor import run_product_doctor
 from hermes_workflow.requirement_intake import check_requirement
 from hermes_workflow.remote_doctor import run_remote_doctor
+from hermes_workflow.remote_fix_run_flow import run_remote_fix_run_project
 from hermes_workflow.remote_optimizer_flow import (
     continue_remote_project,
     optimize_remote_project,
@@ -221,6 +222,29 @@ def main(
                 if cadence_cshrc is not None
                 else ref.remote_project_dir / "cadence_env.csh"
             )
+            # Detect workflow mode: if fix_run, dispatch to remote fix-run flow
+            try:
+                intake = check_requirement(project_dir)
+            except Exception:
+                intake = None
+            if intake is not None and getattr(intake, "workflow_mode", None) == "fix_run":
+                try:
+                    fix_report = run_remote_fix_run_project(
+                        ref,
+                        remote_cadence_cshrc=remote_cshrc,
+                        real=True,
+                    )
+                except (OSError, RuntimeError, ValueError) as exc:
+                    _exit_with_error(exc)
+                if fix_report.status == "pass":
+                    typer.echo("remote fix-run flow completed")
+                    _echo_report_path(
+                        project_dir,
+                        project_dir / "reports" / "fix_run_report.json",
+                    )
+                    return
+                typer.echo("remote fix-run flow failed")
+                raise typer.Exit(code=1)
             try:
                 report = optimize_remote_project(
                     ref,
