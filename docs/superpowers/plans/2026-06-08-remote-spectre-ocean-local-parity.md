@@ -338,5 +338,5 @@ Codex final acceptance will check:
 - remote adapter no longer contains the C-69 hardcoded command semantics;
 - missing artifacts cannot produce success manifests;
 - local adapter behavior remains unchanged;
-- real remote evidence is based on actual Spectre/OCEAN artifacts, not only
-  optimizer closeout success.
+- real remote evidence is based on actual Spectre/OCEAN artifacts, rather than
+  optimizer closeout success alone.

@@ -75,7 +75,7 @@ Workflow acceptance still required:
   prove the requirement value was propagated and became the effective
   initialization.
 - Cover at least OpenBox with a non-default initialization and native TuRBO
-  Sobol seed behavior through generated workflow artifacts, not only helper
+  Sobol seed behavior through generated workflow artifacts rather than helper
   tests.
 - Do not call B-07 fully accepted until artifact-level evidence proves the
   requirement variable was passed and took effect.
@@ -174,12 +174,12 @@ Tests added:
 - `test_remote_ocean_failure_writes_command_trace`
 
 Verification:
-- `rtk proxy ./.venv/bin/python -m pytest tests/test_spectre_ocean_adapter.py tests/test_remote_spectre_ocean.py tests/test_multi_testbench_aggregation.py tests/test_metric_results.py -q` — 168 passed
-- `rtk proxy ./.venv/bin/python -m pytest tests/test_real_run.py tests/test_optimizer_acceptance.py tests/test_product_cli.py tests/test_product_cli_remote.py -q` — 66 passed
-- `rtk proxy ./.venv/bin/python -m pytest -q` — 990 passed
-- `rtk proxy ./.venv/bin/python -m ruff check src tests` — All checks passed
-- `rtk proxy git diff --check -- . ':!vendor' ':!.serena'` — Clean
-- Release package (`ic-auto-opt-workflow-v0.1`) — Not touched
+- `rtk proxy ./.venv/bin/python -m pytest tests/test_spectre_ocean_adapter.py tests/test_remote_spectre_ocean.py tests/test_multi_testbench_aggregation.py tests/test_metric_results.py -q`: 168 passed
+- `rtk proxy ./.venv/bin/python -m pytest tests/test_real_run.py tests/test_optimizer_acceptance.py tests/test_product_cli.py tests/test_product_cli_remote.py -q`: 66 passed
+- `rtk proxy ./.venv/bin/python -m pytest -q`: 990 passed
+- `rtk proxy ./.venv/bin/python -m ruff check src tests`: All checks passed
+- `rtk proxy git diff --check -- . ':!vendor' ':!.serena'`: Clean
+- Release package (`ic-auto-opt-workflow-v0.1`): Not touched
 
 Modified files:
 - `src/hermes_workflow/execution_adapters/spectre_ocean.py`
@@ -229,7 +229,7 @@ Current evidence:
 
 Required outcome:
 - Reconfirm after release sync with real local and remote 3-corner parent aggregate manifests.
-- Specifically inspect parent `result_manifest.json` simulator metadata, not only run success.
+- Specifically inspect parent `result_manifest.json` simulator metadata, rather than run success alone.
 
 ### Release sync
 
@@ -312,12 +312,12 @@ Tests added:
   ``doctor`` step; added `run_product_doctor` mock to `_services`.
 
 Verification:
-- `pytest tests/test_license_probe.py tests/test_product_doctor.py tests/test_remote_doctor.py -q` — 53 passed
-- `pytest tests/test_optimizer_flow.py -q` — 8 passed
-- `pytest -q` — 1022 passed
-- `ruff check src tests` — All checks passed
-- `git diff --check` — Clean
-- Release package (`ic-auto-opt-workflow-v0.1`) — Not touched
+- `pytest tests/test_license_probe.py tests/test_product_doctor.py tests/test_remote_doctor.py -q`: 53 passed
+- `pytest tests/test_optimizer_flow.py -q`: 8 passed
+- `pytest -q`: 1022 passed
+- `ruff check src tests`: All checks passed
+- `git diff --check`: Clean
+- Release package (`ic-auto-opt-workflow-v0.1`): Not touched
 
 Workflow acceptance still required:
 - Run real local doctor with `require_license_check: true` and verify
@@ -328,7 +328,7 @@ Workflow acceptance still required:
 - Do not call B-05 fully accepted until real artifact inspection proves
   enforcement.
 
-### `require_license_check` (old deferred note — superseded)
+### `require_license_check` (old deferred note: superseded)
 
 Status: now implemented as B-05 code-level fix (see above).
 
@@ -878,14 +878,14 @@ Verification commands:
 - `git -C ../ic-auto-opt-workflow-v0.1 status --short` -> only `?? .serena/`; no tracked release source touched
 
 Modified files:
-- `src/hermes_workflow/optimizer_resources.py` — added `OptimizerThreadAudit`, modified `optimizer_cpu_thread_limits` to yield audit
-- `src/hermes_workflow/openbox_backend.py` — capture and propagate runtime thread audit
-- `src/hermes_workflow/native_turbo.py` — capture and propagate runtime thread audit
-- `tests/test_optimizer_resources.py` — new test file (14 tests)
-- `tests/test_openbox_backend.py` — 3 new audit tests
-- `tests/test_native_turbo.py` — 3 new audit tests + 1 existing test updated
-- `tests/test_remote_optimizer_flow.py` — 1 new remote parity test
-- `docs/CURRENT_BUGFIX_PROGRESS.md` — this update
+- `src/hermes_workflow/optimizer_resources.py`: added `OptimizerThreadAudit`, modified `optimizer_cpu_thread_limits` to yield audit
+- `src/hermes_workflow/openbox_backend.py`: capture and propagate runtime thread audit
+- `src/hermes_workflow/native_turbo.py`: capture and propagate runtime thread audit
+- `tests/test_optimizer_resources.py`: new test file (14 tests)
+- `tests/test_openbox_backend.py`: 3 new audit tests
+- `tests/test_native_turbo.py`: 3 new audit tests + 1 existing test updated
+- `tests/test_remote_optimizer_flow.py`: 1 new remote parity test
+- `docs/CURRENT_BUGFIX_PROGRESS.md`: this update
 
 Exact report fields added:
 - OpenBox `reports/optimizer_run_report.json`:

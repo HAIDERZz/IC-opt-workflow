@@ -54,8 +54,8 @@ continue.
 
 Implication: the current `netlists/exported/input.scs` contract is too narrow
 for Maestro-exported decks that rely on relative include sidecars. A later
-scoped fix should preserve the full exported netlist bundle, not only
-`input.scs`.
+scoped fix should preserve the full exported netlist bundle, rather than
+`input.scs` alone.
 
 ### Variable Unit Formatting Gap
 
