@@ -1568,3 +1568,182 @@ def test_local_transient_ocean_failure_command_trace_has_retry_return_codes(
     ocean_trace = metric_manifest["command_trace"]["ocean"]
     assert ocean_trace["return_codes"] == [35, 0]
     assert ocean_trace["return_code"] == 0
+
+
+# ── Waveform CSV export tests ─────────────────────────────────────────
+
+
+def _add_waveform_exports_to_request(
+    project_dir: Path,
+    waveform_exports: list[dict],
+) -> None:
+    """Add waveform_exports entries to the metric extraction request and refresh hashes."""
+    run_dir = project_dir / "runs" / "real" / "real_001"
+    request_path = run_dir / "metric_extraction_request.json"
+    request = _load_json(request_path)
+    request["waveform_exports"] = waveform_exports
+    _write_json(request_path, request)
+    _refresh_metric_request_hash(run_dir)
+
+
+def test_render_ocean_replay_script_emits_ocn_print_for_waveform_exports(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_real_run_project(tmp_path)
+    expression = 'getData("NF" ?result "pnoise")'
+    _add_waveform_exports_to_request(project_dir, [
+        {
+            "name": "nf_pnoise",
+            "testbench": "cg_nf",
+            "expression": expression,
+            "expression_sha256": expression_sha256(expression),
+            "output_format": "csv",
+            "nil_policy": "fail",
+            "csv_output_file": "runs/real/real_001/metrics/waveforms/nf_pnoise.csv",
+        }
+    ])
+
+    context = load_adapter_context(project_dir)
+    script = render_ocean_replay_script(context)
+
+    assert "ocnPrint" in script
+    assert "hermesWave_nf_pnoise" in script
+    assert "; waveform export: nf_pnoise" in script
+
+
+def test_render_ocean_replay_script_preserves_waveform_expression_verbatim(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_real_run_project(tmp_path)
+    expression = 'getData("NF" ?result "pnoise")'
+    _add_waveform_exports_to_request(project_dir, [
+        {
+            "name": "nf_pnoise",
+            "testbench": "cg_nf",
+            "expression": expression,
+            "expression_sha256": expression_sha256(expression),
+            "output_format": "csv",
+            "nil_policy": "fail",
+            "csv_output_file": "runs/real/real_001/metrics/waveforms/nf_pnoise.csv",
+        }
+    ])
+
+    context = load_adapter_context(project_dir)
+    script = render_ocean_replay_script(context)
+
+    # Expression must appear exactly as-is, NOT rewritten
+    assert expression in script
+
+
+def test_render_ocean_replay_script_waveform_writes_to_csv_path(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_real_run_project(tmp_path)
+    expression = 'getData("NF" ?result "pnoise")'
+    csv_path = "runs/real/real_001/metrics/waveforms/nf_pnoise.csv"
+    _add_waveform_exports_to_request(project_dir, [
+        {
+            "name": "nf_pnoise",
+            "testbench": "cg_nf",
+            "expression": expression,
+            "expression_sha256": expression_sha256(expression),
+            "output_format": "csv",
+            "nil_policy": "fail",
+            "csv_output_file": csv_path,
+        }
+    ])
+
+    context = load_adapter_context(project_dir)
+    script = render_ocean_replay_script(context)
+
+    # The posix path must appear in the SKILL script
+    assert csv_path in script
+    # ocnPrint must use comma separator and scientific notation
+    assert "?separator \",\"" in script
+    assert "?numberNotation 'scientific" in script
+
+
+def test_render_ocean_replay_script_rejects_outfile_in_waveform_expression(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_real_run_project(tmp_path)
+    expression = 'outfile("/tmp/evil")'
+    _add_waveform_exports_to_request(project_dir, [
+        {
+            "name": "bad_export",
+            "testbench": "cg_nf",
+            "expression": expression,
+            "expression_sha256": expression_sha256(expression),
+            "output_format": "csv",
+            "nil_policy": "fail",
+            "csv_output_file": "runs/real/real_001/metrics/waveforms/bad_export.csv",
+        }
+    ])
+
+    context = load_adapter_context(project_dir)
+
+    with pytest.raises(AdapterPreconditionError, match="outfile\\("):
+        render_ocean_replay_script(context)
+
+
+def test_render_ocean_replay_script_rejects_system_in_waveform_expression(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_real_run_project(tmp_path)
+    expression = 'system("rm -rf /")'
+    _add_waveform_exports_to_request(project_dir, [
+        {
+            "name": "bad_export",
+            "testbench": "cg_nf",
+            "expression": expression,
+            "expression_sha256": expression_sha256(expression),
+            "output_format": "csv",
+            "nil_policy": "fail",
+            "csv_output_file": "runs/real/real_001/metrics/waveforms/bad_export.csv",
+        }
+    ])
+
+    context = load_adapter_context(project_dir)
+
+    with pytest.raises(AdapterPreconditionError, match="system\\("):
+        render_ocean_replay_script(context)
+
+
+def test_render_ocean_replay_script_rejects_template_placeholders_in_waveform_expression(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_real_run_project(tmp_path)
+    expression = "getData({{signal_name}})"
+    _add_waveform_exports_to_request(project_dir, [
+        {
+            "name": "bad_export",
+            "testbench": "cg_nf",
+            "expression": expression,
+            "expression_sha256": expression_sha256(expression),
+            "output_format": "csv",
+            "nil_policy": "fail",
+            "csv_output_file": "runs/real/real_001/metrics/waveforms/bad_export.csv",
+        }
+    ])
+
+    context = load_adapter_context(project_dir)
+
+    with pytest.raises(AdapterPreconditionError, match="template placeholder"):
+        render_ocean_replay_script(context)
+
+
+def test_render_ocean_replay_script_scalar_output_unchanged_without_waveform_exports(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_real_run_project(tmp_path)
+
+    context = load_adapter_context(project_dir)
+    script = render_ocean_replay_script(context)
+
+    # No waveform export content should appear
+    assert "ocnPrint" not in script
+    assert "waveform export" not in script
+    # Standard scalar metric content should still be there
+    assert "openResults" in script
+    assert "selectResult" in script
+    assert "close(out)" in script

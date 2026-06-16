@@ -25,6 +25,9 @@ from hermes_workflow.validate import assert_valid_project
 
 RUN_ID_RE = re.compile(r"^real_[0-9]{3}$")
 RESULT_SELECTOR_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+WAVEFORM_RESULT_RE = re.compile(r'\?result\s+"([^"]+)"')
+UNSAFE_EXPRESSION_RE = re.compile(r"outfile\(|system\(|\{\{")
+SAFE_IDENTIFIER_RE = re.compile(r"[^A-Za-z0-9_]")
 DEFAULT_RUN_ID = "real_001"
 REAL_RUN_ROOT = "runs/real"
 METRIC_REQUEST_NAME = "metric_extraction_request.json"
@@ -166,6 +169,8 @@ def run_spectre_ocean_adapter(
     _reject_symlinks(context.project_dir, context.psf_dir, "psf directory")
     context.metrics_dir.mkdir(parents=True, exist_ok=True)
     context.psf_dir.mkdir(parents=True, exist_ok=True)
+    if context.request.waveform_exports:
+        (context.metrics_dir / "waveforms").mkdir(parents=True, exist_ok=True)
     _reject_output_file_symlinks(context)
     _assert_overwrite_policy(context, allow_overwrite=allow_overwrite)
     runner = runner or SubprocessCommandRunner()
@@ -416,6 +421,90 @@ def load_adapter_context(
     )
 
 
+def _render_waveform_export_lines(context: SpectreOceanContext) -> list[str]:
+    """Generate SKILL lines for waveform CSV exports.
+
+    Reads ``waveform_exports`` from the request payload (may be empty).
+    For each export entry, validates the expression and emits SKILL code
+    that evaluates the expression and writes the waveform data as CSV.
+    """
+    lines: list[str] = []
+    for wf in context.request.waveform_exports:
+        _validate_emitted_field(wf.name, f"waveform export {wf.name} name")
+        _validate_emitted_field(
+            wf.expression_sha256,
+            f"waveform export {wf.name} expression_sha256",
+        )
+
+        # Safety check: reject dangerous expressions
+        if UNSAFE_EXPRESSION_RE.search(wf.expression):
+            if "outfile(" in wf.expression:
+                raise AdapterPreconditionError(
+                    f"waveform export {wf.name} expression contains outfile("
+                )
+            if "system(" in wf.expression:
+                raise AdapterPreconditionError(
+                    f"waveform export {wf.name} expression contains system("
+                )
+            if "{{" in wf.expression:
+                raise AdapterPreconditionError(
+                    f"waveform export {wf.name} expression contains template placeholder"
+                )
+
+        # Derive a safe SKILL variable name from the export name
+        safe_name = SAFE_IDENTIFIER_RE.sub("_", wf.name)
+
+        lines.append(f"; waveform export: {wf.name}")
+        lines.append(f"; expression_sha256: {wf.expression_sha256}")
+
+        # Check for ?result "RESULT_NAME" pattern and emit selectResult
+        result_match = WAVEFORM_RESULT_RE.search(wf.expression)
+        if result_match:
+            result_name = result_match.group(1)
+            _validate_result_selector(
+                result_name,
+                f"waveform export {wf.name} result from expression",
+            )
+            lines.append(f"selectResult('{result_name})")
+
+        # Evaluate the expression
+        lines.append(f"hermesWave_{safe_name} = {wf.expression}")
+        lines.append(f"if(hermesWave_{safe_name} then")
+
+        # Create the output directory if needed
+        csv_posix = _posix_path(wf.csv_output_file)
+        csv_abs = _project_relative_path(context.project_dir, csv_posix)
+        csv_parent = csv_abs.parent
+        csv_parent_posix = _posix_path(
+            str(csv_parent.relative_to(context.project_dir))
+        )
+        lines.append(
+            f'  hermesWaveDir_{safe_name} = '
+            f'isDir("{csv_parent_posix}") || '
+            f'system("mkdir -p {csv_parent_posix}") == 0'
+        )
+
+        # Open the output file
+        lines.append(
+            f'  hermesWaveOut_{safe_name} = outfile("{csv_posix}" "w")'
+        )
+
+        # ocnPrint the waveform data as CSV
+        lines.append(
+            f"  ocnPrint(?output hermesWaveOut_{safe_name} "
+            f'?separator "," ?numberNotation \'scientific '
+            f"hermesWave_{safe_name})"
+        )
+
+        # Close the output file
+        lines.append(f"  close(hermesWaveOut_{safe_name})")
+        lines.append("else")
+        lines.append(f"  ; waveform export {wf.name} returned nil")
+        lines.append(")")
+
+    return lines
+
+
 def render_ocean_replay_script(context: SpectreOceanContext) -> str:
     scalar_path = _posix_path(context.request.ocean.scalar_output_file)
     psf_path = _posix_path(context.request.expected_psf_dir)
@@ -476,6 +565,9 @@ def render_ocean_replay_script(context: SpectreOceanContext) -> str:
                 ")",
             ]
         )
+
+    # Waveform CSV export lines (after scalar metrics, before close/exit)
+    lines.extend(_render_waveform_export_lines(context))
 
     lines.extend(["close(out)", "exit()"])
     return "\n".join(lines) + "\n"
