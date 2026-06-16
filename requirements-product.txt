@@ -11,5 +11,10 @@
 
 -e .
 -e vendor/open-box
+-e vendor/TuRBO
 -r vendor/open-box/requirements/main.txt
 matplotlib>=3.7
+scipy>=1.10
+threadpoolctl>=3.1
+torch>=2.0
+gpytorch>=1.11

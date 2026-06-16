@@ -11,6 +11,7 @@ from hermes_workflow.execution_agent_handoff import (
     dispatch_execution_agent as dispatch_execution_agent_process,
 )
 from hermes_workflow.health import write_preflight_health
+from hermes_workflow.native_turbo import run_batch_native_turbo_optimization
 from hermes_workflow.netlists import prepare_netlist
 from hermes_workflow.openbox_backend import run_openbox_real_optimization
 from hermes_workflow.optimizer_acceptance import check_optimizer_run
@@ -18,6 +19,7 @@ from hermes_workflow.optimizer_completion import summarize_optimizer_run
 from hermes_workflow.optimizer_decision import generate_optimizer_decision_report
 from hermes_workflow.optimizer_finalize import finalize_optimizer_run
 from hermes_workflow.optimizer_insights import generate_optimizer_insight_report
+from hermes_workflow.optimizer_strategy import OptimizerStrategyName
 from hermes_workflow.optimizer_task_package import build_optimizer_execution_task_package
 from hermes_workflow.package import build_execution_package
 from hermes_workflow.project_readiness import check_project_ready
@@ -25,9 +27,42 @@ from hermes_workflow.requirement_intake import (
     check_requirement,
     prepare_from_requirement,
 )
-from hermes_workflow.validate import validate_project_files
+from hermes_workflow.product_doctor import run_product_doctor
+from hermes_workflow.validate import assert_valid_project, validate_project_files
 
 REPORT_RELATIVE = Path("reports/optimizer_flow_run_report.json")
+
+
+def _backend_for_strategy(strategy_name: OptimizerStrategyName) -> str:
+    return (
+        "native_turbo"
+        if strategy_name is OptimizerStrategyName.TURBO_TRUST_REGION
+        else "openbox"
+    )
+
+
+def _backend_from_explicit_strategy(backend: str, strategy: str | None) -> str:
+    if strategy is None:
+        return backend
+    return _backend_for_strategy(OptimizerStrategyName.from_user_value(strategy))
+
+
+def _backend_from_project_strategy(
+    project_dir: Path,
+    *,
+    backend: str,
+    strategy: str | None,
+) -> str:
+    if strategy is not None:
+        return _backend_from_explicit_strategy(backend, strategy)
+    if not (project_dir / "config" / "optimizer.yaml").exists():
+        return backend
+    configured_strategy = assert_valid_project(project_dir).optimizer.optimizer.strategy
+    if configured_strategy is None:
+        return backend
+    return _backend_for_strategy(
+        OptimizerStrategyName.from_user_value(configured_strategy)
+    )
 
 
 @dataclass(frozen=True)
@@ -44,7 +79,7 @@ class OptimizerFlowReport:
     backend: str
     real: bool
     dry_orchestration: bool
-    max_evals: int
+    max_evals: int | None
     batch_size: int | None
     parallel_jobs: int | None
     execution_agent: str
@@ -74,6 +109,9 @@ class OptimizerFlowServices:
         build_optimizer_execution_task_package
     )
     run_openbox_real_optimization: Callable[..., Any] = run_openbox_real_optimization
+    run_batch_native_turbo_optimization: Callable[..., Any] = (
+        run_batch_native_turbo_optimization
+    )
     check_optimizer_run: Callable[[Path], Any] = check_optimizer_run
     summarize_optimizer_run: Callable[[Path], Any] = summarize_optimizer_run
     finalize_optimizer_run: Callable[[Path], Any] = finalize_optimizer_run
@@ -83,6 +121,7 @@ class OptimizerFlowServices:
     generate_optimizer_decision_report: Callable[[Path], Any] = (
         generate_optimizer_decision_report
     )
+    run_product_doctor: Callable[..., Any] = run_product_doctor
 
 
 def optimize_project(
@@ -91,10 +130,11 @@ def optimize_project(
     real: bool,
     cadence_cshrc: Path | None,
     dry_orchestration: bool = False,
-    max_evals: int = 100,
+    max_evals: int | None = None,
     batch_size: int | None = None,
     parallel_jobs: int | None = None,
     backend: str = "openbox",
+    strategy: str | None = None,
     execution_agent: str = "direct",
     services: OptimizerFlowServices | None = None,
     dispatch_execution_agent: Callable[..., Any] = dispatch_execution_agent_process,
@@ -109,15 +149,25 @@ def optimize_project(
     stopped_before: str | None = None
     handoff_report_path: Path | None = None
     user_decision_required = False
+    execution_backend = _backend_from_explicit_strategy(backend, strategy)
 
     try:
         _validate_options(
             real=real,
             cadence_cshrc=cadence_cshrc,
             max_evals=max_evals,
-            backend=backend,
+            backend=execution_backend,
             execution_agent=execution_agent,
         )
+        if real:
+            doctor_report = service.run_product_doctor(
+                project_root,
+                cadence_cshrc=cadence_cshrc,
+            )
+            if doctor_report.status != "pass":
+                raise ValueError(
+                    "doctor failed: " + "; ".join(doctor_report.issues)
+                )
         _run_step(
             steps,
             "check-requirement",
@@ -141,6 +191,18 @@ def optimize_project(
             "check-project-ready",
             lambda: service.check_project_ready(project_root),
             lambda result: _expect_status(result, "pass"),
+        )
+        execution_backend = _backend_from_project_strategy(
+            project_root,
+            backend=backend,
+            strategy=strategy,
+        )
+        _validate_options(
+            real=real,
+            cadence_cshrc=cadence_cshrc,
+            max_evals=max_evals,
+            backend=execution_backend,
+            execution_agent=execution_agent,
         )
         _run_step(
             steps,
@@ -173,26 +235,30 @@ def optimize_project(
             _expect_approval,
         )
         _run_step(
-            steps,
-            "package-optimizer-task",
+        steps,
+        "package-optimizer-task",
             lambda: service.build_optimizer_execution_task_package(
                 project_root,
-                max_evals=max_evals,
                 cadence_cshrc=cadence_cshrc,
                 parallel=True,
-                optimizer_backend=backend,
+            optimizer_backend=execution_backend,
+            strategy=strategy,
             ),
             _expect_success,
         )
 
+        dry_stopped_before = (
+            "run-native-turbo-real"
+            if execution_backend == "native_turbo"
+            else "run-openbox-real"
+        )
         if dry_orchestration:
-            stopped_before = "run-openbox-real"
             return _write_report(
+            project_root,
+            _report(
                 project_root,
-                _report(
-                    project_root,
-                    status="pass",
-                    backend=backend,
+                status="pass",
+                backend=execution_backend,
                     real=real,
                     dry_orchestration=dry_orchestration,
                     max_evals=max_evals,
@@ -201,7 +267,7 @@ def optimize_project(
                     execution_agent=execution_agent,
                     steps=steps,
                     user_decision_required=False,
-                    stopped_before=stopped_before,
+                stopped_before=dry_stopped_before,
                     handoff_report_path=handoff_report_path,
                     issues=issues,
                     warnings=warnings,
@@ -209,29 +275,43 @@ def optimize_project(
             )
 
         if execution_agent == "direct":
-            _run_step(
-                steps,
-                "run-openbox-real",
-                lambda: service.run_openbox_real_optimization(
-                    project_root,
-                    max_evals=max_evals,
-                    batch_size=batch_size,
-                    parallel_jobs=parallel_jobs,
-                    cadence_cshrc=cadence_cshrc,
-                ),
-                _expect_success,
-            )
+                if execution_backend == "native_turbo":
+                    _run_step(
+                        steps,
+                        "run-native-turbo-real",
+                        lambda: service.run_batch_native_turbo_optimization(
+                            project_root,
+                            max_evals=max_evals,
+                            parallel_jobs=parallel_jobs,
+                            cadence_cshrc=cadence_cshrc,
+                        ),
+                        _expect_success,
+                    )
+                else:
+                    _run_step(
+                        steps,
+                        "run-openbox-real",
+                        lambda: service.run_openbox_real_optimization(
+                            project_root,
+                            max_evals=max_evals,
+                            batch_size=batch_size,
+                            parallel_jobs=parallel_jobs,
+                            cadence_cshrc=cadence_cshrc,
+                            **({"strategy": strategy} if strategy is not None else {}),
+                        ),
+                        _expect_success,
+                    )
         else:
-            handoff = _run_step(
-                steps,
-                "execution-agent-handoff",
-                lambda: dispatch_execution_agent(
-                    project_root,
-                    execution_agent=execution_agent,
-                ),
-                lambda result: _expect_status(result, "pass"),
-            )
-            handoff_report_path = getattr(handoff, "report_path", None)
+                handoff = _run_step(
+                    steps,
+                    "execution-agent-handoff",
+                    lambda: dispatch_execution_agent(
+                        project_root,
+                        execution_agent=execution_agent,
+                    ),
+                    lambda result: _expect_status(result, "pass"),
+                )
+                handoff_report_path = getattr(handoff, "report_path", None)
         _run_step(
             steps,
             "check-optimizer-run",
@@ -270,7 +350,7 @@ def optimize_project(
         report = _report(
             project_root,
             status="fail",
-            backend=backend,
+                backend=execution_backend,
             real=real,
             dry_orchestration=dry_orchestration,
             max_evals=max_evals,
@@ -292,7 +372,7 @@ def optimize_project(
         _report(
             project_root,
             status="pass",
-            backend=backend,
+            backend=execution_backend,
             real=real,
             dry_orchestration=dry_orchestration,
             max_evals=max_evals,
@@ -321,12 +401,12 @@ def _validate_options(
 ) -> None:
     if not real:
         raise ValueError("optimize requires --real; fake optimize is not supported")
-    if backend != "openbox":
-        raise ValueError("optimize currently supports backend=openbox only")
+    if backend not in {"openbox", "native_turbo"}:
+        raise ValueError("optimize backend must be openbox or native_turbo")
     if execution_agent not in {"direct", "claude"}:
         raise ValueError("execution_agent must be direct or claude")
-    if max_evals < 1:
-        raise ValueError("max_evals must be >= 1")
+        if max_evals is not None and max_evals < 1:
+            raise ValueError("max_evals must be >= 1")
     if cadence_cshrc is None:
         raise ValueError("--cadence-cshrc is required")
 

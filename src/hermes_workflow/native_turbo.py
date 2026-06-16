@@ -16,12 +16,14 @@ from pathlib import Path
 from typing import Callable, Sequence
 
 from hermes_workflow.metric_results import check_metric_results
-from hermes_workflow.optimizer_resources import optimizer_cpu_thread_limits
+from hermes_workflow.optimizer_effectiveness import build_batch_effectiveness_audit
+from hermes_workflow.optimizer_resources import OptimizerThreadAudit, optimizer_cpu_thread_limits
 from hermes_workflow.real_result_record import record_real_result
 from hermes_workflow.real_run import prepare_explicit_candidate_real_run
 from hermes_workflow.real_run_recovery import resolve_real_run_failure
 from hermes_workflow.result_handoff import check_real_run
 from hermes_workflow.reports import RealRunResultStatus
+from hermes_workflow.run_retention import apply_local_run_retention
 from hermes_workflow.schemas import (
     ConstraintOp,
     MetricsConfig,
@@ -45,6 +47,7 @@ DEFAULT_TURBO_PATH = Path(
 )
 REPORT_RELATIVE = Path("reports/native_turbo_optimizer_report.json")
 EVALUATIONS_RELATIVE = Path("reports/native_turbo_optimizer_evaluations.jsonl")
+EFFECTIVENESS_AUDIT_RELATIVE = Path("reports/optimizer_effectiveness_audit.json")
 NATIVE_TURBO_SOURCE = "native_turbo_optimizer"
 INITIALIZATION_PHASE = "initialization"
 TRUST_REGION_PHASE = "turbo_trust_region"
@@ -124,6 +127,8 @@ class NativeTurboRunResult:
     best_trace: NativeTurboEvaluationTrace | None
     report_path: Path | None = None
     evaluations_path: Path | None = None
+    initialization: str | None = None
+    effective_initial_design: str | None = None
 
 
 Evaluator = Callable[[dict[str, str]], NativeTurboObservation]
@@ -188,6 +193,7 @@ class NativeTurboRunner:
         max_evals: int | None = None,
         replacement_attempts: int = 32,
         workflow_failure_limit: int = DEFAULT_WORKFLOW_FAILURE_LIMIT,
+        transport_mode: str = "local",
     ) -> None:
         self.variables = variables
         self.metrics = metrics
@@ -196,12 +202,14 @@ class NativeTurboRunner:
         self.turbo_factory = turbo_factory or _default_turbo_factory
         self.max_evals = max_evals or optimizer.optimizer.max_evaluations
         self.optimizer_cpu_threads = optimizer.optimizer.optimizer_cpu_threads
+        self.transport_mode = transport_mode
         self.replacement_attempts = replacement_attempts
         self.workflow_failure_limit = workflow_failure_limit
         self.traces: list[NativeTurboEvaluationTrace] = []
         self._used_keys: set[tuple[tuple[str, str], ...]] = set()
         self._rng = random.Random(optimizer.optimizer.random_seed)
         self._consecutive_workflow_failures = 0
+        self._runtime_thread_audit: OptimizerThreadAudit | None = None
 
     def run(self) -> NativeTurboRunResult:
         lb, ub = _raw_bounds(self.variables)
@@ -209,8 +217,12 @@ class NativeTurboRunner:
         n_init = 2 * n_params
         with optimizer_cpu_thread_limits(
             self.optimizer_cpu_threads,
-            set_environment=False,
-        ):
+                set_environment=True,
+                backend="native_turbo",
+                execution_mode="local",
+                transport_mode=self.transport_mode,
+            ) as audit:
+            self._runtime_thread_audit = audit
             turbo = self.turbo_factory(
                 f=self._objective,
                 lb=lb,
@@ -225,6 +237,8 @@ class NativeTurboRunner:
             evaluation_count=len(self.traces),
             traces=list(self.traces),
             best_trace=_best_trace(self.traces),
+            initialization=self.optimizer.optimizer.initialization.value,
+            effective_initial_design=self.optimizer.optimizer.initialization.value,
         )
 
     def _objective(self, raw_values: Sequence[float]) -> float:
@@ -355,6 +369,7 @@ class NativeTurboBatchRunner(NativeTurboRunner):
         workflow_failure_limit: int = DEFAULT_WORKFLOW_FAILURE_LIMIT,
         parallel_jobs: int = 1,
         threads_per_run: int | None = None,
+        transport_mode: str = "local",
     ) -> None:
         def unused_scalar_evaluator(
             _parameters: dict[str, str],
@@ -370,6 +385,7 @@ class NativeTurboBatchRunner(NativeTurboRunner):
             max_evals=max_evals,
             replacement_attempts=replacement_attempts,
             workflow_failure_limit=workflow_failure_limit,
+            transport_mode=transport_mode,
         )
         self.batch_evaluator = batch_evaluator
         self.parallel_jobs = parallel_jobs
@@ -380,10 +396,14 @@ class NativeTurboBatchRunner(NativeTurboRunner):
         lb, ub = _raw_bounds(self.variables)
         n_params = len(self.variables.variables)
         n_init = 2 * n_params
+        initialization_value = self.optimizer.optimizer.initialization.value
         with optimizer_cpu_thread_limits(
             self.optimizer_cpu_threads,
-            set_environment=False,
-        ):
+            set_environment=True,
+            backend="native_turbo",
+            execution_mode="local",
+        ) as audit:
+            self._runtime_thread_audit = audit
             turbo = self.turbo_factory(
                 f_batch=self._objective_batch,
                 lb=lb,
@@ -392,12 +412,16 @@ class NativeTurboBatchRunner(NativeTurboRunner):
                 max_evals=self.max_evals,
                 batch_size=self.optimizer.optimizer.batch_size,
                 verbose=False,
+                initialization=initialization_value,
+                random_seed=self.optimizer.optimizer.random_seed,
             )
             turbo.optimize()
         return NativeTurboRunResult(
             evaluation_count=len(self.traces),
             traces=list(self.traces),
             best_trace=_best_trace(self.traces),
+            initialization=initialization_value,
+            effective_initial_design=initialization_value,
         )
 
     def _objective_batch(
@@ -524,6 +548,7 @@ def run_native_turbo_optimization(
     cadence_cshrc: Path | None = None,
     evaluator: Evaluator | None = None,
     turbo_factory: Callable[..., object] | None = None,
+    transport_mode: str = "local",
 ) -> NativeTurboRunResult:
     project_dir = Path(project_dir)
     contract = load_native_turbo_contract(project_dir)
@@ -546,15 +571,24 @@ def run_native_turbo_optimization(
         evaluator=evaluator,
         turbo_factory=turbo_factory,
         max_evals=max_evals,
+        transport_mode=transport_mode,
     )
     result = runner.run()
-    report_path, evaluations_path = write_native_turbo_reports(project_dir, result)
+    report_path, evaluations_path = write_native_turbo_reports(
+        project_dir,
+        result,
+        optimizer_cpu_threads=runner.optimizer_cpu_threads,
+        runtime_thread_audit=runner._runtime_thread_audit,
+        execution_mode="local",
+    )
     return NativeTurboRunResult(
         evaluation_count=result.evaluation_count,
         traces=result.traces,
         best_trace=result.best_trace,
         report_path=report_path,
         evaluations_path=evaluations_path,
+        initialization=result.initialization,
+        effective_initial_design=result.effective_initial_design,
     )
 
 
@@ -563,10 +597,12 @@ def run_batch_native_turbo_optimization(
     *,
     max_evals: int | None = None,
     cadence_cshrc: Path | None = None,
+    adapter: Callable[..., object] | None = None,
     batch_evaluator: BatchEvaluator | None = None,
     batch_turbo_factory: Callable[..., object] | None = None,
     parallel_jobs: int | None = None,
     threads_per_run: int | None = None,
+    transport_mode: str = "local",
 ) -> NativeTurboRunResult:
     project_dir = Path(project_dir)
     bundle = assert_valid_project(project_dir)
@@ -580,6 +616,7 @@ def run_batch_native_turbo_optimization(
                 bundle.optimizer.optimizer.batch_size,
                 selected_parallel_jobs,
             ),
+            adapter=adapter,
         )
 
     runner = NativeTurboBatchRunner(
@@ -591,15 +628,24 @@ def run_batch_native_turbo_optimization(
         max_evals=max_evals,
         parallel_jobs=selected_parallel_jobs,
         threads_per_run=selected_threads_per_run,
+        transport_mode=transport_mode,
     )
     result = runner.run()
-    report_path, evaluations_path = write_native_turbo_reports(project_dir, result)
+    report_path, evaluations_path = write_native_turbo_reports(
+        project_dir,
+        result,
+        optimizer_cpu_threads=runner.optimizer_cpu_threads,
+        runtime_thread_audit=runner._runtime_thread_audit,
+        execution_mode="local",
+    )
     return NativeTurboRunResult(
         evaluation_count=result.evaluation_count,
         traces=result.traces,
         best_trace=result.best_trace,
         report_path=report_path,
         evaluations_path=evaluations_path,
+        initialization=result.initialization,
+        effective_initial_design=result.effective_initial_design,
     )
 
 
@@ -628,21 +674,36 @@ def evaluate_real_candidate(
         adapter=adapter,
     )
     if observation.status != "checked":
-        return observation
+        return _apply_retention_with_observation(
+            project_dir,
+            run_id=run_id,
+            candidate_id=candidate_id,
+            observation=observation,
+        )
     record_report = record_real_result(project_dir, run_id=run_id)
     if record_report.status.value != "pass":
         _try_abandon_candidate(project_dir, run_id, "record-real-result failed")
-        return NativeTurboObservation(
-            status="record_failed",
-            issues=record_report.issues,
+        return _apply_retention_with_observation(
+            project_dir,
+            run_id=run_id,
+            candidate_id=candidate_id,
+            observation=NativeTurboObservation(
+                status="record_failed",
+                issues=record_report.issues,
+                result_manifest=observation.result_manifest,
+                metric_result_manifest=observation.metric_result_manifest,
+            ),
+        )
+    return _apply_retention_with_observation(
+        project_dir,
+        run_id=run_id,
+        candidate_id=candidate_id,
+        observation=NativeTurboObservation(
+            status="recorded",
+            metrics=observation.metrics,
             result_manifest=observation.result_manifest,
             metric_result_manifest=observation.metric_result_manifest,
-        )
-    return NativeTurboObservation(
-        status="recorded",
-        metrics=observation.metrics,
-        result_manifest=observation.result_manifest,
-        metric_result_manifest=observation.metric_result_manifest,
+        ),
     )
 
 
@@ -767,7 +828,14 @@ def make_real_candidate_batch_evaluator(
             if observation is None:
                 raise RuntimeError("batch candidate was not evaluated")
             if observation.status != "checked":
-                finalized.append(observation)
+                finalized.append(
+                    _apply_retention_with_observation(
+                        project_dir,
+                        run_id=candidate.run_id,
+                        candidate_id=candidate.candidate_id,
+                        observation=observation,
+                    )
+                )
                 continue
             record_report = record_real_result(project_dir, run_id=candidate.run_id)
             if record_report.status.value != "pass":
@@ -777,20 +845,30 @@ def make_real_candidate_batch_evaluator(
                     "record-real-result failed",
                 )
                 finalized.append(
-                    NativeTurboObservation(
-                        status="record_failed",
-                        issues=record_report.issues,
-                        result_manifest=observation.result_manifest,
-                        metric_result_manifest=observation.metric_result_manifest,
+                    _apply_retention_with_observation(
+                        project_dir,
+                        run_id=candidate.run_id,
+                        candidate_id=candidate.candidate_id,
+                        observation=NativeTurboObservation(
+                            status="record_failed",
+                            issues=record_report.issues,
+                            result_manifest=observation.result_manifest,
+                            metric_result_manifest=observation.metric_result_manifest,
+                        ),
                     )
                 )
                 continue
             finalized.append(
-                NativeTurboObservation(
-                    status="recorded",
-                    metrics=observation.metrics,
-                    result_manifest=observation.result_manifest,
-                    metric_result_manifest=observation.metric_result_manifest,
+                _apply_retention_with_observation(
+                    project_dir,
+                    run_id=candidate.run_id,
+                    candidate_id=candidate.candidate_id,
+                    observation=NativeTurboObservation(
+                        status="recorded",
+                        metrics=observation.metrics,
+                        result_manifest=observation.result_manifest,
+                        metric_result_manifest=observation.metric_result_manifest,
+                    ),
                 )
             )
         return finalized
@@ -810,17 +888,124 @@ def _try_abandon_candidate(project_dir: Path, run_id: str, reason: str) -> None:
         return
 
 
+def _apply_retention_with_observation(
+    project_dir: Path,
+    *,
+    run_id: str,
+    candidate_id: str | None,
+    observation: NativeTurboObservation,
+) -> NativeTurboObservation:
+    """Apply local retention after candidate finalization.
+
+    ``observation.status == "recorded"`` is the only path the optimizer
+    treats as a usable real observation. Every other status is a workflow
+    failure and is governed by ``keep_failed_runs``. Retention failures are
+    merged into the returned observation's ``issues``.
+    """
+    run_succeeded = observation.status == "recorded"
+    retention_issues: list[str] = []
+    try:
+        decision = apply_local_run_retention(
+            project_dir,
+            run_id=run_id,
+            candidate_id=candidate_id,
+            run_succeeded=run_succeeded,
+        )
+        if decision.local_action == "failed":
+            retention_issues.extend(decision.issues)
+    except Exception as exc:  # noqa: BLE001 — retention must not crash the optimizer.
+        retention_issues.append(f"run retention raised: {exc}")
+    if not retention_issues:
+        return observation
+    merged_issues = list(observation.issues or []) + retention_issues
+    return NativeTurboObservation(
+        status=observation.status,
+        metrics=observation.metrics,
+        issues=merged_issues,
+        result_manifest=observation.result_manifest,
+        metric_result_manifest=observation.metric_result_manifest,
+    )
+
+
+def _native_turbo_audit_phase(selection_phase: str | None) -> str:
+    if selection_phase == INITIALIZATION_PHASE:
+        return INITIALIZATION_PHASE
+    if selection_phase == TRUST_REGION_PHASE:
+        return TRUST_REGION_PHASE
+    return selection_phase or "unknown"
+
+
+def _build_native_turbo_effectiveness_audit(
+    traces: list[NativeTurboEvaluationTrace],
+    *,
+    initialization: str | None = None,
+    effective_initial_design: str | None = None,
+) -> dict[str, object]:
+    grouped: list[tuple[str, str, int, list[NativeTurboEvaluationTrace]]] = []
+    for index, trace in enumerate(traces):
+        phase = _native_turbo_audit_phase(trace.selection_phase)
+        batch_id = trace.batch_id or f"{phase}_{len(grouped) + 1:03d}"
+        if grouped and grouped[-1][0] == batch_id:
+            grouped[-1][3].append(trace)
+            continue
+        grouped.append((batch_id, phase, index, [trace]))
+
+    batches: list[dict[str, object]] = []
+    for batch_id, phase, start_index, batch_traces in grouped:
+        end_index = start_index + len(batch_traces)
+        batches.append(
+            build_batch_effectiveness_audit(
+                {
+                    "batch_id": batch_id,
+                    "phase": phase,
+                    "history_size_before": start_index,
+                    "current_batch_observations": batch_traces,
+                    "all_traces_so_far": traces[:end_index],
+                }
+            )
+        )
+    return {
+        "schema_version": "1.0",
+        "backend": "native_turbo",
+        "requested_strategy": TRUST_REGION_PHASE,
+        "batches": batches,
+        "initialization": initialization,
+        "effective_initial_design": effective_initial_design,
+    }
+
+
 def write_native_turbo_reports(
     project_dir: Path,
     result: NativeTurboRunResult,
+    *,
+    optimizer_cpu_threads: int | None = None,
+    runtime_thread_audit: OptimizerThreadAudit | None = None,
+    execution_mode: str = "local",
 ) -> tuple[Path, Path]:
     reports_dir = Path(project_dir) / "reports"
     reports_dir.mkdir(parents=True, exist_ok=True)
     evaluations_path = Path(project_dir) / EVALUATIONS_RELATIVE
     report_path = Path(project_dir) / REPORT_RELATIVE
+    effectiveness_audit_path = Path(project_dir) / EFFECTIVENESS_AUDIT_RELATIVE
     with evaluations_path.open("w", encoding="utf-8") as handle:
         for trace in result.traces:
             handle.write(json.dumps(asdict(trace), sort_keys=True) + "\n")
+    effectiveness_audit_payload = _build_native_turbo_effectiveness_audit(
+        result.traces,
+        initialization=result.initialization,
+        effective_initial_design=result.effective_initial_design,
+    )
+    if runtime_thread_audit is not None:
+        effectiveness_audit_payload["runtime_thread_limits"] = runtime_thread_audit.to_dict()
+    effectiveness_audit_path.write_text(
+        json.dumps(
+            effectiveness_audit_payload,
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     batch_ids = [trace.batch_id for trace in result.traces if trace.batch_id]
     payload = {
         "schema_version": "1.0",
@@ -830,6 +1015,7 @@ def write_native_turbo_reports(
             asdict(result.best_trace) if result.best_trace is not None else None
         ),
         "evaluations": str(EVALUATIONS_RELATIVE),
+        "effectiveness_audit": EFFECTIVENESS_AUDIT_RELATIVE.as_posix(),
         "issues": [],
         "batch_summary": {
             "batch_count": len(set(batch_ids)),
@@ -839,12 +1025,54 @@ def write_native_turbo_reports(
             ),
             "status_counts": dict(Counter(trace.status for trace in result.traces)),
         },
+        "initialization": result.initialization,
+        "effective_initial_design": result.effective_initial_design,
     }
+    if optimizer_cpu_threads is not None:
+        payload["optimizer_cpu_threads"] = optimizer_cpu_threads
+    if runtime_thread_audit is not None:
+        payload["runtime_thread_limits"] = runtime_thread_audit.to_dict()
     report_path.write_text(
         json.dumps(payload, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+    _sync_progress_state_after_report(project_dir, report_path)
     return report_path, evaluations_path
+
+
+def _sync_progress_state_after_report(project_dir: Path, report_path: Path) -> None:
+    """Best-effort optimizer progress-state sync.
+
+    Imported lazily to avoid a circular import. Failures are appended to the
+    report's ``issues`` list so the writer never raises on a malformed test
+    project, but the sync is expected to succeed in real and integration
+    contexts.
+    """
+    from hermes_workflow.optimizer_progress_state import (
+        sync_optimizer_progress_state,
+    )
+
+    try:
+        sync_optimizer_progress_state(project_dir)
+    except Exception as exc:  # noqa: BLE001 — defensive sync sidecar
+        try:
+            payload = json.loads(report_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return
+        if not isinstance(payload, dict):
+            return
+        issues = payload.get("issues")
+        if not isinstance(issues, list):
+            issues = []
+            payload["issues"] = issues
+        issues.append(f"optimizer_progress_state_sync_failed: {exc}")
+        try:
+            report_path.write_text(
+                json.dumps(payload, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+        except OSError:
+            return
 
 
 def _objective_evaluation_for_observation(
@@ -1068,18 +1296,71 @@ def _default_turbo_factory(**kwargs):
     return Turbo1(**kwargs)
 
 
+def _initial_unit_design(method: str, *, n: int, dim: int, seed: int):
+    """Generate initial samples in the unit hypercube for a given method.
+
+    Returns an ``(n, dim)`` numpy array with values in ``[0, 1]``.
+
+    Supported methods:
+      - ``"latin_hypercube"``: TuRBO's vendored ``latin_hypercube`` helper. Note
+        that TuRBO's LHS uses its own internal RNG and is not seeded by
+        ``seed``; the parameter is accepted for interface symmetry.
+      - ``"random"``: ``numpy.random.default_rng(seed)`` uniform samples.
+      - ``"sobol"``: ``scipy.stats.qmc.Sobol`` low-discrepancy samples. The
+        sampler is constructed with ``scramble=True`` and ``seed=seed`` so
+        that ``random_seed`` actually controls the output: same seed yields
+        the same samples, different seeds yield different samples.
+
+    Raises ``ValueError`` for any other method.
+    """
+    import numpy as np
+
+    if method == "latin_hypercube":
+        if str(DEFAULT_TURBO_PATH) not in sys.path:
+            sys.path.insert(0, str(DEFAULT_TURBO_PATH))
+        from turbo.utils import latin_hypercube
+
+        return latin_hypercube(n, dim)
+    if method == "random":
+        rng = np.random.default_rng(seed)
+        return rng.random((n, dim))
+    if method == "sobol":
+        try:
+            from scipy.stats.qmc import Sobol
+        except ImportError as exc:
+            raise RuntimeError(
+                "sobol initialization requires scipy.stats.qmc; "
+                "install scipy to use this initialization method"
+            ) from exc
+        # scramble=False ignores the seed (always returns the canonical Sobol
+        # sequence), so the user's random_seed has no effect. Use scramble=True
+        # so seed actually controls the design — required by the B-07 contract.
+        sampler = Sobol(d=dim, scramble=True, seed=seed)
+        return sampler.random(n=n)
+    raise ValueError(
+        f"unsupported initialization method: {method!r}; "
+        "expected one of: sobol, latin_hypercube, random"
+    )
+
+
 def _default_batch_turbo_factory(**kwargs):
     if str(DEFAULT_TURBO_PATH) not in sys.path:
         sys.path.insert(0, str(DEFAULT_TURBO_PATH))
     import numpy as np
     from turbo import Turbo1
-    from turbo.utils import from_unit_cube, latin_hypercube, to_unit_cube
+    from turbo.utils import from_unit_cube, to_unit_cube
 
     f_batch = kwargs.pop("f_batch")
+    initialization = kwargs.pop("initialization", None) or "latin_hypercube"
+    random_seed = kwargs.pop("random_seed", None)
+    if random_seed is None:
+        random_seed = 0
 
     class BatchTurbo1(Turbo1):
         def __init__(self, *, f_batch, **turbo_kwargs) -> None:
             self.f_batch = f_batch
+            self._initialization = initialization
+            self._initialization_seed = int(random_seed)
             super().__init__(f=lambda _x: math.inf, **turbo_kwargs)
 
         def _evaluate_rows(self, rows, *, selection_phase: str):
@@ -1101,7 +1382,12 @@ def _default_batch_turbo_factory(**kwargs):
                 self._restart()
 
                 init_count = min(self.n_init, self.max_evals - self.n_evals)
-                X_init = latin_hypercube(init_count, self.dim)
+                X_init = _initial_unit_design(
+                    self._initialization,
+                    n=init_count,
+                    dim=self.dim,
+                    seed=self._initialization_seed,
+                )
                 X_init = from_unit_cube(X_init, self.lb, self.ub)
                 init_chunks = [
                     self._evaluate_rows(

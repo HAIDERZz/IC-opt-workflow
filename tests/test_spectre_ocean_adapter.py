@@ -179,7 +179,7 @@ def test_load_adapter_context_accepts_prepared_real_run(tmp_path: Path) -> None:
     assert context.request.backend == "spectre_ocean_batch"
     assert context.request.spectre["output_format"] == "psfxl"
     assert context.request.spectre["threads_per_run"] == 10
-    assert context.request.spectre["parallel_jobs"] == 10
+    assert "parallel_jobs" not in context.request.spectre
     assert context.request.metrics
 
 
@@ -1052,12 +1052,36 @@ def test_load_adapter_context_rejects_spectre_setting_drift(
     run_dir = project_dir / "runs" / "real" / "real_001"
     request_path = run_dir / "metric_extraction_request.json"
     request = _load_json(request_path)
-    request["spectre"]["parallel_jobs"] = 16
+    request["spectre"]["timeout_s"] = 99
     _write_json(request_path, request)
     _refresh_metric_request_hash(run_dir)
 
-    with pytest.raises(AdapterPreconditionError, match="parallel_jobs"):
+    with pytest.raises(AdapterPreconditionError, match="spectre.timeout_s"):
         load_adapter_context(project_dir)
+
+
+def test_adapter_accepts_missing_parallel_jobs_in_spectre_contract(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_real_run_project(tmp_path)
+
+    context = load_adapter_context(project_dir, run_id="real_001")
+
+    assert "parallel_jobs" not in context.prepared.spectre
+    assert "parallel_jobs" not in context.request.spectre
+
+
+def test_adapter_still_rejects_threads_per_run_mismatch(tmp_path: Path) -> None:
+    project_dir = _create_ready_real_run_project(tmp_path)
+    run_dir = project_dir / "runs" / "real" / "real_001"
+    request_path = run_dir / "metric_extraction_request.json"
+    request = _load_json(request_path)
+    request["spectre"]["threads_per_run"] = 99
+    _write_json(request_path, request)
+    _refresh_metric_request_hash(run_dir)
+
+    with pytest.raises(AdapterPreconditionError, match="spectre.threads_per_run"):
+        load_adapter_context(project_dir, run_id="real_001")
 
 
 def test_tool_entrypoint_reports_success_without_real_tools(
@@ -1375,3 +1399,172 @@ def test_run_spectre_ocean_adapter_rejects_symlinked_output_directories(
 
     with pytest.raises(AdapterPreconditionError, match=message):
         run_spectre_ocean_adapter(project_dir, runner=FailingIfCalledRunner())
+
+
+# ── B-10: command_trace tests (RED first) ──────────────────────────────
+
+
+def test_local_success_result_manifest_has_command_trace_spectre_argv(
+    tmp_path: Path,
+) -> None:
+    """B-10: local success result_manifest.json must contain command_trace.spectre.argv."""
+    project_dir = _create_ready_real_run_project(tmp_path)
+    runner = FakeSuccessRunner()
+
+    run_spectre_ocean_adapter(project_dir, runner=runner)
+
+    manifest = _load_json(
+        project_dir / "runs" / "real" / "real_001" / "result_manifest.json"
+    )
+    assert "command_trace" in manifest, "result_manifest must contain command_trace"
+    ct = manifest["command_trace"]
+    assert ct["schema_version"] == "1.0"
+    assert ct["execution_mode"] == "local"
+    assert "spectre" in ct, "command_trace must contain spectre sub-object"
+    spectre_trace = ct["spectre"]
+    assert isinstance(spectre_trace["argv"], list)
+    assert spectre_trace["argv"][0] == "spectre"
+    assert any("+preset=" in a for a in spectre_trace["argv"])
+    assert any("+mt=" in a for a in spectre_trace["argv"])
+    assert spectre_trace["cwd"] is not None
+    assert spectre_trace["timeout_s"] > 0
+    # Must not contain parallel_jobs anywhere in the trace
+    trace_str = json.dumps(ct)
+    assert "parallel_jobs" not in trace_str
+
+
+def test_local_success_metric_manifest_has_command_trace_ocean_argv(
+    tmp_path: Path,
+) -> None:
+    """B-10: local success metric_result_manifest.json must contain command_trace.ocean.argv."""
+    project_dir = _create_ready_real_run_project(tmp_path)
+    runner = FakeSuccessRunner()
+
+    run_spectre_ocean_adapter(project_dir, runner=runner)
+
+    metric_manifest = _load_json(
+        project_dir
+        / "runs"
+        / "real"
+        / "real_001"
+        / "metrics"
+        / "metric_result_manifest.json"
+    )
+    assert "command_trace" in metric_manifest, (
+        "metric_result_manifest must contain command_trace"
+    )
+    ct = metric_manifest["command_trace"]
+    assert ct["schema_version"] == "1.0"
+    assert ct["execution_mode"] == "local"
+    assert "ocean" in ct, "command_trace must contain ocean sub-object"
+    ocean_trace = ct["ocean"]
+    assert isinstance(ocean_trace["argv"], list)
+    assert ocean_trace["argv"][0] == "ocean"
+    assert "-nograph" in ocean_trace["argv"]
+    assert "-replay" in ocean_trace["argv"]
+    assert ocean_trace["mode"] == "nograph_replay"
+    assert ocean_trace["timeout_s"] > 0
+    assert isinstance(ocean_trace["return_code"], int)
+    assert isinstance(ocean_trace["return_codes"], list)
+    # Must not contain parallel_jobs
+    trace_str = json.dumps(ct)
+    assert "parallel_jobs" not in trace_str
+
+
+def test_local_spectre_failure_result_manifest_still_has_command_trace(
+    tmp_path: Path,
+) -> None:
+    """B-10: Spectre failure result manifest must still record command_trace."""
+    project_dir = _create_ready_real_run_project(tmp_path)
+    runner = FakeSpectreFailureRunner()
+
+    result = run_spectre_ocean_adapter(project_dir, runner=runner)
+
+    assert result.status == "failed"
+    manifest = _load_json(result.result_manifest_path)
+    assert "command_trace" in manifest, (
+        "failure result_manifest must still contain command_trace"
+    )
+    ct = manifest["command_trace"]
+    assert ct["execution_mode"] == "local"
+    assert "spectre" in ct
+    spectre_trace = ct["spectre"]
+    assert isinstance(spectre_trace["argv"], list)
+    assert spectre_trace["argv"][0] == "spectre"
+
+
+def test_local_ocean_failure_metric_manifest_has_command_trace_with_return_codes(
+    tmp_path: Path,
+) -> None:
+    """B-10: OCEAN failure metric manifest must have command_trace with return_codes."""
+    project_dir = _create_ready_real_run_project(tmp_path)
+    runner = FakeOceanFailureRunner()
+
+    result = run_spectre_ocean_adapter(project_dir, runner=runner)
+
+    assert result.status == "failed"
+    assert result.metric_result_manifest_path is not None
+    metric_manifest = _load_json(result.metric_result_manifest_path)
+    assert "command_trace" in metric_manifest, (
+        "ocean failure metric_result_manifest must contain command_trace"
+    )
+    ct = metric_manifest["command_trace"]
+    assert ct["execution_mode"] == "local"
+    assert "ocean" in ct
+    ocean_trace = ct["ocean"]
+    assert isinstance(ocean_trace["argv"], list)
+    assert ocean_trace["argv"][0] == "ocean"
+    assert isinstance(ocean_trace["return_code"], int)
+    assert isinstance(ocean_trace["return_codes"], list)
+    assert len(ocean_trace["return_codes"]) > 0
+    # Must not contain parallel_jobs
+    trace_str = json.dumps(ct)
+    assert "parallel_jobs" not in trace_str
+
+
+def test_local_command_trace_does_not_contain_parallel_jobs(
+    tmp_path: Path,
+) -> None:
+    """B-10: command_trace must never contain parallel_jobs in any field."""
+    project_dir = _create_ready_real_run_project(tmp_path)
+    runner = FakeSuccessRunner()
+
+    run_spectre_ocean_adapter(project_dir, runner=runner)
+
+    result_manifest = _load_json(
+        project_dir / "runs" / "real" / "real_001" / "result_manifest.json"
+    )
+    metric_manifest = _load_json(
+        project_dir
+        / "runs"
+        / "real"
+        / "real_001"
+        / "metrics"
+        / "metric_result_manifest.json"
+    )
+    for manifest, label in [
+        (result_manifest, "result_manifest"),
+        (metric_manifest, "metric_result_manifest"),
+    ]:
+        ct_str = json.dumps(manifest.get("command_trace", {}))
+        assert "parallel_jobs" not in ct_str, (
+            f"command_trace in {label} must not contain parallel_jobs"
+        )
+
+
+def test_local_transient_ocean_failure_command_trace_has_retry_return_codes(
+    tmp_path: Path,
+) -> None:
+    """B-10: transient OCEAN failure command_trace.ocean.return_codes matches manifest."""
+    project_dir = _create_ready_real_run_project(tmp_path)
+    runner = FakeTransientOceanFailureRunner()
+
+    result = run_spectre_ocean_adapter(project_dir, runner=runner)
+
+    assert result.status == "succeeded"
+    assert result.metric_result_manifest_path is not None
+    metric_manifest = _load_json(result.metric_result_manifest_path)
+    assert "command_trace" in metric_manifest
+    ocean_trace = metric_manifest["command_trace"]["ocean"]
+    assert ocean_trace["return_codes"] == [35, 0]
+    assert ocean_trace["return_code"] == 0

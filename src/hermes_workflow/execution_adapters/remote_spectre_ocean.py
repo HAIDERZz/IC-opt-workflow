@@ -14,6 +14,7 @@ from hermes_workflow.execution_adapters.spectre_ocean import (
     SPECTRE_STDERR_NAME,
     SPECTRE_STDOUT_NAME,
     AdapterRunResult,
+    _build_command_trace,
     _project_relative_path,
     build_ocean_argv,
     build_spectre_argv,
@@ -60,14 +61,19 @@ def run_remote_spectre_ocean_adapter(
     try:
         runner.upload_tree(context.run_dir, remote_run_dir)
     except Exception as exc:
+        upload_trace = _build_command_trace(
+            context, execution_mode="remote", include_ocean=False,
+        )
         return _write_remote_failure(
             context,
             f"upload run directory failed: {exc}",
             runner=runner,
             remote_run_dir=remote_run_dir,
+            command_trace=upload_trace,
         )
 
     remote_input_dir = remote_run_dir / "netlist"
+    timeout_s = int(context.request.spectre.get("timeout_s", 3600))
     spectre_argv = build_spectre_argv(context)
     spectre_cmd_body = " ".join(shlex.quote(a) for a in spectre_argv)
     spectre_command = (
@@ -78,8 +84,11 @@ def run_remote_spectre_ocean_adapter(
             f"{spectre_cmd_body}"
         )
     )
+    spectre_trace = _build_command_trace(
+        context, execution_mode="remote", include_ocean=False,
+    )
     try:
-        spectre_result = runner.run(spectre_command)
+        spectre_result = runner.run(spectre_command, timeout_s=timeout_s)
     except Exception as exc:
         (context.run_dir / SPECTRE_STDOUT_NAME).write_text(
             f"spectre command failed with exception: {exc}\n",
@@ -95,6 +104,7 @@ def run_remote_spectre_ocean_adapter(
             runner=runner,
             remote_run_dir=remote_run_dir,
             extra_issues=[f"spectre command exception: {exc}"],
+            command_trace=spectre_trace,
         )
 
     # Write spectre diagnostics locally from captured output and upload to
@@ -119,7 +129,7 @@ def run_remote_spectre_ocean_adapter(
     )
 
     if spectre_result.return_code != 0:
-        return _write_remote_failure(context, "spectre command failed", runner=runner, remote_run_dir=remote_run_dir)
+        return _write_remote_failure(context, "spectre command failed", runner=runner, remote_run_dir=remote_run_dir, command_trace=spectre_trace)
 
     # Download Spectre artifacts: psf/
     try:
@@ -131,13 +141,14 @@ def run_remote_spectre_ocean_adapter(
             runner=runner,
             remote_run_dir=remote_run_dir,
             extra_issues=[f"psf download exception: {exc}"],
+            command_trace=spectre_trace,
         )
 
     # Validate required Spectre artifacts exist locally
     if not context.psf_dir.is_dir():
-        return _write_remote_failure(context, "psf directory missing after download", runner=runner, remote_run_dir=remote_run_dir)
+        return _write_remote_failure(context, "psf directory missing after download", runner=runner, remote_run_dir=remote_run_dir, command_trace=spectre_trace)
     if not (context.psf_dir / "spectre.out").is_file():
-        return _write_remote_failure(context, "psf/spectre.out missing after download", runner=runner, remote_run_dir=remote_run_dir)
+        return _write_remote_failure(context, "psf/spectre.out missing after download", runner=runner, remote_run_dir=remote_run_dir, command_trace=spectre_trace)
 
     ocean_argv = build_ocean_argv(context)
     ocean_cmd_body = " ".join(shlex.quote(a) for a in ocean_argv)
@@ -155,7 +166,7 @@ def run_remote_spectre_ocean_adapter(
     ocean_result: RemoteCommandResult | None = None
     for _attempt in range(OCEAN_MAX_ATTEMPTS):
         try:
-            ocean_result = runner.run(ocean_command)
+            ocean_result = runner.run(ocean_command, timeout_s=timeout_s)
             ocean_return_codes.append(ocean_result.return_code)
             if ocean_result.return_code == 0:
                 break
@@ -178,6 +189,7 @@ def run_remote_spectre_ocean_adapter(
             runner=runner,
             remote_run_dir=remote_run_dir,
             extra_issues=["ocean command produced no result"],
+            command_trace=spectre_trace,
         )
     try:
         runner.download_tree(remote_run_dir / "metrics", context.metrics_dir)
@@ -188,6 +200,7 @@ def run_remote_spectre_ocean_adapter(
             runner=runner,
             remote_run_dir=remote_run_dir,
             extra_issues=[f"ocean metric download exception: {exc}"],
+            command_trace=spectre_trace,
         )
 
     # Write ocean diagnostics locally from the LAST attempt (the one that
@@ -217,6 +230,15 @@ def run_remote_spectre_ocean_adapter(
     started = datetime.now(UTC).replace(microsecond=0).strftime("%Y-%m-%dT%H:%M:%SZ")
     completed = started
 
+    # Build full command_trace with both spectre and ocean for the
+    # success/OCEAN-failure manifest paths.
+    full_trace = _build_command_trace(
+        context,
+        execution_mode="remote",
+        ocean_return_code=ocean_result.return_code,
+        ocean_return_codes=ocean_return_codes,
+    )
+
     # Write metric result manifest first (records ocean failure if rc != 0).
     # write_metric_result_manifest handles missing ocean_scalars.tsv gracefully
     # by recording AdapterPreconditionError in the manifest issues, matching
@@ -225,6 +247,7 @@ def run_remote_spectre_ocean_adapter(
         context,
         ocean_return_code=ocean_result.return_code,
         ocean_return_codes=ocean_return_codes,
+        command_trace=full_trace,
     )
 
     # Result manifest always says "succeeded" when spectre succeeded,
@@ -236,6 +259,7 @@ def run_remote_spectre_ocean_adapter(
         completed_at_utc=completed,
         include_metric_manifest=True,
         notes="spectre command completed",
+        command_trace=full_trace,
     )
 
     # Upload both manifests back to remote.
@@ -284,6 +308,7 @@ def _write_remote_failure(
     runner: Any,
     remote_run_dir: PurePosixPath,
     extra_issues: list[str] | None = None,
+    command_trace: dict | None = None,
 ) -> AdapterRunResult:
     """Write a failed result manifest using the shared local helper and upload it."""
     issues = [notes]
@@ -297,6 +322,7 @@ def _write_remote_failure(
         completed_at_utc=started,
         include_metric_manifest=False,
         notes=notes,
+        command_trace=command_trace,
     )
     _safe_upload(
         runner,

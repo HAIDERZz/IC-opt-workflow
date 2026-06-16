@@ -15,7 +15,10 @@ Cadence/OCEAN 公式、SSH/远程环境，还是 optimizer 本身的问题。
 2. doctor 不通过时，不要继续 `--real`。先修 `opt_requirement.md`、路径、SSH 或
    Cadence 环境。
 3. doctor 通过但真实优化失败时，再看 `reports/`、`runs/real_*/` 和
-   `metrics/` 里的 manifest 与日志。
+   `metrics/` 里的 manifest 与日志。如果设置了
+   `Spectre Settings.keep_failed_runs: false`，失败的候选点 `runs/real/<run_id>`
+   会在分类后被删除；这种情况看 `state/run_retention/<run_id>.json` 决策报告
+   以及 `ledger/experiment_ledger.jsonl` 里的失败记录。
 4. 远程模式下，同时看远程项目 `REMOTE_PROJECT/reports/` 和本机镜像：
 
    ```text
@@ -44,7 +47,7 @@ Cadence/OCEAN 公式、SSH/远程环境，还是 optimizer 本身的问题。
 | FoM 瓶颈图所有点贴底边 | 归一化阈值太严格，某个瓶颈 score 长期为 0，或者大量点缺失关键 metric | 逐项计算每个 score。把硬阈值和归一化宽度设置到样本分布能区分优劣的位置，不要让某个指标永远为 0。 |
 | `Host key verification failed` | 本机还没有信任远程服务器 host key | 手动运行 `ssh PROFILE true`，确认服务器地址正确后输入 `yes`。之后再跑 `ssh -o BatchMode=yes PROFILE true`。 |
 | `Permission denied (publickey)` 或 BatchMode SSH 失败 | 免密 SSH 没配置好，公钥没有放到远程 `authorized_keys`，或 SSH profile 写错 | 修 `~/.ssh/config`、`IdentityFile`、远程 `~/.ssh/authorized_keys`。不要让 `ic-opt` 等待密码输入。 |
-| `kex_exchange_identification: Connection closed by remote host`、`Connection reset by peer` | 远程 SSH 服务端连接数限制、`MaxStartups`、防护策略或瞬时并发过高 | 降低 `--parallel-jobs`。远程多 testbench 正常建议 4-8。24/36 更像压力测试，容易触发 SSH 传输失败。 |
+| `kex_exchange_identification: Connection closed by remote host`、`Connection reset by peer` | 远程 SSH 服务端连接数限制、`MaxStartups`、防护策略或瞬时并发过高 | 在 `opt_requirement.md` 里降低 `Spectre Settings.parallel_jobs`。远程多 testbench 正常建议 4-8。24/36 更像压力测试，容易触发 SSH 传输失败。 |
 | 高并发远程 run 后曾出现 `result_manifest.json missing` | 旧版本在某些 SSH/upload/download 异常路径没有写失败 manifest | 更新到 v0.1.5 或更新版本。当前版本应把 SSH/tool 异常记录为 `real_check_failed`，并保留 manifest 供验收。 |
 | `real_check_failed` | Spectre/OCEAN/SSH/license/文件拷贝等真实工具链失败 | 看对应 `runs/real_xxx/` 下 `result_manifest.json`、`spectre.stderr`、`metrics/ocean.stderr`、`metrics/metric_result_manifest.json`。这不是电路性能失败。 |
 | 远程 reports 没同步到本机 | SSH 下载/打包失败，或者本机镜像目录不可写 | 先看远程 `REMOTE_PROJECT/reports/`。再检查本机 `~/.ic-opt/remote_runs/...` 权限和 SSH/tar/scp 是否可用。 |

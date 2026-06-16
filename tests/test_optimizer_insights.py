@@ -520,3 +520,78 @@ def test_generate_optimizer_insight_report_summarizes_process_corners(
     assert "## Corner Failure Distribution" in markdown
     assert "- ss: 1" in markdown
     assert "- tt: 1" in markdown
+
+
+def _write_optimizer_effectiveness_audit(
+    project_dir: Path,
+    payload: dict[str, object] | None = None,
+) -> None:
+    audit_payload = payload or {
+        "schema_version": "1.0",
+        "backend": "openbox",
+        "requested_strategy": "openbox_prf_eic",
+        "resolved_strategy": {
+            "surrogate_type": "prf",
+            "acq_type": "eic",
+            "acq_optimizer_type": "local_random",
+            "initial_trials": 20,
+        },
+        "model_replay_evaluation_count": 40,
+        "batches": [
+            {
+                "batch_id": "batch_001",
+                "phase": "bo",
+                "history_size_before": 20,
+                "history_size_after": 40,
+                "feasible_count": 6,
+            }
+        ],
+    }
+    audit_path = project_dir / "reports" / "optimizer_effectiveness_audit.json"
+    audit_path.parent.mkdir(parents=True, exist_ok=True)
+    audit_path.write_text(
+        json.dumps(audit_payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
+def test_optimizer_insight_report_includes_effectiveness_audit(tmp_path: Path) -> None:
+    project_dir = _write_accepted_optimizer_project(tmp_path)
+    _write_optimizer_effectiveness_audit(project_dir)
+
+    report = generate_optimizer_insight_report(project_dir)
+    payload = json.loads(report.report_path.read_text(encoding="utf-8"))
+    markdown = report.markdown_path.read_text(encoding="utf-8")
+
+    assert payload["optimizer_effectiveness_audit"]["status"] == "available"
+    assert payload["optimizer_effectiveness_audit"]["requested_strategy"] == (
+        "openbox_prf_eic"
+    )
+    assert (
+        payload["optimizer_effectiveness_audit"]["resolved_strategy"][
+            "surrogate_type"
+        ]
+        == "prf"
+    )
+    assert (
+        payload["optimizer_effectiveness_audit"]["model_replay_evaluation_count"]
+        == 40
+    )
+    assert "Optimizer effectiveness audit" in markdown
+    assert "optimizer_effectiveness_audit.json" in markdown
+
+
+def test_optimizer_insight_report_marks_invalid_effectiveness_audit_not_available(
+    tmp_path: Path,
+) -> None:
+    project_dir = _write_accepted_optimizer_project(tmp_path)
+    audit_path = project_dir / "reports" / "optimizer_effectiveness_audit.json"
+    audit_path.write_text("{not-json", encoding="utf-8")
+
+    report = generate_optimizer_insight_report(project_dir)
+    payload = json.loads(report.report_path.read_text(encoding="utf-8"))
+    markdown = report.markdown_path.read_text(encoding="utf-8")
+
+    assert payload["optimizer_effectiveness_audit"]["status"] == "not_available"
+    assert "invalid JSON" in payload["optimizer_effectiveness_audit"]["reason"]
+    assert "Optimizer effectiveness audit" in markdown

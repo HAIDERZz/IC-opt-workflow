@@ -13,7 +13,7 @@ from hermes_workflow.execution_adapters.remote_spectre_ocean import (
     run_remote_spectre_ocean_adapter,
 )
 from hermes_workflow.execution_adapters.spectre_ocean import load_adapter_context
-from hermes_workflow.package import build_execution_package, create_project_from_template
+from hermes_workflow.package import build_execution_package, create_project_from_template, sha256_file
 from hermes_workflow.real_run import prepare_real_run
 from hermes_workflow.remote_project import RemoteProjectRef
 from hermes_workflow.remote_ssh import RemoteCommandResult
@@ -159,6 +159,7 @@ def _prepared_testbench_child_dir(
 class FakeRunner:
     def __init__(self) -> None:
         self.commands: list[str] = []
+        self.command_kwargs: list[dict[str, object]] = []
         self.uploads: list[tuple[Path, str]] = []
         self.downloads: list[tuple[str, Path]] = []
 
@@ -196,6 +197,7 @@ class FakeRunner:
 
     def run(self, command: str, **kwargs: object) -> RemoteCommandResult:
         self.commands.append(command)
+        self.command_kwargs.append(dict(kwargs))
         return RemoteCommandResult(0, "", "", ["ssh", "lab", command])
 
     def upload(self, local_path, remote_path) -> None:
@@ -297,6 +299,38 @@ def test_remote_adapter_runs_spectre_and_ocean_remotely(tmp_path: Path) -> None:
     manifest = json.loads((run_dir / "result_manifest.json").read_text(encoding="utf-8"))
     assert manifest["status"] == "succeeded"
     assert "spectre command completed" in manifest.get("notes", "")
+
+
+def test_remote_adapter_applies_request_timeout_to_remote_commands(tmp_path: Path) -> None:
+    project_dir = create_approved_real_project(tmp_path)
+    run_dir = project_dir / "runs" / "real" / "real_001"
+    request_path = run_dir / "metric_extraction_request.json"
+    request = json.loads(request_path.read_text(encoding="utf-8"))
+    request["spectre"]["timeout_s"] = 7200
+    request_path.write_text(json.dumps(request, indent=2) + "\n", encoding="utf-8")
+    manifest_path = run_dir / "real_run_manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["spectre"]["timeout_s"] = 7200
+    manifest["metric_extraction_request_sha256"] = sha256_file(request_path)
+    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    runner = FakeRunner()
+
+    result = run_remote_spectre_ocean_adapter(
+        project_dir,
+        run_id="real_001",
+        remote_ref=ref,
+        remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
+        runner=runner,
+    )
+
+    assert result.status == "succeeded"
+    command_timeouts = [
+        kwargs.get("timeout_s")
+        for command, kwargs in zip(runner.commands, runner.command_kwargs, strict=True)
+        if "spectre" in command or "ocean" in command
+    ]
+    assert command_timeouts == [7200, 7200]
 
 
 def test_remote_adapter_runs_corner_aware_child_run(tmp_path: Path) -> None:
@@ -1484,3 +1518,326 @@ def test_remote_multi_testbench_adapter_does_not_multiply_parallel_jobs(tmp_path
         assert f"+mt={expected_threads}" in inner, (
             f"expected +mt={expected_threads} in spectre command, got: {inner}"
         )
+
+
+def test_remote_adapter_accepts_missing_parallel_jobs_in_spectre_contract(
+    tmp_path: Path,
+) -> None:
+    project_dir = create_approved_real_project(tmp_path)
+    run_dir = project_dir / "runs" / "real" / "real_001"
+    # Sanity: prepared real_run already drops parallel_jobs from spectre blocks.
+    manifest = json.loads((run_dir / "real_run_manifest.json").read_text(encoding="utf-8"))
+    request = json.loads(
+        (run_dir / "metric_extraction_request.json").read_text(encoding="utf-8")
+    )
+    assert "parallel_jobs" not in manifest["spectre"]
+    assert "parallel_jobs" not in request["spectre"]
+
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    runner = FakeRunner()
+
+    result = run_remote_spectre_ocean_adapter(
+        project_dir,
+        run_id="real_001",
+        remote_ref=ref,
+        remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
+        runner=runner,
+    )
+
+    assert result.status == "succeeded"
+
+
+# ── B-10: remote command_trace tests (RED first) ──────────────────────
+
+
+def test_remote_success_result_manifest_has_command_trace(tmp_path: Path) -> None:
+    """B-10: remote success result_manifest must contain command_trace."""
+    project_dir = create_approved_real_project(tmp_path)
+    run_dir = project_dir / "runs" / "real" / "real_001"
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    runner = FakeRunner()
+
+    run_remote_spectre_ocean_adapter(
+        project_dir,
+        run_id="real_001",
+        remote_ref=ref,
+        remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
+        runner=runner,
+    )
+
+    manifest = json.loads((run_dir / "result_manifest.json").read_text(encoding="utf-8"))
+    assert "command_trace" in manifest, "result_manifest must contain command_trace"
+    ct = manifest["command_trace"]
+    assert ct["schema_version"] == "1.0"
+    assert ct["execution_mode"] == "remote"
+    assert "spectre" in ct
+    spectre_trace = ct["spectre"]
+    assert isinstance(spectre_trace["argv"], list)
+    assert spectre_trace["argv"][0] == "spectre"
+    assert spectre_trace["timeout_s"] > 0
+    # command is the sanitized shell-joined body (no csh wrapper, no cshrc)
+    assert isinstance(spectre_trace["command"], str)
+    assert "spectre" in spectre_trace["command"]
+    # Must not leak cshrc content or raw SSH command
+    assert "source" not in spectre_trace["command"]
+    assert "ssh" not in spectre_trace["command"]
+
+
+def test_remote_success_metric_manifest_has_command_trace(tmp_path: Path) -> None:
+    """B-10: remote success metric_result_manifest must contain command_trace."""
+    project_dir = create_approved_real_project(tmp_path)
+    run_dir = project_dir / "runs" / "real" / "real_001"
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    runner = FakeRunner()
+
+    run_remote_spectre_ocean_adapter(
+        project_dir,
+        run_id="real_001",
+        remote_ref=ref,
+        remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
+        runner=runner,
+    )
+
+    metric_manifest = json.loads(
+        (run_dir / "metrics" / "metric_result_manifest.json").read_text(encoding="utf-8")
+    )
+    assert "command_trace" in metric_manifest, (
+        "metric_result_manifest must contain command_trace"
+    )
+    ct = metric_manifest["command_trace"]
+    assert ct["schema_version"] == "1.0"
+    assert ct["execution_mode"] == "remote"
+    assert "ocean" in ct
+    ocean_trace = ct["ocean"]
+    assert isinstance(ocean_trace["argv"], list)
+    assert ocean_trace["argv"][0] == "ocean"
+    assert ocean_trace["mode"] == "nograph_replay"
+    assert ocean_trace["timeout_s"] > 0
+    assert isinstance(ocean_trace["command"], str)
+    assert "ocean" in ocean_trace["command"]
+    # Must not leak cshrc content or raw SSH command
+    assert "source" not in ocean_trace["command"]
+    assert "ssh" not in ocean_trace["command"]
+
+
+def test_remote_command_trace_timeout_s_comes_from_request(tmp_path: Path) -> None:
+    """B-10: remote command_trace.timeout_s must match request timeout."""
+    project_dir = create_approved_real_project(tmp_path)
+    run_dir = project_dir / "runs" / "real" / "real_001"
+    request_path = run_dir / "metric_extraction_request.json"
+    request = json.loads(request_path.read_text(encoding="utf-8"))
+    request["spectre"]["timeout_s"] = 7200
+    request_path.write_text(json.dumps(request, indent=2) + "\n", encoding="utf-8")
+    manifest_path = run_dir / "real_run_manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["spectre"]["timeout_s"] = 7200
+    manifest["metric_extraction_request_sha256"] = sha256_file(request_path)
+    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    runner = FakeRunner()
+
+    run_remote_spectre_ocean_adapter(
+        project_dir,
+        run_id="real_001",
+        remote_ref=ref,
+        remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
+        runner=runner,
+    )
+
+    result_manifest = json.loads(
+        (run_dir / "result_manifest.json").read_text(encoding="utf-8")
+    )
+    assert result_manifest["command_trace"]["spectre"]["timeout_s"] == 7200
+
+    metric_manifest = json.loads(
+        (run_dir / "metrics" / "metric_result_manifest.json").read_text(encoding="utf-8")
+    )
+    assert metric_manifest["command_trace"]["ocean"]["timeout_s"] == 7200
+
+
+def test_remote_command_trace_does_not_leak_cshrc_or_ssh(tmp_path: Path) -> None:
+    """B-10: command_trace must not contain cshrc content or SSH raw command."""
+    project_dir = create_approved_real_project(tmp_path)
+    run_dir = project_dir / "runs" / "real" / "real_001"
+    cshrc = PurePosixPath("/remote/project/cadence_env.csh")
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    runner = FakeRunner()
+
+    run_remote_spectre_ocean_adapter(
+        project_dir,
+        run_id="real_001",
+        remote_ref=ref,
+        remote_cadence_cshrc=cshrc,
+        runner=runner,
+    )
+
+    result_manifest = json.loads(
+        (run_dir / "result_manifest.json").read_text(encoding="utf-8")
+    )
+    metric_manifest = json.loads(
+        (run_dir / "metrics" / "metric_result_manifest.json").read_text(encoding="utf-8")
+    )
+    for manifest, label in [
+        (result_manifest, "result_manifest"),
+        (metric_manifest, "metric_result_manifest"),
+    ]:
+        ct_str = json.dumps(manifest.get("command_trace", {}))
+        # Must not contain the cshrc path or content
+        assert str(cshrc) not in ct_str, (
+            f"command_trace in {label} must not contain cshrc path"
+        )
+        assert "source " not in ct_str, (
+            f"command_trace in {label} must not contain cshrc source directive"
+        )
+        # Must not contain raw SSH command
+        assert "ssh " not in ct_str, (
+            f"command_trace in {label} must not contain SSH command"
+        )
+        # Must not contain csh wrapper
+        assert "csh -fc" not in ct_str, (
+            f"command_trace in {label} must not contain csh -fc wrapper"
+        )
+        # Must not contain parallel_jobs
+        assert "parallel_jobs" not in ct_str, (
+            f"command_trace in {label} must not contain parallel_jobs"
+        )
+
+
+def test_remote_spectre_failure_still_writes_command_trace(tmp_path: Path) -> None:
+    """B-10: remote Spectre failure must still write command_trace in result manifest."""
+    project_dir = create_approved_real_project(tmp_path)
+    run_dir = project_dir / "runs" / "real" / "real_001"
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    runner = FailingFakeRunner(fail_on_substring="spectre")
+
+    result = run_remote_spectre_ocean_adapter(
+        project_dir,
+        run_id="real_001",
+        remote_ref=ref,
+        remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
+        runner=runner,
+    )
+
+    assert result.status == "failed"
+    manifest = json.loads((run_dir / "result_manifest.json").read_text(encoding="utf-8"))
+    assert "command_trace" in manifest, (
+        "remote failure result_manifest must still contain command_trace"
+    )
+    ct = manifest["command_trace"]
+    assert ct["execution_mode"] == "remote"
+    assert "spectre" in ct
+    spectre_trace = ct["spectre"]
+    assert isinstance(spectre_trace["argv"], list)
+    assert spectre_trace["argv"][0] == "spectre"
+
+
+def test_remote_spectre_runtime_error_still_writes_command_trace(tmp_path: Path) -> None:
+    """B-10: remote Spectre runtime exception must still write command_trace."""
+    project_dir = create_approved_real_project(tmp_path)
+    run_dir = project_dir / "runs" / "real" / "real_001"
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    runner = RunExceptionFakeRunner("spectre")
+
+    result = run_remote_spectre_ocean_adapter(
+        project_dir,
+        run_id="real_001",
+        remote_ref=ref,
+        remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
+        runner=runner,
+    )
+
+    assert result.status == "failed"
+    manifest = json.loads((run_dir / "result_manifest.json").read_text(encoding="utf-8"))
+    assert "command_trace" in manifest, (
+        "remote spectre exception result_manifest must contain command_trace"
+    )
+    ct = manifest["command_trace"]
+    assert ct["execution_mode"] == "remote"
+    assert "spectre" in ct
+
+
+def test_remote_upload_failure_still_writes_command_trace(tmp_path: Path) -> None:
+    """B-10: remote upload failure must still write command_trace."""
+    project_dir = create_approved_real_project(tmp_path)
+    run_dir = project_dir / "runs" / "real" / "real_001"
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+
+    class UploadFailRunner(FakeRunner):
+        def upload_tree(self, local_path, remote_path, include=None, exclude=None):
+            raise RuntimeError("upload failed")
+
+    runner = UploadFailRunner()
+
+    result = run_remote_spectre_ocean_adapter(
+        project_dir,
+        run_id="real_001",
+        remote_ref=ref,
+        remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
+        runner=runner,
+    )
+
+    assert result.status == "failed"
+    manifest = json.loads((run_dir / "result_manifest.json").read_text(encoding="utf-8"))
+    assert "command_trace" in manifest, (
+        "remote upload failure result_manifest must contain command_trace"
+    )
+    ct = manifest["command_trace"]
+    assert ct["execution_mode"] == "remote"
+
+
+def test_remote_psf_missing_still_writes_command_trace(tmp_path: Path) -> None:
+    """B-10: remote PSF artifacts missing must still write command_trace."""
+    project_dir = create_approved_real_project(tmp_path)
+    run_dir = project_dir / "runs" / "real" / "real_001"
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    runner = NoPsfFakeRunner()
+
+    result = run_remote_spectre_ocean_adapter(
+        project_dir,
+        run_id="real_001",
+        remote_ref=ref,
+        remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
+        runner=runner,
+    )
+
+    assert result.status == "failed"
+    manifest = json.loads((run_dir / "result_manifest.json").read_text(encoding="utf-8"))
+    assert "command_trace" in manifest, (
+        "remote PSF missing result_manifest must contain command_trace"
+    )
+    ct = manifest["command_trace"]
+    assert ct["execution_mode"] == "remote"
+    assert "spectre" in ct
+
+
+def test_remote_ocean_failure_writes_command_trace(tmp_path: Path) -> None:
+    """B-10: remote OCEAN failure must write command_trace in metric manifest."""
+    project_dir = create_approved_real_project(tmp_path)
+    run_dir = project_dir / "runs" / "real" / "real_001"
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    runner = OceanFailNoScalarsFakeRunner()
+
+    result = run_remote_spectre_ocean_adapter(
+        project_dir,
+        run_id="real_001",
+        remote_ref=ref,
+        remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
+        runner=runner,
+    )
+
+    assert result.status == "failed"
+    # metric_result_manifest must have command_trace with ocean sub-object
+    metric_manifest = json.loads(
+        (run_dir / "metrics" / "metric_result_manifest.json").read_text(encoding="utf-8")
+    )
+    assert "command_trace" in metric_manifest, (
+        "remote OCEAN failure metric_result_manifest must contain command_trace"
+    )
+    ct = metric_manifest["command_trace"]
+    assert ct["execution_mode"] == "remote"
+    assert "ocean" in ct
+    ocean_trace = ct["ocean"]
+    assert isinstance(ocean_trace["return_code"], int)
+    assert ocean_trace["return_code"] != 0
+    assert isinstance(ocean_trace["return_codes"], list)
+    assert len(ocean_trace["return_codes"]) > 0

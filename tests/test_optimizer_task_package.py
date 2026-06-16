@@ -13,6 +13,43 @@ from hermes_workflow.package import create_project_from_template
 runner = CliRunner()
 
 
+def test_optimizer_task_package_does_not_label_parallel_jobs_as_spectre_setting(
+    tmp_path: Path,
+) -> None:
+    project_dir = tmp_path / "bridge_test_inv"
+    create_project_from_template(project_dir)
+
+    package = build_optimizer_execution_task_package(
+        project_dir,
+        cadence_cshrc=Path("/home/zzchen/cadence_ic231_env.csh"),
+        created_at_utc="2026-06-04T00:00:00Z",
+    )
+
+    task_text = package.task_path.read_text(encoding="utf-8")
+    manifest_payload = package.payload
+
+    # parallel_jobs must not be inside the Spectre settings dict.
+    assert "parallel_jobs" not in manifest_payload["spectre_settings"]
+
+    # Scheduler block exposes candidate parallelism contract.
+    assert manifest_payload["scheduler"]["candidate_parallelism"] == 10
+    assert manifest_payload["scheduler"]["batch_size"] == 10
+    assert manifest_payload["scheduler"]["inside_candidate_execution"] == "serial"
+
+    # Top-level fields kept for backward compatibility.
+    assert manifest_payload["parallel_jobs"] == 10
+    assert manifest_payload["batch_size"] == 10
+
+    # Rendered task text has a Scheduler Settings section.
+    assert "## Scheduler Settings" in task_text
+
+    # Spectre/OCEAN Settings Audit section must NOT mention parallel_jobs.
+    audit_start = task_text.index("## Spectre/OCEAN Settings Audit")
+    next_section = task_text.index("\n## ", audit_start + 1)
+    audit_slice = task_text[audit_start:next_section]
+    assert "parallel_jobs" not in audit_slice
+
+
 def test_build_optimizer_execution_task_package_writes_task_and_manifest(
     tmp_path: Path,
 ) -> None:
@@ -21,8 +58,7 @@ def test_build_optimizer_execution_task_package_writes_task_and_manifest(
 
     package = build_optimizer_execution_task_package(
         project_dir,
-        max_evals=100,
-        cadence_cshrc=Path("/path/to/cadence_env.csh"),
+        cadence_cshrc=Path("/home/zzchen/cadence_ic231_env.csh"),
         created_at_utc="2026-06-04T00:00:00Z",
     )
 
@@ -37,7 +73,7 @@ def test_build_optimizer_execution_task_package_writes_task_and_manifest(
     assert package.manifest_path == manifest_path
     assert "run-native-turbo" in task_text
     assert "--parallel" in task_text
-    assert "--max-evals 100" in task_text
+    assert "--max-evals" not in task_text
     assert "Command exit status alone is not acceptance evidence" in task_text
     assert "Manifest-level audit is required" in task_text
     assert "hermes-workflow optimizer-status" in task_text
@@ -49,21 +85,21 @@ def test_build_optimizer_execution_task_package_writes_task_and_manifest(
     assert manifest_payload["created_at_utc"] == "2026-06-04T00:00:00Z"
     assert manifest_payload["max_evals"] == 100
     assert manifest_payload["parallel"] is True
-    assert manifest_payload["cadence_cshrc"] == "/path/to/cadence_env.csh"
+    assert manifest_payload["cadence_cshrc"] == "/home/zzchen/cadence_ic231_env.csh"
     assert manifest_payload["command"] == [
         "hermes-workflow",
         "run-native-turbo",
         str(project_dir),
         "--parallel",
-        "--max-evals",
-        "100",
         "--cadence-cshrc",
-        "/path/to/cadence_env.csh",
+        "/home/zzchen/cadence_ic231_env.csh",
     ]
     assert manifest_payload["spectre_settings"]["threads_per_run"] == 10
-    assert manifest_payload["spectre_settings"]["parallel_jobs"] == 10
+    assert "parallel_jobs" not in manifest_payload["spectre_settings"]
+    assert manifest_payload["scheduler"]["candidate_parallelism"] == 10
     required_artifacts = manifest_payload["required_returned_artifacts"]
     assert "reports/native_turbo_optimizer_report.json" in required_artifacts
+    assert "reports/optimizer_effectiveness_audit.json" in required_artifacts
     assert "reports/native_turbo_optimizer_evaluations.jsonl" in required_artifacts
     assert "state/optimizer_state.json" in required_artifacts
     assert "ledger/experiment_ledger.jsonl" in required_artifacts
@@ -84,8 +120,7 @@ def test_build_optimizer_execution_task_package_writes_openbox_backend(
 
     package = build_optimizer_execution_task_package(
         project_dir,
-        max_evals=100,
-        cadence_cshrc=Path("/path/to/cadence_env.csh"),
+        cadence_cshrc=Path("/home/zzchen/cadence_ic231_env.csh"),
         optimizer_backend="openbox",
         created_at_utc="2026-06-04T00:00:00Z",
     )
@@ -95,9 +130,9 @@ def test_build_optimizer_execution_task_package_writes_openbox_backend(
 
     assert "run-openbox-real" in task_text
     assert "run-native-turbo" not in task_text
-    assert "--max-evals 100" in task_text
-    assert "--batch-size 10" in task_text
-    assert "--parallel-jobs 10" in task_text
+    assert "--max-evals" not in task_text
+    assert "--batch-size" not in task_text
+    assert "--parallel-jobs" not in task_text
     assert "OpenBox must be installed" in task_text
     assert "report a dependency blocker" in task_text
     assert "Do not silently fall back to TuRBO" in task_text
@@ -110,18 +145,13 @@ def test_build_optimizer_execution_task_package_writes_openbox_backend(
     assert manifest_payload["backend"] == "openbox"
     assert manifest_payload["batch_size"] == 10
     assert manifest_payload["parallel_jobs"] == 10
+    assert manifest_payload["scheduler"]["candidate_parallelism"] == 10
     assert manifest_payload["command"] == [
         "hermes-workflow",
         "run-openbox-real",
         str(project_dir),
-        "--max-evals",
-        "100",
-        "--batch-size",
-        "10",
-        "--parallel-jobs",
-        "10",
         "--cadence-cshrc",
-        "/path/to/cadence_env.csh",
+        "/home/zzchen/cadence_ic231_env.csh",
     ]
     required_artifacts = manifest_payload["required_returned_artifacts"]
     assert "reports/optimizer_run_report.json" in required_artifacts
@@ -129,6 +159,66 @@ def test_build_optimizer_execution_task_package_writes_openbox_backend(
     assert "state/optimizer_state.json" in required_artifacts
     assert "ledger/experiment_ledger.jsonl" in required_artifacts
     assert "reports/optimizer_finalize_report.json" in required_artifacts
+
+
+def test_build_optimizer_execution_task_package_uses_config_turbo_strategy_backend(
+    tmp_path: Path,
+) -> None:
+    project_dir = tmp_path / "bridge_test_inv"
+    create_project_from_template(project_dir)
+    optimizer_path = project_dir / "config" / "optimizer.yaml"
+    optimizer_text = optimizer_path.read_text(encoding="utf-8").replace(
+        "  algorithm: turbo",
+        "  algorithm: turbo\n  strategy: turbo_trust_region",
+        1,
+    )
+    optimizer_path.write_text(optimizer_text, encoding="utf-8")
+
+    package = build_optimizer_execution_task_package(
+        project_dir,
+        cadence_cshrc=Path("/home/zzchen/cadence_ic231_env.csh"),
+        optimizer_backend="openbox",
+        created_at_utc="2026-06-04T00:00:00Z",
+    )
+
+    manifest_payload = json.loads(package.manifest_path.read_text(encoding="utf-8"))
+
+    assert manifest_payload["backend"] == "native_turbo"
+    assert manifest_payload["strategy"] == "turbo_trust_region"
+    assert manifest_payload["command"][:3] == [
+        "hermes-workflow",
+        "run-native-turbo",
+        str(project_dir.resolve()),
+    ]
+
+
+def test_build_optimizer_execution_task_package_uses_config_openbox_strategy(
+    tmp_path: Path,
+) -> None:
+    project_dir = tmp_path / "bridge_test_inv"
+    create_project_from_template(project_dir)
+    optimizer_path = project_dir / "config" / "optimizer.yaml"
+    optimizer_text = optimizer_path.read_text(encoding="utf-8").replace(
+        "  algorithm: turbo",
+        "  algorithm: openbox\n  strategy: openbox_prf_eic",
+        1,
+    )
+    optimizer_path.write_text(optimizer_text, encoding="utf-8")
+
+    package = build_optimizer_execution_task_package(
+        project_dir,
+        cadence_cshrc=Path("/home/zzchen/cadence_ic231_env.csh"),
+        optimizer_backend="native_turbo",
+        created_at_utc="2026-06-04T00:00:00Z",
+    )
+
+    manifest_payload = json.loads(package.manifest_path.read_text(encoding="utf-8"))
+
+    assert manifest_payload["backend"] == "openbox"
+    assert manifest_payload["strategy"] == "openbox_prf_eic"
+    assert "--strategy" in manifest_payload["command"]
+    strategy_index = manifest_payload["command"].index("--strategy")
+    assert manifest_payload["command"][strategy_index + 1] == "openbox_prf_eic"
 
 
 def test_build_optimizer_execution_task_package_writes_openbox_continuation(
@@ -139,9 +229,7 @@ def test_build_optimizer_execution_task_package_writes_openbox_continuation(
 
     package = build_optimizer_execution_task_package(
         project_dir,
-        max_evals=None,
-        additional_evals=50,
-        cadence_cshrc=Path("/path/to/cadence_env.csh"),
+        cadence_cshrc=Path("/home/zzchen/cadence_ic231_env.csh"),
         optimizer_backend="openbox",
         continuation=True,
         created_at_utc="2026-06-05T00:00:00Z",
@@ -152,10 +240,10 @@ def test_build_optimizer_execution_task_package_writes_openbox_continuation(
 
     assert "continue-openbox-real" in task_text
     assert "run-openbox-real" not in task_text
-    assert "--additional-evals 50" in task_text
+    assert "--additional-evals" not in task_text
     assert "existing accepted optimizer traces" in task_text
     assert "check-toolchain-env" in task_text
-    assert ".venv" in task_text
+    assert "/tmp/ic_auto_opt_openbox_spike/.venv" in task_text
     assert "finalize-optimizer-run" in task_text
     assert "non-sandbox" in task_text
     assert "reports/optimizer_run_acceptance_report.json" in task_text
@@ -164,26 +252,22 @@ def test_build_optimizer_execution_task_package_writes_openbox_continuation(
     assert "reports/optimizer_insight_report.md" in task_text
     assert manifest_payload["backend"] == "openbox"
     assert manifest_payload["continuation"] is True
-    assert manifest_payload["additional_evals"] == 50
-    assert manifest_payload["max_evals"] is None
+    assert manifest_payload["additional_evals"] is None
+    assert manifest_payload["max_evals"] == 100
     assert manifest_payload["toolchain_check_command"] == [
         "hermes-workflow",
         "check-toolchain-env",
         "--openbox-venv",
-        ".venv",
+        "/tmp/ic_auto_opt_openbox_spike/.venv",
         "--cadence-cshrc",
-        "/path/to/cadence_env.csh",
+        "/home/zzchen/cadence_ic231_env.csh",
     ]
     assert manifest_payload["command"] == [
         "hermes-workflow",
         "continue-openbox-real",
         str(project_dir),
-        "--additional-evals",
-        "50",
-        "--batch-size",
-        "10",
         "--cadence-cshrc",
-        "/path/to/cadence_env.csh",
+        "/home/zzchen/cadence_ic231_env.csh",
     ]
     assert "--parallel-jobs" not in manifest_payload["command"]
     assert [
@@ -207,13 +291,11 @@ def test_package_optimizer_task_cli_writes_task_and_manifest(tmp_path: Path) -> 
 
     result = runner.invoke(
         app,
-        [
-            "package-optimizer-task",
-            str(project_dir),
-            "--max-evals",
-            "100",
-            "--cadence-cshrc",
-            "/path/to/cadence_env.csh",
+            [
+                "package-optimizer-task",
+                str(project_dir),
+                "--cadence-cshrc",
+                "/home/zzchen/cadence_ic231_env.csh",
             "--parallel",
         ],
     )
@@ -236,12 +318,12 @@ def test_package_optimizer_task_cli_writes_openbox_manifest(tmp_path: Path) -> N
         [
             "package-optimizer-task",
             str(project_dir),
-            "--max-evals",
-            "100",
             "--cadence-cshrc",
-            "/path/to/cadence_env.csh",
+            "/home/zzchen/cadence_ic231_env.csh",
             "--backend",
             "openbox",
+            "--strategy",
+            "openbox_gp_eic",
         ],
     )
 
@@ -249,7 +331,13 @@ def test_package_optimizer_task_cli_writes_openbox_manifest(tmp_path: Path) -> N
     manifest_path = project_dir / "execution_package" / "optimizer_execution_manifest.json"
     manifest_payload = json.loads(manifest_path.read_text(encoding="utf-8"))
     assert manifest_payload["backend"] == "openbox"
+    assert manifest_payload["strategy"] == "openbox_gp_eic"
     assert manifest_payload["command"][1] == "run-openbox-real"
+    strategy_index = manifest_payload["command"].index("--strategy")
+    assert manifest_payload["command"][strategy_index : strategy_index + 2] == [
+        "--strategy",
+        "openbox_gp_eic",
+    ]
 
 
 def test_package_optimizer_task_cli_writes_openbox_continuation_manifest(
@@ -266,10 +354,8 @@ def test_package_optimizer_task_cli_writes_openbox_continuation_manifest(
             "--backend",
             "openbox",
             "--continuation",
-            "--additional-evals",
-            "50",
             "--cadence-cshrc",
-            "/path/to/cadence_env.csh",
+            "/home/zzchen/cadence_ic231_env.csh",
         ],
     )
 
@@ -277,7 +363,7 @@ def test_package_optimizer_task_cli_writes_openbox_continuation_manifest(
     manifest_path = project_dir / "execution_package" / "optimizer_execution_manifest.json"
     manifest_payload = json.loads(manifest_path.read_text(encoding="utf-8"))
     assert manifest_payload["continuation"] is True
-    assert manifest_payload["additional_evals"] == 50
+    assert manifest_payload["additional_evals"] is None
     assert manifest_payload["command"][1] == "continue-openbox-real"
 
 
@@ -292,7 +378,6 @@ def test_optimizer_task_package_uses_absolute_shell_safe_command(
 
     package = build_optimizer_execution_task_package(
         project_dir,
-        max_evals=100,
         cadence_cshrc=cadence_cshrc,
         created_at_utc="2026-06-04T00:00:00Z",
     )
@@ -315,8 +400,7 @@ def test_optimizer_execution_task_keeps_forbidden_actions_in_forbidden_section(
 
     package = build_optimizer_execution_task_package(
         project_dir,
-        max_evals=100,
-        cadence_cshrc=Path("/path/to/cadence_env.csh"),
+        cadence_cshrc=Path("/home/zzchen/cadence_ic231_env.csh"),
     )
 
     task_text = package.task_path.read_text(encoding="utf-8")
@@ -343,8 +427,7 @@ def test_optimizer_execution_task_keeps_openbox_fallback_in_required_behavior(
 
     package = build_optimizer_execution_task_package(
         project_dir,
-        max_evals=100,
-        cadence_cshrc=Path("/path/to/cadence_env.csh"),
+        cadence_cshrc=Path("/home/zzchen/cadence_ic231_env.csh"),
         optimizer_backend="openbox",
     )
 
@@ -356,3 +439,42 @@ def test_optimizer_execution_task_keeps_openbox_fallback_in_required_behavior(
 
     assert "Do not silently fall back to TuRBO" in required_behavior
     assert "Do not hand-pick candidate points." not in required_behavior
+
+
+def test_build_openbox_task_package_includes_optimizer_strategy(
+    tmp_path: Path,
+) -> None:
+    project_dir = tmp_path / "bridge_test_inv"
+    create_project_from_template(project_dir)
+
+    package = build_optimizer_execution_task_package(
+        project_dir,
+        cadence_cshrc=Path("/home/zzchen/cadence_ic231_env.csh"),
+        optimizer_backend="openbox",
+        strategy="openbox_prf_eic",
+        created_at_utc="2026-06-04T00:00:00Z",
+    )
+
+    task_text = package.task_path.read_text(encoding="utf-8")
+    manifest_payload = package.payload
+
+    assert "--strategy openbox_prf_eic" in task_text
+    assert "Requested optimizer strategy: `openbox_prf_eic`" in task_text
+    assert "Do not silently switch optimizer backend." in task_text
+    assert "reports/optimizer_effectiveness_audit.json" in task_text
+    assert manifest_payload["strategy"] == "openbox_prf_eic"
+    command = manifest_payload["command"]
+    assert command[:3] == [
+        "hermes-workflow",
+        "run-openbox-real",
+        str(project_dir),
+    ]
+    strategy_index = command.index("--strategy")
+    assert command[strategy_index : strategy_index + 2] == [
+        "--strategy",
+        "openbox_prf_eic",
+    ]
+    assert (
+        "reports/optimizer_effectiveness_audit.json"
+        in manifest_payload["required_returned_artifacts"]
+    )

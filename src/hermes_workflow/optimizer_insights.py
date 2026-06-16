@@ -29,6 +29,7 @@ from hermes_workflow.validate import evaluate_objective
 
 REPORT_RELATIVE = Path("reports/optimizer_insight_report.json")
 MARKDOWN_RELATIVE = Path("reports/optimizer_insight_report.md")
+EFFECTIVENESS_AUDIT_RELATIVE = Path("reports/optimizer_effectiveness_audit.json")
 VISUALS_DIR_RELATIVE = Path("reports/optimizer_visuals")
 ALL_EVALUABLE_FOM_RELATIVE = VISUALS_DIR_RELATIVE / "all_evaluable_fom.png"
 BOTTLENECK_WEIGHTED_SCORE_RELATIVE = (
@@ -67,6 +68,7 @@ class OptimizerInsightReport:
     openbox_parameter_importance: dict[str, Any]
     advanced_surrogate_visualization: dict[str, str]
     process_corner_summary: dict[str, Any]
+    optimizer_effectiveness_audit: dict[str, Any]
     issues: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     report_path: Path | None = None
@@ -125,6 +127,7 @@ def generate_optimizer_insight_report(project_dir: str | Path) -> OptimizerInsig
     advanced = _advanced_visualization_payload(report_payload)
     openbox_importance = _openbox_parameter_importance(project_root, advanced, metric_contract)
     process_corner_summary = _process_corner_summary(project_root, traces, best_observed)
+    effectiveness_audit = _load_optimizer_effectiveness_audit(project_root)
 
     report = OptimizerInsightReport(
         status="fail" if issues else "pass",
@@ -142,6 +145,7 @@ def generate_optimizer_insight_report(project_dir: str | Path) -> OptimizerInsig
         openbox_parameter_importance=openbox_importance,
         advanced_surrogate_visualization=advanced,
         process_corner_summary=process_corner_summary,
+        optimizer_effectiveness_audit=effectiveness_audit,
         issues=issues,
         warnings=warnings,
         report_path=project_root / REPORT_RELATIVE,
@@ -149,6 +153,36 @@ def generate_optimizer_insight_report(project_dir: str | Path) -> OptimizerInsig
     )
     _write_outputs(project_root, report, traces)
     return report
+
+
+def _load_optimizer_effectiveness_audit(project_root: Path) -> dict[str, Any]:
+    audit_path = project_root / EFFECTIVENESS_AUDIT_RELATIVE
+    if not audit_path.exists():
+        return {
+            "status": "not_available",
+            "reason": "optimizer effectiveness audit artifact is missing",
+        }
+    try:
+        payload = json.loads(audit_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return {
+            "status": "not_available",
+            "reason": f"invalid JSON: {exc}",
+        }
+
+    batches = payload.get("batches")
+    latest_batch = batches[-1] if isinstance(batches, list) and batches else {}
+    return {
+        "status": "available",
+        "path": EFFECTIVENESS_AUDIT_RELATIVE.as_posix(),
+        "backend": payload.get("backend"),
+        "requested_strategy": payload.get("requested_strategy"),
+        "resolved_strategy": _dict_value(payload.get("resolved_strategy"), default={}),
+        "resolved_settings": _dict_value(payload.get("resolved_settings"), default={}),
+        "model_replay_evaluation_count": payload.get("model_replay_evaluation_count", 0),
+        "batch_count": len(batches) if isinstance(batches, list) else 0,
+        "latest_batch": _dict_value(latest_batch, default={}),
+    }
 
 
 def _process_corner_summary(
@@ -1700,6 +1734,51 @@ def _scale_point(
     return sx, sy
 
 
+def _optimizer_effectiveness_markdown(report: OptimizerInsightReport) -> list[str]:
+    audit = report.optimizer_effectiveness_audit
+    lines = [
+        "",
+        "## Optimizer effectiveness audit",
+        "",
+    ]
+    if audit.get("status") == "available":
+        latest_batch = _dict_value(audit.get("latest_batch"), default={})
+        resolved_strategy = _dict_value(audit.get("resolved_strategy"), default={})
+        lines.extend(
+            [
+                f"- Requested strategy: `{audit.get('requested_strategy') or 'unknown'}`",
+                f"- Resolved surrogate: `{resolved_strategy.get('surrogate_type') or 'unknown'}`",
+                f"- Resolved acquisition: `{resolved_strategy.get('acq_type') or 'unknown'}`",
+                (
+                    "- Resolved acquisition optimizer: "
+                    f"`{resolved_strategy.get('acq_optimizer_type') or 'unknown'}`"
+                ),
+                f"- Initial trials: `{resolved_strategy.get('initial_trials') or 'unknown'}`",
+                (
+                    "- Replay history count: "
+                    f"`{audit.get('model_replay_evaluation_count') or 0}`"
+                ),
+                f"- Latest phase: `{latest_batch.get('phase') or 'unknown'}`",
+                (
+                    "- Latest history size: "
+                    f"`{latest_batch.get('history_size_before') or 0}` -> "
+                    f"`{latest_batch.get('history_size_after') or 0}`"
+                ),
+                (
+                    "- Latest feasible count: "
+                    f"`{latest_batch.get('feasible_count') or 0}`"
+                ),
+                f"- Artifact: `{audit.get('path') or EFFECTIVENESS_AUDIT_RELATIVE.as_posix()}`",
+            ]
+        )
+        return lines
+
+    lines.append(f"- Status: `{audit.get('status') or 'not_available'}`")
+    if reason := audit.get("reason"):
+        lines.append(f"- Reason: {reason}")
+    return lines
+
+
 def _markdown_report(report: OptimizerInsightReport) -> str:
     best = report.best_observed or {}
     lines = [
@@ -1815,6 +1894,7 @@ def _markdown_report(report: OptimizerInsightReport) -> str:
                 lines.append(f"- {corner_name}: {count}")
         else:
             lines.append("- No corner-attributed failures were recorded.")
+    lines.extend(_optimizer_effectiveness_markdown(report))
     lines.extend(
         [
             "",

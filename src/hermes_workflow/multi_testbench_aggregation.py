@@ -58,6 +58,7 @@ class _LoadedChild(BaseModel):
     status: ChildAggregationStatus
     result_reference: dict
     metric_reference: dict | None
+    command_trace: dict | None = None
     metrics: list[dict]
     real_failed: bool
     metric_failed: bool
@@ -92,6 +93,7 @@ def aggregate_multi_testbench_run(
     child_statuses: list[ChildAggregationStatus] = []
     child_results: list[dict] = []
     child_metric_results: list[dict] = []
+    child_command_traces: list[dict] = []
     issues: list[str] = []
     corner_aggregates: dict[str, _CornerAggregate] = {}
     real_failed = False
@@ -119,6 +121,8 @@ def aggregate_multi_testbench_run(
             child_results.append(child.result_reference)
             if child.metric_reference is not None:
                 child_metric_results.append(child.metric_reference)
+            if child.command_trace is not None:
+                child_command_traces.append(child.command_trace)
             issues.extend(child.status.issues)
             corner_real_failed = corner_real_failed or child.real_failed
             corner_metric_failed = corner_metric_failed or child.metric_failed
@@ -219,6 +223,7 @@ def aggregate_multi_testbench_run(
         aggregate_metrics=aggregate_metrics,
         child_results=child_results,
         child_metric_results=child_metric_results,
+        child_command_traces=child_command_traces,
         issues=issues,
         completed_at_utc=AGGREGATE_TIMESTAMP,
     )
@@ -348,6 +353,13 @@ def _load_child_handoff(
         if manifest is not None
         else None
     )
+    command_trace = _build_child_command_trace_reference(
+        testbench=testbench_label,
+        result_manifest=result_relative,
+        metric_result_manifest=metric_relative,
+        result_payload=result_payload,
+        metric_payload=metric_payload,
+    )
     return _LoadedChild(
         status=ChildAggregationStatus(
             testbench=testbench_label,
@@ -359,10 +371,62 @@ def _load_child_handoff(
         ),
         result_reference=result_reference,
         metric_reference=metric_reference,
+        command_trace=command_trace,
         metrics=metrics,
         real_failed=real_failed,
         metric_failed=metric_failed,
     )
+
+
+def _build_child_command_trace_reference(
+    *,
+    testbench: str,
+    result_manifest: str,
+    metric_result_manifest: str,
+    result_payload: dict | None,
+    metric_payload: dict | None,
+) -> dict | None:
+    result_trace = (
+        result_payload.get("command_trace") if isinstance(result_payload, dict) else None
+    )
+    metric_trace = (
+        metric_payload.get("command_trace") if isinstance(metric_payload, dict) else None
+    )
+    if not isinstance(result_trace, dict) and not isinstance(metric_trace, dict):
+        return None
+    child: dict = {
+        "testbench": testbench,
+        "result_manifest": result_manifest,
+        "metric_result_manifest": metric_result_manifest,
+    }
+    if isinstance(result_trace, dict):
+        child["result"] = result_trace
+    if isinstance(metric_trace, dict):
+        child["metric"] = metric_trace
+    return child
+
+
+def _build_aggregate_command_trace(child_command_traces: list[dict]) -> dict | None:
+    if not child_command_traces:
+        return None
+    execution_modes = sorted(
+        {
+            str(trace.get("result", trace.get("metric", {})).get("execution_mode"))
+            for trace in child_command_traces
+            if isinstance(trace.get("result", trace.get("metric", {})), dict)
+            and trace.get("result", trace.get("metric", {})).get("execution_mode")
+            is not None
+        }
+    )
+    execution_mode = execution_modes[0] if len(execution_modes) == 1 else "mixed"
+    return {
+        "schema_version": "1.0",
+        "execution_mode": execution_mode,
+        "aggregate": {
+            "kind": "multi_testbench_parent",
+            "children": child_command_traces,
+        },
+    }
 
 
 def _write_aggregate_artifacts(
@@ -377,6 +441,7 @@ def _write_aggregate_artifacts(
     aggregate_metrics: list[dict],
     child_results: list[dict],
     child_metric_results: list[dict],
+    child_command_traces: list[dict],
     issues: list[str],
     completed_at_utc: str,
 ) -> None:
@@ -411,14 +476,7 @@ def _write_aggregate_artifacts(
         "status": result_status.value,
         "started_at_utc": AGGREGATE_TIMESTAMP,
         "completed_at_utc": completed_at_utc,
-        "simulator": {
-            "engine": "spectre_x",
-            "preset": "ax",
-            "output_format": "psfxl",
-            "threads_per_run": 10,
-            "timeout_s": 3600,
-            "command_label": "multi_testbench_aggregate",
-        },
+        "simulator": _aggregate_simulator_metadata(prepared=prepared, request=request),
         "prepared_input_scs": prepared_input_relative,
         "prepared_input_sha256": sha256_file(prepared_input_path),
         "log_file": f"{run_prefix}/spectre.log",
@@ -463,6 +521,10 @@ def _write_aggregate_artifacts(
         "child_metric_results": child_metric_results,
         "issues": issues if metric_status == MetricResultStatus.FAILED else [],
     }
+    aggregate_command_trace = _build_aggregate_command_trace(child_command_traces)
+    if aggregate_command_trace is not None:
+        result_manifest["command_trace"] = aggregate_command_trace
+        metric_manifest["command_trace"] = aggregate_command_trace
 
     _write_json(run_dir / "result_manifest.json", result_manifest)
     _write_json(metrics_dir / "metric_result_manifest.json", metric_manifest)
@@ -475,6 +537,24 @@ def _scalar_output_text(metrics: list[dict]) -> str:
             f"{metric['name']}\t{metric['status']}\t{metric.get('value_text') or ''}"
         )
     return "\n".join(lines) + "\n"
+
+
+def _aggregate_simulator_metadata(*, prepared: dict, request: dict) -> dict:
+    spectre: dict = {}
+    prepared_spectre = prepared.get("spectre")
+    if isinstance(prepared_spectre, dict):
+        spectre.update(prepared_spectre)
+    request_spectre = request.get("spectre")
+    if isinstance(request_spectre, dict):
+        spectre.update(request_spectre)
+    return {
+        "engine": str(spectre.get("engine", "spectre_x")),
+        "preset": str(spectre.get("preset", "ax")),
+        "output_format": str(spectre.get("output_format", "psfxl")),
+        "threads_per_run": int(spectre.get("threads_per_run", 10)),
+        "timeout_s": int(spectre.get("timeout_s", 3600)),
+        "command_label": "multi_testbench_aggregate",
+    }
 
 
 def _aggregation_testbench_specs(

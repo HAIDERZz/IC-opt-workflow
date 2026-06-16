@@ -27,7 +27,7 @@ clean clone
 -> install requirements-product.txt
 -> ic-opt --help
 -> ic-opt PROJECT --doctor
--> ic-opt PROJECT --real --max-evals 100 --batch-size 10
+-> ic-opt PROJECT --real
 -> ic-opt PROJECT --continue 40
 ```
 

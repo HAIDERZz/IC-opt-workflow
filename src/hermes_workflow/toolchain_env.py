@@ -7,8 +7,8 @@ from pathlib import Path
 from typing import Callable
 
 
-DEFAULT_OPENBOX_EXECUTION_VENV = Path(".venv")
-DEFAULT_CADENCE_CSHRC = Path("cadence_env.csh")
+DEFAULT_OPENBOX_EXECUTION_VENV = Path("/tmp/ic_auto_opt_openbox_spike/.venv")
+DEFAULT_CADENCE_CSHRC = Path("/home/zzchen/cadence_ic231_env.csh")
 
 
 @dataclass(frozen=True)

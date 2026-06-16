@@ -104,7 +104,7 @@ def _exit_with_error(exc: Exception) -> NoReturn:
 def install_runtime_adapter_command(
     runtime: Annotated[
         str,
-        typer.Argument(help="Agent runtime to install: skill."),
+        typer.Argument(help="Agent runtime to install: claude or opencode."),
     ],
     target_home: Annotated[
         Path | None,
@@ -141,7 +141,7 @@ def install_runtime_adapter_command(
 def runtime_adapter_status_command(
     runtime: Annotated[
         str | None,
-        typer.Argument(help="Optional runtime: skill."),
+        typer.Argument(help="Optional runtime: claude or opencode."),
     ] = None,
     target_home: Annotated[
         Path | None,
@@ -442,17 +442,6 @@ def package_optimizer_task_command(
         Path,
         typer.Argument(help="Project directory with approved real-tool contracts."),
     ],
-    max_evals: Annotated[
-        int | None,
-        typer.Option("--max-evals", help="Optimizer evaluation budget for the task."),
-    ] = None,
-    additional_evals: Annotated[
-        int | None,
-        typer.Option(
-            "--additional-evals",
-            help="Additional OpenBox evaluations for a continuation task.",
-        ),
-    ] = None,
     continuation: Annotated[
         bool,
         typer.Option(
@@ -478,15 +467,18 @@ def package_optimizer_task_command(
             help="Optimizer backend for the execution task: native-turbo or openbox.",
         ),
     ] = "native-turbo",
+    strategy: Annotated[
+        str | None,
+        typer.Option("--strategy", help="Optimizer strategy preset."),
+    ] = None,
 ) -> None:
     try:
         package = build_optimizer_execution_task_package(
             project_dir,
-            max_evals=max_evals,
-            additional_evals=additional_evals,
             cadence_cshrc=cadence_cshrc,
             parallel=parallel,
             optimizer_backend=backend,
+            strategy=strategy,
             continuation=continuation,
         )
     except (OSError, ValueError) as exc:
@@ -1069,22 +1061,6 @@ def optimize_command(
             help="Run all offline orchestration gates and stop before real tools.",
         ),
     ] = False,
-    max_evals: Annotated[
-        int,
-        typer.Option("--max-evals", min=1, help="OpenBox real evaluation budget."),
-    ] = 100,
-    batch_size: Annotated[
-        int | None,
-        typer.Option("--batch-size", min=1, help="OpenBox suggestion batch size."),
-    ] = None,
-    parallel_jobs: Annotated[
-        int | None,
-        typer.Option(
-            "--parallel-jobs",
-            min=1,
-            help="Maximum concurrently launched Spectre runs.",
-        ),
-    ] = None,
     cadence_cshrc: Annotated[
         Path,
         typer.Option(
@@ -1105,9 +1081,9 @@ def optimize_command(
             project_dir,
             real=real,
             dry_orchestration=dry_orchestration,
-            max_evals=max_evals,
-            batch_size=batch_size,
-            parallel_jobs=parallel_jobs,
+            max_evals=None,
+            batch_size=None,
+            parallel_jobs=None,
             cadence_cshrc=cadence_cshrc,
             execution_agent=execution_agent,
         )
@@ -1137,20 +1113,12 @@ def run_openbox_fake_command(
         Path,
         typer.Argument(help="Project directory with optimizer config artifacts."),
     ],
-    max_evals: Annotated[
-        int,
-        typer.Option("--max-evals", min=1, help="Fake OpenBox evaluation budget."),
-    ] = 40,
-    batch_size: Annotated[
-        int,
-        typer.Option("--batch-size", min=1, help="Fake OpenBox suggestion batch size."),
-    ] = 4,
 ) -> None:
     try:
         result = run_openbox_fake_optimization(
             project_dir,
-            max_evals=max_evals,
-            batch_size=batch_size,
+            max_evals=None,
+            batch_size=None,
         )
     except (OSError, RuntimeError, ValueError) as exc:
         _exit_with_error(exc)
@@ -1169,22 +1137,6 @@ def run_openbox_real_command(
         Path,
         typer.Argument(help="Project directory with approved real-tool contracts."),
     ],
-    max_evals: Annotated[
-        int | None,
-        typer.Option("--max-evals", min=1, help="OpenBox real evaluation budget."),
-    ] = None,
-    batch_size: Annotated[
-        int | None,
-        typer.Option("--batch-size", min=1, help="OpenBox suggestion batch size."),
-    ] = None,
-    parallel_jobs: Annotated[
-        int | None,
-        typer.Option(
-            "--parallel-jobs",
-            min=1,
-            help="Maximum concurrently launched Spectre runs.",
-        ),
-    ] = None,
     cadence_cshrc: Annotated[
         Path | None,
         typer.Option(
@@ -1207,17 +1159,31 @@ def run_openbox_real_command(
             help="Optional OpenBox acq_optimizer_type override.",
         ),
     ] = None,
+    strategy: Annotated[
+        str | None,
+        typer.Option("--strategy", help="Optional OpenBox strategy preset."),
+    ] = None,
+    initial_trials: Annotated[
+        int | None,
+        typer.Option(
+            "--initial-trials",
+            min=1,
+            help="Optional OpenBox initial_trials override.",
+        ),
+    ] = None,
 ) -> None:
     try:
         result = run_openbox_real_optimization(
             project_dir,
-            max_evals=max_evals,
-            batch_size=batch_size,
-            parallel_jobs=parallel_jobs,
+            max_evals=None,
+            batch_size=None,
+            parallel_jobs=None,
             cadence_cshrc=cadence_cshrc,
+            strategy=strategy,
             surrogate_type=surrogate_type,
             acq_type=acq_type,
             acq_optimizer_type=acq_optimizer_type,
+            initial_trials=initial_trials,
         )
     except (OSError, RuntimeError, ValueError) as exc:
         _exit_with_error(exc)
@@ -1236,26 +1202,6 @@ def continue_openbox_real_command(
         Path,
         typer.Argument(help="Project directory with prior OpenBox optimizer artifacts."),
     ],
-    additional_evals: Annotated[
-        int,
-        typer.Option(
-            "--additional-evals",
-            min=1,
-            help="Number of new OpenBox real evaluations to add.",
-        ),
-    ],
-    batch_size: Annotated[
-        int | None,
-        typer.Option("--batch-size", min=1, help="OpenBox suggestion batch size."),
-    ] = None,
-    parallel_jobs: Annotated[
-        int | None,
-        typer.Option(
-            "--parallel-jobs",
-            min=1,
-            help="Maximum concurrently launched Spectre runs.",
-        ),
-    ] = None,
     cadence_cshrc: Annotated[
         Path | None,
         typer.Option(
@@ -1278,22 +1224,44 @@ def continue_openbox_real_command(
             help="Optional OpenBox acq_optimizer_type override.",
         ),
     ] = None,
+    strategy: Annotated[
+        str | None,
+        typer.Option("--strategy", help="Optional OpenBox strategy preset."),
+    ] = None,
+    initial_trials: Annotated[
+        int | None,
+        typer.Option(
+            "--initial-trials",
+            min=1,
+            help="Optional OpenBox initial_trials override.",
+        ),
+    ] = None,
 ) -> None:
     try:
         _ensure_base_execution_manifest(project_dir)
+        if strategy is None:
+            effective_surrogate_type = surrogate_type or CONTINUATION_SURROGATE_TYPE
+            effective_acq_type = acq_type or CONTINUATION_ACQ_TYPE
+            effective_acq_optimizer_type = (
+                acq_optimizer_type or CONTINUATION_ACQ_OPTIMIZER_TYPE
+            )
+        else:
+            effective_surrogate_type = surrogate_type
+            effective_acq_type = acq_type
+            effective_acq_optimizer_type = acq_optimizer_type
         result = run_openbox_real_optimization(
             project_dir,
             max_evals=None,
-            additional_evals=additional_evals,
+            additional_evals=None,
             continue_from_existing=True,
-            batch_size=batch_size,
-            parallel_jobs=parallel_jobs,
+            batch_size=None,
+            parallel_jobs=None,
             cadence_cshrc=cadence_cshrc,
-            surrogate_type=surrogate_type or CONTINUATION_SURROGATE_TYPE,
-            acq_type=acq_type or CONTINUATION_ACQ_TYPE,
-            acq_optimizer_type=(
-                acq_optimizer_type or CONTINUATION_ACQ_OPTIMIZER_TYPE
-            ),
+            strategy=strategy,
+            surrogate_type=effective_surrogate_type,
+            acq_type=effective_acq_type,
+            acq_optimizer_type=effective_acq_optimizer_type,
+            initial_trials=initial_trials,
         )
     except (OSError, RuntimeError, ValueError) as exc:
         _exit_with_error(exc)
@@ -1371,10 +1339,6 @@ def run_native_turbo_command(
         Path,
         typer.Argument(help="Project directory with approved real-tool contracts."),
     ],
-    max_evals: Annotated[
-        int | None,
-        typer.Option("--max-evals", help="Override optimizer evaluation budget."),
-    ] = None,
     cadence_cshrc: Annotated[
         Path | None,
         typer.Option(
@@ -1398,7 +1362,7 @@ def run_native_turbo_command(
         )
         result = runner(
             project_dir,
-            max_evals=max_evals,
+            max_evals=None,
             cadence_cshrc=cadence_cshrc,
         )
     except (OSError, RuntimeError, ValueError) as exc:

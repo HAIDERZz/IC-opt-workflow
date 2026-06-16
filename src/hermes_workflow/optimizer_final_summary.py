@@ -109,9 +109,9 @@ def _load_supervisor_decision(project_root: Path) -> dict[str, Any]:
 def _visual_paths(project_root: Path) -> list[str]:
     candidates = [
         "reports/optimizer_visuals/bottleneck_weighted_score.png",
-        "reports/optimizer_visuals/all_evaluable_fom.png",
-        "reports/optimizer_visuals/feasible_convergence.png",
-        "reports/optimizer_visuals/constraint_margins.png",
+        "reports/optimizer_visuals/all_evaluable_fom.svg",
+        "reports/optimizer_visuals/feasible_convergence.svg",
+        "reports/optimizer_visuals/constraint_margins.svg",
         "reports/openbox_advanced_visualization_manifest.json",
     ]
     return [path for path in candidates if (project_root / path).exists()]

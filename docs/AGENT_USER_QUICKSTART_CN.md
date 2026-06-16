@@ -9,38 +9,24 @@
 你希望最终这样使用：
 
 ```text
-/ic-opt ~/spectre_opt_prj/项目名 --doctor
-/ic-opt ~/spectre_opt_prj/项目名 --real
-/ic-opt --ssh-profile eda-lab /remote/path/to/项目名 --real
-```
-
-如果看完报告后想在已有 N 个点基础上继续追加 M 个点：
-
-```text
-/ic-opt ~/spectre_opt_prj/项目名 --continue M
-/ic-opt --ssh-profile eda-lab /remote/path/to/项目名 --continue M
+/ic-opt /home/你的用户名/spectre_opt_prj/项目名 --real
 ```
 
 然后 agent 自动完成：
 
 1. 读取你的 `opt_requirement.md`；
-2. 先运行 doctor，检查 `opt_requirement.md`、Maestro/ADE point root、环境文件和
-   SSH 是否准备好；
-3. 生成 optimizer 所需 YAML 配置；
-4. 复制 Maestro/ADE 已经跑通过的 netlist bundle；
-5. 检查项目是否可以真实运行；
-6. 调用 `ic-opt` 跑 Spectre/OCEAN/OpenBox 优化流程；
-7. 读取报告，并告诉你最佳已观察点、指标、约束通过情况和下一步建议。
+2. 生成 optimizer 所需 YAML 配置；
+3. 复制 Maestro/ADE 已经跑通过的 netlist bundle；
+4. 检查项目是否可以真实运行；
+5. 派一个执行 subagent 去跑 Spectre/OCEAN/OpenBox；
+6. 主管 agent 读取报告，并告诉你最佳已观察点、指标、约束通过情况和下一步建议。
 
 ## 先分清两个入口
 
 ### 1. Shell 自动化入口
 
 ```bash
-ic-opt PROJECT_DIR --doctor
 ic-opt PROJECT_DIR --real
-ic-opt PROJECT_DIR --continue 40
-ic-opt --ssh-profile PROFILE REMOTE_PROJECT --real
 ```
 
 这是自动化脚本入口。它可以自己跑完整流程，适合调试和命令行用户。
@@ -48,32 +34,22 @@ ic-opt --ssh-profile PROFILE REMOTE_PROJECT --real
 ### 2. Agent 产品入口
 
 ```text
-/ic-opt PROJECT_DIR --doctor
 /ic-opt PROJECT_DIR --real
-/ic-opt PROJECT_DIR --continue 40
-/ic-opt --ssh-profile PROFILE REMOTE_PROJECT --real
-/ic-opt --ssh-profile PROFILE REMOTE_PROJECT --continue 40
 ```
 
-这是 agent 入口。agent 的默认职责是根据平台无关 skill 操作 `ic-opt` CLI，
-等待流程完成，读取报告并解释结果。native subagent 只是可选高级模式，不是默认
-产品路线。
+这是 agent 入口。当前 agent CLI 的主会话是 supervisor agent，它应该调用同
+一个 CLI 里的 execution subagent 来执行真实优化任务。
 
-对新的或修改过的项目，agent 应先执行 `--doctor`。doctor 不通过时，agent 应停止并
-指出具体文件、字段或路径问题，而不是继续跑真实 Spectre/OCEAN。
-本地 doctor 是独立检查命令，不需要也不应该加 `--real`。如果 doctor 或 optimizer
-JSON 报告里有 `structured_issues`，agent 应优先读取其中的 `code`、
-`likely_cause`、`recommended_action` 和 `evidence`，再回退到普通 `issues`。
-
-如果项目在远程 Linux EDA 服务器上，用户只需要提供 SSH profile 和远程项目路径。
-agent 不应该把项目复制成本地流程，也不应该在远程服务器上安装 Python 包。
+C-65 之后，项目目标是第二种：你在 Claude、OpenCode、Codex 等当前 agent
+窗口里发一句 `/ic-opt ...`，由当前 runtime 自己派 subagent。不是让 OpenCode
+或 Codex 再去调用 `claude -p`。
 
 ## 第一次安装
 
 进入 `ic-auto-opt-workflow` 仓库：
 
 ```bash
-cd /path/to/ic-auto-opt-workflow-v0.1
+cd /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow
 ```
 
 创建并安装产品 Python 环境：
@@ -91,23 +67,24 @@ python3 -m venv .venv
 ./.venv/bin/hermes-workflow --help
 ```
 
-## 给 agent 使用的 skill
+## 安装你正在用的 agent 入口
 
-平台无关 skill 在：
-
-```text
-skills/ic-opt/SKILL.md
-```
-
-任何能运行 shell 命令、读取文件的 agent 都可以按这个 skill 工作。不同 agent
-平台的 skill 安装目录可能不同；把这份 `SKILL.md` 放到你当前 agent 能读取的
-skill/command 目录即可。这个 skill 本身不绑定任何具体 agent 平台。
-
-如果你是用 `pip install` 安装的，而不是从源码目录里使用，可以用下面命令找到
-安装后的 skill 文件：
+如果你用 Claude：
 
 ```bash
-hermes-workflow agent-skill-path
+./.venv/bin/hermes-workflow install-runtime-adapter claude
+```
+
+如果你用 OpenCode：
+
+```bash
+./.venv/bin/hermes-workflow install-runtime-adapter opencode
+```
+
+检查安装状态：
+
+```bash
+./.venv/bin/hermes-workflow runtime-adapter-status
 ```
 
 ## 配置 Cadence/Spectre/OCEAN 环境
@@ -115,7 +92,7 @@ hermes-workflow agent-skill-path
 你需要提供一个 `csh` 环境脚本，比如：
 
 ```text
-/path/to/cadence_env.csh
+/home/你的用户名/cadence_env.csh
 ```
 
 推荐放到用户级固定位置：
@@ -132,13 +109,6 @@ PROJECT_DIR/cadence_env.csh
 ```
 
 本项目不会自动猜 `.bashrc` 或 `.zshrc`，也不会硬编码某个 Spectre 版本。
-
-远程模式下，`cadence_env.csh` 放在远程项目目录或用远程路径传给
-`--cadence-cshrc`。本机只需要能通过免密 SSH 登录远程服务器：
-
-```bash
-ssh -o BatchMode=yes eda-lab true
-```
 
 ## 创建一个优化项目
 
@@ -170,6 +140,20 @@ execution_package/
 
 ## opt_requirement.md 写什么
 
+当前产品合同：初次真实优化的机器关键变量只能来自 `opt_requirement.md` / 生成的
+config，包括 `max_evaluations`、`batch_size`、`parallel_jobs`、
+`threads_per_run`、`optimizer_cpu_threads`、optimizer strategy、
+initialization、output format、保留策略、metric 公式、约束和多工艺角设置。
+不要在 `ic-opt PROJECT --real` 后追加 `--max-evals`、`--batch-size`、
+`--parallel-jobs`、`--threads` 或 `--strategy`。续跑只保留一个命令行入口：
+`ic-opt PROJECT --real --continue N`，表示追加 N 个评估点，其余配置仍从项目
+requirement/config 继承。
+
+多工艺角通过 `opt_requirement.md` 的 `Process Corners` 配置，不存在
+`--multi-corner` CLI 开关。示例见
+`examples/spectre_maestro_project/opt_requirement.multi_corner.md` 和
+`examples/spectre_maestro_project/opt_requirement.multi_tb_corner.md`。
+
 `opt_requirement.md` 是机器要读的正式需求文件，不是聊天记录。
 
 它要包含：
@@ -198,26 +182,20 @@ testbench。项目会保留每个 testbench 的原生 Maestro/ADE 文件结构�
 
 ## 正式运行
 
-打开你正在使用的 agent 窗口，并确认它能读取 `skills/ic-opt/SKILL.md`。
+打开你使用的 agent CLI，比如 Claude 或 OpenCode。
 
 然后只发一句：
 
 ```text
-/ic-opt ~/spectre_opt_prj/项目名 --real
-```
-
-如果报告建议继续优化，或者你想追加更多点数，再发一句：
-
-```text
-/ic-opt ~/spectre_opt_prj/项目名 --continue 40
+/ic-opt /home/你的用户名/spectre_opt_prj/项目名 --real
 ```
 
 正常情况下，agent 会：
 
-1. 运行 doctor 检查 `opt_requirement.md`、point root、环境文件和 SSH；
+1. 检查 `opt_requirement.md`；
 2. 生成配置；
 3. 生成执行包；
-4. 调用 `ic-opt` CLI 真实运行；
+4. 调用同 runtime 的 execution subagent 真实运行；
 5. 写报告；
 6. 汇报结果。
 
@@ -251,9 +229,6 @@ PROJECT_DIR/reports/optimizer_insight_report.md
 PROJECT_DIR/reports/optimizer_visuals/
 PROJECT_DIR/reports/openbox_advanced_visualization/
 ```
-
-`optimizer_visuals/` 默认是 PNG 图片。agent 汇报结果时应优先引用这些图片路径，
-不要要求用户打开 SVG。
 
 ## 常见状态是什么意思
 
@@ -290,26 +265,15 @@ PROJECT_DIR/reports/openbox_advanced_visualization/
 - Maestro point root 路径不对；
 - OCEAN 公式在已知正确点上都算不出标量；
 - 约束过严，几乎没有 feasible 点；
-- 远程 SSH 免密登录或 host key 没准备好；
-- 远程高并发触发 SSH 连接限制，需要降低 `parallel_jobs`；
 - agent 问你是否接受当前 best observed；
 - 你想继续追加更多 evaluations；
 - 你想改搜索范围、FoM 或约束。
 
-遇到报错时，先看：
-
-```text
-docs/TROUBLESHOOTING_CN.md
-```
-
-常见情况包括 `opt_requirement.md` 格式错误、Maestro point root 层级错误、OCEAN
-非标量、SSH `Host key verification failed`、`Permission denied`、远程高并发
-`kex_exchange_identification` 和旧版本 manifest missing。
-
-当前边界：agent skill 的默认路线是单 agent 操作 `ic-opt` CLI。用户说“请再进行
-40 个点的优化”时，agent 应转换成 `ic-opt PROJECT --continue 40`。续跑时 agent
-不应随手覆盖 `parallel_jobs`，应默认继承项目 `config/spectre.yaml` 里的资源设置，
-除非用户明确要求改变资源。
+当前边界：C-66 已验证 Claude 能把“请再进行40个点的优化”这种短句转成
+continuation 命令；后续也已经做了窄修复，使 OpenBox 在已有 100 个点后凑不满
+完整唯一候选批次时可以使用部分批次继续。续跑时 agent 不应随手覆盖
+`parallel_jobs`，应默认继承项目 `config/spectre.yaml` 里的资源设置，除非用户明确
+要求改变资源。
 
 ## 一句原则
 

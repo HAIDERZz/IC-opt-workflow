@@ -20,31 +20,6 @@ test_name: tran_dc_test  # optional metadata
 corner: Nominal          # optional metadata
 ```
 
-## Process Corners (optional)
-
-Leave this section out for the legacy single-corner flow. To enable
-multi-corner evaluation, define it here; there is no `--multi-corner` CLI
-switch. Candidate-internal testbench/corner execution remains serial, so
-`parallel_jobs` still means candidate-level concurrency only. For complete
-examples, see `opt_requirement.multi_corner.md` and
-`opt_requirement.multi_tb_corner.md`. Monte Carlo is not configured here; treat
-it as a separate post-optimization validation step.
-
-```yaml
-# Process Corners:
-#   objective_policy: worst_case
-#   constraint_policy: all_corners
-#   corners:
-#     - id: tt
-#       model_section: Post_simu_top_tt
-#       variables:
-#         temperature: "27"
-#     - id: ss
-#       model_section: Post_simu_top_ss
-#       variables:
-#         temperature: "125"
-```
-
 ## Design Variables
 
 ```yaml
@@ -115,6 +90,15 @@ direction: minimize
 expression: "(rise + fall) * DC"
 ```
 
+## Process Corners
+
+```yaml
+objective_policy: nominal
+constraint_policy: nominal
+corners:
+  - id: nominal
+```
+
 ## Spectre Settings
 
 ```yaml
@@ -129,13 +113,11 @@ keep_failed_runs: true
 keep_successful_runs: true
 ```
 
-`parallel_jobs` is candidate-level concurrency. Enabling multiple testbenches or
-multiple process corners does not add inner parallelism inside one candidate.
-
 ## Optimizer Settings
 
 ```yaml
 algorithm: openbox
+strategy: openbox_auto
 initialization: sobol
 max_evaluations: 100
 batch_size: 10

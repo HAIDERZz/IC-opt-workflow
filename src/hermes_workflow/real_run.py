@@ -433,10 +433,20 @@ def _assert_optimizer_state_matches_bundle(
         raise ValueError(f"optimizer state is {state.status}")
     if state.status == "completed" and not allow_optimizer_continuation:
         raise ValueError(f"optimizer state is {state.status}")
-    if state.current_evaluations != len(ledger_rows):
-        raise ValueError(
-            "optimizer state current_evaluations disagrees with ledger row count"
-        )
+    ledger_count = len(ledger_rows)
+    if state.recorded_observation_count is not None:
+        # B-09 contract: ledger reflects recorded observations, not attempted.
+        if state.recorded_observation_count != ledger_count:
+            raise ValueError(
+                "optimizer state recorded_observation_count disagrees with "
+                "ledger row count"
+            )
+    else:
+        # Legacy state without B-09 fields: keep the original rule.
+        if state.current_evaluations != ledger_count:
+            raise ValueError(
+                "optimizer state current_evaluations disagrees with ledger row count"
+            )
     if (
         state.current_evaluations >= optimizer.max_evaluations
         and not allow_optimizer_continuation
@@ -1304,7 +1314,6 @@ def _build_manifest(
             "preset": spectre.preset.value,
             "output_format": spectre.output_format,
             "threads_per_run": spectre.threads_per_run,
-            "parallel_jobs": spectre.parallel_jobs,
             "timeout_s": spectre.timeout_s,
         },
         "forbidden_actions": [

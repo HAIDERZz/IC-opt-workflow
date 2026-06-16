@@ -86,6 +86,7 @@ class MetricResultManifest(BaseModel):
     ocean: OceanExecution
     metrics: list[MetricResultEntry]
     child_metric_results: list[ChildMetricResultReference] = Field(default_factory=list)
+    command_trace: dict | None = None
     issues: list[str] = Field(default_factory=list)
 
 

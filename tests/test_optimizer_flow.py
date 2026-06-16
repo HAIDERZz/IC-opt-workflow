@@ -1,4 +1,5 @@
 import json
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -7,12 +8,23 @@ from typer.testing import CliRunner
 from hermes_workflow.cli import app
 from hermes_workflow.execution_agent_handoff import ExecutionAgentHandoffReport
 from hermes_workflow.optimizer_flow import OptimizerFlowServices, optimize_project
+from hermes_workflow.package import create_project_from_template
 
 runner = CliRunner()
 
 
 def _status(value: str) -> SimpleNamespace:
     return SimpleNamespace(value=value)
+
+
+def _set_optimizer_strategy(project_dir: Path, strategy: str) -> None:
+    optimizer_path = project_dir / "config" / "optimizer.yaml"
+    optimizer_text = optimizer_path.read_text(encoding="utf-8").replace(
+        "  algorithm: turbo",
+        f"  algorithm: turbo\n  strategy: {strategy}",
+        1,
+    )
+    optimizer_path.write_text(optimizer_text, encoding="utf-8")
 
 
 def _services(project_dir: Path, calls: list[str]) -> OptimizerFlowServices:
@@ -104,6 +116,10 @@ def _services(project_dir: Path, calls: list[str]) -> OptimizerFlowServices:
                 issues=[],
             ),
         ),
+        run_product_doctor=lambda _project, **_kwargs: record(
+            "doctor",
+            SimpleNamespace(status="pass", issues=[]),
+        ),
     )
 
 
@@ -147,6 +163,7 @@ def test_optimize_project_dry_orchestration_stops_before_real_optimizer(
     )
 
     assert calls == [
+        "doctor",
         "check-requirement",
         "prepare-from-requirement",
         "validate",
@@ -164,6 +181,62 @@ def test_optimize_project_dry_orchestration_stops_before_real_optimizer(
     payload = json.loads(report.report_path.read_text(encoding="utf-8"))
     assert payload["dry_orchestration"] is True
     assert payload["steps"][-1]["name"] == "package-optimizer-task"
+
+
+def test_optimize_project_dry_orchestration_reports_turbo_strategy_backend(
+    tmp_path: Path,
+) -> None:
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    cadence_cshrc = tmp_path / "cadence_env.csh"
+    cadence_cshrc.write_text("# cadence", encoding="utf-8")
+    calls: list[str] = []
+
+    report = optimize_project(
+        project_dir,
+        real=True,
+        dry_orchestration=True,
+        max_evals=10,
+        batch_size=2,
+        parallel_jobs=2,
+        cadence_cshrc=cadence_cshrc,
+        strategy="turbo_trust_region",
+        services=_services(project_dir, calls),
+    )
+
+    payload = json.loads(report.report_path.read_text(encoding="utf-8"))
+    assert report.backend == "native_turbo"
+    assert report.stopped_before == "run-native-turbo-real"
+    assert payload["backend"] == "native_turbo"
+    assert payload["stopped_before"] == "run-native-turbo-real"
+
+
+def test_optimize_project_dry_orchestration_uses_config_turbo_strategy_backend(
+    tmp_path: Path,
+) -> None:
+    project_dir = tmp_path / "project"
+    create_project_from_template(project_dir)
+    _set_optimizer_strategy(project_dir, "turbo_trust_region")
+    cadence_cshrc = tmp_path / "cadence_env.csh"
+    cadence_cshrc.write_text("# cadence", encoding="utf-8")
+    calls: list[str] = []
+
+    report = optimize_project(
+        project_dir,
+        real=True,
+        dry_orchestration=True,
+        max_evals=10,
+        batch_size=2,
+        parallel_jobs=2,
+        cadence_cshrc=cadence_cshrc,
+        services=_services(project_dir, calls),
+    )
+
+    payload = json.loads(report.report_path.read_text(encoding="utf-8"))
+    assert report.backend == "native_turbo"
+    assert report.stopped_before == "run-native-turbo-real"
+    assert payload["backend"] == "native_turbo"
+    assert payload["stopped_before"] == "run-native-turbo-real"
 
 
 def test_optimize_project_real_runs_closeout_without_recording_user_acceptance(
@@ -187,6 +260,7 @@ def test_optimize_project_real_runs_closeout_without_recording_user_acceptance(
     )
 
     assert calls == [
+        "doctor",
         "check-requirement",
         "prepare-from-requirement",
         "validate",
@@ -235,6 +309,7 @@ def test_optimize_project_claude_handoff_replaces_direct_optimizer_execution(
     )
 
     assert calls == [
+        "doctor",
         "check-requirement",
         "prepare-from-requirement",
         "validate",
@@ -260,6 +335,81 @@ def test_optimize_project_claude_handoff_replaces_direct_optimizer_execution(
     assert report.recommended_run_id == "real_002"
 
 
+def test_optimize_project_turbo_strategy_routes_to_native_turbo(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    cadence_cshrc = tmp_path / "cadence_env.csh"
+    cadence_cshrc.write_text("# cadence", encoding="utf-8")
+    calls: list[str] = []
+    native_calls: list[dict[str, object]] = []
+    package_calls: list[dict[str, object]] = []
+
+    def fake_run_batch_native_turbo_optimization(
+        project_dir_arg: Path,
+        **kwargs: object,
+    ) -> object:
+        native_calls.append(
+            {
+                "project_dir": project_dir_arg,
+                "max_evals": kwargs["max_evals"],
+                "has_batch_size": "batch_size" in kwargs,
+                "parallel_jobs": kwargs["parallel_jobs"],
+                "cadence_cshrc": kwargs["cadence_cshrc"],
+            }
+        )
+        return SimpleNamespace(
+            evaluation_count=7,
+            report_path=project_dir_arg / "reports" / "native_turbo_optimizer_report.json",
+        )
+
+    services = replace(
+        _services(project_dir, calls),
+        run_batch_native_turbo_optimization=fake_run_batch_native_turbo_optimization,
+        build_optimizer_execution_task_package=lambda _project, **kwargs: (
+            package_calls.append(kwargs)
+            or SimpleNamespace(
+                task_path=project_dir
+                / "execution_package"
+                / "OPTIMIZER_EXECUTION_TASK.md",
+                manifest_path=project_dir
+                / "execution_package"
+                / "optimizer_execution_manifest.json",
+                payload={},
+            )
+        ),
+    )
+    report = optimize_project(
+        project_dir,
+        real=True,
+        max_evals=7,
+        batch_size=3,
+        parallel_jobs=2,
+        cadence_cshrc=cadence_cshrc,
+        strategy="turbo_trust_region",
+        services=services,
+    )
+
+    assert native_calls == [
+            {
+                "project_dir": project_dir,
+                "max_evals": 7,
+                "has_batch_size": False,
+                "parallel_jobs": 2,
+                "cadence_cshrc": cadence_cshrc,
+            }
+    ]
+    assert "run-openbox-real" not in calls
+    assert report.status == "pass"
+    assert package_calls[0]["optimizer_backend"] == "native_turbo"
+    assert package_calls[0]["strategy"] == "turbo_trust_region"
+    assert report.backend == "native_turbo"
+    payload = json.loads(report.report_path.read_text(encoding="utf-8"))
+    assert payload["backend"] == "native_turbo"
+
+
 def record_handoff(calls: list[str], project: Path, **kwargs) -> ExecutionAgentHandoffReport:
     calls.append("execution-agent-handoff")
     assert kwargs["execution_agent"] == "claude"
@@ -281,9 +431,9 @@ def test_optimize_cli_wires_real_dry_orchestration_options(
         assert project_dir_arg == project_dir
         assert kwargs["real"] is True
         assert kwargs["dry_orchestration"] is True
-        assert kwargs["max_evals"] == 7
-        assert kwargs["batch_size"] == 3
-        assert kwargs["parallel_jobs"] == 2
+        assert kwargs["max_evals"] is None
+        assert kwargs["batch_size"] is None
+        assert kwargs["parallel_jobs"] is None
         assert kwargs["cadence_cshrc"] == cadence_cshrc
         assert kwargs["execution_agent"] == "direct"
         return SimpleNamespace(
@@ -302,12 +452,6 @@ def test_optimize_cli_wires_real_dry_orchestration_options(
             str(project_dir),
             "--real",
             "--dry-orchestration",
-            "--max-evals",
-            "7",
-            "--batch-size",
-            "3",
-            "--parallel-jobs",
-            "2",
             "--cadence-cshrc",
             str(cadence_cshrc),
         ],
@@ -316,3 +460,67 @@ def test_optimize_cli_wires_real_dry_orchestration_options(
     assert result.exit_code == 0, result.output
     assert "optimizer flow completed" in result.output
     assert "stopped before: run-openbox-real" in result.output
+
+
+def test_optimize_project_openbox_strategy_ignores_legacy_algorithm_for_routing(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    cadence_cshrc = tmp_path / "cadence_env.csh"
+    cadence_cshrc.write_text("# cadence", encoding="utf-8")
+    calls: list[str] = []
+    openbox_calls: list[dict[str, object]] = []
+
+    def fail_native_turbo(*_args: object, **_kwargs: object) -> object:
+        raise AssertionError("openbox strategy must not route to native TuRBO")
+
+    def fake_openbox(project_dir_arg: Path, **kwargs: object) -> object:
+        calls.append("run-openbox-real")
+        openbox_calls.append(
+            {
+                "project_dir": project_dir_arg,
+                "strategy": kwargs["strategy"],
+                "max_evals": kwargs["max_evals"],
+            }
+        )
+        return SimpleNamespace(
+            evaluation_count=5,
+            report_path=project_dir_arg / "reports" / "openbox_optimizer_report.json",
+            evaluations_path=(
+                project_dir_arg / "reports" / "openbox_optimizer_evaluations.jsonl"
+            ),
+        )
+
+    monkeypatch.setattr(
+        "hermes_workflow.optimizer_flow.run_batch_native_turbo_optimization",
+        fail_native_turbo,
+        raising=False,
+    )
+    services = replace(
+        _services(project_dir, calls),
+        run_openbox_real_optimization=fake_openbox,
+    )
+
+    report = optimize_project(
+        project_dir,
+        real=True,
+        max_evals=5,
+        batch_size=2,
+        parallel_jobs=2,
+        cadence_cshrc=cadence_cshrc,
+        strategy="random_baseline",
+        services=services,
+    )
+
+    assert report.status == "pass"
+    assert openbox_calls == [
+        {
+            "project_dir": project_dir,
+            "strategy": "random_baseline",
+            "max_evals": 5,
+        }
+    ]
+    assert "run-openbox-real" in calls
+    assert "run-native-turbo-real" not in calls

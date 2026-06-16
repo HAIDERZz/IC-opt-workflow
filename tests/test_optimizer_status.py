@@ -55,6 +55,9 @@ def test_summarize_optimizer_status_reads_closeout_reports(tmp_path: Path) -> No
     assert summary.evaluation_count == 4
     assert summary.status_counts
     assert summary.continuation_recommended in {True, False}
+    assert summary.reports["effectiveness_audit"] == (
+        "reports/optimizer_effectiveness_audit.json"
+    )
     assert summary.reports["finalize"] == "reports/optimizer_finalize_report.json"
 
 

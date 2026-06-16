@@ -6,6 +6,12 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
+from hermes_workflow.diagnostics import Diagnostic, DiagnosticSeverity
+from hermes_workflow.doctor_readiness import (
+    build_dirty_state_summary,
+    build_doctor_semantic_summaries,
+    build_optimizer_progress_summary,
+)
 from hermes_workflow.optimizer_artifacts import EVALUATIONS_RELATIVE
 from hermes_workflow.optimizer_artifacts import REPORT_RELATIVE as OPTIMIZER_REPORT_RELATIVE
 from hermes_workflow.project_readiness import check_project_ready
@@ -13,6 +19,12 @@ from hermes_workflow.real_result_record import LEDGER_PATH, OPTIMIZER_STATE_PATH
 from hermes_workflow.requirement_intake import (
     check_requirement,
     prepare_from_requirement,
+)
+from hermes_workflow.license_probe import (
+    LicenseProbeReport,
+    run_license_probe_skipped,
+    run_local_license_probe,
+    write_license_probe_report,
 )
 from hermes_workflow.toolchain_env import check_toolchain_environment
 
@@ -34,6 +46,15 @@ class ProductDoctorReport:
     checks: list[ProductDoctorCheck]
     issues: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
+    structured_issues: list[Diagnostic] = field(default_factory=list)
+    transport: dict[str, Any] = field(default_factory=dict)
+    requirement_summary: dict[str, Any] = field(default_factory=dict)
+    evaluation_matrix: dict[str, Any] = field(default_factory=dict)
+    optimizer_summary: dict[str, Any] = field(default_factory=dict)
+    resource_summary: dict[str, Any] = field(default_factory=dict)
+    dirty_state: dict[str, Any] = field(default_factory=dict)
+    optimizer_progress_summary: dict[str, Any] = field(default_factory=dict)
+    license_probe: dict[str, Any] = field(default_factory=dict)
     report_path: Path | None = None
 
 
@@ -45,6 +66,7 @@ class ProductDoctorServices:
     check_toolchain_environment: Callable[..., dict[str, Any]] = (
         check_toolchain_environment
     )
+    check_license: Callable[..., LicenseProbeReport] = run_local_license_probe
 
 
 def run_product_doctor(
@@ -53,23 +75,71 @@ def run_product_doctor(
     cadence_cshrc: Path | None,
     openbox_venv: Path | None = None,
     services: ProductDoctorServices | None = None,
+    cli_max_evals: int | None = None,
 ) -> ProductDoctorReport:
     project_root = Path(project_dir)
     service = services or ProductDoctorServices()
     checks: list[ProductDoctorCheck] = []
     issues: list[str] = []
     warnings: list[str] = []
+    structured_issues: list[Diagnostic] = []
+
+    transport = {
+        "mode": "local",
+        "ssh_profile": None,
+        "project_dir": str(project_root),
+    }
 
     if not project_root.exists():
         _add(checks, issues, "project_directory", "fail", "project directory is missing")
-        return _report(project_root, checks, issues, warnings, write=False)
+        return _report(
+            project_root,
+            checks,
+            issues,
+            warnings,
+            structured_issues,
+            transport=transport,
+            requirement_summary={},
+            evaluation_matrix={},
+            optimizer_summary={},
+            resource_summary={},
+            dirty_state={},
+            optimizer_progress_summary={},
+            license_probe={},
+            write=False,
+        )
     if not project_root.is_dir():
         _add(checks, issues, "project_directory", "fail", "project path is not a directory")
-        return _report(project_root, checks, issues, warnings, write=False)
+        return _report(
+            project_root,
+            checks,
+            issues,
+            warnings,
+            structured_issues,
+            transport=transport,
+            requirement_summary={},
+            evaluation_matrix={},
+            optimizer_summary={},
+            resource_summary={},
+            dirty_state={},
+            optimizer_progress_summary={},
+            license_probe={},
+            write=False,
+        )
     _add(checks, issues, "project_directory", "pass", "project directory exists")
 
-    requirement_ok = _check_requirement(project_root, service, checks, issues)
+    requirement_ok, requirement_sections = _check_requirement(
+        project_root, service, checks, issues
+    )
     cadence_ok = _check_cadence_cshrc(cadence_cshrc, checks, issues)
+    license_probe_report = _check_license_probe(
+        project_root,
+        requirement_sections,
+        cadence_cshrc=cadence_cshrc if cadence_ok else None,
+        service=service,
+        checks=checks,
+        issues=issues,
+    )
     _check_toolchain(
         project_root,
         service,
@@ -103,7 +173,61 @@ def run_product_doctor(
         )
 
     _check_continuation_artifacts(project_root, checks, issues, warnings)
-    return _report(project_root, checks, issues, warnings, write=True)
+
+    requirement_summary, evaluation_matrix, optimizer_summary, resource_summary, semantic_diagnostics = (
+        build_doctor_semantic_summaries(requirement_sections, cli_max_evals=cli_max_evals)
+    )
+    structured_issues.extend(semantic_diagnostics)
+    for diagnostic in semantic_diagnostics:
+        if diagnostic.severity is DiagnosticSeverity.ERROR:
+            _add(
+                checks,
+                issues,
+                diagnostic.code.lower(),
+                "fail",
+                diagnostic.detail or diagnostic.message,
+            )
+    dirty_state, dirty_diagnostics = build_dirty_state_summary(project_root)
+    structured_issues.extend(dirty_diagnostics)
+    for diagnostic in dirty_diagnostics:
+        warnings.append(f"{diagnostic.code}: {diagnostic.message}")
+
+    requirement_max_evaluations: int | None = None
+    if isinstance(optimizer_summary, dict):
+        candidate = optimizer_summary.get("max_evaluations")
+        if isinstance(candidate, int):
+            requirement_max_evaluations = candidate
+    optimizer_progress_summary, progress_diagnostics = build_optimizer_progress_summary(
+        project_root,
+        requirement_max_evaluations=requirement_max_evaluations,
+    )
+    structured_issues.extend(progress_diagnostics)
+    for diagnostic in progress_diagnostics:
+        if diagnostic.severity is DiagnosticSeverity.ERROR:
+            _add(
+                checks,
+                issues,
+                diagnostic.code.lower(),
+                "fail",
+                diagnostic.detail or diagnostic.message,
+            )
+
+    return _report(
+        project_root,
+        checks,
+        issues,
+        warnings,
+        structured_issues,
+        transport=transport,
+        requirement_summary=requirement_summary,
+        evaluation_matrix=evaluation_matrix,
+        optimizer_summary=optimizer_summary,
+        resource_summary=resource_summary,
+        dirty_state=dirty_state,
+        optimizer_progress_summary=optimizer_progress_summary,
+        license_probe=license_probe_report.to_dict() if license_probe_report else {},
+        write=True,
+    )
 
 
 def _check_requirement(
@@ -111,18 +235,21 @@ def _check_requirement(
     service: ProductDoctorServices,
     checks: list[ProductDoctorCheck],
     issues: list[str],
-) -> bool:
+) -> tuple[bool, dict[str, Any]]:
     try:
         result = service.check_requirement(project_root)
     except Exception as exc:
         _add(checks, issues, "requirement", "fail", str(exc))
-        return False
+        return False, {}
+    sections = getattr(result, "sections", None)
+    if not isinstance(sections, dict):
+        sections = {}
     if getattr(result, "status", None) == "pass":
         _add(checks, issues, "requirement", "pass", "opt_requirement.md parsed")
-        return True
+        return True, sections
     detail = _issues_detail(getattr(result, "issues", []))
     _add(checks, issues, "requirement", "fail", detail or "requirement intake failed")
-    return False
+    return False, sections
 
 
 def _check_cadence_cshrc(
@@ -144,6 +271,58 @@ def _check_cadence_cshrc(
         f"Cadence cshrc does not exist: {cadence_cshrc}",
     )
     return False
+
+
+def _check_license_probe(
+    project_root: Path,
+    requirement_sections: dict[str, Any],
+    *,
+    cadence_cshrc: Path | None,
+    service: ProductDoctorServices,
+    checks: list[ProductDoctorCheck],
+    issues: list[str],
+) -> LicenseProbeReport | None:
+    """Run license probe if ``require_license_check`` is true."""
+    spectre_settings = requirement_sections.get("Spectre Settings")
+    require = False
+    if isinstance(spectre_settings, dict):
+        require = bool(spectre_settings.get("require_license_check", False))
+
+    if not require:
+        report = run_license_probe_skipped(execution_mode="local")
+        _add(checks, issues, "license_probe", "skipped", "require_license_check is false")
+        write_license_probe_report(project_root, report)
+        return report
+
+    if cadence_cshrc is None:
+        report = LicenseProbeReport(
+            status="fail",
+            execution_mode="local",
+            require_license_check=True,
+            issues=["cadence cshrc is missing; cannot run license probe"],
+        )
+        _add(checks, issues, "license_probe", "fail", "cadence cshrc is missing; cannot run license probe")
+        write_license_probe_report(project_root, report)
+        return report
+
+    try:
+        report = service.check_license(cadence_cshrc)
+    except Exception as exc:
+        report = LicenseProbeReport(
+            status="fail",
+            execution_mode="local",
+            require_license_check=True,
+            issues=[f"license probe raised exception: {exc}"],
+        )
+
+    write_license_probe_report(project_root, report)
+
+    if report.status == "pass":
+        _add(checks, issues, "license_probe", "pass", "license environment probe passed")
+    else:
+        detail = "; ".join(report.issues) if report.issues else "license environment probe failed"
+        _add(checks, issues, "license_probe", "fail", detail)
+    return report
 
 
 def _check_toolchain(
@@ -297,7 +476,16 @@ def _report(
     checks: list[ProductDoctorCheck],
     issues: list[str],
     warnings: list[str],
+    structured_issues: list[Diagnostic],
     *,
+    transport: dict[str, Any],
+    requirement_summary: dict[str, Any],
+    evaluation_matrix: dict[str, Any],
+    optimizer_summary: dict[str, Any],
+    resource_summary: dict[str, Any],
+    dirty_state: dict[str, Any],
+    optimizer_progress_summary: dict[str, Any],
+    license_probe: dict[str, Any],
     write: bool,
 ) -> ProductDoctorReport:
     report_path = project_root / REPORT_RELATIVE if write else None
@@ -307,6 +495,15 @@ def _report(
         checks=list(checks),
         issues=list(issues),
         warnings=list(warnings),
+        structured_issues=list(structured_issues),
+        transport=transport,
+        requirement_summary=requirement_summary,
+        evaluation_matrix=evaluation_matrix,
+        optimizer_summary=optimizer_summary,
+        resource_summary=resource_summary,
+        dirty_state=dirty_state,
+        optimizer_progress_summary=optimizer_progress_summary,
+        license_probe=license_probe,
         report_path=report_path,
     )
     if report_path is not None:
@@ -314,6 +511,9 @@ def _report(
         payload = asdict(report)
         payload["schema_version"] = "1.0"
         payload["report_path"] = REPORT_RELATIVE.as_posix()
+        payload["structured_issues"] = [
+            diagnostic.model_dump() for diagnostic in structured_issues
+        ]
         report_path.write_text(
             json.dumps(payload, indent=2, sort_keys=True, default=str) + "\n",
             encoding="utf-8",

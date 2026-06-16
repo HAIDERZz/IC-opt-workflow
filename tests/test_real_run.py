@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 import pytest
+import yaml
 
 from hermes_workflow import real_run
 from hermes_workflow.approvals import decide_first_real_run
@@ -318,13 +319,35 @@ def test_prepare_real_run_writes_first_real_run_package(tmp_path: Path) -> None:
         "preset": "ax",
         "output_format": "psfxl",
         "threads_per_run": 10,
-        "parallel_jobs": 10,
         "timeout_s": 3600,
     }
     assert "modify_maestro_setup" in manifest["forbidden_actions"]
     assert not (project_dir / "ledger" / "experiment_ledger.jsonl").exists()
     assert not (project_dir / "state" / "optimizer_state.json").exists()
     assert not (project_dir / "state" / "best_candidate.json").exists()
+
+
+def test_prepare_real_run_omits_parallel_jobs_from_spectre_runtime_contract(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_project(tmp_path)
+    _approve_project(project_dir)
+    _write_template(project_dir)
+
+    prepare_real_run(project_dir, created_at_utc="2026-06-13T00:20:00Z")
+
+    run_dir = project_dir / "runs" / "real" / "real_001"
+    manifest = _load_json(run_dir / "real_run_manifest.json")
+
+    assert "parallel_jobs" not in manifest["spectre"]
+    assert manifest["spectre"]["threads_per_run"] == 10
+    assert manifest["spectre"]["timeout_s"] == 3600
+
+    spectre_yaml = yaml.safe_load(
+        (project_dir / "config" / "spectre.yaml").read_text(encoding="utf-8")
+    )
+    assert "parallel_jobs" in spectre_yaml["spectre"]
+    assert spectre_yaml["spectre"]["parallel_jobs"] == 10
 
 
 def test_prepare_real_run_copies_exported_netlist_sidecars(tmp_path: Path) -> None:
@@ -414,7 +437,6 @@ def test_prepare_real_run_writes_metric_extraction_request(tmp_path: Path) -> No
         "preset": "ax",
         "output_format": "psfxl",
         "threads_per_run": 10,
-        "parallel_jobs": 10,
         "timeout_s": 3600,
     }
     assert request["ocean"] == {
@@ -445,6 +467,24 @@ def test_prepare_real_run_writes_metric_extraction_request(tmp_path: Path) -> No
         == "runs/real/real_001/metric_extraction_request.json"
     )
     assert manifest["metric_extraction_request_sha256"] == sha256_file(request_path)
+
+
+def test_metric_request_omits_parallel_jobs_from_spectre_runtime_contract(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_project(tmp_path)
+    _approve_project(project_dir)
+    _write_template(project_dir)
+
+    prepare_real_run(project_dir, created_at_utc="2026-06-13T00:20:00Z")
+
+    run_dir = project_dir / "runs" / "real" / "real_001"
+    request = _load_json(run_dir / "metric_extraction_request.json")
+
+    assert "parallel_jobs" not in request["spectre"]
+    assert request["spectre"]["output_format"] == "psfxl"
+    assert request["spectre"]["threads_per_run"] == 10
+    assert request["spectre"]["timeout_s"] == 3600
 
 
 def test_prepare_real_run_writes_multi_testbench_child_packages(tmp_path: Path) -> None:
@@ -534,14 +574,10 @@ def test_prepare_real_run_requires_ocean_ready_spectre_format(tmp_path: Path) ->
         ),
         encoding="utf-8",
     )
-    _approve_project(project_dir)
     _write_template(project_dir)
 
-    with pytest.raises(
-        ValueError,
-        match="spectre.output_format must be OCEAN-ready for metric extraction: psfascii",
-    ):
-        prepare_real_run(project_dir)
+    with pytest.raises(ValueError, match="spectre.output_format"):
+        _approve_project(project_dir)
 
     assert not (project_dir / "runs" / "real" / "real_001").exists()
 

@@ -206,12 +206,13 @@ python3 -m venv .venv
 
 ./.venv/bin/ic-opt ~/spectre_opt_prj/<project_name> \
   --real \
-  --dry-orchestration \
-  --max-evals 100 \
-  --batch-size 10
+  --dry-orchestration
 
 ./.venv/bin/ic-opt ~/spectre_opt_prj/<project_name> \
-  --real \
-  --max-evals 100 \
-  --batch-size 10
+  --real
 ```
+
+Current product contract: `max_evaluations`, `batch_size`, `parallel_jobs`,
+`threads_per_run`, `optimizer_cpu_threads`, and optimizer strategy come from
+`opt_requirement.md` / generated config. Use `ic-opt PROJECT --real --continue N`
+only when adding continuation evaluations.

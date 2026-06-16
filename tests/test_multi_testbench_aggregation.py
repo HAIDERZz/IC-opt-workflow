@@ -35,6 +35,54 @@ def _write_json(path: Path, payload: dict) -> None:
     )
 
 
+def _inject_child_command_trace(
+    project_dir: Path,
+    *,
+    testbench_id: str,
+    corner_id: str | None = "nominal",
+    run_id: str = "real_001",
+) -> None:
+    child_dir = project_dir / "runs" / "real" / run_id / "testbenches" / testbench_id
+    if corner_id is not None:
+        child_dir = child_dir / "corners" / corner_id
+    result_path = child_dir / "result_manifest.json"
+    metric_path = child_dir / "metrics" / "metric_result_manifest.json"
+    result_payload = _load_json(result_path)
+    metric_payload = _load_json(metric_path)
+    result_payload["command_trace"] = {
+        "schema_version": "1.0",
+        "execution_mode": "local",
+        "spectre": {
+            "argv": ["spectre", "-64", "input.scs", "+preset=ax", "+mt=10"],
+            "command": "spectre -64 input.scs +preset=ax +mt=10",
+            "cwd": str(child_dir / "netlist"),
+            "timeout_s": 3600,
+            "settings": {
+                "engine": "spectre_x",
+                "preset": "ax",
+                "threads_per_run": 10,
+                "output_format": "psfxl",
+            },
+        },
+    }
+    metric_payload["command_trace"] = {
+        "schema_version": "1.0",
+        "execution_mode": "local",
+        "spectre": result_payload["command_trace"]["spectre"],
+        "ocean": {
+            "argv": ["ocean", "-nograph", "-replay", "metric_probe.ocn"],
+            "command": "ocean -nograph -replay metric_probe.ocn",
+            "cwd": str(child_dir),
+            "timeout_s": 3600,
+            "mode": "nograph_replay",
+            "return_code": 0,
+            "return_codes": [0],
+        },
+    }
+    _write_json(result_path, result_payload)
+    _write_json(metric_path, metric_payload)
+
+
 def _create_ready_multi_testbench_project(tmp_path: Path) -> Path:
     project_dir = _copy_multi_testbench_requirement_project(tmp_path)
     assert prepare_from_requirement(project_dir).status == "pass"
@@ -587,6 +635,94 @@ def test_aggregate_multi_testbench_child_manifests_pass_existing_checks(
         "cg_nf",
         "iip3",
     ]
+
+
+def test_aggregate_result_manifest_inherits_prepared_spectre_settings(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_multi_testbench_project(tmp_path)
+    run_dir = project_dir / "runs" / "real" / "real_001"
+    prepared_path = run_dir / "real_run_manifest.json"
+    request_path = run_dir / "metric_extraction_request.json"
+    prepared = _load_json(prepared_path)
+    request = _load_json(request_path)
+    prepared["spectre"].update(
+        {
+            "engine": "spectre_x",
+            "preset": "cx",
+            "output_format": "psfbin",
+            "threads_per_run": 7,
+            "timeout_s": 7200,
+        }
+    )
+    request["spectre"].update(
+        {
+            "preset": "cx",
+            "output_format": "psfbin",
+            "threads_per_run": 7,
+            "timeout_s": 7200,
+        }
+    )
+    _write_json(prepared_path, prepared)
+    _write_json(request_path, request)
+    _write_child_handoff(project_dir, testbench_id="cg_nf", metric_name="MAX_GAIN")
+    _write_child_handoff(project_dir, testbench_id="iip3", metric_name="IIP3")
+
+    aggregate_multi_testbench_run(project_dir, run_id="real_001")
+
+    aggregate_result = _load_json(run_dir / "result_manifest.json")
+    assert aggregate_result["simulator"] == {
+        "engine": "spectre_x",
+        "preset": "cx",
+        "output_format": "psfbin",
+        "threads_per_run": 7,
+        "timeout_s": 7200,
+        "command_label": "multi_testbench_aggregate",
+    }
+
+
+def test_aggregate_parent_manifests_include_child_command_trace(tmp_path: Path) -> None:
+    project_dir = _create_ready_multi_testbench_project(tmp_path)
+    _write_child_handoff(project_dir, testbench_id="cg_nf", metric_name="MAX_GAIN")
+    _write_child_handoff(project_dir, testbench_id="iip3", metric_name="IIP3")
+    _inject_child_command_trace(project_dir, testbench_id="cg_nf")
+    _inject_child_command_trace(project_dir, testbench_id="iip3")
+
+    aggregate_multi_testbench_run(project_dir, run_id="real_001")
+
+    aggregate_result = _load_json(
+        project_dir / "runs" / "real" / "real_001" / "result_manifest.json"
+    )
+    aggregate_metric = _load_json(
+        project_dir
+        / "runs"
+        / "real"
+        / "real_001"
+        / "metrics"
+        / "metric_result_manifest.json"
+    )
+
+    for payload in (aggregate_result, aggregate_metric):
+        trace = payload["command_trace"]
+        assert trace["schema_version"] == "1.0"
+        assert trace["execution_mode"] == "local"
+        assert trace["aggregate"]["kind"] == "multi_testbench_parent"
+        children = trace["aggregate"]["children"]
+        assert len(children) == 2
+        cg_nf = next(child for child in children if child["testbench"] == "cg_nf")
+        assert cg_nf["result_manifest"] == (
+            "runs/real/real_001/testbenches/cg_nf/corners/nominal/result_manifest.json"
+        )
+        assert cg_nf["metric_result_manifest"] == (
+            "runs/real/real_001/testbenches/cg_nf/corners/nominal/metrics/"
+            "metric_result_manifest.json"
+        )
+        assert cg_nf["result"]["spectre"]["argv"][0] == "spectre"
+        assert cg_nf["metric"]["ocean"]["argv"][0] == "ocean"
+        serialized = json.dumps(trace, sort_keys=True)
+        assert "cshrc" not in serialized
+        assert "source " not in serialized
+        assert "ssh " not in serialized
 
 
 def test_aggregate_multi_testbench_metric_failure_fails_metric_check_only(

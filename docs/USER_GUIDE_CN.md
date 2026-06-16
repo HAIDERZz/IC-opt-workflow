@@ -1,4 +1,4 @@
-# IC Auto Opt Workflow v0.1.6 使用说明
+# IC Auto Opt Workflow v0.1.7 使用说明
 
 这份说明面向集成电路方向用户，假设你会使用 Linux 和 Cadence，但不要求你熟悉
 Python 工程。
@@ -23,6 +23,19 @@ Hermes 在这里指“信使层”：它把用户写在 `opt_requirement.md` 里
 ```bash
 ./.venv/bin/ic-opt /path/to/project --real
 ```
+
+当前产品合同：初次真实优化的机器关键变量只能从 `opt_requirement.md` / 生成的
+config 进入，包括最大评估数 `max_evaluations`、批大小 `batch_size`、
+候选并发 `parallel_jobs`、单个 Spectre 线程数 `threads_per_run`、优化器 CPU
+线程限制 `optimizer_cpu_threads`、优化策略、初始化方式、输出格式、保留策略、
+metric 公式、约束和多工艺角设置。不要在 `ic-opt PROJECT --real` 命令行追加
+`--max-evals`、`--batch-size`、`--parallel-jobs`、`--threads` 或 `--strategy`。
+续跑只保留 `ic-opt PROJECT --real --continue N`，表示追加 N 个评估点。
+
+多工艺角通过 `opt_requirement.md` 的 `Process Corners` 配置，不存在
+`--multi-corner` CLI 开关。示例见
+`examples/spectre_maestro_project/opt_requirement.multi_corner.md` 和
+`examples/spectre_maestro_project/opt_requirement.multi_tb_corner.md`。
 
 项目会自动完成：
 
@@ -343,11 +356,7 @@ expression: >-
 这个命令不会启动 Spectre/OCEAN：
 
 ```bash
-./.venv/bin/ic-opt ~/spectre_opt_prj/Mixer_opt \
-  --real \
-  --dry-orchestration \
-  --max-evals 100 \
-  --batch-size 10
+./.venv/bin/ic-opt ~/spectre_opt_prj/Mixer_opt --real --dry-orchestration
 ```
 
 如果这里失败，通常是 `opt_requirement.md`、路径、格式或环境文件位置有问题。
@@ -355,10 +364,7 @@ expression: >-
 ## 7. 跑真实优化
 
 ```bash
-./.venv/bin/ic-opt ~/spectre_opt_prj/Mixer_opt \
-  --real \
-  --max-evals 100 \
-  --batch-size 10
+./.venv/bin/ic-opt ~/spectre_opt_prj/Mixer_opt --real
 ```
 
 如果你的环境文件不叫 `cadence_env.csh`：
@@ -450,30 +456,44 @@ ssh eda-lab 'test -f /remote/path/to/Mixer_opt/cadence_env.csh'
 ```bash
 ic-opt --ssh-profile eda-lab /remote/path/to/Mixer_opt --doctor
 
-ic-opt --ssh-profile eda-lab /remote/path/to/Mixer_opt \
-  --real \
-  --max-evals 80 \
-  --batch-size 10 \
-  --parallel-jobs 6
+ic-opt --ssh-profile eda-lab /remote/path/to/Mixer_opt --real
 
-ic-opt --ssh-profile eda-lab /remote/path/to/Mixer_opt \
-  --continue 20 \
-  --batch-size 10 \
-  --parallel-jobs 6
+ic-opt --ssh-profile eda-lab /remote/path/to/Mixer_opt --real --continue 20
 ```
 
 远程并发建议：
 
-- `parallel_jobs` 是 candidate 级别并发，不是每个 testbench 的并发数。
+- `parallel_jobs` 在 `opt_requirement.md` 里设置，是 candidate 级别并发，
+  不是每个 testbench 的并发数。
 - 多 testbench candidate 会在每个 candidate 内部跑它需要的 testbench。
 - 开启多 corner 后，这个语义也不变；单个 candidate 内部仍然按
   `testbench x corner` 串行执行。
-- 正常远程多 testbench 或多 corner 项目，建议从 `--parallel-jobs 4`
-  到 `--parallel-jobs 8` 开始。
-- `--parallel-jobs 24` 或 `36` 更像压力测试，容易触发远程 SSH 服务端限制，比如
+- 正常远程多 testbench 或多 corner 项目，建议在 `opt_requirement.md`
+  里从 `parallel_jobs: 4` 到 `parallel_jobs: 8` 开始。
+- `parallel_jobs: 24` 或 `36` 更像压力测试，容易触发远程 SSH 服务端限制，比如
   `kex_exchange_identification: Connection closed by remote host`。
 - `optimizer_cpu_threads` 只限制本机 optimizer/OpenBox 侧 CPU 使用，不限制远程
   Spectre/OCEAN 进程数量，也不限制 SSH 连接数。
+
+### 候选 run 目录保留 (`keep_failed_runs` / `keep_successful_runs`)
+
+`opt_requirement.md` 里的 `Spectre Settings.keep_successful_runs` 和
+`keep_failed_runs` 控制每个候选点 `runs/real/<run_id>` 目录在结果记录完成后是否
+保留。两个开关都在候选点 finalize 之后才生效，不会破坏 result_manifest、metric
+聚合、目标函数计算或 `record_real_result` 需要的中间产物。
+
+- `keep_successful_runs: true`：候选点产出可用真实观测时保留 run 目录。
+  注意约束（constraint）失败但指标 scalar 全部有效的情况，仍然算"成功观测"，
+  由这个开关控制。
+- `keep_successful_runs: false`：结果记录完成后删除该 run 目录。
+- `keep_failed_runs: true`：候选点在真实执行、metric 提取、聚合、结果检查或结果
+  记录中失败时保留 run 目录方便排查。
+- `keep_failed_runs: false`：失败被分类并写入报告后删除该 run 目录。
+
+`ledger/`、`state/`、最佳候选状态、`reports/` 下的优化报告以及
+`state/run_retention/<run_id>.json` 决策报告不会被这两个开关删除。远程模式下，
+同一份策略也会清理远程 `<remote_project_dir>/runs/real/<run_id>`，仅在产物已下载
+完毕后执行。
 
 多 corner 只通过 `opt_requirement.md` 里的 `Process Corners` 配置启用，
 没有 `--multi-corner` 命令行开关；如果不写这个 section，就保持原来的单 corner
@@ -529,13 +549,17 @@ accept_best_observed_or_continue
 ## 10. 继续追加优化
 
 ```bash
-./.venv/bin/ic-opt ~/spectre_opt_prj/Mixer_opt \
-  --continue 40
+./.venv/bin/ic-opt ~/spectre_opt_prj/Mixer_opt --real --continue 40
 ```
 
-续跑时如果已有优化历史，默认继承历史里已经验收过的资源设置；如果没有历史，
-才使用项目里的 `config/spectre.yaml`。不要习惯性加 `--parallel-jobs`，除非你
-明确想改变资源；混用不同并行设置会让验收器拒绝这份优化历史。
+续跑时只接受继续点数 `N`：策略、资源、batch_size、parallel_jobs、Spectre 设置等
+均由项目里 `opt_requirement.md` / `config/optimizer.yaml` 决定。不要给产品 CLI 加
+`--parallel-jobs`、`--batch-size` 或 `--strategy`；这些不是产品续跑入口。
+混用不同并行设置会让验收器拒绝
+这份优化历史。
+
+低层 `hermes-workflow` 命令只用于开发和诊断某个内部阶段，不是产品入口。普通用户和
+agent 操作都应使用 `ic-opt`，不要把低层调试参数当作 requirement 的替代入口。
 
 ## 11. 和 Agent 配合使用
 

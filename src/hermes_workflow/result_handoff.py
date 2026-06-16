@@ -71,6 +71,7 @@ class ResultManifest(BaseModel):
     result_data: ResultData | None = None
     metric_result_manifest: str | None = None
     child_results: list[ChildResultReference] = Field(default_factory=list)
+    command_trace: dict | None = None
     notes: str | None = None
 
     @field_validator("started_at_utc", "completed_at_utc")

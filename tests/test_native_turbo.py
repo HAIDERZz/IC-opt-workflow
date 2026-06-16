@@ -230,6 +230,8 @@ class _FakeBatchTurbo:
         max_evals,
         batch_size,
         verbose,
+        initialization=None,
+        random_seed=None,
     ) -> None:
         self.f_batch = f_batch
         self.lb = lb
@@ -238,6 +240,8 @@ class _FakeBatchTurbo:
         self.max_evals = max_evals
         self.batch_size = batch_size
         self.verbose = verbose
+        self.initialization = initialization
+        self.random_seed = random_seed
         self.optimize_called = False
         _FakeBatchTurbo.instances.append(self)
 
@@ -646,6 +650,8 @@ def test_run_native_turbo_optimization_writes_compact_trace_files(tmp_path: Path
     ).read_text(encoding="utf-8").splitlines()
     assert report["evaluation_count"] == 5
     assert report["best_candidate"]["status"] == "feasible"
+    assert report["initialization"] == "sobol"
+    assert report["effective_initial_design"] == "sobol"
     assert len(lines) == 5
     assert result.report_path == project_dir / "reports/native_turbo_optimizer_report.json"
 
@@ -682,6 +688,46 @@ def test_run_batch_native_turbo_optimization_uses_optimizer_batch_size(
     assert observed_batch_sizes == [10]
     assert result.evaluation_count == 5
     assert result.report_path == project_dir / "reports/native_turbo_optimizer_report.json"
+
+
+def test_run_batch_native_turbo_optimization_accepts_adapter_argument(
+    tmp_path: Path,
+) -> None:
+    project_dir = tmp_path / "bridge_test_inv"
+    create_project_from_template(project_dir)
+
+    def batch_evaluator(candidates) -> list[NativeTurboObservation]:
+        return [
+            NativeTurboObservation(
+                metrics={"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-6},
+            )
+            for _candidate in candidates
+        ]
+
+    result = run_batch_native_turbo_optimization(
+        project_dir,
+        adapter=lambda *args, **kwargs: None,
+        batch_evaluator=batch_evaluator,
+        batch_turbo_factory=_FakeBatchTurbo,
+        max_evals=5,
+        parallel_jobs=3,
+        threads_per_run=10,
+    )
+
+    assert result.evaluation_count == 5
+    report = json.loads(
+        (project_dir / "reports/native_turbo_optimizer_report.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert report["runtime_thread_limits"]["env_vars"] == {
+        "MKL_NUM_THREADS": "4",
+        "NUMBA_NUM_THREADS": "4",
+        "NUMEXPR_NUM_THREADS": "4",
+        "OMP_NUM_THREADS": "4",
+        "OPENBLAS_NUM_THREADS": "4",
+        "VECLIB_MAXIMUM_THREADS": "4",
+    }
 
 
 def test_run_batch_native_turbo_optimization_applies_optimizer_cpu_thread_limit(
@@ -727,7 +773,7 @@ def test_run_batch_native_turbo_optimization_applies_optimizer_cpu_thread_limit(
     )
 
     assert result.evaluation_count == 5
-    assert calls == [(3, {"set_environment": False})]
+    assert calls == [(3, {"set_environment": True, "backend": "native_turbo", "execution_mode": "local"})]
 
 
 def test_default_batch_turbo_factory_calls_f_batch_by_chunk() -> None:
@@ -1318,6 +1364,7 @@ def test_run_native_turbo_cli_uses_fake_runner(monkeypatch: pytest.MonkeyPatch, 
     project_dir.mkdir()
 
     def fake_run_native_turbo_optimization(project_dir_arg: Path, **kwargs):
+        assert kwargs["max_evals"] is None
         reports = project_dir_arg / "reports"
         reports.mkdir()
         report_path = reports / "native_turbo_optimizer_report.json"
@@ -1327,7 +1374,7 @@ def test_run_native_turbo_cli_uses_fake_runner(monkeypatch: pytest.MonkeyPatch, 
                 {
                     "schema_version": "1.0",
                     "status": "completed",
-                    "evaluation_count": kwargs["max_evals"],
+                    "evaluation_count": 3,
                     "best_candidate": None,
                     "issues": [],
                 },
@@ -1342,7 +1389,7 @@ def test_run_native_turbo_cli_uses_fake_runner(monkeypatch: pytest.MonkeyPatch, 
             "FakeResult",
             (),
             {
-                "evaluation_count": kwargs["max_evals"],
+                "evaluation_count": 3,
                 "report_path": report_path,
                 "evaluations_path": evaluations_path,
             },
@@ -1354,14 +1401,12 @@ def test_run_native_turbo_cli_uses_fake_runner(monkeypatch: pytest.MonkeyPatch, 
     )
     result = CliRunner().invoke(
         app,
-        [
-            "run-native-turbo",
-            str(project_dir),
-            "--max-evals",
-            "3",
-            "--cadence-cshrc",
-            "/tmp/fake.csh",
-        ],
+            [
+                "run-native-turbo",
+                str(project_dir),
+                "--cadence-cshrc",
+                "/tmp/fake.csh",
+            ],
     )
 
     assert result.exit_code == 0
@@ -1417,20 +1462,18 @@ def test_run_native_turbo_cli_parallel_uses_batch_runner(
     )
     result = CliRunner().invoke(
         app,
-        [
-            "run-native-turbo",
-            str(project_dir),
-            "--parallel",
-            "--max-evals",
-            "10",
-            "--cadence-cshrc",
-            "/tmp/fake.csh",
-        ],
+            [
+                "run-native-turbo",
+                str(project_dir),
+                "--parallel",
+                "--cadence-cshrc",
+                "/tmp/fake.csh",
+            ],
     )
 
     assert result.exit_code == 0
     assert called["project_dir"] == project_dir
-    assert called["max_evals"] == 10
+    assert called["max_evals"] is None
     assert called["cadence_cshrc"] == Path("/tmp/fake.csh")
 
 
@@ -1490,8 +1533,772 @@ def test_write_native_turbo_reports_includes_batch_summary(tmp_path: Path) -> No
     )
 
     payload = json.loads(report_path.read_text(encoding="utf-8"))
+    assert payload["effectiveness_audit"] == "reports/optimizer_effectiveness_audit.json"
     assert payload["batch_summary"] == {
         "batch_count": 1,
         "max_batch_worker_count": 2,
         "status_counts": {"constraint_failed": 1, "feasible": 1},
+    }
+    audit_payload = json.loads(
+        (tmp_path / "reports" / "optimizer_effectiveness_audit.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert audit_payload["backend"] == "native_turbo"
+    assert audit_payload["requested_strategy"] == "turbo_trust_region"
+    assert audit_payload["batches"][0]["history_size_before"] == 0
+
+
+class _CapturedNativeTurboMaxWorkers(Exception):
+    """Sentinel raised by the monkeypatched evaluator factory to short-circuit
+    `run_batch_native_turbo_optimization` after capturing the scheduler value."""
+
+
+def _set_native_turbo_config_parallelism(
+    project_dir: Path,
+    *,
+    batch_size: int,
+    parallel_jobs: int,
+) -> None:
+    """Update batch_size in optimizer.yaml and parallel_jobs in spectre.yaml."""
+
+    optimizer_path = project_dir / "config" / "optimizer.yaml"
+    optimizer_text = optimizer_path.read_text(encoding="utf-8").replace(
+        "batch_size: 10",
+        f"batch_size: {batch_size}",
+    )
+    optimizer_path.write_text(optimizer_text, encoding="utf-8")
+
+    spectre_path = project_dir / "config" / "spectre.yaml"
+    spectre_text = spectre_path.read_text(encoding="utf-8").replace(
+        "parallel_jobs: 10",
+        f"parallel_jobs: {parallel_jobs}",
+    )
+    spectre_path.write_text(spectre_text, encoding="utf-8")
+
+
+def test_native_turbo_uses_requirement_parallel_jobs_for_candidate_workers(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Lock contract: native TuRBO real evaluator uses
+    max_workers = min(batch_size, parallel_jobs_from_config)
+    where parallel_jobs comes from bundle.spectre.spectre.parallel_jobs
+    (config-loaded SpectreSettings), not from prepared/request spectre metadata.
+    """
+
+    import hermes_workflow.native_turbo as module
+
+    # Schema rule (validate.py) requires optimizer.batch_size <= spectre.parallel_jobs.
+    cases = [
+        # (batch_size, parallel_jobs, expected min)
+        (3, 5, 3),
+        (2, 4, 2),
+    ]
+    for batch_size, parallel_jobs, expected in cases:
+        case_root = tmp_path / f"case_b{batch_size}_p{parallel_jobs}"
+        project_dir = case_root / "project"
+        create_project_from_template(project_dir)
+        _set_native_turbo_config_parallelism(
+            project_dir,
+            batch_size=batch_size,
+            parallel_jobs=parallel_jobs,
+        )
+
+        # No prepared/request files exist here at all, which makes it
+        # mechanically impossible for the scheduler value to come from
+        # runtime spectre metadata. The contract under test forces the value
+        # to flow from bundle.spectre.spectre.parallel_jobs.
+        assert not (project_dir / "runs").exists()
+
+        captured: dict[str, int] = {}
+
+        def fake_factory(
+            project_dir,
+            *,
+            cadence_cshrc,
+            max_workers,
+            adapter=None,
+        ):
+            captured["max_workers"] = max_workers
+            raise _CapturedNativeTurboMaxWorkers
+
+        monkeypatch.setattr(
+            module,
+            "make_real_candidate_batch_evaluator",
+            fake_factory,
+        )
+
+        with pytest.raises(_CapturedNativeTurboMaxWorkers):
+            run_batch_native_turbo_optimization(
+                project_dir,
+                max_evals=1,
+            )
+
+        assert captured["max_workers"] == expected, (
+            f"expected min({batch_size}, {parallel_jobs}) == {expected}, "
+            f"got {captured['max_workers']}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# B-06 Run retention contract integration (local TuRBO paths)
+# ---------------------------------------------------------------------------
+
+
+def _set_keep_flags_for_retention(
+    project_dir: Path, *, keep_failed_runs: bool, keep_successful_runs: bool
+) -> None:
+    spectre_path = project_dir / "config" / "spectre.yaml"
+    text = spectre_path.read_text(encoding="utf-8")
+    text = text.replace(
+        "keep_failed_runs: true",
+        f"keep_failed_runs: {str(keep_failed_runs).lower()}",
+    )
+    text = text.replace(
+        "keep_successful_runs: true",
+        f"keep_successful_runs: {str(keep_successful_runs).lower()}",
+    )
+    spectre_path.write_text(text, encoding="utf-8")
+
+
+def _create_approved_real_project_with_keep_flags(
+    tmp_path: Path,
+    *,
+    keep_failed_runs: bool,
+    keep_successful_runs: bool,
+) -> Path:
+    """Mirror create_approved_real_project but flip retention flags BEFORE the
+    execution package hashes config files (to avoid immutable-config drift)."""
+    from hermes_workflow.approvals import decide_first_real_run
+    from hermes_workflow.real_run import prepare_real_run
+
+    project_dir = tmp_path / "bridge_test_inv"
+    create_project_from_template(project_dir)
+    _set_keep_flags_for_retention(
+        project_dir,
+        keep_failed_runs=keep_failed_runs,
+        keep_successful_runs=keep_successful_runs,
+    )
+    build_execution_package(project_dir, created_at_utc="2026-06-03T00:00:00Z")
+    write_pass_reports(project_dir)
+    instruction = decide_first_real_run(
+        project_dir,
+        created_at_utc="2026-06-03T00:10:00Z",
+    )
+    assert instruction["decision"] == "approve_first_real_run"
+    template_path = project_dir / "netlists" / "templates" / "template.scs"
+    template_path.parent.mkdir(parents=True, exist_ok=True)
+    template_path.write_text(
+        "simulator lang=spectre\n"
+        "parameters FN={{FN}} WN={{WN}} FP={{FP}} WP={{WP}}\n"
+        "tran tran stop=10n\n",
+        encoding="utf-8",
+    )
+    prepare_real_run(project_dir, created_at_utc="2026-06-03T00:20:00Z")
+    return project_dir
+
+
+def test_native_turbo_evaluate_real_candidate_deletes_run_dir_when_keep_successful_runs_false(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_approved_real_project_with_keep_flags(
+        tmp_path, keep_failed_runs=True, keep_successful_runs=False
+    )
+    import shutil
+
+    shutil.rmtree(project_dir / "runs")
+
+    def adapter(project: Path, *, run_id: str, cadence_cshrc: Path | None) -> None:
+        write_fake_result_manifest(project, run_id=run_id)
+        write_fake_metric_result_manifest(
+            project,
+            run_id=run_id,
+            values={"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-6},
+        )
+
+    observation = evaluate_real_candidate(
+        project_dir,
+        candidate_id="candidate_000001",
+        parameters={"FN": "4", "WN": "0.5u", "FP": "4", "WP": "1.1u"},
+        run_id="real_001",
+        adapter=adapter,
+    )
+
+    assert observation.status == "recorded"
+    assert not (project_dir / "runs" / "real" / "real_001").exists()
+    decision_path = project_dir / "state" / "run_retention" / "real_001.json"
+    assert decision_path.is_file()
+    decision = json.loads(decision_path.read_text(encoding="utf-8"))
+    assert decision["run_status"] == "successful"
+    assert decision["local_action"] == "deleted"
+    assert decision["candidate_id"] == "candidate_000001"
+    # ledger and state must NOT be removed.
+    assert (project_dir / "ledger" / "experiment_ledger.jsonl").exists()
+    assert (project_dir / "state" / "optimizer_state.json").exists()
+
+
+def test_native_turbo_evaluate_real_candidate_keeps_run_dir_when_keep_successful_runs_true(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_approved_real_project_with_keep_flags(
+        tmp_path, keep_failed_runs=True, keep_successful_runs=True
+    )
+    import shutil
+
+    shutil.rmtree(project_dir / "runs")
+
+    def adapter(project: Path, *, run_id: str, cadence_cshrc: Path | None) -> None:
+        write_fake_result_manifest(project, run_id=run_id)
+        write_fake_metric_result_manifest(
+            project,
+            run_id=run_id,
+            values={"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-6},
+        )
+
+    observation = evaluate_real_candidate(
+        project_dir,
+        candidate_id="candidate_000001",
+        parameters={"FN": "4", "WN": "0.5u", "FP": "4", "WP": "1.1u"},
+        run_id="real_001",
+        adapter=adapter,
+    )
+
+    assert observation.status == "recorded"
+    assert (project_dir / "runs" / "real" / "real_001").is_dir()
+    decision = json.loads(
+        (project_dir / "state" / "run_retention" / "real_001.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert decision["local_action"] == "kept"
+    assert decision["run_status"] == "successful"
+
+
+def test_native_turbo_evaluate_real_candidate_classifies_constraint_fail_as_successful_for_retention(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_approved_real_project_with_keep_flags(
+        tmp_path, keep_failed_runs=False, keep_successful_runs=True
+    )
+    import shutil
+
+    shutil.rmtree(project_dir / "runs")
+
+    # Values violate the rise<80e-12 constraint but are valid finite scalars,
+    # so record_real_result will still record (simulation_status=real_constraint_fail).
+    def adapter(project: Path, *, run_id: str, cadence_cshrc: Path | None) -> None:
+        write_fake_result_manifest(project, run_id=run_id)
+        write_fake_metric_result_manifest(
+            project,
+            run_id=run_id,
+            values={"rise": 200.0e-12, "fall": 1.0e-12, "DC": 1.0e-6},
+        )
+
+    observation = evaluate_real_candidate(
+        project_dir,
+        candidate_id="candidate_000001",
+        parameters={"FN": "4", "WN": "0.5u", "FP": "4", "WP": "1.1u"},
+        run_id="real_001",
+        adapter=adapter,
+    )
+
+    assert observation.status == "recorded"
+    decision = json.loads(
+        (project_dir / "state" / "run_retention" / "real_001.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert decision["run_status"] == "successful"
+    # keep_successful_runs is true → kept.
+    assert decision["local_action"] == "kept"
+    assert (project_dir / "runs" / "real" / "real_001").is_dir()
+
+
+def test_native_turbo_evaluate_real_candidate_deletes_run_dir_when_keep_failed_runs_false_on_record_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    project_dir = _create_approved_real_project_with_keep_flags(
+        tmp_path, keep_failed_runs=False, keep_successful_runs=True
+    )
+    import shutil
+
+    shutil.rmtree(project_dir / "runs")
+
+    def adapter(project: Path, *, run_id: str, cadence_cshrc: Path | None) -> None:
+        write_fake_result_manifest(project, run_id=run_id)
+        write_fake_metric_result_manifest(
+            project,
+            run_id=run_id,
+            values={"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-6},
+        )
+
+    # Force record_real_result to report a non-pass status.
+    import hermes_workflow.native_turbo as native_turbo_module
+    from hermes_workflow.reports import (
+        RealResultRecordFlags,
+        RealResultRecordReport,
+        RealResultRecordStatus,
+    )
+
+    def fake_record(project_dir: Path, *, run_id: str) -> object:
+        return RealResultRecordReport(
+            schema_version="1.0",
+            status=RealResultRecordStatus.FAIL,
+            run_id=run_id,
+            candidate_id="candidate_000001",
+            ledger_path="ledger/experiment_ledger.jsonl",
+            optimizer_state_path="state/optimizer_state.json",
+            best_candidate_path=None,
+            checks=RealResultRecordFlags(),
+            issues=["fake record failure"],
+        )
+
+    monkeypatch.setattr(native_turbo_module, "record_real_result", fake_record)
+
+    observation = evaluate_real_candidate(
+        project_dir,
+        candidate_id="candidate_000001",
+        parameters={"FN": "4", "WN": "0.5u", "FP": "4", "WP": "1.1u"},
+        run_id="real_001",
+        adapter=adapter,
+    )
+
+    assert observation.status == "record_failed"
+    decision_path = project_dir / "state" / "run_retention" / "real_001.json"
+    assert decision_path.is_file()
+    decision = json.loads(decision_path.read_text(encoding="utf-8"))
+    assert decision["run_status"] == "failed"
+    assert decision["local_action"] == "deleted"
+    assert not (project_dir / "runs" / "real" / "real_001").exists()
+
+
+def _make_split_native_turbo_traces() -> list[NativeTurboEvaluationTrace]:
+    traces: list[NativeTurboEvaluationTrace] = []
+    for index in range(7):
+        traces.append(
+            NativeTurboEvaluationTrace(
+                evaluation_index=index + 1,
+                run_id=f"real_{index + 1:03d}",
+                selection_phase="initialization",
+                raw_x=[float(index), 0.5],
+                parameters={"FN": str(index + 2), "WN": "0.5u"},
+                status="constraint_failed",
+                objective=1001.0,
+                fom=1.0,
+                constraint_penalty=1.0,
+                metrics={"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-6},
+                result_manifest=None,
+                metric_result_manifest=None,
+                issues=["constraint failed"],
+                batch_id="batch_001",
+                batch_slot=index + 1,
+                batch_size=10,
+                batch_worker_count=10,
+                max_parallel_jobs=10,
+                threads_per_run=10,
+                parallel_jobs=10,
+            )
+        )
+    for index in range(3):
+        traces.append(
+            NativeTurboEvaluationTrace(
+                evaluation_index=8 + index,
+                run_id=f"real_{8 + index:03d}",
+                selection_phase="initialization",
+                raw_x=[float(index + 7), 0.5],
+                parameters={"FN": str(index + 9), "WN": "0.5u"},
+                status="metric_check_failed",
+                objective=1001.0,
+                fom=None,
+                constraint_penalty=0.0,
+                metrics=None,
+                result_manifest=None,
+                metric_result_manifest=None,
+                issues=["metric check failed"],
+                batch_id="batch_001",
+                batch_slot=index + 8,
+                batch_size=10,
+                batch_worker_count=10,
+                max_parallel_jobs=10,
+                threads_per_run=10,
+                parallel_jobs=10,
+            )
+        )
+    return traces
+
+
+def _write_seven_ledger_rows(project_dir: Path) -> None:
+    ledger_path = project_dir / "ledger" / "experiment_ledger.jsonl"
+    ledger_path.parent.mkdir(parents=True, exist_ok=True)
+    with ledger_path.open("w", encoding="utf-8") as handle:
+        for index in range(7):
+            handle.write(
+                json.dumps(
+                    {
+                        "candidate_id": f"real_{index + 1:03d}",
+                        "parameters": {"FN": "2"},
+                        "metrics": {"rise": 1.0e-12},
+                        "constraints_passed": False,
+                        "objective": 1001.0,
+                        "batch_id": 1,
+                        "simulation_status": "real_pass",
+                        "timestamp_utc": "2026-06-14T00:00:00Z",
+                        "result_source": "real",
+                        "run_id": f"real_{index + 1:03d}",
+                    },
+                    sort_keys=True,
+                )
+                + "\n"
+            )
+
+
+def _set_optimizer_max_evaluations_for_native(project_dir: Path, value: int) -> None:
+    optimizer_path = project_dir / "config" / "optimizer.yaml"
+    text = optimizer_path.read_text(encoding="utf-8")
+    text = text.replace("max_evaluations: 100", f"max_evaluations: {value}")
+    optimizer_path.write_text(text, encoding="utf-8")
+
+
+def test_write_native_turbo_reports_syncs_optimizer_progress_state(
+    tmp_path: Path,
+) -> None:
+    project_dir = tmp_path / "bridge_test_inv"
+    create_project_from_template(project_dir)
+    _set_optimizer_max_evaluations_for_native(project_dir, 10)
+    _write_seven_ledger_rows(project_dir)
+
+    traces = _make_split_native_turbo_traces()
+    write_native_turbo_reports(
+        project_dir,
+        NativeTurboRunResult(
+            evaluation_count=10,
+            traces=traces,
+            best_trace=None,
+        ),
+    )
+
+    state_payload = json.loads(
+        (project_dir / "state" / "optimizer_state.json").read_text(encoding="utf-8")
+    )
+    assert state_payload["current_evaluations"] == 10
+    assert state_payload["recorded_observation_count"] == 7
+    assert state_payload["failed_evaluation_count"] == 3
+    assert state_payload["status_counts"] == {
+        "constraint_failed": 7,
+        "metric_check_failed": 3,
+    }
+    assert state_payload["status"] == "completed"
+    assert state_payload["best_candidate_id"] is None
+    assert not (project_dir / "state" / "best_candidate.json").exists()
+
+
+def _set_turbo_optimizer_initialization(
+    project_dir: Path, *, initialization: str
+) -> None:
+    optimizer_path = project_dir / "config" / "optimizer.yaml"
+    body = [
+        'schema_version: "1.0"',
+        '',
+        'optimizer:',
+        '  algorithm: turbo',
+        f'  initialization: {initialization}',
+        '  max_evaluations: 8',
+        '  batch_size: 2',
+        '  random_seed: 20260528',
+        '  optimizer_cpu_threads: 4',
+        '  failure_penalty: 1000000.0',
+        '  deduplicate_candidates: true',
+    ]
+    optimizer_path.write_text("\n".join(body) + "\n", encoding="utf-8")
+
+
+def test_initial_unit_design_returns_lhs_for_latin_hypercube() -> None:
+    pytest.importorskip("numpy")
+    from hermes_workflow.native_turbo import _initial_unit_design
+
+    samples = _initial_unit_design("latin_hypercube", n=4, dim=2, seed=20260528)
+    assert samples.shape == (4, 2)
+    assert ((samples >= 0.0) & (samples <= 1.0)).all()
+
+
+def test_initial_unit_design_random_is_deterministic() -> None:
+    pytest.importorskip("numpy")
+    from hermes_workflow.native_turbo import _initial_unit_design
+
+    a = _initial_unit_design("random", n=4, dim=2, seed=20260528)
+    b = _initial_unit_design("random", n=4, dim=2, seed=20260528)
+    assert a.shape == (4, 2)
+    assert ((a >= 0.0) & (a <= 1.0)).all()
+    assert (a == b).all()
+
+
+def test_initial_unit_design_sobol_is_deterministic() -> None:
+    pytest.importorskip("numpy")
+    pytest.importorskip("scipy.stats.qmc")
+    from hermes_workflow.native_turbo import _initial_unit_design
+
+    a = _initial_unit_design("sobol", n=4, dim=2, seed=20260528)
+    b = _initial_unit_design("sobol", n=4, dim=2, seed=20260528)
+    assert a.shape == (4, 2)
+    assert ((a >= 0.0) & (a <= 1.0)).all()
+    assert (a == b).all()
+
+
+def test_initial_unit_design_sobol_differs_for_different_seeds() -> None:
+    """B-07 contract: random_seed must actually change the Sobol design.
+
+    With ``scramble=False`` scipy's Sobol ignores the seed and returns the
+    canonical Sobol sequence regardless of input. Two distinct seeds must
+    therefore produce distinct samples for the contract to hold.
+    """
+    pytest.importorskip("numpy")
+    pytest.importorskip("scipy.stats.qmc")
+    from hermes_workflow.native_turbo import _initial_unit_design
+
+    a = _initial_unit_design("sobol", n=4, dim=2, seed=1)
+    b = _initial_unit_design("sobol", n=4, dim=2, seed=2)
+    assert a.shape == (4, 2)
+    assert b.shape == (4, 2)
+    assert not (a == b).all()
+
+
+def test_initial_unit_design_rejects_unknown_method() -> None:
+    pytest.importorskip("numpy")
+    from hermes_workflow.native_turbo import _initial_unit_design
+
+    with pytest.raises(ValueError, match="initialization method"):
+        _initial_unit_design("uniform_grid", n=4, dim=2, seed=42)
+
+
+@pytest.mark.parametrize(
+    "initialization",
+    ["sobol", "latin_hypercube", "random"],
+)
+def test_native_turbo_batch_runner_passes_initialization_to_factory(
+    tmp_path: Path, initialization: str
+) -> None:
+    project_dir = create_approved_real_project(tmp_path)
+    _set_turbo_optimizer_initialization(project_dir, initialization=initialization)
+
+    captured: list[dict[str, object]] = []
+
+    def fake_factory(**kwargs):
+        captured.append(dict(kwargs))
+        return _FakeBatchTurbo(
+            **{
+                key: value
+                for key, value in kwargs.items()
+                if key
+                in {"f_batch", "lb", "ub", "n_init", "max_evals", "batch_size", "verbose"}
+            }
+        )
+
+    _FakeBatchTurbo.instances.clear()
+
+    def batch_evaluator(candidates):
+        return [
+            NativeTurboObservation(metrics={"delay": 50.0, "gain": 20.0})
+            for _candidate in candidates
+        ]
+
+    run_batch_native_turbo_optimization(
+        project_dir,
+        max_evals=2,
+        batch_evaluator=batch_evaluator,
+        batch_turbo_factory=fake_factory,
+    )
+
+    assert captured, "factory must have been invoked at least once"
+    assert captured[0]["initialization"] == initialization
+
+
+def test_native_turbo_report_records_initialization(tmp_path: Path) -> None:
+    trace = NativeTurboEvaluationTrace(
+        evaluation_index=1,
+        run_id="real_001",
+        selection_phase="initialization",
+        raw_x=[4.0, 0.5],
+        parameters={"FN": "4", "WN": "0.5u"},
+        status="feasible",
+        objective=1.0,
+        fom=1.0,
+        constraint_penalty=0.0,
+        metrics={"delay": 1.0, "gain": 20.0},
+        result_manifest=None,
+        metric_result_manifest=None,
+        issues=[],
+        batch_id="batch_001",
+        batch_slot=1,
+        batch_size=1,
+        batch_worker_count=1,
+        max_parallel_jobs=1,
+        threads_per_run=1,
+        parallel_jobs=1,
+    )
+
+    report_path, _evaluations_path = write_native_turbo_reports(
+        tmp_path,
+        NativeTurboRunResult(
+            evaluation_count=1,
+            traces=[trace],
+            best_trace=trace,
+            initialization="random",
+            effective_initial_design="random",
+        ),
+    )
+
+    payload = json.loads(report_path.read_text(encoding="utf-8"))
+    assert payload["initialization"] == "random"
+    assert payload["effective_initial_design"] == "random"
+
+    audit_payload = json.loads(
+        (tmp_path / "reports" / "optimizer_effectiveness_audit.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert audit_payload["initialization"] == "random"
+    assert audit_payload["effective_initial_design"] == "random"
+
+
+# ---------------------------------------------------------------------------
+# CPU thread limit runtime audit (B-11)
+# ---------------------------------------------------------------------------
+
+
+def test_native_turbo_report_contains_optimizer_cpu_threads(tmp_path: Path) -> None:
+    """native_turbo_optimizer_report.json must record optimizer_cpu_threads."""
+    project_dir = tmp_path / "bridge_test_inv"
+    create_project_from_template(project_dir)
+    optimizer_path = project_dir / "config" / "optimizer.yaml"
+    optimizer_path.write_text(
+        optimizer_path.read_text(encoding="utf-8").replace(
+            "deduplicate_candidates: true",
+            "deduplicate_candidates: true\n  optimizer_cpu_threads: 32",
+        ),
+        encoding="utf-8",
+    )
+
+    def evaluator(parameters: dict[str, str]) -> NativeTurboObservation:
+        return NativeTurboObservation(
+            metrics={"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-6},
+        )
+
+    run_native_turbo_optimization(
+        project_dir,
+        evaluator=evaluator,
+        turbo_factory=_FakeTurbo,
+        max_evals=5,
+    )
+
+    report = json.loads(
+        (project_dir / "reports" / "native_turbo_optimizer_report.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert "optimizer_cpu_threads" in report, (
+        f"optimizer_cpu_threads missing from report, keys: {list(report.keys())}"
+    )
+    assert report["optimizer_cpu_threads"] == 32
+
+
+def test_native_turbo_report_contains_runtime_thread_limits(tmp_path: Path) -> None:
+    """native_turbo_optimizer_report.json must contain runtime_thread_limits
+    with env vars and threadpoolctl state."""
+    project_dir = tmp_path / "bridge_test_inv"
+    create_project_from_template(project_dir)
+    optimizer_path = project_dir / "config" / "optimizer.yaml"
+    optimizer_path.write_text(
+        optimizer_path.read_text(encoding="utf-8").replace(
+            "deduplicate_candidates: true",
+            "deduplicate_candidates: true\n  optimizer_cpu_threads: 32",
+        ),
+        encoding="utf-8",
+    )
+
+    def evaluator(parameters: dict[str, str]) -> NativeTurboObservation:
+        return NativeTurboObservation(
+            metrics={"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-6},
+        )
+
+    run_native_turbo_optimization(
+        project_dir,
+        evaluator=evaluator,
+        turbo_factory=_FakeTurbo,
+        max_evals=5,
+    )
+
+    report = json.loads(
+        (project_dir / "reports" / "native_turbo_optimizer_report.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert "runtime_thread_limits" in report, (
+        f"runtime_thread_limits missing from report, keys: {list(report.keys())}"
+    )
+    rtl = report["runtime_thread_limits"]
+    assert rtl["source"] == "optimizer.optimizer_cpu_threads"
+    assert rtl["requested_threads"] == 32
+    assert rtl["backend"] == "native_turbo"
+    assert rtl["execution_mode"] == "local"
+    assert rtl["process_scope"] == "local_optimizer_process"
+    assert rtl["transport_mode"] == "local"
+    # Native TuRBO uses set_environment=False, so env_vars reflect actual
+    # runtime state (not forced). The key is that env_vars dict is present
+    # with all expected keys, even if values are None.
+    assert "OMP_NUM_THREADS" in rtl["env_vars"]
+    assert "MKL_NUM_THREADS" in rtl["env_vars"]
+    assert "available" in rtl["threadpoolctl"]
+    assert "available" in rtl["torch"]
+    assert isinstance(rtl["issues"], list)
+
+
+def test_native_turbo_effectiveness_audit_contains_runtime_thread_limits(
+    tmp_path: Path,
+) -> None:
+    """optimizer_effectiveness_audit.json must contain runtime_thread_limits
+    for native TuRBO runs."""
+    project_dir = tmp_path / "bridge_test_inv"
+    create_project_from_template(project_dir)
+    optimizer_path = project_dir / "config" / "optimizer.yaml"
+    optimizer_path.write_text(
+        optimizer_path.read_text(encoding="utf-8").replace(
+            "deduplicate_candidates: true",
+            "deduplicate_candidates: true\n  optimizer_cpu_threads: 32",
+        ),
+        encoding="utf-8",
+    )
+
+    def evaluator(parameters: dict[str, str]) -> NativeTurboObservation:
+        return NativeTurboObservation(
+            metrics={"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-6},
+        )
+
+    run_native_turbo_optimization(
+        project_dir,
+        evaluator=evaluator,
+        turbo_factory=_FakeTurbo,
+        max_evals=5,
+    )
+
+    audit = json.loads(
+        (project_dir / "reports" / "optimizer_effectiveness_audit.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert "runtime_thread_limits" in audit, (
+        f"runtime_thread_limits missing from effectiveness audit, "
+        f"keys: {list(audit.keys())}"
+    )
+    assert audit["runtime_thread_limits"]["backend"] == "native_turbo"
+    assert audit["runtime_thread_limits"]["requested_threads"] == 32
+    env_vars = audit["runtime_thread_limits"]["env_vars"]
+    assert env_vars == {
+        "MKL_NUM_THREADS": "32",
+        "NUMBA_NUM_THREADS": "32",
+        "NUMEXPR_NUM_THREADS": "32",
+        "OMP_NUM_THREADS": "32",
+        "OPENBLAS_NUM_THREADS": "32",
+        "VECLIB_MAXIMUM_THREADS": "32",
     }

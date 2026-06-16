@@ -10,6 +10,7 @@ from hermes_workflow.optimizer_finalize import finalize_optimizer_run
 
 COMPLETION_RELATIVE = Path("reports/optimizer_completion_report.json")
 FINALIZE_RELATIVE = Path("reports/optimizer_finalize_report.json")
+EFFECTIVENESS_AUDIT_RELATIVE = Path("reports/optimizer_effectiveness_audit.json")
 
 
 @dataclass(frozen=True)
@@ -37,6 +38,8 @@ def summarize_optimizer_status(project_dir: str | Path) -> OptimizerStatusSummar
 
     reports = dict(finalize.reports)
     reports["finalize"] = FINALIZE_RELATIVE.as_posix()
+    if (project_root / EFFECTIVENESS_AUDIT_RELATIVE).exists():
+        reports["effectiveness_audit"] = EFFECTIVENESS_AUDIT_RELATIVE.as_posix()
 
     return OptimizerStatusSummary(
         status=finalize.status,

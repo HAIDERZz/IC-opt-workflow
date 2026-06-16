@@ -8,11 +8,6 @@ optimization only in chat. Put machine-critical settings in
 `opt_requirement.md`, then let Hermes render the standard YAML contracts and
 import the Maestro/ADE netlist bundle.
 
-In this project, Hermes means the requirement-to-execution messenger layer. It
-does not mean that a separate Hermes agent is required. The normal user and
-agent entrypoint is `ic-opt`; lower-level `hermes-workflow` commands are mainly
-for debugging or advanced inspection.
-
 ## Project Directory
 
 Recommended user-created directory:
@@ -27,7 +22,7 @@ Recommended user-created directory:
 User-owned files:
 
 - `opt_requirement.md`: required, canonical optimization request.
-- `constraints.md`: optional human/operator/agent guidance.
+- `constraints.md`: optional supervisor-agent guidance.
 - `context/`: optional notes, screenshots, prior reports, or circuit context.
 
 Generated/imported files:
@@ -88,38 +83,6 @@ Each section must contain exactly one fenced `yaml` block.
 `maestro_point_root` is the important field. It should point to the Maestro/ADE
 single-point result directory that contains `netlist/input.scs`.
 
-How to find the correct directory:
-
-1. In Maestro/ADE, run one known-good simulation point for the testbench.
-2. In the filesystem, go to that testbench's Maestro result tree, usually shaped
-   like:
-
-```text
-~/simulation/<library>/<cell>/<test_name>/results/maestro/Interactive.<N>/<point>/<run_name>/
-```
-
-3. Use the leaf `<run_name>/` directory as `maestro_point_root`.
-
-The quick check is:
-
-```bash
-ls <maestro_point_root>
-# expected: netlist/  psf/
-
-ls <maestro_point_root>/netlist/input.scs
-# expected: the file exists
-```
-
-For example, if the ADE result tree is:
-
-```text
-.../results/maestro/Interactive.45/1/<run_name>/
-```
-
-then `maestro_point_root` should be exactly that leaf directory. Do not point it
-to `Interactive.45`, `Interactive.45/1`, the `netlist/` subdirectory, or the
-`psf/` subdirectory.
-
 The following fields are metadata used for traceability and reports:
 
 ```yaml
@@ -140,13 +103,6 @@ For circuits that need multiple Maestro/ADE testbenches for one candidate, use
 `Maestro Source` contains a `testbenches:` list, and each metric declares a
 `testbench:` routing key. The routing key only decides which child Spectre/OCEAN
 run evaluates the formula; it is not part of the OCEAN expression.
-
-The workflow supports one or more testbenches. A single testbench is the normal
-special case and can use the simpler top-level `maestro_point_root` form. Use
-`testbenches:` only when one candidate's metrics must be collected from multiple
-Maestro/ADE point roots. The file format has no fixed maximum count; simulation
-time, license availability, disk usage, and `parallel_jobs` are the practical
-limits.
 
 After `prepare-from-requirement`, multi-testbench projects should pass:
 
@@ -236,7 +192,7 @@ maestro_point_root/
 Typical example:
 
 ```text
-/path/to/simulation/<lib>/<cell>/maestro/results/maestro/Interactive.9/1/<lib>_<cell>_1
+/home/zzchen/simulation/<lib>/<cell>/maestro/results/maestro/Interactive.9/1/<lib>_<cell>_1
 ```
 
 Hermes copies the full `maestro_point_root/netlist/` bundle into
@@ -263,6 +219,7 @@ The file must contain these sections exactly once:
 ## Metrics
 ## Constraints
 ## Objective
+## Process Corners        # optional; defaults to one nominal corner if omitted
 ## Spectre Settings
 ## Optimizer Settings
 ## Approval Checklist
@@ -282,6 +239,15 @@ backend: maestro_exported_spectre_deck
 
 Free prose outside YAML blocks is allowed, but Hermes only reads the fenced
 YAML blocks.
+
+Template variants:
+
+```text
+opt_requirement.md                  single testbench, nominal corner default
+opt_requirement.multi_testbench.md  multiple testbenches, nominal corner default
+opt_requirement.multi_corner.md     single testbench, explicit process corners
+opt_requirement.multi_tb_corner.md  multiple testbenches with explicit corners
+```
 
 ## Section Reference
 
@@ -395,39 +361,10 @@ Rules:
 
 ### Objective
 
-Simple lower-is-better FoM:
-
 ```yaml
 direction: minimize
 expression: "(rise + fall) * DC"
 ```
-
-For `direction: minimize`, smaller expression values are better.
-
-Higher-is-better normalized score:
-
-```yaml
-direction: maximize
-expression: >-
-  0.7*min(
-    max(0,min(1,10*(ln(BW/19e9)/ln(10))/0.5)),
-    max(0,min(1,(MAX_GAIN-4)/0.5)),
-    max(0,min(1,(12-NF_3G)/0.1)),
-    max(0,min(1,(IIP3-0)/0.5)),
-    max(0,min(1,(P1DB+2)/0.5))
-  )
-  +0.3*(
-    0.15*max(0,min(1,10*(ln(BW/19e9)/ln(10))/0.5))
-    +0.10*max(0,min(1,(MAX_GAIN-4)/0.5))
-    +0.25*max(0,min(1,(12-NF_3G)/0.1))
-    +0.30*max(0,min(1,(IIP3-0)/0.5))
-    +0.20*max(0,min(1,(P1DB+2)/0.5))
-  )
-```
-
-For `direction: maximize`, larger expression values are better. Internally, the
-optimizer still minimizes, so feasible candidates use `objective = -FoM`. Reports
-show both the user FoM and the internal minimized objective.
 
 Supported directions:
 
@@ -437,11 +374,41 @@ Supported directions:
 Rules:
 
 - Expression may use metric names and arithmetic operators.
-- Supported objective functions are `min(...)`, `max(...)`, and `ln(...)`.
+- Do not call functions in the objective expression.
 - Do not reference undeclared metrics.
 - This is the FoM comparison expression, not an OCEAN formula.
-- Write the expression using metric names, not OCEAN expressions. OCEAN belongs
-  in `## Metrics`; `## Objective` combines already extracted scalar metrics.
+
+### Process Corners
+
+Optional. If omitted, Hermes writes one implicit nominal corner:
+
+```yaml
+objective_policy: nominal
+constraint_policy: nominal
+corners:
+  - id: nominal
+```
+
+Explicit multi-corner projects should provide full PDK section names and any
+corner variables. Hermes does not guess PDK model sections.
+
+```yaml
+objective_policy: worst_case
+constraint_policy: all_corners
+corners:
+  - id: tt
+    model_section: Post_simu_top_tt
+    variables:
+      temperature: "27"
+  - id: ss
+    model_section: Post_simu_top_ss
+    variables:
+      temperature: "125"
+```
+
+`parallel_jobs` remains candidate-level concurrency. It is not multiplied by
+testbench count or corner count; child testbench/corner evaluations stay serial
+inside one candidate.
 
 ### Spectre Settings
 
@@ -470,6 +437,7 @@ Rules:
 
 ```yaml
 algorithm: openbox
+strategy: openbox_auto
 initialization: sobol
 max_evaluations: 100
 batch_size: 10
@@ -478,9 +446,17 @@ failure_penalty: 1000000.0
 deduplicate_candidates: true
 ```
 
-Recommended algorithm:
+Recommended default strategy:
 
-- `openbox`
+- `openbox_auto`
+
+Available strategy and algorithm pairs:
+
+- `algorithm: openbox`, `strategy: openbox_auto`
+- `algorithm: openbox`, `strategy: openbox_gp_eic`
+- `algorithm: openbox`, `strategy: openbox_prf_eic`
+- `algorithm: turbo`, `strategy: turbo_trust_region`
+- `algorithm: random`, `strategy: random_baseline`
 
 Rules:
 
@@ -488,31 +464,8 @@ Rules:
 - `batch_size` is how many candidates the optimizer asks for per batch.
 - `deduplicate_candidates` must be `true`.
 - Use a fixed `random_seed` for reproducibility.
-
-### Process Corners (Optional)
-
-```yaml
-objective_policy: worst_case
-constraint_policy: all_corners
-corners:
-  - id: tt
-    model_section: Post_simu_top_tt
-    variables:
-      temperature: "27"
-  - id: ss
-    model_section: Post_simu_top_ss
-    variables:
-      temperature: "125"
-```
-
-Rules:
-
-- `id` must be a simple identifier: letters, numbers, underscore, not starting with a number.
-- `objective_policy` must be `nominal` or `worst_case`. Defaults to `worst_case` when corners are explicitly defined.
-- `constraint_policy` must be `nominal` or `all_corners`. Defaults to `all_corners` when corners are explicitly defined.
-- `model_section` is the name of the model section to use for this corner.
-- `variables` are corner-specific variable overrides.
-- When `Process Corners` is omitted, a single implicit `nominal` corner is used with `objective_policy: nominal` and `constraint_policy: nominal`.
+- For strategy selection details and backend expectations, read
+  `docs/OPTIMIZER_ALGORITHM_MODES.md`.
 
 ### Approval Checklist
 
@@ -530,8 +483,8 @@ source path, bounds, or resource settings have not been reviewed.
 
 ## `constraints.md`
 
-`constraints.md` is optional. It is for human/operator/agent guidance, not
-direct contract generation.
+`constraints.md` is optional. It is for supervisor-agent guidance, not direct
+contract generation.
 
 Good uses:
 

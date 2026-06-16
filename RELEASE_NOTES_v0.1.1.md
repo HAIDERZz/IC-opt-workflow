@@ -17,7 +17,7 @@ python3 -m venv .venv
 ./.venv/bin/python -m pip install -e .
 
 ./.venv/bin/ic-opt /path/to/project --doctor
-./.venv/bin/ic-opt /path/to/project --real --max-evals 100 --batch-size 10
+./.venv/bin/ic-opt /path/to/project --real
 ./.venv/bin/ic-opt /path/to/project --continue 40
 ```
 
@@ -47,9 +47,13 @@ clean clone
 -> install requirements-product.txt
 -> ic-opt --help
 -> ic-opt PROJECT --doctor
--> ic-opt PROJECT --real --max-evals 100 --batch-size 10
+-> ic-opt PROJECT --real
 -> ic-opt PROJECT --continue 40
 ```
+
+Current product contract note: `max_evaluations`, `batch_size`, and resource
+settings come from `opt_requirement.md`; initial-run product CLI override flags
+such as `--max-evals` and `--batch-size` are no longer supported.
 
 Final acceptance evidence:
 

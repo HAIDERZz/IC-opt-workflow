@@ -1,6 +1,6 @@
 ---
 name: ic-opt
-description: Operate IC Auto Opt Workflow from a project directory. Trigger when the user asks to run "/ic-opt PROJECT --doctor", "/ic-opt PROJECT --real", "/ic-opt PROJECT --continue M", "/ic-opt --ssh-profile PROFILE PROJECT --real", or asks an agent to optimize a Spectre/Maestro/ADE IC project with ic-opt. The default path is one current agent running the deterministic ic-opt CLI and explaining reports; same-runtime subagent execution is optional only when explicitly requested.
+description: Operate IC Auto Opt Workflow from a project directory. Trigger when the user asks to run "/ic-opt PROJECT --doctor", "/ic-opt PROJECT --real", "/ic-opt PROJECT --real --continue M", "/ic-opt --ssh-profile PROFILE PROJECT --real", or asks an agent to optimize a Spectre/Maestro/ADE IC project with ic-opt. The default path is one current agent running the deterministic ic-opt CLI and explaining reports; same-runtime subagent execution is optional only when explicitly requested.
 ---
 
 # IC Auto Opt Agent Operator
@@ -32,15 +32,15 @@ Accept these forms:
 
 ```text
 /ic-opt PROJECT --doctor
-/ic-opt PROJECT --real [ic-opt flags]
-/ic-opt PROJECT --continue M [ic-opt flags]
+/ic-opt PROJECT --real [--cadence-cshrc PATH]
+/ic-opt PROJECT --real --continue M [--cadence-cshrc PATH]
 /ic-opt --ssh-profile PROFILE REMOTE_PROJECT --doctor
-/ic-opt --ssh-profile PROFILE REMOTE_PROJECT --real [ic-opt flags]
-/ic-opt --ssh-profile PROFILE REMOTE_PROJECT --continue M [ic-opt flags]
+/ic-opt --ssh-profile PROFILE REMOTE_PROJECT --real [--cadence-cshrc PATH]
+/ic-opt --ssh-profile PROFILE REMOTE_PROJECT --real --continue M [--cadence-cshrc PATH]
 ```
 
 If the user gives only a project path and asks to optimize, use `--real`.
-If the user says "add/run/continue M more points", use `--continue M`.
+If the user says "add/run/continue M more points", use `--real --continue M`.
 If the user asks to check readiness, use `--doctor`.
 If the user says the project is on a remote EDA server, use remote mode with
 `--ssh-profile PROFILE`. `PROFILE` is any OpenSSH target the local machine can
@@ -48,6 +48,12 @@ use, preferably a `~/.ssh/config` alias such as `eda-lab`. If the SSH profile is
 missing, ask only for the profile name. Do not collect passwords. Tell the user
 to configure passwordless SSH, accept the host key once with `ssh PROFILE true`,
 and verify `ssh -o BatchMode=yes PROFILE true`.
+
+`ic-opt` is the product contract. Do not add workload/resource/optimizer override
+flags such as `--max-evals`, `--batch-size`, `--parallel-jobs`, `--threads`,
+`--strategy`, `--surrogate-type`, `--acq-type`, or `--acq-optimizer-type`.
+Those values come from `opt_requirement.md` / generated config. Low-level
+`hermes-workflow` commands are development/debugging tools only.
 
 Do not ask the user to restate formulas, variables, metric routes, testbench
 paths, Spectre resources, or optimizer settings. Those belong in
@@ -127,7 +133,7 @@ ic-opt PROJECT --real [user flags]
 For continuation:
 
 ```bash
-ic-opt PROJECT --continue M [user flags]
+ic-opt PROJECT --real --continue M [user flags]
 ```
 
 For remote projects:
@@ -135,7 +141,7 @@ For remote projects:
 ```bash
 ic-opt --ssh-profile PROFILE REMOTE_PROJECT --doctor
 ic-opt --ssh-profile PROFILE REMOTE_PROJECT --real [user flags]
-ic-opt --ssh-profile PROFILE REMOTE_PROJECT --continue M [user flags]
+ic-opt --ssh-profile PROFILE REMOTE_PROJECT --real --continue M [user flags]
 ```
 
 In remote mode, `REMOTE_PROJECT` is the project directory on the Linux EDA
@@ -156,7 +162,7 @@ Remote parallelism guidance:
   serially inside that same candidate. Increasing `parallel_jobs` multiplies
   total remote tool pressure.
 - For normal remote multi-testbench or multi-corner use, prefer conservative
-  values such as `--parallel-jobs 4` to `--parallel-jobs 8`.
+  `Spectre Settings.parallel_jobs` values such as `4` to `8` in `opt_requirement.md`.
 - High values such as 24 or 36 can trigger SSH server limits, for example
   `kex_exchange_identification: Connection closed by remote host`. Treat those
   as remote transport/tool failures, not circuit-performance failures.
@@ -185,7 +191,7 @@ If the user explicitly requests native subagent execution:
    or for continuation:
 
    ```bash
-   ic-opt PROJECT --continue M [user flags] --dry-orchestration
+   ic-opt PROJECT --real --continue M [user flags] --dry-orchestration
    ```
 
 2. Dispatch the same-runtime native subagent, if available, with only:

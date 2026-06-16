@@ -1,566 +1,308 @@
-# IC Auto Opt Workflow v0.1.6
+# IC Auto Opt Workflow
 
-IC Auto Opt Workflow helps analog/RF IC designers run repeatable Spectre/OCEAN
-optimization from a project folder.
+`ic-auto-opt-workflow` is a file-driven IC optimization workflow for
+Maestro-exported Spectre/OCEAN projects.
 
-You write the design variables, metric formulas, constraints, and optimizer
-settings in `opt_requirement.md`. The tool then prepares YAML configs, imports
-Maestro/ADE exported netlists, runs OpenBox optimization, launches Spectre,
-extracts metrics with OCEAN, and writes reports that are easy for a human or an
-AI agent to read.
-
-In this project, **Hermes** means the contract messenger layer: it carries an IC
-optimization request from `opt_requirement.md` into executable, auditable
-workflow contracts. The user-facing command is `ic-opt`; the internal
-`hermes_workflow` package performs parsing, validation, contract generation,
-tool orchestration, and report writing.
-
-The main command is:
+The implemented shell product command is:
 
 ```bash
 ic-opt /path/to/project --real
 ```
 
-Before a fresh real run, especially when an AI agent is operating the tool, run
-a doctor check first:
+The runtime-native agent entrypoint, after installing the adapter for your
+agent CLI, is:
 
-```bash
-ic-opt /path/to/project --doctor
+```text
+/ic-opt /path/to/project --real
 ```
 
-For a remote Linux EDA server, keep the project on the server and run:
+The project has been exercised on a real multi-testbench Mixer optimization
+flow with OpenBox, Spectre, OCEAN, and post-run visualization/reporting.
+
+Important agent-integration boundary: `ic-opt` is the deterministic automation
+core. Runtime adapters make the current agent CLI act as supervisor and
+delegate real execution to that same CLI's native subagent/task mechanism.
+C-64's `--execution-agent claude` subprocess handoff remains development
+evidence, not the C-65 default product target. See
+`docs/AGENT_INTEGRATION_STATUS.md` before describing runtime support.
+
+For the detailed Chinese explanation of what the automation does, what evidence
+proves it, and which runtime adapters are still missing, read
+`docs/PROJECT_STATUS_AND_ARCHITECTURE_CN.md`.
+
+## What This Project Does
+
+- Reads a strict `opt_requirement.md` from a user project directory.
+- Safely imports native Maestro/ADE point-root netlist bundles.
+- Preserves each testbench as its own Spectre/OCEAN run context.
+- Uses OpenBox or native optimizer backends to generate candidates.
+- Runs approved real Spectre/OCEAN evaluations through workflow contracts.
+- Aggregates scalar OCEAN metric results across one or more testbenches.
+- Writes optimizer acceptance, decision, visualization, and final-summary
+  reports.
+
+Hermes workflow tooling does not parse PSF data and does not rewrite approved
+OCEAN formulas.
+
+## Current Product Contract
+
+- `opt_requirement.md` is the only product entry for workload, optimizer budget
+  (`max_evaluations`), optimizer batch size, Spectre parallelism
+  (`parallel_jobs`), Spectre threads (`threads_per_run`), optimizer CPU thread
+  limit (`optimizer_cpu_threads`), optimizer strategy, initialization,
+  process-corner policy, output format, retention policy, and metric contracts.
+- The product CLI does not accept initial-run overrides for those values. Do not
+  use or document `--max-evals`, `--batch-size`, `--parallel-jobs`, `--threads`,
+  or `--strategy` on `ic-opt PROJECT --real`.
+- Product continuation keeps one CLI delta: `ic-opt PROJECT --real --continue N`
+  adds `N` more evaluations. All other values are inherited from the project
+  requirement/generated config.
+- Multi-corner optimization is configured in `opt_requirement.md` through
+  `Process Corners`; there is no `--multi-corner` switch. See
+  `examples/spectre_maestro_project/opt_requirement.multi_corner.md` and
+  `examples/spectre_maestro_project/opt_requirement.multi_tb_corner.md`.
+- The production OpenBox strategy combinations are `openbox_auto`,
+  `openbox_gp_eic`, and `openbox_prf_eic`. Native TuRBO
+  `turbo_trust_region` is also supported for mostly continuous trust-region
+  search. See `docs/OPTIMIZER_ALGORITHM_MODES.md` for when to choose each mode.
+- Current release changes and fixed bugs are summarized in
+  `RELEASE_NOTES_v0.1.7.md`.
+
+## Install
+
+Use one product-level Python environment for the repo and optimizer
+dependencies. Do not create a Python virtualenv inside each user optimization
+project.
+
+From the repository root:
 
 ```bash
-ic-opt --ssh-profile eda-lab /remote/path/to/project --real
-```
-
-The same command can also be called by an AI agent. The agent should operate the
-tool, run doctor before fresh real optimization, and explain the reports; the
-deterministic optimization work is done by the CLI.
-
-The platform-neutral agent skill is available in the source tree at
-`skills/ic-opt/SKILL.md`. If you installed the package with `pip`, locate the
-packaged copy with:
-
-```bash
-hermes-workflow agent-skill-path
-```
-
-## What This Tool Does
-
-- Converts a structured `opt_requirement.md` into project `config/*.yaml`.
-- Imports one or more Maestro/ADE point roots as Spectre netlist bundles.
-- Runs OpenBox over discrete or quantized IC design variables.
-- Runs real Spectre simulations and OCEAN metric extraction.
-- Supports multi-testbench evaluation, for example one Mixer candidate measured
-  by CG/NF, IIP3, and P1dB testbenches.
-- Supports optional multi-corner evaluation through `Process Corners` in
-  `opt_requirement.md`; single-corner projects remain the default special case.
-- Uses the same model for one or more testbenches. A single testbench is a valid
-  special case; multiple testbenches are only needed when one candidate's
-  metrics come from different Maestro/ADE setups.
-- Within one candidate, testbench and corner evaluations remain serial.
-  `parallel_jobs` stays candidate-level concurrency only.
-- Generates decision reports, insight reports, and PNG FoM/diagnostic plots.
-  Optional OpenBox
-  advanced dependencies add HTML/JSON surrogate visualization artifacts.
-- Supports continuing an existing run, for example adding 40 more evaluations
-  after the first 100.
-- Supports remote SSH execution: the Python optimizer can run on your local
-  Linux/macOS/Windows workstation while Spectre/OCEAN run on a remote Linux EDA
-  server through passwordless OpenSSH.
-- Provides a platform-neutral agent skill for any shell-capable AI agent.
-
-## What This Tool Does Not Provide
-
-- It does not include Cadence Virtuoso, Spectre, OCEAN, PDK files, or licenses.
-- It does not replace your Maestro/ADE setup. You still need a known-good
-  Maestro/ADE point root for each testbench.
-- It reports the best observed feasible point. It does not prove a mathematical
-  global optimum.
-- The workflow can automate Cadence tool usage, but it does not grant access to
-  Cadence software, PDKs, or simulator licenses.
-
-## Quick Start
-
-### 1. Install The Tool Once
-
-Create one Python environment for the tool itself. Do not create a virtualenv
-inside every optimization project.
-
-```bash
-git clone https://github.com/HAIDERZz/IC-opt-workflow.git
-cd IC-opt-workflow
-
-python3 --version  # must be Python 3.11 or newer
 python3 -m venv .venv
+./.venv/bin/python -m pip install --upgrade pip setuptools wheel
+./.venv/bin/python -m pip install -r requirements-product.txt
 ```
 
-Activate the environment with the command that matches your shell:
-
-```bash
-# bash / zsh
-source .venv/bin/activate
-```
-
-```csh
-# csh / tcsh, common on EDA servers
-source .venv/bin/activate.csh
-```
-
-Then install dependencies:
-
-```bash
-python -m pip install --upgrade pip setuptools wheel
-python -m pip install -r requirements-product.txt
-```
-
-If your server's `python3` is older than 3.11, use whatever Python 3.11+ command
-your administrator provides, such as `python3.11` or `python3.12`.
-
-On macOS, install Python 3.11+ and Git first, for example with Homebrew:
-
-```bash
-brew install python@3.11 git
-python3 -m venv .venv
-```
-
-On Windows, the recommended path is WSL2 Ubuntu because it gives you normal
-Linux shell, Python, Git, and OpenSSH behavior:
-
-```bash
-# inside WSL2 Ubuntu
-sudo apt update
-sudo apt install python3 python3-venv python3-pip git openssh-client
-python3 -m venv .venv
-```
-
-Native Windows PowerShell is theoretically possible for remote mode, but it has
-not been release-validated. If you choose native Windows, verify Python 3.11+,
-`ssh`, `scp`, and local `tar` yourself before running `ic-opt`. WSL2 is the
-recommended Windows path for now.
-
-Advanced OpenBox surrogate visualization is optional. The base optimizer,
-Spectre/OCEAN execution, decision report, insight report, continuation, and
-project doctor do not require `pyrfr`. Install the advanced dependencies only if
-you need OpenBox's advanced surrogate verification / importance views:
-
-```bash
-python -m pip install --upgrade pip setuptools wheel
-python -m pip install swig
-swig -version
-python -m pip install --no-build-isolation pyrfr==0.9.0
-python -m pip install -r requirements-advanced.txt
-```
-
-If you installed `swig` into `.venv` but still see `command 'swig' failed`, the
-virtual environment is probably not on `PATH`. Run:
-
-```bash
-# bash / zsh
-source .venv/bin/activate
-swig -version
-```
-
-```csh
-# csh / tcsh
-source .venv/bin/activate.csh
-swig -version
-```
-
-or, without shell activation:
-
-```bash
-env PATH="$PWD/.venv/bin:$PATH" ./.venv/bin/python -m pip install -r requirements-product.txt
-```
-
-If `pyrfr` fails with `fatal error: Python.h: No such file or directory`, your
-Python development headers are missing. Ask your administrator to install the
-package matching the Python used by your `.venv`:
-
-```bash
-# Ubuntu / Debian
-sudo apt install swig build-essential python3-dev
-
-# RHEL / CentOS / Rocky / AlmaLinux
-sudo dnf install swig gcc gcc-c++ python3-devel
-```
-
-For Python 3.11 specifically, the package may be named `python3.11-dev` or
-`python3.11-devel`, depending on the distribution. If you do not have `sudo`,
-ask your administrator for one of these: matching Python development headers,
-`swig`, a compiler toolchain, or a micromamba/conda environment that already
-contains them.
-
-Check that the command is available:
+Expected entrypoints:
 
 ```bash
 ./.venv/bin/ic-opt --help
+./.venv/bin/hermes-workflow --help
 ```
 
-### 2. Prepare One Optimization Project
+Install an agent runtime adapter once.
 
-Create a project folder for your circuit:
+For Claude:
 
 ```bash
-mkdir -p ~/spectre_opt_prj/my_mixer_opt
+./.venv/bin/hermes-workflow install-runtime-adapter claude
 ```
 
-Put these files in it:
+For OpenCode:
+
+```bash
+./.venv/bin/hermes-workflow install-runtime-adapter opencode
+```
+
+Then use the short agent command:
 
 ```text
-~/spectre_opt_prj/my_mixer_opt/
-  opt_requirement.md      # required
-  constraints.md          # optional, recommended for human/agent guidance
-  cadence_env.csh         # recommended Cadence setup file
+/ic-opt /path/to/project --real
 ```
 
-The Cadence setup file should be the environment you normally use to run
-Spectre/OCEAN. The tool should not hard-code a specific Spectre version.
+For direct shell/operator debugging, use:
 
-Example requirement files are in:
+```bash
+ic-opt /path/to/project --real
+```
+
+## Cadence Environment
+
+The Cadence/Spectre/OCEAN setup is user supplied. Configure it once before using
+the short product command.
+
+Recommended user-level setup:
+
+```bash
+mkdir -p ~/.ic-opt
+cp /path/to/user/cadence_env.csh ~/.ic-opt/cadence_env.csh
+```
+
+Project-local setup is also supported:
 
 ```text
-examples/spectre_maestro_project/
+/path/to/project/cadence_env.csh
 ```
 
-`opt_requirement.md` may describe one testbench or multiple testbenches. For
-multi-testbench optimization, list each Maestro/ADE point root and map each
-metric to the correct testbench. There is no fixed maximum number of
-testbenches in the file format; simulation time, license availability, disk
-space, and `parallel_jobs` are the real limits.
+Discovery order for `ic-opt`:
 
-Multi-corner evaluation is enabled only from `opt_requirement.md` via a
-`Process Corners` section or the generated `config/process_corners.yaml`.
-There is no `--multi-corner` CLI mode. If `Process Corners` is omitted, the
-workflow behaves like the legacy single-corner flow. For enabled multi-corner
-runs, constraint/objective policy is configured per project, and each
-candidate's testbench-by-corner matrix is executed serially inside that
-candidate.
+1. explicit `--cadence-cshrc PATH`;
+2. `PROJECT_DIR/cadence_env.csh`;
+3. `IC_OPT_CADENCE_CSHRC`;
+4. `~/.ic-opt/cadence_env.csh`.
 
-Reference templates:
+`ic-opt` does not infer `.bashrc`/`.zshrc` content and does not hardcode a
+Spectre version.
 
-- `src/hermes_workflow/templates/spectre_maestro_project/opt_requirement.md`
-- `src/hermes_workflow/templates/spectre_maestro_project/opt_requirement.multi_testbench.md`
-- `src/hermes_workflow/templates/spectre_maestro_project/opt_requirement.multi_corner.md`
-- `src/hermes_workflow/templates/spectre_maestro_project/opt_requirement.multi_tb_corner.md`
+## Remote SSH Mode
 
-Monte Carlo is still outside this real-run optimization loop. Use it as a
-follow-up validation or post-optimization analysis step rather than trying to
-encode it into `Process Corners`.
+Use this when your Cadence/Spectre/OCEAN environment is on a Linux EDA server,
+but you want to run `ic-opt`, OpenBox, and report viewing from your own
+workstation.
 
-Each `maestro_point_root` must be the leaf Maestro/ADE run directory that
-contains both `netlist/` and `psf/`, and
-`<maestro_point_root>/netlist/input.scs` must exist. A typical path looks like:
+First configure passwordless SSH yourself:
+
+```bash
+ssh lab true
+```
+
+Then run:
+
+```bash
+ic-opt --ssh-profile lab /home/user/spectre_opt_prj/Mixer_opt --doctor
+ic-opt --ssh-profile lab /home/user/spectre_opt_prj/Mixer_opt --real
+ic-opt --ssh-profile lab /home/user/spectre_opt_prj/Mixer_opt --real --continue 40
+```
+
+The project path is the Linux server path. Reports are written on the server
+under `PROJECT/reports/` and mirrored locally under `~/.ic-opt/remote_runs/`.
+
+## User Project Layout
+
+Recommended layout:
 
 ```text
-~/simulation/<library>/<cell>/<test_name>/results/maestro/Interactive.<N>/<point>/<run_name>/
+~/spectre_opt_prj/<project_name>/
+├── opt_requirement.md
+├── constraints.md
+└── context/
 ```
 
-Use the final `<run_name>/` directory. Do not use the parent `Interactive.<N>`
-directory, the `<point>` directory, or the `netlist/` subdirectory itself.
+Only `opt_requirement.md` is required. `constraints.md` is for human guidance to
+the supervisor agent. Do not hand-build generated directories such as
+`config/`, `netlists/`, `runs/`, `reports/`, `ledger/`, or `state/`.
 
-Objective expressions combine extracted scalar metric names, not OCEAN
-expressions. Use `direction: minimize` for lower-is-better FoM. Use
-`direction: maximize` for higher-is-better FoM; the tool keeps the user FoM and
-internally minimizes `-FoM` for feasible candidates.
-
-### 3. Run A Doctor Check
-
-Before launching real simulations, run:
-
-```bash
-./.venv/bin/ic-opt ~/spectre_opt_prj/my_mixer_opt --doctor
-```
-
-The doctor check verifies the requirement file, Cadence setup path, Python
-toolchain, generated configs, imported netlist bundles, and continuation
-artifacts. It does not launch Spectre/OCEAN.
-In v0.1.6 and later, local `--doctor` is wired directly to the product doctor
-route instead of falling through to the optimizer path, so it can be used safely
-as the first project check even before `--real`.
-
-If your Cadence setup file is somewhere else:
-
-```bash
-./.venv/bin/ic-opt ~/spectre_opt_prj/my_mixer_opt \
-  --doctor \
-  --cadence-cshrc /path/to/cadence_env.csh
-```
-
-### 4. Run A Dry Gate
-
-This checks the workflow without launching Spectre/OCEAN:
-
-```bash
-./.venv/bin/ic-opt ~/spectre_opt_prj/my_mixer_opt \
-  --real \
-  --dry-orchestration \
-  --max-evals 100 \
-  --batch-size 10
-```
-
-### 5. Run Real Optimization
-
-```bash
-./.venv/bin/ic-opt ~/spectre_opt_prj/my_mixer_opt \
-  --real \
-  --max-evals 100 \
-  --batch-size 10
-```
-
-For a project without `cadence_env.csh`:
-
-```bash
-./.venv/bin/ic-opt ~/spectre_opt_prj/my_mixer_opt \
-  --real \
-  --cadence-cshrc /path/to/cadence_env.csh
-```
-
-Run real Spectre/OCEAN outside restricted sandboxes. The process needs access to
-your Cadence tools, license server, project files, and simulation directories.
-
-### 6. Continue An Existing Run
-
-After reviewing the first result, you can add more evaluations:
-
-```bash
-./.venv/bin/ic-opt ~/spectre_opt_prj/my_mixer_opt --continue 40
-```
-
-When prior optimizer history exists, continuation inherits that history's
-resource settings. Do not add `--parallel-jobs` unless you intentionally want to
-change resources; mixed resource settings make optimizer evidence harder to
-compare and can be rejected by the acceptance audit.
-
-### 7. Remote SSH Mode
-
-Remote mode is for the common case where your laptop or workstation can install
-Python packages, but Cadence/Spectre/OCEAN are only available on a Linux EDA
-server.
-
-The project folder stays on the remote server and keeps the same layout as local
-mode:
+For each testbench, first run one known-good Maestro/ADE point and put the point
+root in `opt_requirement.md`. The point root must contain:
 
 ```text
-/remote/path/to/my_mixer_opt/
-  opt_requirement.md
-  constraints.md          # optional
-  cadence_env.csh         # remote Cadence setup file
+<maestro_point_root>/netlist/input.scs
 ```
 
-`--ssh-profile` is the SSH target that your local OpenSSH client understands.
-It can be a raw target such as `user@server`, but a stable alias in
-`~/.ssh/config` is recommended because it keeps `ic-opt` commands short and
-repeatable.
+Multi-testbench projects route each metric to a named testbench; Hermes keeps
+those native netlist bundles separate and aggregates scalar metric manifests at
+candidate level.
 
-Configure passwordless SSH yourself, the same way you would for other EDA bridge
-tools. A typical `~/.ssh/config` entry on your local machine is:
+## Run
 
-```sshconfig
-Host eda-lab
-  HostName your.eda.server
-  User your_user_name
-  IdentityFile ~/.ssh/id_ed25519
-```
-
-If you do not already have an SSH key, create one on the local machine:
+Preferred product command:
 
 ```bash
-ssh-keygen -t ed25519 -C "your_email@example.com"
+./.venv/bin/ic-opt ~/spectre_opt_prj/<project_name> --real
 ```
 
-Copy the public key to the remote EDA server. If `ssh-copy-id` is available:
+Offline gate check without launching Spectre/OCEAN/OpenBox:
 
 ```bash
-ssh-copy-id eda-lab
+./.venv/bin/ic-opt ~/spectre_opt_prj/<project_name> --real --dry-orchestration
 ```
 
-If `ssh-copy-id` is not available, ask your server administrator how to add
-`~/.ssh/id_ed25519.pub` to the remote `~/.ssh/authorized_keys`.
-
-The first SSH connection may ask you to trust the remote host key. Do this once
-interactively:
+The product CLI is the contract for normal users: initial real runs read workload
+and resources from `opt_requirement.md`, and continuation accepts only
+`--continue N` as a CLI delta. Low-level `hermes-workflow` commands are
+development/debugging tools for maintainers inspecting a specific pipeline stage;
+do not present them as product usage and do not use them to override the user's
+requirement contract.
 
 ```bash
-ssh eda-lab true
+./.venv/bin/hermes-workflow optimize ~/spectre_opt_prj/<project_name> --real
 ```
 
-Then verify that the connection does not ask for a password:
+For product continuation after a completed run:
 
 ```bash
-ssh -o BatchMode=yes eda-lab true
+./.venv/bin/ic-opt ~/spectre_opt_prj/<project_name> --real --continue 40
 ```
 
-`BatchMode=yes` is important. If this command fails, `ic-opt --ssh-profile` is
-not ready yet.
+Do not copy workload, resource, or strategy flags into product continuation
+commands. `parallel_jobs`, `batch_size`, optimizer strategy, Spectre settings,
+and retention policy come from `opt_requirement.md` / generated config.
 
-Before running optimization, also verify the remote project path:
+## Read Results
 
-```bash
-ssh eda-lab 'test -f /remote/path/to/my_mixer_opt/opt_requirement.md'
-ssh eda-lab 'test -f /remote/path/to/my_mixer_opt/cadence_env.csh'
-```
-
-Then run the same workflow with `--ssh-profile`:
-
-```bash
-ic-opt --ssh-profile eda-lab /remote/path/to/my_mixer_opt --doctor
-
-ic-opt --ssh-profile eda-lab /remote/path/to/my_mixer_opt \
-  --real \
-  --max-evals 80 \
-  --batch-size 10 \
-  --parallel-jobs 6
-
-ic-opt --ssh-profile eda-lab /remote/path/to/my_mixer_opt \
-  --continue 20 \
-  --batch-size 10 \
-  --parallel-jobs 6
-```
-
-For remote multi-testbench or multi-corner projects, start conservatively with
-`--parallel-jobs 4` to `--parallel-jobs 8`. `parallel_jobs` is candidate-level
-concurrency, not per-testbench or per-corner concurrency. High values such as
-24 or 36 can hit SSH server limits and produce transport errors like
-`kex_exchange_identification: Connection closed by remote host`.
-
-If the remote Cadence setup file is not
-`/remote/path/to/my_mixer_opt/cadence_env.csh`, pass the remote path:
-
-```bash
-ic-opt --ssh-profile eda-lab /remote/path/to/my_mixer_opt \
-  --real \
-  --cadence-cshrc /remote/path/to/cadence_env.csh
-```
-
-Reports are kept on the remote server under `PROJECT/reports/` and mirrored to
-your local machine under:
+Primary reports:
 
 ```text
-~/.ic-opt/remote_runs/<ssh-profile>/<project-hash>/reports/
-```
-
-Remote mode does not install Cadence, OpenBox, or this Python package on the EDA
-server. It uses SSH to run the same canonical Spectre/OCEAN commands remotely
-and mirrors the resulting reports back to the local optimizer environment.
-
-## Read The Results
-
-Start with:
-
-```text
+reports/optimizer_flow_run_report.json
 reports/optimizer_decision_report.md
 reports/optimizer_insight_report.md
 reports/optimizer_final_summary.md
 ```
 
-Useful machine-readable reports:
-
-```text
-reports/optimizer_flow_run_report.json
-reports/optimizer_run_acceptance_report.json
-reports/optimizer_evaluations.jsonl
-```
-
-Useful visual outputs:
+Visual artifacts are under:
 
 ```text
 reports/optimizer_visuals/
 reports/openbox_advanced_visualization/
 ```
 
-Important wording:
+The accepted candidate is a best-observed point under the evaluated samples and
+configured objective. It is not a mathematical proof of global optimum.
 
-- `best observed` means the best point found in the completed evaluations.
-- `feasible` means the point passed the configured constraints.
-- `constraint_failed` usually means the circuit simulated but did not meet the
-  design requirements.
-- `metric_check_failed` usually means the OCEAN formula did not return a valid
-  scalar for that candidate.
+## Proven Product Evidence
 
-## Using It With An AI Agent
-
-The preferred user interaction is short:
-
-```text
-/ic-opt ~/spectre_opt_prj/my_mixer_opt --real
-```
-
-The project requirements should live in files, not in a long chat message. The
-agent should:
-
-- read the project files,
-- run `ic-opt PROJECT --doctor` before a fresh real run,
-- run `ic-opt`,
-- wait for completion,
-- read the reports,
-- explain the recommended point, feasible count, failure categories, and whether
-  continuation is worth doing.
-
-Give your agent the platform-neutral skill before asking it to operate the tool:
-
-```text
-skills/ic-opt/SKILL.md
-```
-
-For a pip-installed copy, ask the tool where the packaged skill lives:
+C-60 real product acceptance used a fresh Mixer multi-testbench project with a
+project-local `cadence_env.csh` and ran:
 
 ```bash
-hermes-workflow agent-skill-path
+./.venv/bin/ic-opt PROJECT --real
 ```
 
-The skill is not tied to one agent platform. Any agent that can read files and
-run shell commands can use it.
+It completed 100 real OpenBox/Spectre/OCEAN evaluations, generated OpenBox
+advanced visualization, and recommended a feasible best-observed candidate.
 
-The agent should not rewrite OCEAN formulas, parse PSF directly, hand-pick
-optimizer points, or change resource settings unless the user explicitly asks.
+C-64 Claude subprocess handoff acceptance used a fresh Mixer multi-testbench
+project with
+only `opt_requirement.md` and `cadence_env.csh`, then ran:
 
-## Repository Layout
-
-```text
-src/hermes_workflow/        Python package and CLI implementation
-vendor/open-box/            vendored OpenBox backend used by the product env
-skills/ic-opt/              platform-neutral agent skill
-examples/                   requirement examples for users
-docs/                       user, agent, and release manuals
-tests/                      regression tests
-tools/                      development helper scripts
-requirements-product.txt    product Python dependencies
-requirements-advanced.txt   optional OpenBox advanced visualization dependencies
-pyproject.toml              package metadata and console scripts
+```bash
+claude -p --dangerously-skip-permissions "/ic-opt PROJECT --real"
 ```
 
-## More Documentation
+The historical `/ic-opt` skill appended `--execution-agent claude`; the flow wrote
+`reports/execution_agent_handoff_report.json` with `status=pass`,
+`execution_agent=claude`, `returncode=0`, completed 100 real evaluations, and
+recommended feasible `real_051`. C-65 keeps that route as acceptance evidence
+and development fallback, while product adapters target runtime-native
+same-CLI subagent delegation.
 
-- `docs/USER_GUIDE_CN.md`: beginner-friendly Chinese user guide.
-- `docs/OPTIMIZER_PRODUCTION_QUICKSTART.md`: product quickstart.
-- `docs/TOOLCHAIN_EXECUTION_REFERENCE.md`: known-good tool execution rules.
-- `docs/TROUBLESHOOTING_CN.md`: common errors, likely causes, and fixes.
-- `examples/spectre_maestro_project/OPT_REQUIREMENT_README.md`: requirement file
-  format.
-- `docs/AGENT_OPTIMIZER_USAGE_MANUAL.md`: platform-neutral agent operating
+## Documentation
+
+- `docs/OPTIMIZER_PRODUCTION_QUICKSTART.md`: shortest production workflow.
+- `docs/AGENT_OPTIMIZER_USAGE_MANUAL.md`: supervisor/execution-agent operating
   manual.
-- `docs/AGENT_USER_QUICKSTART_CN.md`: short Chinese agent usage guide.
-- `docs/GITHUB_PUBLISH_GUIDE.md`: first GitHub publication checklist.
+- `docs/OPTIMIZER_ALGORITHM_MODES.md`: supported optimizer strategies and when
+  to use OpenBox auto, GP+EIC, PRF+EIC, TuRBO, or random baseline.
+- `docs/PROCESS_CORNER_OPTIMIZATION_FLOW_CN.md`: multi-corner aggregation flow
+  and what the optimizer sees.
+- `docs/AGENT_INTEGRATION_STATUS.md`: current implemented agent boundary and
+  remaining runtime-specific adapter work.
+- `docs/AGENT_USER_QUICKSTART_CN.md`: beginner-friendly Chinese guide for IC
+  users running the agent workflow.
+- `docs/PROJECT_STATUS_AND_ARCHITECTURE_CN.md`: detailed Chinese status and
+  architecture explanation with evidence references.
+- `src/hermes_workflow/templates/spectre_maestro_project/OPT_REQUIREMENT_README.md`:
+  `opt_requirement.md` format reference.
+- `docs/TOOLCHAIN_EXECUTION_REFERENCE.md`: mandatory real-tool execution
+  reference for development and debugging.
+- `docs/PRODUCT_RELEASE_CHECKLIST.md`: release sanity checklist.
+- `RELEASE_NOTES_v0.1.7.md`: current release contract and fixed bug summary.
 
-## Version
+## Boundaries
 
-Current release: `v0.1.6`.
-
-This release has been clean-installed from GitHub and validated on real
-multi-testbench Mixer optimization flows, including local continuation and
-remote SSH execution:
-
-```text
-local: 100 real evaluations -> continuation by 40 -> 140 accepted cumulative evaluations
-remote: 80 real evaluations -> continuation by 20 -> 100 accepted cumulative evaluations
-```
-
-Remote SSH users should keep `--parallel-jobs` conservative. For normal
-multi-testbench work, start around 4-8; higher values can hit SSH server limits
-before they improve optimizer quality.
-
-## License
-
-This project is released under the MIT License. See `LICENSE`.
+- Do not parse PSF in Python.
+- Do not rewrite approved OCEAN formulas.
+- Do not merge multiple testbenches into a synthetic Spectre deck.
+- Do not hand-pick optimizer points for backend acceptance.
+- Do not create per-project Python virtualenvs.
+- Do not commit raw `input.scs`, protected sidecars, PSF data, or full Cadence
+  logs.

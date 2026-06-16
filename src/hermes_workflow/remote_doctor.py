@@ -5,10 +5,22 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+from hermes_workflow.doctor_readiness import (
+    RealRunDirFacts,
+    build_doctor_semantic_summaries,
+    build_optimizer_progress_summary,
+    is_incomplete_real_run_dir,
+)
 from hermes_workflow.remote_project import RemoteProjectRef, remote_cache_dir
 from hermes_workflow.remote_ssh import RemoteSshRunner, quote_remote_path
 from hermes_workflow.requirement_intake import RequirementIntakeReport, parse_requirement_text
 from hermes_workflow.diagnostics import Diagnostic, DiagnosticSeverity
+from hermes_workflow.license_probe import (
+    LicenseProbeReport,
+    run_license_probe_skipped,
+    run_remote_license_probe,
+    write_license_probe_report,
+)
 
 
 @dataclass(frozen=True)
@@ -21,6 +33,14 @@ class RemoteDoctorReport:
     checks: dict[str, dict[str, str]]
     issues: list[str]
     structured_issues: list[Diagnostic]
+    transport: dict[str, Any]
+    requirement_summary: dict[str, Any]
+    evaluation_matrix: dict[str, Any]
+    optimizer_summary: dict[str, Any]
+    resource_summary: dict[str, Any]
+    dirty_state: dict[str, Any]
+    optimizer_progress_summary: dict[str, Any]
+    license_probe: dict[str, Any] = None
 
 
 def run_remote_doctor(
@@ -29,6 +49,7 @@ def run_remote_doctor(
     runner: RemoteSshRunner | Any | None = None,
     cadence_cshrc: PurePosixPath | str | None = None,
     cache_root: Path | None = None,
+    cli_max_evals: int | None = None,
 ) -> RemoteDoctorReport:
     ssh = runner or RemoteSshRunner(ref.ssh_profile)
     cache_dir = remote_cache_dir(ref, cache_root=cache_root)
@@ -37,6 +58,12 @@ def run_remote_doctor(
     checks: dict[str, dict[str, str]] = {}
     issues: list[str] = []
     structured_issues: list[Diagnostic] = []
+    requirement_sections: dict[str, Any] = {}
+    transport = {
+        "mode": "remote",
+        "ssh_profile": ref.ssh_profile,
+        "remote_project_dir": str(ref.remote_project_dir),
+    }
 
     _record_command_check(
         checks,
@@ -50,7 +77,17 @@ def run_remote_doctor(
         failure_detail=f"Unable to authenticate or execute remote commands with ssh profile {ref.ssh_profile}.",
     )
     if issues:
-        return _write_doctor(ref, ssh, local_report_path, checks, issues, structured_issues)
+        return _write_doctor(
+            ref,
+            ssh,
+            local_report_path,
+            checks,
+            issues,
+            structured_issues,
+            transport=transport,
+            requirement_sections=requirement_sections,
+            cli_max_evals=cli_max_evals,
+        )
 
     _record_command_check(
         checks,
@@ -104,6 +141,9 @@ def run_remote_doctor(
         }
         issues.extend(req_report.issues)
         structured_issues.extend(req_report.structured_issues)
+        requirement_sections = dict(req_report.sections) if isinstance(
+            req_report.sections, dict
+        ) else {}
         _record_parallel_jobs_warning(
             checks,
             req_report,
@@ -150,7 +190,92 @@ def run_remote_doctor(
             "Update cadence_env.csh so which spectre and which ocean resolve on the remote host."
         ),
     )
-    return _write_doctor(ref, ssh, local_report_path, checks, issues, structured_issues)
+
+    # License probe: check require_license_check from requirement sections
+    cache_dir = remote_cache_dir(ref, cache_root=cache_root)
+    license_probe_report = _check_remote_license_probe(
+        ssh,
+        cshrc_path,
+        requirement_sections,
+        checks,
+        issues,
+        structured_issues,
+        cache_dir=cache_dir,
+    )
+    return _write_doctor(
+        ref,
+        ssh,
+        local_report_path,
+        checks,
+        issues,
+        structured_issues,
+        transport=transport,
+        requirement_sections=requirement_sections,
+        license_probe_report=license_probe_report,
+        cli_max_evals=cli_max_evals,
+    )
+
+
+def _check_remote_license_probe(
+    ssh: Any,
+    cshrc_path: PurePosixPath,
+    requirement_sections: dict[str, Any],
+    checks: dict[str, dict[str, str]],
+    issues: list[str],
+    structured_issues: list[Diagnostic],
+    *,
+    cache_dir: Path,
+) -> LicenseProbeReport | None:
+    """Run remote license probe if ``require_license_check`` is true."""
+    spectre_settings = requirement_sections.get("Spectre Settings")
+    require = False
+    if isinstance(spectre_settings, dict):
+        require = bool(spectre_settings.get("require_license_check", False))
+
+    if not require:
+        report = run_license_probe_skipped(execution_mode="remote")
+        checks["license_probe"] = {
+            "status": "skipped",
+            "message": "require_license_check is false",
+        }
+        write_license_probe_report(cache_dir, report)
+        return report
+
+    try:
+        report = run_remote_license_probe(ssh, cshrc_path)
+    except Exception as exc:
+        report = LicenseProbeReport(
+            status="fail",
+            execution_mode="remote",
+            require_license_check=True,
+            issues=[f"remote license probe raised exception: {exc}"],
+        )
+
+    write_license_probe_report(cache_dir, report)
+
+    if report.status == "pass":
+        checks["license_probe"] = {
+            "status": "pass",
+            "message": "remote license environment probe passed",
+        }
+    else:
+        detail = "; ".join(report.issues) if report.issues else "remote license environment probe failed"
+        checks["license_probe"] = {"status": "fail", "message": detail}
+        issues.append(f"license_probe: {detail}")
+        structured_issues.append(
+            Diagnostic(
+                code="LICENSE_PROBE_FAILED",
+                severity=DiagnosticSeverity.ERROR,
+                stage="remote_ssh",
+                component="remote_doctor",
+                message="Remote license probe failed",
+                detail=detail,
+                likely_cause="Spectre or license server not available after sourcing cadence cshrc",
+                recommended_action="Verify cadence_env.csh sets up spectre and license paths correctly on the remote host",
+                evidence=[str(cshrc_path)],
+            )
+        )
+    return report
 
 
 def _record_parallel_jobs_warning(
@@ -171,7 +296,9 @@ def _record_parallel_jobs_warning(
     checks["parallel_jobs"] = {
         "status": "warn",
         "message": (
-            f"remote parallel_jobs={parallel_jobs} is high; "
+            f"remote candidate_parallelism (Spectre Settings.parallel_jobs)={parallel_jobs} is high; "
+            "this is the scheduler-level number of candidates running concurrently, "
+            "not a Spectre child-runtime setting; "
             "normal remote multi-testbench runs should start around 4-8 to avoid SSH server limits"
         ),
     }
@@ -182,16 +309,20 @@ def _record_parallel_jobs_warning(
                 severity=DiagnosticSeverity.WARN,
                 stage="remote_ssh",
                 component="remote_doctor",
-                message=f"remote parallel_jobs={parallel_jobs} is high.",
+                message=(
+                    f"remote candidate_parallelism (Spectre Settings.parallel_jobs)={parallel_jobs} is high."
+                ),
                 detail=(
-                    "High parallel_jobs values can increase SSH connection pressure and may "
-                    "trigger remote transport errors."
+                    "candidate_parallelism is the scheduler-level number of optimizer candidates "
+                    "evaluated concurrently; high values can increase SSH connection pressure and may "
+                    "trigger remote transport errors. Testbenches/corners inside one candidate always run serially."
                 ),
                 likely_cause=(
                     "Remote candidate concurrency exceeds typical safe ranges for multi-testbench runs."
                 ),
                 recommended_action=(
-                    "Try --parallel-jobs values around 4 to 8 for remote multi-testbench runs."
+                    "Set Spectre Settings.parallel_jobs (candidate_parallelism) to values around 4 to 8 "
+                    "for remote multi-testbench runs."
                 ),
                 evidence=(evidence or []),
             )
@@ -270,8 +401,49 @@ def _write_doctor(
     checks: dict[str, dict[str, str]],
     issues: list[str],
     structured_issues: list[Diagnostic],
+    *,
+    transport: dict[str, Any],
+    requirement_sections: dict[str, Any],
+    cli_max_evals: int | None,
+    license_probe_report: LicenseProbeReport | None = None,
 ) -> RemoteDoctorReport:
+    requirement_summary, evaluation_matrix, optimizer_summary, resource_summary, semantic_diagnostics = (
+        build_doctor_semantic_summaries(
+            requirement_sections, cli_max_evals=cli_max_evals
+        )
+    )
+    for diagnostic in semantic_diagnostics:
+        structured_issues.append(diagnostic)
+        if diagnostic.severity is DiagnosticSeverity.ERROR:
+            message = diagnostic.detail or diagnostic.message
+            checks[diagnostic.code.lower()] = {
+                "status": "fail",
+                "message": message,
+            }
+            issues.append(f"{diagnostic.code}: {message}")
+    dirty_state, dirty_diagnostics = _build_remote_dirty_state(ref, ssh)
+    structured_issues.extend(dirty_diagnostics)
+    cache_dir = local_report_path.parent.parent
+    requirement_max_evaluations: int | None = None
+    if isinstance(optimizer_summary, dict):
+        candidate = optimizer_summary.get("max_evaluations")
+        if isinstance(candidate, int):
+            requirement_max_evaluations = candidate
+    optimizer_progress_summary, progress_diagnostics = build_optimizer_progress_summary(
+        cache_dir,
+        requirement_max_evaluations=requirement_max_evaluations,
+    )
+    for diagnostic in progress_diagnostics:
+        structured_issues.append(diagnostic)
+        if diagnostic.severity is DiagnosticSeverity.ERROR:
+            message = diagnostic.detail or diagnostic.message
+            checks[diagnostic.code.lower()] = {
+                "status": "fail",
+                "message": message,
+            }
+            issues.append(f"{diagnostic.code}: {message}")
     status = "pass" if not issues else "fail"
+    license_probe_dict = license_probe_report.to_dict() if license_probe_report else {}
     payload = {
         "schema_version": "1.0",
         "status": status,
@@ -280,6 +452,14 @@ def _write_doctor(
         "checks": checks,
         "issues": issues,
         "structured_issues": [diagnostic.model_dump() for diagnostic in structured_issues],
+        "transport": transport,
+        "requirement_summary": requirement_summary,
+        "evaluation_matrix": evaluation_matrix,
+        "optimizer_summary": optimizer_summary,
+        "resource_summary": resource_summary,
+        "dirty_state": dirty_state,
+        "optimizer_progress_summary": optimizer_progress_summary,
+        "license_probe": license_probe_dict,
     }
     report_json = json.dumps(payload, indent=2, sort_keys=True) + "\n"
 
@@ -300,4 +480,152 @@ def _write_doctor(
         checks=checks,
         issues=issues,
         structured_issues=structured_issues,
+        transport=transport,
+        requirement_summary=requirement_summary,
+        evaluation_matrix=evaluation_matrix,
+        optimizer_summary=optimizer_summary,
+        resource_summary=resource_summary,
+        dirty_state=dirty_state,
+        optimizer_progress_summary=optimizer_progress_summary,
+        license_probe=license_probe_dict,
+    )
+
+
+def _build_remote_dirty_state(
+    ref: RemoteProjectRef,
+    ssh: Any,
+) -> tuple[dict[str, Any], list[Diagnostic]]:
+    """Inspect remote project for dirty/interrupted state via SSH probes.
+
+    Doctor only checks file presence; it does not download remote artifacts.
+    Optimizer history alone is not a warning. Candidate run directories that
+    lack any candidate-level completion artifact are surfaced as
+    INCOMPLETE_REAL_RUN warnings via the shared classifier.
+    """
+    project = ref.remote_project_dir
+    diagnostics: list[Diagnostic] = []
+    has_runs = _remote_path_exists(ssh, project / "runs" / "real", kind="dir")
+    incomplete_runs: list[str] = []
+    if has_runs:
+        runs_root = project / "runs" / "real"
+        listing = ssh.run(
+            f"ls -1 {quote_remote_path(runs_root)} 2>/dev/null"
+        )
+        if listing.return_code == 0:
+            for name in (line.strip() for line in listing.stdout.splitlines()):
+                if not name:
+                    continue
+                run_dir = runs_root / name
+                facts = _remote_real_run_dir_facts(ssh, run_dir)
+                if is_incomplete_real_run_dir(facts):
+                    incomplete_runs.append(name)
+    has_incomplete_real_run = bool(incomplete_runs)
+    if has_incomplete_real_run:
+        for name in incomplete_runs:
+            diagnostics.append(
+                Diagnostic(
+                    code="INCOMPLETE_REAL_RUN",
+                    severity=DiagnosticSeverity.WARN,
+                    stage="doctor",
+                    component="remote_doctor",
+                    message=f"Incomplete real run directory detected: {name}.",
+                    detail=(
+                        "The remote candidate run directory has neither a "
+                        "candidate-level result manifest "
+                        "(result_manifest.json or "
+                        "metrics/metric_result_manifest.json) nor a legacy "
+                        "optimizer-level report; the previous run may have "
+                        "been interrupted before finalizing."
+                    ),
+                    likely_cause=(
+                        "The previous remote real candidate evaluation did "
+                        "not finalize before exiting."
+                    ),
+                    recommended_action=(
+                        "Inspect the remote candidate run directory before "
+                        "starting a fresh real run."
+                    ),
+                    evidence=[f"runs/real/{name}"],
+                )
+            )
+    has_execution_package = _remote_path_exists(
+        ssh, project / "execution_package", kind="dir"
+    )
+    has_optimizer_state = _remote_path_exists(
+        ssh, project / "state" / "optimizer_state.json", kind="file"
+    )
+    has_optimizer_run_report = _remote_path_exists(
+        ssh, project / "reports" / "optimizer_run_report.json", kind="file"
+    )
+    has_optimizer_evaluations = _remote_path_exists(
+        ssh, project / "reports" / "optimizer_evaluations.jsonl", kind="file"
+    )
+    summary = {
+        "has_runs": has_runs,
+        "has_incomplete_real_run": has_incomplete_real_run,
+        "has_execution_package": has_execution_package,
+        "has_optimizer_state": has_optimizer_state,
+        "has_optimizer_run_report": has_optimizer_run_report,
+        "has_optimizer_evaluations": has_optimizer_evaluations,
+    }
+    return summary, diagnostics
+
+
+def _remote_path_exists(ssh: Any, remote_path: PurePosixPath, *, kind: str) -> bool:
+    flag = "-d" if kind == "dir" else "-f"
+    try:
+        result = ssh.run(f"test {flag} {quote_remote_path(remote_path)}")
+    except Exception:
+        return False
+    return result.return_code == 0
+
+
+def _remote_real_run_dir_facts(
+    ssh: Any, run_dir: PurePosixPath
+) -> RealRunDirFacts:
+    """Probe one remote candidate run directory and return shared facts.
+
+    Mirrors :func:`hermes_workflow.doctor_readiness._local_real_run_dir_facts`
+    so local and remote doctor use the same classification semantics.
+    """
+    return RealRunDirFacts(
+        name=run_dir.name,
+        has_result_manifest=_remote_path_exists(
+            ssh, run_dir / "result_manifest.json", kind="file"
+        ),
+        has_metric_result_manifest=_remote_path_exists(
+            ssh,
+            run_dir / "metrics" / "metric_result_manifest.json",
+            kind="file",
+        ),
+        has_optimizer_run_report=(
+            _remote_path_exists(
+                ssh,
+                run_dir / "reports" / "optimizer_run_report.json",
+                kind="file",
+            )
+            or _remote_path_exists(
+                ssh, run_dir / "optimizer_run_report.json", kind="file"
+            )
+        ),
+        has_optimizer_completion_report=(
+            _remote_path_exists(
+                ssh,
+                run_dir / "reports" / "optimizer_completion_report.json",
+                kind="file",
+            )
+            or _remote_path_exists(
+                ssh,
+                run_dir / "optimizer_completion_report.json",
+                kind="file",
+            )
+        ),
+        has_candidate_marker=(
+            _remote_path_exists(
+                ssh, run_dir / "candidate_request.json", kind="file"
+            )
+            or _remote_path_exists(
+                ssh, run_dir / "candidate.json", kind="file"
+            )
+        ),
     )

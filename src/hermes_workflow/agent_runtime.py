@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
-SUPPORTED_RUNTIMES = ("skill",)
+SUPPORTED_RUNTIMES = ("claude", "opencode")
 
 
 @dataclass(frozen=True)
@@ -32,11 +32,23 @@ class RuntimeStatusResult:
 
 
 RUNTIME_ASSETS: dict[str, tuple[RuntimeAsset, ...]] = {
-    "skill": (
+    "claude": (
         RuntimeAsset(
-            source=Path("skills/ic-opt"),
+            source=Path("claude_skills/ic-opt"),
             target=Path("skills/ic-opt"),
             kind="directory",
+        ),
+    ),
+    "opencode": (
+        RuntimeAsset(
+            source=Path("agent_runtime/opencode/command/ic-opt.md"),
+            target=Path("command/ic-opt.md"),
+            kind="file",
+        ),
+        RuntimeAsset(
+            source=Path("agent_runtime/opencode/agents/ic-opt-execution.md"),
+            target=Path("agents/ic-opt-execution.md"),
+            kind="file",
         ),
     ),
 }
@@ -44,8 +56,10 @@ RUNTIME_ASSETS: dict[str, tuple[RuntimeAsset, ...]] = {
 
 def default_runtime_home(runtime: str) -> Path:
     normalized = _normalize_runtime(runtime)
-    if normalized == "skill":
-        return Path.home() / ".ic-opt"
+    if normalized == "claude":
+        return Path.home() / ".claude"
+    if normalized == "opencode":
+        return Path.home() / ".config" / "opencode"
     raise ValueError(f"unsupported runtime: {runtime}")
 
 

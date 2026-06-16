@@ -22,9 +22,9 @@ def _write_project(
     review_evidence: dict[str, str | None] | None = None,
     progress_status: str = "process hardening complete; verified-only",
 ) -> None:
-    spec_path = root / "docs/dev/specs/process-hardening.md"
-    active_plan_path = root / "docs/dev/plans/current.md"
-    plan_path = root / "docs/dev/plans/top-level.md"
+    spec_path = root / "docs/superpowers/specs/process-hardening.md"
+    active_plan_path = root / "docs/superpowers/plans/current.md"
+    plan_path = root / "docs/superpowers/plans/top-level.md"
     progress_path = root / "docs/NEXT.md"
     spec_path.parent.mkdir(parents=True, exist_ok=True)
     active_plan_path.parent.mkdir(parents=True, exist_ok=True)
@@ -50,9 +50,9 @@ def _write_project(
         "current_status": current_status,
         "review_status": review_status,
         "subagent_dispatch": "not_available",
-        "active_spec": "docs/dev/specs/process-hardening.md",
-        "active_plan": "docs/dev/plans/current.md",
-        "top_level_plan": "docs/dev/plans/top-level.md",
+        "active_spec": "docs/superpowers/specs/process-hardening.md",
+        "active_plan": "docs/superpowers/plans/current.md",
+        "top_level_plan": "docs/superpowers/plans/top-level.md",
         "progress_files": ["docs/NEXT.md"],
         "next_allowed_action": "decide whether to redo C-11 or draft next approved scope",
         "forbidden_actions": [

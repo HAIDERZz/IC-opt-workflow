@@ -7,6 +7,7 @@ from typing import Annotated, NoReturn
 import typer
 
 from hermes_workflow.diagnostics import parse_diagnostics, format_diagnostics_for_cli
+from hermes_workflow.optimizer_continuation_flow import continue_local_project
 from hermes_workflow.optimizer_flow import optimize_project
 from hermes_workflow.product_doctor import run_product_doctor
 from hermes_workflow.remote_doctor import run_remote_doctor
@@ -133,22 +134,6 @@ def main(
             help="Run offline gates and stop before real tools.",
         ),
     ] = False,
-    max_evals: Annotated[
-        int,
-        typer.Option("--max-evals", min=1, help="OpenBox real evaluation budget."),
-    ] = 100,
-    batch_size: Annotated[
-        int | None,
-        typer.Option("--batch-size", min=1, help="OpenBox suggestion batch size."),
-    ] = None,
-    parallel_jobs: Annotated[
-        int | None,
-        typer.Option(
-            "--parallel-jobs",
-            min=1,
-            help="Maximum concurrently launched Spectre runs.",
-        ),
-    ] = None,
     cadence_cshrc: Annotated[
         Path | None,
         typer.Option(
@@ -188,14 +173,45 @@ def main(
         if doctor:
             report = run_remote_doctor(ref, cadence_cshrc=cadence_cshrc)
             if report.status == "pass":
-                typer.echo("remote doctor completed")
+                typer.echo("doctor completed")
+                typer.echo("transport: remote")
                 typer.echo(f"remote report: {report.remote_report_path}")
                 typer.echo(f"local report: {report.local_report_path}")
                 _print_report_issues(report)
                 return
-            typer.echo("remote doctor failed")
+            typer.echo("doctor failed")
+            typer.echo("transport: remote")
             _print_report_issues(report)
             typer.echo(f"local report: {report.local_report_path}")
+            raise typer.Exit(code=1)
+        if continue_evals is not None:
+            if not real:
+                _exit_with_error(
+                    ValueError("--continue requires --real")
+                )
+            remote_cshrc = (
+                PurePosixPath(str(cadence_cshrc))
+                if cadence_cshrc is not None
+                else ref.remote_project_dir / "cadence_env.csh"
+            )
+            try:
+                report = continue_remote_project(
+                    ref,
+                    additional_evals=continue_evals,
+                    remote_cadence_cshrc=remote_cshrc,
+                    batch_size=None,
+                    parallel_jobs=None,
+                    strategy=None,
+                )
+            except (OSError, RuntimeError, ValueError) as exc:
+                _exit_with_error(exc)
+            if report.status == "pass":
+                typer.echo("remote continuation completed")
+                if report.recommended_run_id is not None:
+                    typer.echo(f"recommended: {report.recommended_run_id}")
+                typer.echo(f"local report: {report.report_path}")
+                return
+            _print_report_issues(report)
             raise typer.Exit(code=1)
         if real:
             remote_cshrc = (
@@ -208,9 +224,10 @@ def main(
                     ref,
                     real=True,
                     remote_cadence_cshrc=remote_cshrc,
-                    max_evals=max_evals,
-                    batch_size=batch_size,
-                    parallel_jobs=parallel_jobs,
+                    max_evals=None,
+                    batch_size=None,
+                    parallel_jobs=None,
+                    strategy=None,
                 )
             except (OSError, RuntimeError, ValueError) as exc:
                 _exit_with_error(exc)
@@ -225,30 +242,6 @@ def main(
                 return
             _print_report_issues(report)
             raise typer.Exit(code=1)
-        if continue_evals is not None:
-            remote_cshrc = (
-                PurePosixPath(str(cadence_cshrc))
-                if cadence_cshrc is not None
-                else ref.remote_project_dir / "cadence_env.csh"
-            )
-            try:
-                report = continue_remote_project(
-                    ref,
-                    additional_evals=continue_evals,
-                    remote_cadence_cshrc=remote_cshrc,
-                    batch_size=batch_size,
-                    parallel_jobs=parallel_jobs,
-                )
-            except (OSError, RuntimeError, ValueError) as exc:
-                _exit_with_error(exc)
-            if report.status == "pass":
-                typer.echo("remote continuation completed")
-                if report.recommended_run_id is not None:
-                    typer.echo(f"recommended: {report.recommended_run_id}")
-                typer.echo(f"local report: {report.report_path}")
-                return
-            _print_report_issues(report)
-            raise typer.Exit(code=1)
         _exit_with_error(
             ValueError("remote mode requires --doctor, --real, or --continue N")
         )
@@ -259,26 +252,55 @@ def main(
             cadence_cshrc=_resolve_cadence_cshrc_for_doctor(project_dir, cadence_cshrc),
         )
         if report.status == "pass":
-            typer.echo("local doctor completed")
+            typer.echo("doctor completed")
+            typer.echo("transport: local")
             _echo_report_path(project_dir, report.report_path)
             for warning in getattr(report, "warnings", []):
                 typer.echo(f"warning: {warning}")
             return
-        typer.echo("local doctor failed")
+        typer.echo("doctor failed")
+        typer.echo("transport: local")
         _print_report_issues(report)
         _echo_report_path(project_dir, report.report_path)
         raise typer.Exit(code=1)
 
     try:
         resolved_cadence_cshrc = _resolve_cadence_cshrc(project_dir, cadence_cshrc)
+    except (OSError, RuntimeError, ValueError) as exc:
+        _exit_with_error(exc)
+
+    if continue_evals is not None:
+        if not real:
+            _exit_with_error(ValueError("--continue requires --real"))
+        try:
+            report = continue_local_project(
+                project_dir,
+                additional_evals=continue_evals,
+                cadence_cshrc=resolved_cadence_cshrc,
+            )
+        except (OSError, RuntimeError, ValueError) as exc:
+            _exit_with_error(exc)
+        if report.status == "pass":
+            typer.echo("continuation completed")
+            _echo_report_path(project_dir, report.report_path)
+            if getattr(report, "recommended_run_id", None) is not None:
+                typer.echo(f"recommended: {report.recommended_run_id}")
+            return
+        typer.echo("continuation failed")
+        _print_report_issues(report)
+        _echo_report_path(project_dir, report.report_path)
+        raise typer.Exit(code=1)
+
+    try:
         report = optimize_project(
             project_dir,
             real=real,
             dry_orchestration=dry_orchestration,
-            max_evals=max_evals,
-            batch_size=batch_size,
-            parallel_jobs=parallel_jobs,
+            max_evals=None,
+            batch_size=None,
+            parallel_jobs=None,
             cadence_cshrc=resolved_cadence_cshrc,
+            strategy=None,
             execution_agent=execution_agent,
         )
     except (OSError, RuntimeError, ValueError) as exc:

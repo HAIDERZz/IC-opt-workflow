@@ -435,3 +435,70 @@ def test_check_optimizer_run_cli_exits_nonzero_for_rejected_run(
     assert result.exit_code == 1
     assert "optimizer run rejected" in result.stdout
     assert "reports/optimizer_run_acceptance_report.json" in result.stdout
+
+
+def _set_optimizer_report_issues(project_dir: Path, issues: object) -> None:
+    """Mutate the legacy native turbo optimizer report's `issues` field in place."""
+    report_path = project_dir / "reports" / "native_turbo_optimizer_report.json"
+    payload = json.loads(report_path.read_text(encoding="utf-8"))
+    payload["issues"] = issues
+    _write_json(report_path, payload)
+
+
+def test_check_optimizer_run_rejects_when_optimizer_report_lists_progress_sync_failure(
+    tmp_path: Path,
+) -> None:
+    """B-09 blocker: writer best-effort sync logs failures into
+    `optimizer_run_report.json.issues`. Acceptance must fail-closed and surface
+    every report issue. Otherwise progress-state contract failures get silently
+    accepted and downstream completion can pass.
+    """
+    project_dir = _write_minimal_optimizer_run(tmp_path)
+    _set_optimizer_report_issues(
+        project_dir,
+        ["optimizer_progress_state_sync_failed: boom"],
+    )
+
+    report = check_optimizer_run(project_dir)
+
+    assert report.status == "rejected"
+    assert any(
+        "optimizer_progress_state_sync_failed" in issue for issue in report.issues
+    ), report.issues
+    # The acceptance JSON on disk must agree with the returned dataclass.
+    on_disk = json.loads(
+        (project_dir / "reports" / "optimizer_run_acceptance_report.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert on_disk["status"] == "rejected"
+    assert any(
+        "optimizer_progress_state_sync_failed" in issue for issue in on_disk["issues"]
+    )
+
+
+def test_check_optimizer_run_keeps_accepting_when_optimizer_report_issues_is_empty_list(
+    tmp_path: Path,
+) -> None:
+    """Empty issues list must not regress the existing accepted path."""
+    project_dir = _write_minimal_optimizer_run(tmp_path)
+    _set_optimizer_report_issues(project_dir, [])
+
+    report = check_optimizer_run(project_dir)
+
+    assert report.status == "accepted"
+    assert report.issues == []
+
+
+def test_check_optimizer_run_rejects_when_optimizer_report_issues_is_not_a_list(
+    tmp_path: Path,
+) -> None:
+    """If the optimizer report ships a malformed `issues` field, acceptance must
+    flag it instead of silently ignoring the contract."""
+    project_dir = _write_minimal_optimizer_run(tmp_path)
+    _set_optimizer_report_issues(project_dir, "boom-as-string")
+
+    report = check_optimizer_run(project_dir)
+
+    assert report.status == "rejected"
+    assert any("issues must be a list" in issue for issue in report.issues), report.issues

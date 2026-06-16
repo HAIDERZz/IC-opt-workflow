@@ -3,22 +3,22 @@
 This is the shortest supported path for using `ic-auto-opt-workflow` on a real
 Maestro-exported Spectre/OCEAN optimization project.
 
-For a user-facing manual that explains how to ask an agent to run the workflow,
-read `docs/AGENT_OPTIMIZER_USAGE_MANUAL.md`. For a Chinese user guide, read
-`docs/USER_GUIDE_CN.md`.
+For a user-facing manual that explains how to ask a supervisor agent to run the
+workflow, read `docs/AGENT_OPTIMIZER_USAGE_MANUAL.md`. For the current
+implemented agent boundary, read `docs/AGENT_INTEGRATION_STATUS.md`; for the
+detailed Chinese status explanation, read
+`docs/PROJECT_STATUS_AND_ARCHITECTURE_CN.md`.
 
-For agents, the canonical skill is platform-neutral:
-
-```text
-skills/ic-opt/SKILL.md
-```
-
-This skill can be copied or loaded into any agent environment that supports
-reading skill/command instructions. It is not tied to a specific agent platform.
-After installation, locate the packaged copy with:
+Install the adapter for the agent CLI you use. For Claude:
 
 ```bash
-hermes-workflow agent-skill-path
+./.venv/bin/hermes-workflow install-runtime-adapter claude
+```
+
+For OpenCode:
+
+```bash
+./.venv/bin/hermes-workflow install-runtime-adapter opencode
 ```
 
 ```text
@@ -29,13 +29,18 @@ The workflow is file based. Do not describe machine-critical setup only in
 chat. Put the request in `opt_requirement.md`, optionally put human guidance in
 `constraints.md`, then let Hermes generate and check the contracts.
 
-Here, Hermes means the requirement-to-execution messenger layer: it translates
-the user's Markdown requirement into executable YAML/config contracts and
-auditable reports. Humans and agents both use the same `ic-opt` CLI.
-
-For common errors and fixes, especially requirement-file mistakes, OCEAN
-non-scalar metrics, Maestro point-root paths, and remote SSH failures, read
-`docs/TROUBLESHOOTING_CN.md`.
+Current product CLI contract:
+- `opt_requirement.md` is the only product entry for initial-run optimizer
+  budget, batch size, Spectre `parallel_jobs`, Spectre `threads_per_run`,
+  `optimizer_cpu_threads`, strategy, initialization, output format, retention
+  policy, testbenches, and process corners.
+- Do not pass product CLI overrides such as `--max-evals`, `--batch-size`,
+  `--parallel-jobs`, `--threads`, or `--strategy` to `ic-opt PROJECT --real`.
+- The only product CLI budget delta is continuation:
+  `ic-opt PROJECT --real --continue N`.
+- Multi-corner projects use `Process Corners` in `opt_requirement.md`; see
+  `examples/spectre_maestro_project/opt_requirement.multi_corner.md` and
+  `examples/spectre_maestro_project/opt_requirement.multi_tb_corner.md`.
 
 ## 0. Product Environment Model
 
@@ -57,33 +62,21 @@ Implemented shell product invocation for direct operator/debug use:
 ic-opt ~/spectre_opt_prj/<project_name> --real
 ```
 
-Agent invocation after giving the agent the canonical skill:
+Runtime-native supervisor-agent invocation after installing the matching
+adapter:
 
 ```text
 /ic-opt ~/spectre_opt_prj/<project_name> --real
 ```
 
-Remote EDA server invocation:
-
-```bash
-ic-opt --ssh-profile eda-lab /remote/path/to/<project_name> --real
-```
-
-In remote mode, the project directory and Cadence setup file remain on the
-Linux EDA server. The product Python environment runs locally and connects
-through passwordless OpenSSH.
-
-The current agent should operate the deterministic `ic-opt` CLI, wait for
-completion, read reports, and explain the result. For a fresh real run on a new
-or changed project, the agent should run doctor before `--real`. Native
-subagent execution is optional advanced behavior only when explicitly
-requested. `hermes-workflow
-optimize ... --real` is the lower-level implementation command behind the shell
-route.
+The runtime adapter should make the current agent CLI act as supervisor, run the
+Hermes preparation gate, dispatch that same CLI's native execution subagent, and
+then run closeout. `hermes-workflow optimize ... --real` is the lower-level
+implementation command behind the shell route.
 
 Release packaging must make OpenBox, TuRBO, and report dependencies available
 from the product environment. A development-only path such as
-`.venv` is not a valid production dependency.
+`/tmp/ic_auto_opt_openbox_spike/.venv` is not a valid production dependency.
 
 The Cadence/Spectre/OCEAN environment remains user supplied. Configure it once
 before the short product command. Recommended one-user setup:
@@ -105,21 +98,6 @@ cshrc in this order:
 Do not expect `ic-opt` to infer `.bashrc`/`.zshrc` content, and do not hardcode
 a Spectre version.
 
-For remote mode, configure an OpenSSH profile first:
-
-```sshconfig
-Host eda-lab
-  HostName your.eda.server
-  User your_user_name
-  IdentityFile ~/.ssh/id_ed25519
-```
-
-Then verify:
-
-```bash
-ssh -o BatchMode=yes eda-lab true
-```
-
 ## 1. Create A User Project
 
 Recommended layout:
@@ -134,7 +112,7 @@ Recommended layout:
 Use:
 
 - `opt_requirement.md` for the strict optimization request.
-- `constraints.md` for optional human/operator/agent guidance and user preferences.
+- `constraints.md` for supervisor-agent guidance and user preferences.
 - `context/` for notes, screenshots, prior reports, or circuit explanations.
 
 Do not hand-build `config/`, `netlists/`, `runs/`, or `reports/`.
@@ -176,77 +154,45 @@ project readiness: pass
 readiness: ready_for_first_run
 ```
 
-Product-level doctor check:
-
-```bash
-./.venv/bin/ic-opt ~/spectre_opt_prj/<project_name> --doctor
-```
-
-Remote doctor check:
-
-```bash
-./.venv/bin/ic-opt --ssh-profile eda-lab /remote/path/to/<project_name> --doctor
-```
-
-Do not skip doctor before a fresh remote `--real`. It is the cheapest way to
-catch strict `opt_requirement.md` mistakes, wrong remote point-root paths,
-missing `cadence_env.csh`, and SSH readiness problems.
-
-Doctor parses the requirement, checks the Cadence cshrc path, checks the
-OpenBox/Hermes Python environment, prepares config/netlist bundles, and writes
-`reports/ic_opt_doctor_report.json`. It does not launch Spectre/OCEAN.
-For local projects, `--doctor` is a standalone product check; it must not be
-combined with `--real`, and it must not fall through to optimizer execution.
-When a JSON report contains `structured_issues`, tools and agents should prefer
-those structured diagnostics over the older plain `issues` list.
-
 ## 4. Run The Optimizer
 
 Preferred one-command route:
 
 ```bash
-./.venv/bin/ic-opt ~/spectre_opt_prj/<project_name> \
-  --real \
-  --max-evals 100 \
-  --batch-size 10 \
-  --parallel-jobs 10
+./.venv/bin/ic-opt ~/spectre_opt_prj/<project_name> --real
 ```
 
-Remote route:
+Shell/operator default is direct execution. The historical C-64
+`--execution-agent claude` subprocess route remains available only for
+acceptance/debugging:
 
 ```bash
-./.venv/bin/ic-opt --ssh-profile eda-lab /remote/path/to/<project_name> \
+./.venv/bin/ic-opt ~/spectre_opt_prj/<project_name> \
   --real \
-  --max-evals 100 \
-  --batch-size 10 \
-  --parallel-jobs 6
+  --execution-agent claude
 ```
-
-For remote multi-testbench work, start conservatively. `parallel_jobs` is
-candidate-level concurrency, not per-testbench concurrency. Values around 4-8
-are usually safer for SSH and license pressure; much higher values can hit
-remote SSH limits and produce `kex_exchange_identification` / connection reset
-errors.
 
 This wraps intake, preparation, validation, readiness, package, netlist
 preparation, dry run, preflight health, approval, optimizer task packaging, real
 OpenBox execution, optimizer acceptance, completion, finalization,
 visualization, and decision reporting. It stops before recording user
-acceptance.
+acceptance. In `--execution-agent claude` mode, the real OpenBox execution step
+is performed by an independent Claude CLI subprocess and the supervisor-side
+flow resumes for closeout. Do not describe this as the C-65 default product
+model.
 
 To check the offline orchestration gates without launching Spectre/OCEAN/OpenBox:
 
 ```bash
-./.venv/bin/ic-opt ~/spectre_opt_prj/<project_name> \
-  --real \
-  --dry-orchestration \
-  --max-evals 100 \
-  --batch-size 10 \
-  --parallel-jobs 10
+./.venv/bin/ic-opt ~/spectre_opt_prj/<project_name> --real --dry-orchestration
 ```
 
-Manual equivalent: before a real run, the supervisor must build and approve the
-execution package. Do not jump directly from readiness to real execution.
+Low-level debug equivalent: before a real run, the supervisor must build and
+approve the execution package. This section is for maintainers inspecting a
+pipeline stage, not for product users. Product users should use
+`ic-opt PROJECT --real`; workload, resources, strategy, Spectre settings,
+testbenches, corners, and retention policy come from `opt_requirement.md` /
+generated config. Do not jump directly from readiness to real execution.
 
 ```bash
 ./.venv/bin/hermes-workflow package ~/spectre_opt_prj/<project_name>
@@ -256,7 +202,6 @@ execution package. Do not jump directly from readiness to real execution.
 ./.venv/bin/hermes-workflow approve ~/spectre_opt_prj/<project_name>
 ./.venv/bin/hermes-workflow package-optimizer-task ~/spectre_opt_prj/<project_name> \
   --backend openbox \
-  --max-evals 100 \
   --parallel \
   --cadence-cshrc /path/to/user/cadence_env.csh
 ```
@@ -265,34 +210,80 @@ Before a real run, read `docs/TOOLCHAIN_EXECUTION_REFERENCE.md` and use the
 user/project Cadence/OpenBox environment. The environment setup path must come
 from the user project or user shell setup; do not hardcode a Spectre version.
 
-Manual OpenBox run:
+Manual OpenBox run for debugging:
 
 ```bash
 ./.venv/bin/hermes-workflow run-openbox-real ~/spectre_opt_prj/<project_name> \
-  --max-evals 100 \
-  --batch-size 10 \
-  --parallel-jobs 10 \
   --cadence-cshrc /path/to/user/cadence_env.csh
 ```
 
+Do not use low-level commands to bypass the product contract. In the product
+flow, `ic-opt ... --real` reads workload, resources, strategy, Spectre settings,
+testbenches, corners, and retention policy from `opt_requirement.md` / generated
+config.
+
 Resource meanings:
 
-- `spectre.parallel_jobs`: how many Spectre child jobs may run at once.
+- `spectre.parallel_jobs`: candidate-level scheduler concurrency — how many
+  candidates the optimizer evaluates at once. Inside one candidate, configured
+  testbenches and corners still run serially. It is not a Spectre child-run
+  flag and is not written into per-run Spectre metadata.
 - `spectre.threads_per_run`: Spectre `+mt` threads per individual simulation.
 - `optimizer.optimizer_cpu_threads`: Python/OpenBox-side optimizer math threads.
 
-Continuation should inherit the already accepted optimizer-history resource
-settings when history exists, falling back to the project config only for the
-first run. Change resources only when the user explicitly asks to do so:
+### Run retention
+
+`spectre.keep_successful_runs` and `spectre.keep_failed_runs` from
+`opt_requirement.md` control whether each candidate's `runs/real/<run_id>`
+directory is kept after the optimizer has consumed its result. They are
+applied after candidate finalization, never before result checking,
+aggregation, objective evaluation, or `record_real_result` have completed.
+
+- `keep_successful_runs: true` keeps the run directory when the candidate
+  produced a usable real observation. A constraint-violating candidate with
+  valid metric scalars is a successful observation and is controlled by this
+  flag.
+- `keep_successful_runs: false` removes the run directory after the result
+  has been recorded.
+- `keep_failed_runs: true` keeps the run directory when the candidate failed
+  during real execution, metric extraction, aggregation, result checking, or
+  result recording.
+- `keep_failed_runs: false` removes the run directory after the failure has
+  been classified and reported.
+
+Ledger, optimizer state, best-candidate state, optimizer reports, and the
+per-run decision report at `state/run_retention/<run_id>.json` are retained
+regardless of these settings. For remote runs, the same policy also cleans
+the remote project's `runs/real/<run_id>` after artifacts are downloaded.
+
+Default to `openbox_auto` unless the user already knows they need a specific
+mode. Choose `openbox_gp_eic` for mostly continuous, smooth, constraint-aware
+IC optimization where local surrogate quality matters. Choose
+`openbox_prf_eic` for stepped, integer-heavy, mixed, or failure-prone search
+spaces. Keep `turbo_trust_region` for mostly continuous problems that still
+benefit from trust-region local improvement even when a few variables have
+steps. Use `random_baseline` only for sanity checks, pipeline debugging, or
+algorithm comparisons.
+
+`optimizer.optimizer_cpu_threads` changes runtime and host load, not optimizer
+correctness. Use `reports/optimizer_effectiveness_audit.json` and the matching
+section in `reports/optimizer_insight_report.md` to verify which strategy
+actually ran, whether continuation replayed prior observations into the model,
+and whether the latest batch was still initialization or real BO progress.
+
+Low-level OpenBox continuation is a debug fallback. Product continuation is
+`ic-opt PROJECT --real --continue N`; only `N` comes from CLI and every other
+setting comes from the project config.
 
 ```bash
-./.venv/bin/ic-opt ~/spectre_opt_prj/<project_name> \
-  --continue 40
+./.venv/bin/hermes-workflow continue-openbox-real ~/spectre_opt_prj/<project_name> \
+  --additional-evals 40 \
+  --cadence-cshrc /path/to/user/cadence_env.csh
 ```
 
-Do not add `--parallel-jobs` to continuation commands by habit. Mixed
-`parallel_jobs` histories are rejected because they make optimizer evidence less
-comparable.
+Do not add workload, resource, strategy, surrogate, acquisition, or acquisition
+optimizer flags to product continuation. Mixed execution contracts make optimizer
+evidence less comparable and should be rejected by review/acceptance.
 
 Execution-agent status policy: report start, unexpected failure, completion,
 and only low-frequency heartbeat status for long runs. Do not poll every batch.
@@ -338,6 +329,7 @@ reports/optimizer_final_summary.md
 Supporting reports:
 
 ```text
+reports/optimizer_effectiveness_audit.json
 reports/optimizer_insight_report.md
 reports/optimizer_decision_report.md
 reports/optimizer_supervisor_decision.md

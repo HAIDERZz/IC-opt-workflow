@@ -42,6 +42,22 @@ def check_optimizer_run(project_dir: str | Path) -> OptimizerRunAcceptanceReport
     if is_fake and backend != "openbox":
         issues.append("fake optimizer artifacts are only accepted for backend=openbox")
 
+    # Fail-closed on any issue the optimizer writer recorded in the report.
+    # Best-effort writers (B-09 progress-state sync, etc.) log structured
+    # failures here; acceptance must surface them instead of silently accepting.
+    if "issues" in native_report:
+        report_issues = native_report["issues"]
+        if isinstance(report_issues, list):
+            for entry in report_issues:
+                if isinstance(entry, str) and entry:
+                    issues.append(f"optimizer report issue: {entry}")
+                elif entry is not None:
+                    issues.append(
+                        f"optimizer report issue: {entry!r}"
+                    )
+        else:
+            issues.append("optimizer report issues must be a list")
+
     evaluation_count = _int_value(native_report.get("evaluation_count"))
     if evaluation_count != len(traces):
         issues.append(
