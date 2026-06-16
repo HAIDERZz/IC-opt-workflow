@@ -2,7 +2,7 @@
 
 > **For agentic workers:** Keep this plan lean. Do not create a broad optimizer framework. The goal is to run the real optimizer loop and fix only real blockers exposed by that run.
 
-**Goal:** Prove the current Hermes + TuRBO + Spectre/OCEAN loop can run a meaningful fixed-budget optimization, not just a few hand-picked points.
+**Goal:** Prove the current Hermes + TuRBO + Spectre/OCEAN loop can run a meaningful fixed-budget optimization, rather than a few hand-picked points.
 
 **Architecture:** C-16 uses the existing C-15 loop driver and C-7 Spectre/OCEAN adapter. The execution agent is not part of the normal candidate loop; it remains optional for Virtuoso/Maestro setup/export/debug.
 

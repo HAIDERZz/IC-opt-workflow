@@ -104,8 +104,8 @@ The new OpenBox log stopped after advisor initialization and before any
 Spectre/OCEAN child process appeared. The Claude command eventually returned:
 
 ```text
-Continuation Failed — Search Space Exhausted
-OpenBox was unable to generate enough unique candidate points — only 8 out of
+Continuation failed: search space exhausted
+OpenBox was unable to generate enough unique candidate points: only 8 out of
 the requested 10 per batch could be produced after 300 deduplication attempts.
 ```
 

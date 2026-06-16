@@ -224,7 +224,7 @@ config.
 
 Resource meanings:
 
-- `spectre.parallel_jobs`: candidate-level scheduler concurrency — how many
+- `spectre.parallel_jobs`: candidate-level scheduler concurrency. It controls how many
   candidates the optimizer evaluates at once. Inside one candidate, configured
   testbenches and corners still run serially. It is not a Spectre child-run
   flag and is not written into per-run Spectre metadata.

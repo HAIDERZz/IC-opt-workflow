@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Implement a deterministic mock optimization loop that reads the same validated YAML configs Hermes already owns, generates quantized candidate parameter sets, computes mock metrics, evaluates constraints and objective, and writes standardized state files — without requiring Cadence, Virtuoso, Spectre, or TuRBO.
+**Goal:** Implement a deterministic mock optimization loop that reads the same validated YAML configs Hermes already owns, generates quantized candidate parameter sets, computes mock metrics, evaluates constraints and objective, and writes standardized state files without requiring Cadence, Virtuoso, Spectre, or TuRBO.
 
 **Architecture:** The mock optimizer is a library module (`hermes_workflow.mock_optimizer`) callable from a new CLI command (`hermes-workflow mock-run`). It reuses the existing `ContractBundle` from `validate.py` for config loading and the AST-based expression evaluator for objective computation. Candidate generation uses numpy-based Sobol, Latin hypercube, and random samplers with deduplication. It never calls Spectre, never imports `virtuoso_bridge`, and never performs real simulation.
 
@@ -268,7 +268,7 @@ Updated after each evaluation:
 
 **Steps:**
 
-- [ ] **Step 1:** Extract a public function `evaluate_objective(expression: str, metrics: dict[str, float]) -> float` from the private AST validation in `validate.py`. The function parses the expression AST, substitutes metric name→float values, evaluates arithmetic, and returns the scalar result. It raises `ValueError` for unknown names, non-numeric constants, or unsupported nodes — reusing the same whitelist as `_is_allowed_objective_node`.
+- [ ] **Step 1:** Extract a public function `evaluate_objective(expression: str, metrics: dict[str, float]) -> float` from the private AST validation in `validate.py`. The function parses the expression AST, substitutes metric name→float values, evaluates arithmetic, and returns the scalar result. It raises `ValueError` for unknown names, non-numeric constants, or unsupported nodes, reusing the same whitelist as `_is_allowed_objective_node`.
 
 - [ ] **Step 2:** Write a failing test: `evaluate_objective("(rise + fall) * DC", {"rise": 52.0, "fall": 43.0, "DC": 120.0})` should return `(52.0 + 43.0) * 120.0 = 11400.0`.
 
@@ -292,7 +292,7 @@ Updated after each evaluation:
   - `generate_integer_grid(lower=2, upper=12, step=1)` returns `[2, 3, 4, ..., 12]`.
   - `generate_continuous_grid(lower="0.3 um", upper="3 um", step="0.2 um")` returns `["0.3 um", "0.5 um", ..., "2.9 um"]`.
   - `generate_candidates(bundle, n_candidates=6, seed=20260528)` returns a list of `dict[str, str]` parameter sets using Sobol initialization.
-  - `generate_candidates` with `initialization=random` returns different candidates from the same seed each call (in the epoch sense — within one call they are deterministic for that seed). Actually: same seed always produces same candidates for a given initialization method.
+  - `generate_candidates` is deterministic for a fixed seed and initialization method.
   - Deduplication: generating more candidates than the grid allows produces only unique combinations.
 
 - [ ] **Step 2:** Implement `generate_integer_grid`, `generate_continuous_grid`, `generate_candidates`, and deduplication in `mock_optimizer.py`.
@@ -313,7 +313,7 @@ Updated after each evaluation:
   - `compute_mock_metrics(variables_config, metrics_config, parameters)` returns a `dict[str, float]` mapping metric names to deterministic mock values.
   - For the `bridge_test_inv` fixture, given `FN=4, WN=1.0um, FP=4, WP=1.0um`, the metric values are deterministic and reproducible.
   - Different parameter sets produce different metric values.
-  - The function works for any valid `MetricsConfig` with declared metrics, not just `bridge_test_inv`.
+  - The function works for any valid `MetricsConfig` with declared metrics, beyond `bridge_test_inv`.
 
 - [ ] **Step 2:** Implement `compute_mock_metrics` using a seeded deterministic formula: for each metric, compute `hashlib.sha256(f"{metric_name}:{sorted_param_str}".encode()).hexdigest()`, convert to float in [0,1), then scale into a reasonable range based on the metric unit and variable count.
 

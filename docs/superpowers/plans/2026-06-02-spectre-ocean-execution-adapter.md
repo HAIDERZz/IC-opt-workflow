@@ -979,7 +979,7 @@ def _ocean_argv(context: SpectreOceanContext) -> list[str]:
     ]
 ```
 
-If `_ocean_argv()` needs the replay script path relative to `runs/real/<run_id>`, use `metrics/metric_probe.ocn`, not only the basename.
+If `_ocean_argv()` needs the replay script path relative to `runs/real/<run_id>`, use `metrics/metric_probe.ocn`, not the basename alone.
 
 - [x] **Step 4: Run fake success test**
 

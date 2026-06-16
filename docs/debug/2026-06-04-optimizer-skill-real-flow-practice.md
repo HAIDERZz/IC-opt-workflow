@@ -28,7 +28,7 @@ The practice used the known-good Maestro/ADE exported netlist bundle from the
 C-7/C-14 closure path. Python did not parse PSF data and did not rewrite OCEAN
 formulas.
 
-## Flow Actually Tested
+## Flow tested
 
 ```text
 Turbo1.optimize()
