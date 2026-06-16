@@ -23,6 +23,8 @@ from hermes_workflow.reports import (
 from hermes_workflow.result_handoff import ResultManifest
 from hermes_workflow.validate import ContractBundle, assert_valid_project
 
+WAVEFORM_EXPORT_MANIFEST_NAME = "waveform_export_manifest.json"
+
 
 RUN_ID_RE = re.compile(r"^real_[0-9]{3}$")
 DEFAULT_RUN_ID = "real_001"
@@ -245,6 +247,9 @@ def check_metric_results(
             metrics,
         )
 
+    # Optional waveform export manifest validation
+    _validate_waveform_export_manifest(run_dir, issues)
+
     report = MetricResultCheckReport(
         schema_version="1.0",
         status=MetricResultCheckStatus.FAIL if issues else MetricResultCheckStatus.PASS,
@@ -306,6 +311,28 @@ def _validate_result_manifest(
     else:
         issues.append("simulator result is not succeeded")
     return handoff
+
+
+def _validate_waveform_export_manifest(
+    run_dir: Path,
+    issues: list[str],
+) -> None:
+    """If a waveform_export_manifest.json exists in the metrics dir, validate it.
+
+    This is optional — only checked when the file exists.
+    """
+    manifest_path = run_dir / "metrics" / WAVEFORM_EXPORT_MANIFEST_NAME
+    if not manifest_path.exists():
+        return
+    payload = _load_json(manifest_path, "waveform export manifest", issues)
+    if payload is None:
+        return
+    try:
+        from hermes_workflow.fix_run_models import WaveformExportManifest
+
+        WaveformExportManifest.model_validate(payload)
+    except ValidationError:
+        issues.append("waveform export manifest is invalid")
 
 
 def _declared_metric_result_manifest(

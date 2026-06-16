@@ -1747,3 +1747,193 @@ def test_render_ocean_replay_script_scalar_output_unchanged_without_waveform_exp
     assert "openResults" in script
     assert "selectResult" in script
     assert "close(out)" in script
+
+
+# ── Waveform export manifest tests ─────────────────────────────────────
+
+
+class FakeSuccessRunnerWithWaveforms(FakeSuccessRunner):
+    """FakeSuccessRunner that also creates CSV files for waveform exports."""
+
+    def run(
+        self,
+        argv: list[str],
+        *,
+        cwd: Path,
+        stdout_path: Path,
+        stderr_path: Path,
+        timeout_s: int,
+    ) -> CommandResult:
+        result = super().run(
+            argv,
+            cwd=cwd,
+            stdout_path=stdout_path,
+            stderr_path=stderr_path,
+            timeout_s=timeout_s,
+        )
+        if argv[0] == "ocean":
+            metrics_dir = _metrics_dir_from_ocean_argv(cwd, argv)
+            request = _load_json(metrics_dir.parent / "metric_extraction_request.json")
+            for wf in request.get("waveform_exports", []):
+                csv_abs = cwd / wf["csv_output_file"]
+                csv_abs.parent.mkdir(parents=True, exist_ok=True)
+                csv_abs.write_text("x,y\n0.0,1.0\n1e-12,2.0\n", encoding="utf-8")
+        return result
+
+
+def _waveform_exports() -> list[dict]:
+    expression = 'getData("NF" ?result "pnoise")'
+    return [
+        {
+            "name": "nf_pnoise",
+            "testbench": "cg_nf",
+            "expression": expression,
+            "expression_sha256": expression_sha256(expression),
+            "output_format": "csv",
+            "nil_policy": "fail",
+            "csv_output_file": "runs/real/real_001/metrics/waveforms/nf_pnoise.csv",
+        }
+    ]
+
+
+def test_waveform_export_manifest_written_on_success(tmp_path: Path) -> None:
+    """Successful local OCEAN run with waveform exports writes metrics/waveform_export_manifest.json."""
+    project_dir = _create_ready_real_run_project(tmp_path)
+    _add_waveform_exports_to_request(project_dir, _waveform_exports())
+    runner = FakeSuccessRunnerWithWaveforms()
+
+    run_spectre_ocean_adapter(project_dir, runner=runner)
+
+    manifest_path = (
+        project_dir
+        / "runs"
+        / "real"
+        / "real_001"
+        / "metrics"
+        / "waveform_export_manifest.json"
+    )
+    assert manifest_path.exists(), "waveform_export_manifest.json must be written"
+    manifest = _load_json(manifest_path)
+    assert manifest["schema_version"] == "1.0"
+    assert manifest["workflow_mode"] == "fix_run"
+    assert manifest["run_id"] == "real_001"
+    assert manifest["candidate_id"] == "real_001"
+    assert manifest["testbench_id"] is None or isinstance(manifest["testbench_id"], str)
+    assert manifest["corner_id"] is None or isinstance(manifest["corner_id"], str)
+    assert isinstance(manifest["model_section"], str)
+    assert isinstance(manifest["corner_variables"], dict)
+    assert isinstance(manifest["parameters"], dict)
+    assert isinstance(manifest["exports"], list)
+    assert manifest["psf_dir"] == "psf"
+    assert manifest["ocean_log"] == "metrics/ocean.log"
+    assert "command_trace" in manifest
+
+
+def test_waveform_export_manifest_contains_export_results(tmp_path: Path) -> None:
+    """Manifest exports contain waveform export results with pass/fail status."""
+    project_dir = _create_ready_real_run_project(tmp_path)
+    _add_waveform_exports_to_request(project_dir, _waveform_exports())
+    runner = FakeSuccessRunnerWithWaveforms()
+
+    run_spectre_ocean_adapter(project_dir, runner=runner)
+
+    manifest_path = (
+        project_dir
+        / "runs"
+        / "real"
+        / "real_001"
+        / "metrics"
+        / "waveform_export_manifest.json"
+    )
+    manifest = _load_json(manifest_path)
+    assert len(manifest["exports"]) == 1
+    export = manifest["exports"][0]
+    assert export["name"] == "nf_pnoise"
+    assert export["status"] == "pass"
+    assert export["csv_path"] is not None
+    assert export["issues"] == []
+
+
+def test_waveform_export_manifest_marks_missing_csv_as_failed(tmp_path: Path) -> None:
+    """Missing CSV after OCEAN return code zero marks the export as failed in the manifest."""
+    project_dir = _create_ready_real_run_project(tmp_path)
+    _add_waveform_exports_to_request(project_dir, _waveform_exports())
+    runner = FakeSuccessRunner()  # does NOT create CSV files
+
+    run_spectre_ocean_adapter(project_dir, runner=runner)
+
+    manifest_path = (
+        project_dir
+        / "runs"
+        / "real"
+        / "real_001"
+        / "metrics"
+        / "waveform_export_manifest.json"
+    )
+    assert manifest_path.exists()
+    manifest = _load_json(manifest_path)
+    assert len(manifest["exports"]) == 1
+    export = manifest["exports"][0]
+    assert export["status"] == "fail"
+    assert any("csv" in issue.lower() or "missing" in issue.lower() for issue in export["issues"])
+
+
+def test_waveform_export_manifest_written_on_ocean_failure(tmp_path: Path) -> None:
+    """OCEAN failure still writes a waveform export manifest with all exports marked as failed."""
+    project_dir = _create_ready_real_run_project(tmp_path)
+    _add_waveform_exports_to_request(project_dir, _waveform_exports())
+    runner = FakeOceanFailureRunner()
+
+    result = run_spectre_ocean_adapter(project_dir, runner=runner)
+
+    assert result.status == "failed"
+    manifest_path = (
+        project_dir
+        / "runs"
+        / "real"
+        / "real_001"
+        / "metrics"
+        / "waveform_export_manifest.json"
+    )
+    assert manifest_path.exists()
+    manifest = _load_json(manifest_path)
+    assert len(manifest["exports"]) == 1
+    export = manifest["exports"][0]
+    assert export["status"] == "fail"
+
+
+def test_waveform_export_manifest_coexists_with_metric_result_manifest(
+    tmp_path: Path,
+) -> None:
+    """Existing metric_result_manifest.json remains valid alongside the waveform manifest."""
+    project_dir = _create_ready_real_run_project(tmp_path)
+    _add_waveform_exports_to_request(project_dir, _waveform_exports())
+    runner = FakeSuccessRunnerWithWaveforms()
+
+    run_spectre_ocean_adapter(project_dir, runner=runner)
+
+    metrics_dir = project_dir / "runs" / "real" / "real_001" / "metrics"
+    metric_result_path = metrics_dir / "metric_result_manifest.json"
+    waveform_manifest_path = metrics_dir / "waveform_export_manifest.json"
+    assert metric_result_path.exists(), "metric_result_manifest.json must still be written"
+    assert waveform_manifest_path.exists(), "waveform_export_manifest.json must be written"
+    metric_manifest = _load_json(metric_result_path)
+    assert metric_manifest["status"] == "succeeded"
+
+
+def test_no_waveform_export_manifest_without_waveform_exports(tmp_path: Path) -> None:
+    """No waveform_export_manifest.json is written when the request has no waveform exports."""
+    project_dir = _create_ready_real_run_project(tmp_path)
+    runner = FakeSuccessRunner()
+
+    run_spectre_ocean_adapter(project_dir, runner=runner)
+
+    manifest_path = (
+        project_dir
+        / "runs"
+        / "real"
+        / "real_001"
+        / "metrics"
+        / "waveform_export_manifest.json"
+    )
+    assert not manifest_path.exists()
