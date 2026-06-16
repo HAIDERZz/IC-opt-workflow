@@ -1,20 +1,9 @@
 # Toolchain Execution Reference
 
-Date: 2026-06-05
+Date: 2026-06-16
 
-This is the mandatory reference for real tool execution in
-`ic-auto-opt-workflow`.
-
-Read this before running Virtuoso, Spectre, OCEAN, OpenBox, native TuRBO, or any
-optimizer handoff command.
-
-The purpose is to stop repeating the same failures:
-
-- running real Cadence inside a restrictive sandbox;
-- running OpenBox from a venv that cannot import OpenBox;
-- running Hermes from a venv that cannot import Hermes workflow tooling;
-- reusing stale optimizer workspaces with old ledger/state;
-- doing long fake-run ladders before validating the real path.
+Mandatory reference before running Virtuoso, Spectre, OCEAN, OpenBox, native
+TuRBO, license probes, or optimizer handoff commands in this repo.
 
 ## Canonical Repo
 
@@ -22,518 +11,102 @@ The purpose is to stop repeating the same failures:
 /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow
 ```
 
-Branch:
+Release package:
 
 ```text
-plan-a-hermes-file-contract-mvp
+/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow-v0.1
 ```
 
-## Environment Rules
+## Current Product Command Contract
 
-### Product And Development Venv
+Initial real optimization:
 
-Use this for normal repository development, tests, docs checks, contract-only
-Hermes commands, and the product optimizer route after C-58:
-
-```text
-/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow/.venv
+```bash
+.venv/bin/ic-opt PROJECT_DIR --real
 ```
 
-Install from the repo root:
+Dry orchestration:
+
+```bash
+.venv/bin/ic-opt PROJECT_DIR --real --dry-orchestration
+```
+
+Doctor gate:
+
+```bash
+.venv/bin/ic-opt PROJECT_DIR --doctor
+```
+
+Continuation:
+
+```bash
+.venv/bin/ic-opt PROJECT_DIR --real --continue N
+```
+
+Do not pass first-run workload/resource/optimizer overrides such as
+`--max-evals`, `--batch-size`, `--parallel-jobs`, `--threads-per-run`,
+`--optimizer-cpu-threads`, or `--strategy` to product `ic-opt`. Those values
+come from `PROJECT_DIR/opt_requirement.md` and generated config.
+
+## Product Environment
+
+Install from the repo or release package root:
 
 ```bash
 python3 -m venv .venv
-./.venv/bin/python -m pip install --upgrade pip setuptools wheel
-./.venv/bin/python -m pip install -r requirements-product.txt
-```
-
-Known use:
-
-```bash
-.venv/bin/ic-opt PROJECT_DIR --real --max-evals 100 --batch-size 10 --parallel-jobs 10
-.venv/bin/hermes-workflow validate PROJECT_DIR
-.venv/bin/hermes-workflow package PROJECT_DIR
-.venv/bin/hermes-workflow package-optimizer-task PROJECT_DIR --backend openbox --max-evals 100 --cadence-cshrc /home/zzchen/cadence_ic231_env.csh --parallel
-.venv/bin/hermes-workflow check-optimizer-run PROJECT_DIR
-.venv/bin/hermes-workflow summarize-optimizer-run PROJECT_DIR
-.venv/bin/hermes-workflow finalize-optimizer-run PROJECT_DIR
-python3 tools/check_development_cadence.py
-python3 -m pytest -q
-python3 -m ruff check src tests tools
+.venv/bin/python -m pip install --upgrade pip setuptools wheel
+.venv/bin/python -m pip install -r requirements-product.txt
 ```
 
 Required import check:
 
 ```bash
-.venv/bin/python -c "import openbox, hermes_workflow, lightgbm, shap, pyrfr; print('product optimizer env ok')"
+.venv/bin/python -c "import openbox, turbo, torch, gpytorch, scipy, threadpoolctl, hermes_workflow; print('product optimizer env ok')"
 ```
 
-C-58 validated this venv with the product `ic-opt` command. Do not fall back to
-`/tmp/ic_auto_opt_openbox_spike/.venv` for product acceptance unless the task is
-explicitly investigating legacy evidence.
+Do not fall back to `/tmp/ic_auto_opt_openbox_spike/.venv` for product
+acceptance. That older environment is historical debugging evidence only.
 
-After C-59, `ic-opt` discovers only user-supplied Cadence cshrc anchors in this
-order: explicit `--cadence-cshrc`, `PROJECT_DIR/cadence_env.csh`,
-`IC_OPT_CADENCE_CSHRC`, then `~/.ic-opt/cadence_env.csh`. This is not automatic
-`.bashrc`/`.zshrc` inference and must not hardcode a Spectre version.
+## Cadence Environment
 
-### Legacy OpenBox Development Evidence Venv
+`ic-opt` discovers the user-approved Cadence setup in this order:
 
-This older venv is retained only as evidence/debug history:
+1. explicit `--cadence-cshrc PATH`
+2. `PROJECT_DIR/cadence_env.csh`
+3. `IC_OPT_CADENCE_CSHRC`
+4. `~/.ic-opt/cadence_env.csh`
+
+Do not infer `.bashrc` or `.zshrc`. Do not hardcode a Spectre version.
+
+## Real Workflow Evidence
+
+After a real run, inspect files rather than chat claims:
 
 ```text
-/tmp/ic_auto_opt_openbox_spike/.venv
+config/optimizer.yaml
+config/spectre.yaml
+reports/optimizer_flow_run_report.json
+reports/optimizer_decision_report.md
+reports/optimizer_insight_report.md
+state/optimizer_state.json
+ledger/experiment_ledger.jsonl
+runs/real/<run_id>/result_manifest.json
+runs/real/<run_id>/metrics/metric_result_manifest.json
 ```
 
-Known contents after C-34:
+For multi-corner projects, also inspect parent aggregate manifests and confirm
+each expected corner/testbench child appears under aggregate child evidence.
 
-- editable OpenBox from:
+For B-10 traceability, confirm `command_trace` includes sanitized Spectre/OCEAN
+argv summaries and does not include cshrc contents, SSH wrappers, or secrets.
 
-```text
-/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/openbox_reference/open-box
-```
+For B-11 CPU-limit audit, confirm optimizer reports include
+`runtime_thread_limits` with requested/effective thread evidence.
 
-- editable Hermes workflow tooling from:
+## Historical Command Notes
 
-```text
-/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow
-```
-
-Required import check:
-
-```bash
-/tmp/ic_auto_opt_openbox_spike/.venv/bin/python -c "import openbox, hermes_workflow.openbox_backend; print('openbox hermes env ok')"
-```
-
-Advanced visualization dependency check after C-47:
-
-```bash
-/tmp/ic_auto_opt_openbox_spike/.venv/bin/python -c "import openbox, shap, lightgbm, pyrfr; import pyrfr.regression; print('openbox advanced visualization deps ok')"
-```
-
-Do not install unpinned latest `shap` into this venv. OpenBox 0.9 requires the
-older numeric stack; latest SHAP can upgrade `numpy`, `scipy`, `scikit-learn`,
-and `pandas` beyond OpenBox's supported versions. The compatible stack used by
-C-47 is:
-
-```text
-numpy==1.26.4
-scipy==1.12.0
-scikit-learn==1.3.2
-pandas==2.1.4
-shap==0.44.1
-lightgbm==4.6.0
-swig==4.4.1
-pyrfr==0.9.0
-```
-
-OpenBox 0.9's feature-importance import path also references `pyrfr`.
-`pyrfr` can be built without system package changes by installing PyPI `swig`
-inside the OpenBox venv first, then installing `pyrfr` without build isolation:
-
-```bash
-/tmp/ic_auto_opt_openbox_spike/.venv/bin/python -m pip install swig
-PATH=/tmp/ic_auto_opt_openbox_spike/.venv/bin:$PATH /tmp/ic_auto_opt_openbox_spike/.venv/bin/python -m pip install --no-build-isolation pyrfr
-```
-
-This was the accepted C-47 environment. If `pyrfr` is absent, C-47 still
-generates OpenBox official HTML/JSON and surrogate verification, but the
-manifest reports `generated_partial` with `parameter importance data was not
-generated`.
-
-Preferred project gate after C-36:
-
-```bash
-.venv/bin/hermes-workflow check-toolchain-env --openbox-venv /tmp/ic_auto_opt_openbox_spike/.venv --cadence-cshrc /home/zzchen/cadence_ic231_env.csh --report /tmp/toolchain_environment_report.json
-```
-
-This checks the OpenBox venv, OpenBox/Hermes imports in the same Python
-environment, the `hermes-workflow` script in that venv, and the Cadence cshrc.
-It does not run Spectre, OCEAN, Virtuoso, or an optimizer loop.
-
-Do not use this legacy venv as the production dependency path after C-58. If a
-real route works only from this venv, record it as a productization regression.
-
-Legacy use put it first in `PATH`:
-
-```bash
-setenv PATH /tmp/ic_auto_opt_openbox_spike/.venv/bin:$PATH
-```
-
-Do not silently fall back from OpenBox to native TuRBO if this venv is missing
-or broken. Fix the OpenBox/Hermes execution environment first.
-
-### Optimizer And Spectre Resource Controls
-
-Keep these controls separate:
-
-- `config/optimizer.yaml: optimizer.optimizer_cpu_threads` limits Python-side
-  optimizer math and surrogate-model work, including OpenBox candidate
-  generation, OpenBox final visualization, and native TuRBO Torch/threadpool
-  work. It does not mean "run this many Spectre jobs."
-- `config/spectre.yaml: spectre.parallel_jobs` limits how many Spectre/OCEAN
-  candidate runs the execution side may launch at the same time.
-- `config/spectre.yaml: spectre.threads_per_run` maps to per-Spectre threading
-  such as `+mt=N`; it is not the candidate-level parallelism.
-
-For workstation-friendly real optimizer runs, start with
-`optimizer_cpu_threads: 4`, `parallel_jobs` set to the user's approved Cadence
-license/resource limit, and `threads_per_run` set to the validated Spectre
-accuracy/performance setting for the testbench.
-
-### Cadence Environment
-
-Cadence cshrc:
-
-```text
-/home/zzchen/cadence_ic231_env.csh
-```
-
-### Mixer Project Spectre Version Note
-
-The user project at:
-
-```text
-/home/zzchen/spectre_opt_prj/Mixer_opt
-```
-
-imports an encrypted Maestro/ADE netlist bundle that requires Spectre 25.1.
-The IC231 environment's Spectre 23.1 fails on this bundle with:
-
-```text
-FATAL (SFE-79): Cannot decrypt the data
-```
-
-Use this override for the Mixer single-point and optimizer practice runs:
-
-```bash
-setenv SPECTRE_HOME /opt/eda/cadence/spectre_2510_125
-setenv PATH /opt/eda/cadence/spectre_2510_125/bin:$PATH
-```
-
-This is a tool-version compatibility requirement for that imported Maestro
-bundle, not a formula issue and not a reason to rewrite OCEAN expressions.
-
-Preferred Spectre/OCEAN/OpenBox real execution command shape after C-58:
-
-```bash
-.venv/bin/ic-opt PROJECT_DIR --real --max-evals 100 --batch-size 10 --parallel-jobs 10
-```
-
-Lower-level implementation command:
-
-```bash
-.venv/bin/hermes-workflow optimize PROJECT_DIR --real --max-evals 100 --batch-size 10 --parallel-jobs 10 --cadence-cshrc /home/zzchen/cadence_ic231_env.csh
-```
-
-Legacy C-34 command shape:
-
-```bash
-csh -fc 'source /home/zzchen/cadence_ic231_env.csh; setenv PATH /tmp/ic_auto_opt_openbox_spike/.venv/bin:$PATH; setenv MPLCONFIGDIR /tmp/ic_auto_opt_c34/mpl_cache; cd /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow; hermes-workflow run-openbox-real PROJECT_DIR --max-evals 100 --batch-size 10 --parallel-jobs 10 --cadence-cshrc /home/zzchen/cadence_ic231_env.csh'
-```
-
-Keep `MPLCONFIGDIR` set to a writable `/tmp` directory for real OpenBox runs.
-Without it, OpenBox/Matplotlib may still import but can emit cache-directory
-warnings and slow down process startup.
-
-`+mt` / `threads_per_run` and run-level parallelism are different:
-
-- `threads_per_run` maps to Spectre `+mt` for one Spectre process.
-- `parallel_jobs` is the maximum number of concurrent Spectre runs.
-
-For the accepted inverter flow:
-
-```text
-preset=ax
-threads_per_run=10
-parallel_jobs=10
-output_format=psfxl
-```
-
-## Sandbox Rule
-
-Real Cadence execution must not be treated as a normal sandboxed command.
-
-When using Codex tooling, real commands that launch Spectre/OCEAN/OpenBox
-workers must run through an approved non-sandbox/escalated path. Earlier
-sandboxed runs produced invalid Spectre pipe/socket failures.
-
-Do not count sandboxed Spectre failures as toolchain evidence.
-
-Allowed normal-sandbox work:
-
-- reading files;
-- editing docs/code;
-- running unit tests;
-- generating task packets;
-- running contract-only `check-*`, `summarize-*`, and `finalize-*` reports.
-
-Needs non-sandbox/escalated execution:
-
-- `run-openbox-real`;
-- `run-native-turbo` when it launches real Spectre/OCEAN;
-- direct `spectre`;
-- direct `ocean`;
-- `virtuoso-bridge-lite` real bridge actions;
-- SSH/remote tool execution.
-
-## Canonical Successful References
-
-### Spectre + OCEAN Backend
-
-Reference evidence:
-
-```text
-docs/toolchain_evidence/2026-06-01-spectre-ocean-bridge-smoke/
-docs/toolchain_evidence/2026-06-01-pss-pac-directplot-ocean-probe/
-```
-
-Use these as proof that OCEAN can evaluate approved formulas on Maestro
-point-level PSF and standalone Spectre replay PSF.
-
-Do not change formulas to compensate for adapter bugs.
-
-### OpenBox Real Handoff
-
-Reference note:
-
-```text
-docs/debug/2026-06-05-c34-production-openbox-handoff-success.md
-```
-
-Successful workspace:
-
-```text
-/tmp/ic_auto_opt_c34_clean2/bridge_test_inv
-```
-
-Successful result:
-
-```text
-backend: openbox
-execution_mode: real
-evaluations: 100
-feasible: 43
-constraint_failed: 51
-metric_check_failed: 6
-real_check_failed: 0
-best_observed: real_071
-```
-
-Successful closeout:
-
-```bash
-.venv/bin/hermes-workflow check-optimizer-run /tmp/ic_auto_opt_c34_clean2/bridge_test_inv
-.venv/bin/hermes-workflow summarize-optimizer-run /tmp/ic_auto_opt_c34_clean2/bridge_test_inv
-.venv/bin/hermes-workflow finalize-optimizer-run /tmp/ic_auto_opt_c34_clean2/bridge_test_inv
-.venv/bin/hermes-workflow optimizer-status /tmp/ic_auto_opt_c34_clean2/bridge_test_inv
-```
-
-All passed. `global_optimum_claim=false`.
-
-Latest fresh packet/status handoff smoke:
-
-```text
-docs/debug/2026-06-05-c45-fresh-optimizer-status-handoff-drill.md
-```
-
-This C-45 smoke used a fresh workspace and the updated task packet with
-`optimizer-status` in `audit_commands`.
-
-Latest real-scale packet/status handoff:
-
-```text
-docs/debug/2026-06-05-c46-real-scale-optimizer-status-handoff.md
-```
-
-This C-46 run used a fresh workspace, the updated task packet with
-`optimizer-status`, and completed 100 real OpenBox/Spectre/OCEAN evaluations.
-
-Latest real OpenBox advanced visualization flow:
-
-```text
-docs/debug/2026-06-05-c47-real-openbox-advanced-visualization-flow.md
-```
-
-This C-47 run used the full real OpenBox/Spectre/OCEAN path and generated
-OpenBox official advanced visualization artifacts with manifest status
-`generated`, including objective/constraint history, surrogate verification,
-and parameter importance.
-
-## Fresh Workspace Preparation
-
-Do not rerun production optimizer acceptance in a stale project with old
-`ledger/`, `state/`, `reports/`, or `runs/`.
-
-For a fresh production-style optimizer handoff, preserve:
-
-```text
-config/
-netlists/
-```
-
-Then generate:
-
-```bash
-.venv/bin/hermes-workflow validate PROJECT_DIR
-.venv/bin/hermes-workflow package PROJECT_DIR
-.venv/bin/hermes-workflow package-optimizer-task PROJECT_DIR --backend openbox --max-evals 100 --cadence-cshrc /home/zzchen/cadence_ic231_env.csh --parallel
-```
-
-The fresh workspace must contain:
-
-```text
-execution_package/execution_manifest.json
-execution_package/OPTIMIZER_EXECUTION_TASK.md
-execution_package/optimizer_execution_manifest.json
-supervisor_instruction.json
-```
-
-If `supervisor_instruction.json` is copied from a known-good approved project,
-the `approved_config_hashes` must exactly match
-`execution_package/execution_manifest.json`.
-
-Do not copy:
-
-```text
-ledger/
-state/
-reports/
-runs/
-```
-
-unless the task is explicitly a continuation run that is designed to preserve
-optimizer state.
-
-## OpenBox Real Run Command
-
-Use the product entrypoint unless the task explicitly tests a lower-level
-command:
-
-```bash
-.venv/bin/ic-opt PROJECT_DIR --real --max-evals 100 --batch-size 10 --parallel-jobs 10
-```
-
-C-58 successful product-entrypoint acceptance:
-
-```text
-/tmp/ic_auto_opt_c58_real_unsandboxed_rj40MJ/Mixer_opt_muti_tb
-```
-
-Result:
-
-```text
-evaluations: 100
-feasible: 19
-constraint_failed: 65
-metric_check_failed: 16
-real_check_failed: 0
-recommended: real_066
-global_optimum_claim: false
-advanced_visualization: generated
-```
-
-The C-34 accepted legacy command was:
-
-```bash
-csh -fc 'source /home/zzchen/cadence_ic231_env.csh; setenv PATH /tmp/ic_auto_opt_openbox_spike/.venv/bin:$PATH; setenv MPLCONFIGDIR /tmp/ic_auto_opt_c34/mpl_cache; cd /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow; hermes-workflow run-openbox-real /tmp/ic_auto_opt_c34_clean2/bridge_test_inv --max-evals 100 --batch-size 10 --parallel-jobs 10 --cadence-cshrc /home/zzchen/cadence_ic231_env.csh'
-```
-
-After it finishes, do not trust exit status alone. Run:
-
-```bash
-.venv/bin/hermes-workflow finalize-optimizer-run PROJECT_DIR
-```
-
-Acceptance requires:
-
-- finalize status pass;
-- optimizer run accepted;
-- completion status pass;
-- insight status pass;
-- reports and SVGs generated.
-
-## OpenBox Real Continuation Command
-
-For continuation after about 100 prior constrained evaluations, do not rely on
-OpenBox's default `auto` strategy. The observed default route can select
-`gp/eic/random_scipy` and stay CPU-bound before any new Spectre run starts.
-
-Use explicit lightweight settings for continuation unless a later evidence run
-proves a better default:
-
-```bash
-csh -fc 'source /tmp/ic_auto_opt_mixer_spectre251_env.csh; setenv PATH /tmp/ic_auto_opt_openbox_spike/.venv/bin:$PATH; setenv MPLCONFIGDIR /tmp/ic_auto_opt_mixer_nf12_001_mpl; cd /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow; hermes-workflow continue-openbox-real PROJECT_DIR --additional-evals 100 --batch-size 10 --parallel-jobs 10 --cadence-cshrc /tmp/ic_auto_opt_mixer_spectre251_env.csh --surrogate-type prf --acq-type eic --acq-optimizer-type local_random'
-```
-
-Reference successful continuation:
-
-```text
-/home/zzchen/spectre_opt_prj/Mixer_opt_openbox_nf12_001
-```
-
-Result after continuation:
-
-```text
-evaluations: 200
-feasible: 48
-constraint_failed: 134
-metric_check_failed: 18
-real_check_failed: 0
-best_observed: real_100
-plateau_detected: true
-continuation_recommended: false
-```
-
-## Native TuRBO Real Run Command
-
-Native TuRBO remains available and must not be deleted or silently substituted
-for OpenBox.
-
-Command shape:
-
-```bash
-csh -fc 'source /home/zzchen/cadence_ic231_env.csh; cd /home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow; .venv/bin/hermes-workflow run-native-turbo PROJECT_DIR --parallel --max-evals 100 --cadence-cshrc /home/zzchen/cadence_ic231_env.csh'
-```
-
-Use this only when the user explicitly selects native TuRBO or when a plan says
-the current task is native TuRBO acceptance.
-
-## Fake Run Rule
-
-Fake runs are allowed only to check contracts, CLI wiring, schema shape, or unit
-behavior before a real run.
-
-Do not spend many cycles on fake runs when the feature's value depends on
-real Cadence/OpenBox behavior.
-
-Default rule:
-
-- At most one focused fake/local smoke per new command path.
-- Then run the smallest meaningful real practice flow.
-- For optimizer backend acceptance, meaningful means a real optimizer-guided run,
-  not hand-picked points.
-
-Fake run outputs must never override real evidence.
-
-## Common Failure Table
-
-| Symptom | Root Cause | Correct Fix |
-| --- | --- | --- |
-| `OpenBox is not installed` | Product `.venv` was not installed with `requirements-product.txt` | Install the repo product environment with `.venv/bin/python -m pip install -r requirements-product.txt`; do not switch product acceptance to `/tmp/ic_auto_opt_openbox_spike/.venv` |
-| `ModuleNotFoundError: pydantic` in OpenBox venv | OpenBox venv lacks Hermes workflow dependencies | Install `ic-auto-opt-workflow` editable into the OpenBox venv |
-| `ledger already contains candidate_id` | Reused stale optimizer workspace with old ledger/state | Rebuild a fresh workspace without old `ledger/`, `state/`, `reports/`, `runs/` |
-| `execution manifest is missing` | Fresh workspace skipped `hermes-workflow package` | Run `package` before `package-optimizer-task` |
-| `supervisor instruction is missing` | Fresh workspace lacks approved `supervisor_instruction.json` | Generate approval through normal flow or copy only when config hashes match |
-| Spectre pipe/socket errors in sandbox | Real Cadence run executed in restrictive sandbox | Rerun through approved non-sandbox/escalated path |
-| OCEAN scalar non-scalar/failed metric | Candidate/tool produced invalid scalar for approved formula | Record as candidate-level `metric_check_failed`; do not rewrite formula in Python |
-
-## Never Do These
-
-- Do not hand-pick optimizer points for backend acceptance.
-- Do not parse PSF in Python.
-- Do not rewrite OCEAN formulas.
-- Do not flatten Maestro/ADE netlist layout.
-- Do not silently fall back from OpenBox to TuRBO.
-- Do not commit raw `input.scs`, `ade_e.scs`, PSF/raw, or full Cadence logs.
-- Do not treat chat prose or command exit status as acceptance evidence.
+Older development logs in `docs/` may show low-level commands such as
+`run-openbox-real --max-evals ...` or product commands that passed
+`--max-evals`, `--batch-size`, and `--parallel-jobs`. Treat those as historical
+evidence only. Current product usage is the requirement-driven `ic-opt`
+contract above.

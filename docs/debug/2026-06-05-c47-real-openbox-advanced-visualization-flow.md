@@ -1,5 +1,10 @@
 # C-47 Real OpenBox Advanced Visualization Flow
 
+> Historical command notice: command examples in this debug note may show old
+> workload/resource CLI flags. Current release product first runs read those
+> values only from `opt_requirement.md`; only `ic-opt PROJECT --real --continue N`
+> remains as a product CLI budget delta.
+
 Date: 2026-06-05
 
 ## Scope
@@ -151,4 +156,3 @@ generation and was not a Spectre/OCEAN/OpenBox flow failure.
 C-47 is now proven in a full real OpenBox/Spectre/OCEAN optimizer flow. The
 advanced visualization route generated official OpenBox HTML/JSON artifacts
 with surrogate verification and parameter importance present.
-

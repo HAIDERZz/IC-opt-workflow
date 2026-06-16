@@ -87,6 +87,21 @@ p1db  -> P1dB
 
 Each metric then declares which testbench should evaluate it.
 
+`opt_requirement.md` is also the only product entry for runtime and optimizer
+resource settings: `max_evaluations`, `batch_size`, `parallel_jobs`,
+`threads_per_run`, `optimizer_cpu_threads`, strategy, initialization, output
+format, retention policy, and process corners. The agent must not ask the user
+to put these values in the chat prompt or append CLI overrides such as
+`--max-evals`, `--batch-size`, `--parallel-jobs`, `--threads`, or `--strategy`.
+Product continuation may use only `ic-opt PROJECT_DIR --real --continue N`;
+all other values stay inherited from `opt_requirement.md` / generated config.
+
+Multi-corner optimization is configured in `Process Corners` inside
+`opt_requirement.md`; use
+`examples/spectre_maestro_project/opt_requirement.multi_corner.md` or
+`examples/spectre_maestro_project/opt_requirement.multi_tb_corner.md` as the
+release examples.
+
 ## 3. What Goes In constraints.md
 
 `constraints.md` is for human guidance to the supervisor agent.
@@ -229,11 +244,7 @@ Typical user-side fixes:
 For direct shell/operator use, run the single orchestration command:
 
 ```bash
-./.venv/bin/ic-opt PROJECT_DIR \
-  --real \
-  --max-evals 100 \
-  --batch-size 10 \
-  --parallel-jobs 10
+./.venv/bin/ic-opt PROJECT_DIR --real
 ```
 
 This command performs the approved package/preflight/approval gate, launches the
@@ -244,12 +255,7 @@ automation, not a two-agent product session.
 For shell/operator use, `ic-opt` defaults to direct execution:
 
 ```bash
-./.venv/bin/ic-opt PROJECT_DIR \
-  --real \
-  --execution-agent direct \
-  --max-evals 100 \
-  --batch-size 10 \
-  --parallel-jobs 10
+./.venv/bin/ic-opt PROJECT_DIR --real --execution-agent direct
 ```
 
 For runtime-native agent use, `/ic-opt PROJECT_DIR --real` should prepare and
@@ -261,15 +267,16 @@ development/acceptance fallback, not the default product model.
 To test the offline gates only:
 
 ```bash
-./.venv/bin/ic-opt PROJECT_DIR \
-  --real \
-  --dry-orchestration \
-  --max-evals 100 \
-  --batch-size 10 \
-  --parallel-jobs 10
+./.venv/bin/ic-opt PROJECT_DIR --real --dry-orchestration
 ```
 
-## 8. Manual Fallback: Build The Approved Execution Package
+## 8. Low-Level Debug Fallback: Build The Approved Execution Package
+
+This section is for maintainers debugging a specific orchestration stage. It is
+not the product user entrypoint. Product users and agents should use
+`ic-opt PROJECT_DIR --real`; workload, resources, strategy, Spectre settings,
+testbenches, corners, and retention policy come from `opt_requirement.md` /
+generated config.
 
 Before any real optimizer execution, the supervisor agent must build and approve
 the file-contract package. Do not skip this gate.
@@ -282,7 +289,6 @@ the file-contract package. Do not skip this gate.
 ./.venv/bin/hermes-workflow approve PROJECT_DIR
 ./.venv/bin/hermes-workflow package-optimizer-task PROJECT_DIR \
   --backend openbox \
-  --max-evals 100 \
   --parallel \
   --cadence-cshrc /path/to/user/cadence_env.csh
 ```
@@ -291,26 +297,41 @@ the file-contract package. Do not skip this gate.
 come from the user environment or project configuration; do not hardcode a
 Spectre version in prompts, docs, or code.
 
-## 9. Manual Fallback: Run Optimizer
+## 9. Low-Level Debug Fallback: Run Optimizer
 
-For OpenBox real optimization:
+For OpenBox real optimization during debugging:
 
 ```bash
 ./.venv/bin/hermes-workflow run-openbox-real PROJECT_DIR \
-  --max-evals 100 \
-  --batch-size 10 \
-  --parallel-jobs 10 \
   --cadence-cshrc /path/to/user/cadence_env.csh
 ```
 
-The exact values should come from `opt_requirement.md` unless the user
-explicitly changes them.
+Do not use this command to invent product-level workload or resource overrides.
+In the product flow, exact values come from `opt_requirement.md` / generated
+config.
 
 Resource meanings:
 
 - `parallel_jobs`: how many Spectre simulations may run at once.
 - `threads_per_run`: Spectre `+mt` threads per simulation.
 - `optimizer_cpu_threads`: Python/OpenBox optimizer CPU thread limit.
+
+Use `openbox_auto` as the default strategy unless the user already knows they
+need something else. Choose `openbox_gp_eic` for mostly continuous, smooth,
+constraint-aware IC optimization where local surrogate accuracy matters. Choose
+`openbox_prf_eic` for stepped, integer-heavy, mixed, or failure-prone spaces
+where PRF is usually more robust. Keep `turbo_trust_region` for mostly
+continuous searches that still benefit from trust-region local improvement even
+when a few variables have steps. Use `random_baseline` only for sanity checks,
+pipeline debugging, or algorithm comparisons.
+
+`optimizer_cpu_threads` changes runtime and machine load, not optimizer
+correctness. After the run, inspect
+`PROJECT_DIR/reports/optimizer_effectiveness_audit.json` and the matching
+section in `optimizer_insight_report.md` to see the requested strategy, the
+resolved surrogate/acquisition settings, whether continuation replayed prior
+observations into the model, and whether the latest batch was still
+initialization or real BO progress.
 
 The agent should not replace this with manually selected candidate points.
 
@@ -335,6 +356,7 @@ agent should run:
 Then the agent should read:
 
 ```text
+PROJECT_DIR/reports/optimizer_effectiveness_audit.json
 PROJECT_DIR/reports/optimizer_decision_report.md
 PROJECT_DIR/reports/optimizer_insight_report.md
 ```
@@ -418,14 +440,14 @@ Example:
 ```bash
 ./.venv/bin/hermes-workflow continue-openbox-real PROJECT_DIR \
   --additional-evals 100 \
-  --batch-size 10 \
   --cadence-cshrc /path/to/user/cadence_env.csh
 ```
 
-Do not add `--parallel-jobs` during continuation unless the user explicitly
-asks to change resources. Continuation should inherit the project's
-`config/spectre.yaml` settings so one optimizer history does not mix different
-parallel execution limits.
+Do not add workload, resource, strategy, surrogate, acquisition, or acquisition
+optimizer flags during product continuation. Product continuation is only
+`ic-opt PROJECT_DIR --real --continue N`; everything except `N` is inherited from
+the project's requirement-backed config so one optimizer history does not mix
+different execution contracts.
 
 Then rerun the closeout chain:
 

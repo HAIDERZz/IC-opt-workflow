@@ -4,14 +4,25 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ic-auto-opt-workflow"
-version = "0.1.0"
+version = "0.1.7"
 description = "Hermes file-contract workflow for IC auto optimization"
 readme = "README.md"
 requires-python = ">=3.11"
+license = { text = "MIT" }
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+]
 dependencies = [
+    "matplotlib>=3.7",
     "numpy>=1.24",
     "pydantic>=2.7",
     "PyYAML>=6.0",
+    "scipy>=1.10",
+    "threadpoolctl>=3.1",
+    "torch>=2.0",
+    "gpytorch>=1.11",
     "typer>=0.12",
 ]
 
@@ -34,6 +45,7 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 hermes_workflow = [
+    "agent_skills/ic-opt/SKILL.md",
     "templates/spectre_maestro_project/*.md",
     "templates/spectre_maestro_project/config/*.yaml",
     "templates/spectre_maestro_project/**/.gitkeep",
@@ -41,6 +53,7 @@ hermes_workflow = [
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
+testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 100

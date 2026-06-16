@@ -1,5 +1,10 @@
 # Generated Optimizer Task Packet Handoff Acceptance Implementation Plan
 
+> Historical command notice: this old implementation plan may show obsolete
+> workload/resource CLI flags. Current release product first runs read those
+> values only from `opt_requirement.md`; only `ic-opt PROJECT --real --continue N`
+> remains as a product CLI budget delta.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Validate that the C-23 Hermes-generated optimizer execution-agent task packet can drive the proven `run-native-turbo --parallel` flow through a local worker-agent handoff and supervisor/Hermes manifest-level audit.

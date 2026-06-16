@@ -3,27 +3,41 @@
 Use this checklist before treating `ic-auto-opt-workflow` as ready for another
 user or another clean machine.
 
-Important boundary: this checklist validates the implemented shell automation
-core and C-65 runtime-native adapter assets. The implemented shell entrypoint is
-`ic-opt PROJECT_DIR --real`; agent runtimes should install their own adapter and
-then use `/ic-opt PROJECT_DIR --real` so the current runtime supervisor can
-delegate to a same-runtime execution subagent. The historical C-64
-`--execution-agent claude` subprocess route is development acceptance evidence,
-not the C-65 default product target. See `docs/AGENT_INTEGRATION_STATUS.md`
-before describing runtime support.
+## 1. Current Product Contract
 
-For the detailed Chinese status explanation, read
-`docs/PROJECT_STATUS_AND_ARCHITECTURE_CN.md`.
+Initial real optimization is requirement driven. The only supported product
+first-run command is:
 
-## 1. Product Environment
+```bash
+./.venv/bin/ic-opt PROJECT_DIR --real
+```
 
-From the repository root:
+The only product CLI budget delta is continuation:
+
+```bash
+./.venv/bin/ic-opt PROJECT_DIR --real --continue N
+```
+
+Do not document or use product first-run CLI overrides for `max_evaluations`,
+`batch_size`, `parallel_jobs`, `threads_per_run`, `optimizer_cpu_threads`,
+optimizer strategy, optimizer initialization, process corners, output format,
+metric formulas, constraints, or retention policy. Those values must come from
+`PROJECT_DIR/opt_requirement.md` and the generated `config/*.yaml` files.
+
+## 2. Product Environment
+
+Install the product environment from the release package:
 
 ```bash
 python3 -m venv .venv
 ./.venv/bin/python -m pip install --upgrade pip setuptools wheel
 ./.venv/bin/python -m pip install -r requirements-product.txt
-./.venv/bin/python -c "import openbox, hermes_workflow, lightgbm, shap, pyrfr; print('product optimizer env ok')"
+```
+
+Required dependency smoke:
+
+```bash
+./.venv/bin/python -c "import openbox, turbo, torch, gpytorch, scipy, threadpoolctl, hermes_workflow; print('product optimizer env ok')"
 ```
 
 Expected scripts:
@@ -35,15 +49,7 @@ Expected scripts:
 
 Do not use `/tmp/ic_auto_opt_openbox_spike/.venv` as a product dependency.
 
-Install runtime adapters as needed:
-
-```bash
-./.venv/bin/hermes-workflow install-runtime-adapter claude
-./.venv/bin/hermes-workflow install-runtime-adapter opencode
-./.venv/bin/hermes-workflow runtime-adapter-status
-```
-
-## 2. User Project Contract
+## 3. User Project Contract
 
 The user project should contain only user inputs before the first run:
 
@@ -58,7 +64,16 @@ PROJECT_DIR/
 `config/`, `netlists/`, `runs/`, `reports/`, `ledger/`, `state/`, and
 `execution_package/` are created by Hermes workflow tooling.
 
-## 3. Cadence Environment Anchor
+The release includes current examples:
+
+```text
+examples/spectre_maestro_project/opt_requirement.md
+examples/spectre_maestro_project/opt_requirement.multi_testbench.md
+examples/spectre_maestro_project/opt_requirement.multi_corner.md
+examples/spectre_maestro_project/opt_requirement.multi_tb_corner.md
+```
+
+## 4. Cadence Environment Anchor
 
 The user supplies one Cadence cshrc anchor:
 
@@ -78,58 +93,59 @@ or:
 export IC_OPT_CADENCE_CSHRC=/path/to/user/cadence_env.csh
 ```
 
-Do not infer `.bashrc`/`.zshrc` automatically. Do not hardcode a Spectre
+Do not infer `.bashrc` or `.zshrc` automatically. Do not hardcode a Spectre
 version in product docs or command examples.
 
-## 4. Dry Orchestration Gate
+## 5. Dry Orchestration Gate
 
 Before a long real run on a new project, dry orchestration should pass:
 
 ```bash
-./.venv/bin/ic-opt PROJECT_DIR \
-  --real \
-  --dry-orchestration \
-  --max-evals 100 \
-  --batch-size 10 \
-  --parallel-jobs 10
+./.venv/bin/ic-opt PROJECT_DIR --real --dry-orchestration
 ```
 
-This should stop before `run-openbox-real`.
+This should stop before real Spectre/OCEAN execution.
 
-## 5. Real Product Acceptance
+## 6. Real Product Acceptance
 
-The real product route is:
+Run:
 
 ```bash
-./.venv/bin/ic-opt PROJECT_DIR \
-  --real \
-  --max-evals 100 \
-  --batch-size 10 \
-  --parallel-jobs 10
+./.venv/bin/ic-opt PROJECT_DIR --real
 ```
 
-Shell acceptance requires:
+Acceptance requires:
 
 - `reports/optimizer_flow_run_report.json` has `status=pass`.
-- `reports/optimizer_run_report.json` has `evaluation_count=max_evals`.
-- `reports/optimizer_decision_report.md` recommends a feasible candidate when
-  feasible evidence exists.
-- OpenBox advanced visualization status is `generated` or explicitly recorded
-  as unavailable with a reason.
-- `global_optimum_claim=false`.
+- Evaluation count equals `optimizer.max_evaluations` from the requirement.
+- Generated `config/optimizer.yaml` and `config/spectre.yaml` match the
+  requirement values.
+- Child result and metric manifests include sanitized `command_trace`.
+- Multi-corner parent manifests include aggregate child command traces when
+  the requirement enables process corners.
+- Optimizer reports include runtime thread-limit audit when
+  `optimizer_cpu_threads` is configured.
+- `reports/optimizer_decision_report.md` recommends a best observed feasible
+  candidate when feasible evidence exists.
+- The workflow does not claim a mathematical global optimum.
 
-Runtime-native agent acceptance additionally requires:
+## 7. Supported Optimizer Modes
 
-- the runtime adapter is installed and visible to that CLI;
-- the supervisor gate writes `execution_package/OPTIMIZER_EXECUTION_TASK.md`;
-- the same-runtime execution subagent runs the approved task package;
-- the supervisor runs closeout and reports the decision without asking the user
-  to restate machine-critical information.
+Release-supported product modes are:
 
-## 6. Final User Acceptance
+- `algorithm: openbox`, `strategy: openbox_auto`
+- `algorithm: openbox`, `strategy: openbox_gp_eic`
+- `algorithm: openbox`, `strategy: openbox_prf_eic`
+- `algorithm: turbo`, `strategy: turbo_trust_region`
+- `algorithm: random`, `strategy: random_baseline` for diagnostic baseline use
+
+Read `docs/OPTIMIZER_ALGORITHM_MODES.md` before recommending a mode.
+
+## 8. Final User Acceptance
 
 The optimizer flow stops before final user acceptance. Only after the user
-accepts the recommended best-observed candidate:
+accepts the recommended best-observed candidate should the operator record a
+final decision:
 
 ```bash
 ./.venv/bin/hermes-workflow record-optimizer-decision PROJECT_DIR \
@@ -146,15 +162,9 @@ project readiness: pass
 readiness: ready_for_closeout_review
 ```
 
-## 7. Files That Must Not Be Released
+## 9. Files That Must Not Be Released
 
-Do not commit or publish:
-
-- raw `input.scs`;
-- protected sidecars such as encrypted includes;
-- PSF/raw simulator databases;
-- full Cadence logs;
-- user proprietary Maestro point-root bundles;
-- `docs/OCEAN_DOC_*`;
-- `docs/toolchain_evidence/` unless the user explicitly approves a sanitized
-  evidence release.
+Do not commit or publish raw `input.scs`, protected sidecars, encrypted PDK
+includes, PSF/raw simulator databases, full Cadence logs, user proprietary
+Maestro point-root bundles, `docs/OCEAN_DOC_*`, or `docs/toolchain_evidence/`
+unless the user explicitly approves a sanitized evidence release.

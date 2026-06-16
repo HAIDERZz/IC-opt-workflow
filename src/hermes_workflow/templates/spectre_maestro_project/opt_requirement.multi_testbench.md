@@ -125,6 +125,15 @@ direction: minimize
 expression: "NF_3G / (MAX_GAIN * BW)"
 ```
 
+## Process Corners
+
+```yaml
+objective_policy: nominal
+constraint_policy: nominal
+corners:
+  - id: nominal
+```
+
 ## Spectre Settings
 
 ```yaml
@@ -143,6 +152,7 @@ keep_successful_runs: true
 
 ```yaml
 algorithm: openbox
+strategy: openbox_auto
 initialization: sobol
 max_evaluations: 100
 batch_size: 10

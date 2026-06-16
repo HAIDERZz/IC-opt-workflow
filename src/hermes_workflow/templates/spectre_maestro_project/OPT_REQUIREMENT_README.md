@@ -219,6 +219,7 @@ The file must contain these sections exactly once:
 ## Metrics
 ## Constraints
 ## Objective
+## Process Corners        # optional; defaults to one nominal corner if omitted
 ## Spectre Settings
 ## Optimizer Settings
 ## Approval Checklist
@@ -238,6 +239,15 @@ backend: maestro_exported_spectre_deck
 
 Free prose outside YAML blocks is allowed, but Hermes only reads the fenced
 YAML blocks.
+
+Template variants:
+
+```text
+opt_requirement.md                  single testbench, nominal corner default
+opt_requirement.multi_testbench.md  multiple testbenches, nominal corner default
+opt_requirement.multi_corner.md     single testbench, explicit process corners
+opt_requirement.multi_tb_corner.md  multiple testbenches with explicit corners
+```
 
 ## Section Reference
 
@@ -368,6 +378,38 @@ Rules:
 - Do not reference undeclared metrics.
 - This is the FoM comparison expression, not an OCEAN formula.
 
+### Process Corners
+
+Optional. If omitted, Hermes writes one implicit nominal corner:
+
+```yaml
+objective_policy: nominal
+constraint_policy: nominal
+corners:
+  - id: nominal
+```
+
+Explicit multi-corner projects should provide full PDK section names and any
+corner variables. Hermes does not guess PDK model sections.
+
+```yaml
+objective_policy: worst_case
+constraint_policy: all_corners
+corners:
+  - id: tt
+    model_section: Post_simu_top_tt
+    variables:
+      temperature: "27"
+  - id: ss
+    model_section: Post_simu_top_ss
+    variables:
+      temperature: "125"
+```
+
+`parallel_jobs` remains candidate-level concurrency. It is not multiplied by
+testbench count or corner count; child testbench/corner evaluations stay serial
+inside one candidate.
+
 ### Spectre Settings
 
 ```yaml
@@ -395,6 +437,7 @@ Rules:
 
 ```yaml
 algorithm: openbox
+strategy: openbox_auto
 initialization: sobol
 max_evaluations: 100
 batch_size: 10
@@ -403,9 +446,17 @@ failure_penalty: 1000000.0
 deduplicate_candidates: true
 ```
 
-Recommended algorithm:
+Recommended default strategy:
 
-- `openbox`
+- `openbox_auto`
+
+Available strategy and algorithm pairs:
+
+- `algorithm: openbox`, `strategy: openbox_auto`
+- `algorithm: openbox`, `strategy: openbox_gp_eic`
+- `algorithm: openbox`, `strategy: openbox_prf_eic`
+- `algorithm: turbo`, `strategy: turbo_trust_region`
+- `algorithm: random`, `strategy: random_baseline`
 
 Rules:
 
@@ -413,6 +464,8 @@ Rules:
 - `batch_size` is how many candidates the optimizer asks for per batch.
 - `deduplicate_candidates` must be `true`.
 - Use a fixed `random_seed` for reproducibility.
+- For strategy selection details and backend expectations, read
+  `docs/OPTIMIZER_ALGORITHM_MODES.md`.
 
 ### Approval Checklist
 

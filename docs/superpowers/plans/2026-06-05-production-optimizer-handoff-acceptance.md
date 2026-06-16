@@ -1,5 +1,10 @@
 # Production Optimizer Handoff Acceptance Plan
 
+> Historical command notice: this old implementation plan may show obsolete
+> workload/resource CLI flags. Current release product first runs read those
+> values only from `opt_requirement.md`; only `ic-opt PROJECT --real --continue N`
+> remains as a product CLI budget delta.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Run one production-style optimizer handoff using the C-33 guide, with supervisor packet generation, execution-agent command handoff, and Hermes finalize/audit closeout.

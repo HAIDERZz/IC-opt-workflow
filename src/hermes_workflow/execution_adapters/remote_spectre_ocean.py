@@ -14,6 +14,7 @@ from hermes_workflow.execution_adapters.spectre_ocean import (
     SPECTRE_STDERR_NAME,
     SPECTRE_STDOUT_NAME,
     AdapterRunResult,
+    _build_command_trace,
     _project_relative_path,
     build_ocean_argv,
     build_spectre_argv,
@@ -23,7 +24,14 @@ from hermes_workflow.execution_adapters.spectre_ocean import (
     write_spectre_result_manifest,
 )
 from hermes_workflow.remote_project import RemoteProjectRef
-from hermes_workflow.remote_ssh import quote_remote_path
+from hermes_workflow.remote_ssh import RemoteCommandResult, quote_remote_path
+
+
+def _configured_corner_ids(bundle: Any) -> list[str | None]:
+    process_corners = getattr(bundle, "process_corners", None)
+    if process_corners is None:
+        return [None]
+    return [corner.id for corner in process_corners.corners]
 
 
 def run_remote_spectre_ocean_adapter(
@@ -34,8 +42,11 @@ def run_remote_spectre_ocean_adapter(
     remote_cadence_cshrc: PurePosixPath,
     runner: Any,
     testbench_id: str | None = None,
+    corner_id: str | None = None,
 ) -> AdapterRunResult:
-    context = load_adapter_context(project_dir, run_id=run_id, testbench_id=testbench_id)
+    context = load_adapter_context(
+        project_dir, run_id=run_id, testbench_id=testbench_id, corner_id=corner_id
+    )
     script_path = _project_relative_path(context.project_dir, context.request.ocean.script_file)
     script_path.parent.mkdir(parents=True, exist_ok=True)
     script_path.write_text(render_ocean_replay_script(context), encoding="utf-8")
@@ -45,9 +56,24 @@ def run_remote_spectre_ocean_adapter(
         remote_run_dir = remote_run_base / "testbenches" / testbench_id
     else:
         remote_run_dir = remote_run_base
-    runner.upload_tree(context.run_dir, remote_run_dir)
+    if corner_id is not None:
+        remote_run_dir = remote_run_dir / "corners" / corner_id
+    try:
+        runner.upload_tree(context.run_dir, remote_run_dir)
+    except Exception as exc:
+        upload_trace = _build_command_trace(
+            context, execution_mode="remote", include_ocean=False,
+        )
+        return _write_remote_failure(
+            context,
+            f"upload run directory failed: {exc}",
+            runner=runner,
+            remote_run_dir=remote_run_dir,
+            command_trace=upload_trace,
+        )
 
     remote_input_dir = remote_run_dir / "netlist"
+    timeout_s = int(context.request.spectre.get("timeout_s", 3600))
     spectre_argv = build_spectre_argv(context)
     spectre_cmd_body = " ".join(shlex.quote(a) for a in spectre_argv)
     spectre_command = (
@@ -58,7 +84,28 @@ def run_remote_spectre_ocean_adapter(
             f"{spectre_cmd_body}"
         )
     )
-    spectre_result = runner.run(spectre_command)
+    spectre_trace = _build_command_trace(
+        context, execution_mode="remote", include_ocean=False,
+    )
+    try:
+        spectre_result = runner.run(spectre_command, timeout_s=timeout_s)
+    except Exception as exc:
+        (context.run_dir / SPECTRE_STDOUT_NAME).write_text(
+            f"spectre command failed with exception: {exc}\n",
+            encoding="utf-8",
+        )
+        (context.run_dir / SPECTRE_STDERR_NAME).write_text(
+            f"spectre command failed with exception: {exc}\n",
+            encoding="utf-8",
+        )
+        return _write_remote_failure(
+            context,
+            "spectre command failed",
+            runner=runner,
+            remote_run_dir=remote_run_dir,
+            extra_issues=[f"spectre command exception: {exc}"],
+            command_trace=spectre_trace,
+        )
 
     # Write spectre diagnostics locally from captured output and upload to
     # remote so that failure paths always have diagnostic artifacts available.
@@ -68,20 +115,40 @@ def run_remote_spectre_ocean_adapter(
     (context.run_dir / SPECTRE_STDERR_NAME).write_text(
         spectre_result.stderr, encoding="utf-8",
     )
-    runner.upload(context.run_dir / SPECTRE_STDOUT_NAME, remote_run_dir / SPECTRE_STDOUT_NAME)
-    runner.upload(context.run_dir / SPECTRE_STDERR_NAME, remote_run_dir / SPECTRE_STDERR_NAME)
+    _safe_upload(
+        runner,
+        context.run_dir / SPECTRE_STDOUT_NAME,
+        remote_run_dir / SPECTRE_STDOUT_NAME,
+        prefix="spectre stdout",
+    )
+    _safe_upload(
+        runner,
+        context.run_dir / SPECTRE_STDERR_NAME,
+        remote_run_dir / SPECTRE_STDERR_NAME,
+        prefix="spectre stderr",
+    )
 
     if spectre_result.return_code != 0:
-        return _write_remote_failure(context, "spectre command failed", runner=runner, remote_run_dir=remote_run_dir)
+        return _write_remote_failure(context, "spectre command failed", runner=runner, remote_run_dir=remote_run_dir, command_trace=spectre_trace)
 
     # Download Spectre artifacts: psf/
-    runner.download_tree(remote_run_dir / "psf", context.psf_dir)
+    try:
+        runner.download_tree(remote_run_dir / "psf", context.psf_dir)
+    except Exception as exc:
+        return _write_remote_failure(
+            context,
+            "psf directory download failed",
+            runner=runner,
+            remote_run_dir=remote_run_dir,
+            extra_issues=[f"psf download exception: {exc}"],
+            command_trace=spectre_trace,
+        )
 
     # Validate required Spectre artifacts exist locally
     if not context.psf_dir.is_dir():
-        return _write_remote_failure(context, "psf directory missing after download", runner=runner, remote_run_dir=remote_run_dir)
+        return _write_remote_failure(context, "psf directory missing after download", runner=runner, remote_run_dir=remote_run_dir, command_trace=spectre_trace)
     if not (context.psf_dir / "spectre.out").is_file():
-        return _write_remote_failure(context, "psf/spectre.out missing after download", runner=runner, remote_run_dir=remote_run_dir)
+        return _write_remote_failure(context, "psf/spectre.out missing after download", runner=runner, remote_run_dir=remote_run_dir, command_trace=spectre_trace)
 
     ocean_argv = build_ocean_argv(context)
     ocean_cmd_body = " ".join(shlex.quote(a) for a in ocean_argv)
@@ -96,15 +163,45 @@ def run_remote_spectre_ocean_adapter(
 
     # Retry OCEAN up to OCEAN_MAX_ATTEMPTS, matching local adapter semantics.
     ocean_return_codes: list[int] = []
+    ocean_result: RemoteCommandResult | None = None
     for _attempt in range(OCEAN_MAX_ATTEMPTS):
-        ocean_result = runner.run(ocean_command)
-        ocean_return_codes.append(ocean_result.return_code)
-        if ocean_result.return_code == 0:
+        try:
+            ocean_result = runner.run(ocean_command, timeout_s=timeout_s)
+            ocean_return_codes.append(ocean_result.return_code)
+            if ocean_result.return_code == 0:
+                break
+        except Exception as exc:
+            ocean_return_codes.append(1)
+            ocean_result = RemoteCommandResult(
+                1,
+                "",
+                f"ocean command failed with exception: {exc}",
+                ["ssh", remote_ref.ssh_profile, ocean_command],
+            )
             break
 
     # Download OCEAN artifacts regardless of return code, matching local
     # adapter behaviour where the metric manifest records the failure.
-    runner.download_tree(remote_run_dir / "metrics", context.metrics_dir)
+    if ocean_result is None:
+        return _write_remote_failure(
+            context,
+            "ocean command produced no result",
+            runner=runner,
+            remote_run_dir=remote_run_dir,
+            extra_issues=["ocean command produced no result"],
+            command_trace=spectre_trace,
+        )
+    try:
+        runner.download_tree(remote_run_dir / "metrics", context.metrics_dir)
+    except Exception as exc:
+        return _write_remote_failure(
+            context,
+            "ocean metric download failed",
+            runner=runner,
+            remote_run_dir=remote_run_dir,
+            extra_issues=[f"ocean metric download exception: {exc}"],
+            command_trace=spectre_trace,
+        )
 
     # Write ocean diagnostics locally from the LAST attempt (the one that
     # determined success/failure) and upload to remote.  Written after
@@ -117,11 +214,30 @@ def run_remote_spectre_ocean_adapter(
     (context.metrics_dir / OCEAN_STDERR_NAME).write_text(
         ocean_result.stderr, encoding="utf-8",
     )
-    runner.upload(context.metrics_dir / OCEAN_STDOUT_NAME, remote_run_dir / "metrics" / OCEAN_STDOUT_NAME)
-    runner.upload(context.metrics_dir / OCEAN_STDERR_NAME, remote_run_dir / "metrics" / OCEAN_STDERR_NAME)
+    _safe_upload(
+        runner,
+        context.metrics_dir / OCEAN_STDOUT_NAME,
+        remote_run_dir / "metrics" / OCEAN_STDOUT_NAME,
+        prefix="ocean stdout",
+    )
+    _safe_upload(
+        runner,
+        context.metrics_dir / OCEAN_STDERR_NAME,
+        remote_run_dir / "metrics" / OCEAN_STDERR_NAME,
+        prefix="ocean stderr",
+    )
 
     started = datetime.now(UTC).replace(microsecond=0).strftime("%Y-%m-%dT%H:%M:%SZ")
     completed = started
+
+    # Build full command_trace with both spectre and ocean for the
+    # success/OCEAN-failure manifest paths.
+    full_trace = _build_command_trace(
+        context,
+        execution_mode="remote",
+        ocean_return_code=ocean_result.return_code,
+        ocean_return_codes=ocean_return_codes,
+    )
 
     # Write metric result manifest first (records ocean failure if rc != 0).
     # write_metric_result_manifest handles missing ocean_scalars.tsv gracefully
@@ -131,6 +247,7 @@ def run_remote_spectre_ocean_adapter(
         context,
         ocean_return_code=ocean_result.return_code,
         ocean_return_codes=ocean_return_codes,
+        command_trace=full_trace,
     )
 
     # Result manifest always says "succeeded" when spectre succeeded,
@@ -142,13 +259,21 @@ def run_remote_spectre_ocean_adapter(
         completed_at_utc=completed,
         include_metric_manifest=True,
         notes="spectre command completed",
+        command_trace=full_trace,
     )
 
     # Upload both manifests back to remote.
-    runner.upload(result_manifest_path, remote_run_dir / RESULT_MANIFEST_NAME)
-    runner.upload(
+    _safe_upload(
+        runner,
+        result_manifest_path,
+        remote_run_dir / RESULT_MANIFEST_NAME,
+        prefix="result manifest",
+    )
+    _safe_upload(
+        runner,
         metric_result.path,
         remote_run_dir / "metrics" / METRIC_RESULT_MANIFEST_NAME,
+        prefix="metric result manifest",
     )
 
     status = "succeeded" if metric_result.status == "succeeded" else "failed"
@@ -161,8 +286,34 @@ def run_remote_spectre_ocean_adapter(
     )
 
 
-def _write_remote_failure(context: Any, notes: str, *, runner: Any, remote_run_dir: PurePosixPath) -> AdapterRunResult:
+def _safe_upload(
+    runner: Any,
+    local_path: Path,
+    remote_path: PurePosixPath | str,
+    *,
+    prefix: str,
+    issues: list[str] | None = None,
+) -> None:
+    try:
+        runner.upload(local_path, remote_path)
+    except Exception as exc:
+        if issues is not None:
+            issues.append(f"failed to upload {prefix}: {exc}")
+
+
+def _write_remote_failure(
+    context: Any,
+    notes: str,
+    *,
+    runner: Any,
+    remote_run_dir: PurePosixPath,
+    extra_issues: list[str] | None = None,
+    command_trace: dict | None = None,
+) -> AdapterRunResult:
     """Write a failed result manifest using the shared local helper and upload it."""
+    issues = [notes]
+    if extra_issues:
+        issues.extend(extra_issues)
     started = datetime.now(UTC).replace(microsecond=0).strftime("%Y-%m-%dT%H:%M:%SZ")
     result_path = write_spectre_result_manifest(
         context,
@@ -171,14 +322,21 @@ def _write_remote_failure(context: Any, notes: str, *, runner: Any, remote_run_d
         completed_at_utc=started,
         include_metric_manifest=False,
         notes=notes,
+        command_trace=command_trace,
     )
-    runner.upload(result_path, remote_run_dir / RESULT_MANIFEST_NAME)
+    _safe_upload(
+        runner,
+        result_path,
+        remote_run_dir / RESULT_MANIFEST_NAME,
+        prefix="result manifest",
+        issues=issues,
+    )
     return AdapterRunResult(
         status="failed",
         run_id=context.run_id,
         result_manifest_path=result_path,
         metric_result_manifest_path=None,
-        issues=[notes],
+        issues=issues,
     )
 
 
@@ -194,31 +352,52 @@ def run_remote_multi_testbench_adapter(
     from hermes_workflow.validate import assert_valid_project
 
     bundle = assert_valid_project(project_dir)
-    if bundle.testbenches is None:
-        raise RuntimeError("run_remote_multi_testbench_adapter called without testbenches config")
-
     issues: list[str] = []
-    for testbench in bundle.testbenches.testbenches:
-        result = run_remote_spectre_ocean_adapter(
-            project_dir,
-            run_id=run_id,
-            remote_ref=remote_ref,
-            remote_cadence_cshrc=remote_cadence_cshrc,
-            runner=runner,
-            testbench_id=testbench.id,
-        )
-        if result.status != "succeeded":
-            message = "; ".join(result.issues) or result.status
-            issues.append(f"{testbench.id}: {message}")
+    corner_ids = _configured_corner_ids(bundle)
+    testbench_ids = (
+        [testbench.id for testbench in bundle.testbenches.testbenches]
+        if bundle.testbenches is not None
+        else [None]
+    )
+    for testbench_id in testbench_ids:
+        for corner_id in corner_ids:
+            result = run_remote_spectre_ocean_adapter(
+                project_dir,
+                run_id=run_id,
+                remote_ref=remote_ref,
+                remote_cadence_cshrc=remote_cadence_cshrc,
+                runner=runner,
+                testbench_id=testbench_id,
+                corner_id=corner_id,
+            )
+            if result.status != "succeeded":
+                message = "; ".join(result.issues) or result.status
+                label = (
+                    (testbench_id or "default_testbench")
+                    if corner_id is None
+                    else (
+                        f"{testbench_id}/{corner_id}"
+                        if testbench_id is not None
+                        else corner_id
+                    )
+                )
+                issues.append(f"{label}: {message}")
 
     aggregate_report = aggregate_multi_testbench_run(project_dir, run_id=run_id)
 
     remote_run_dir = remote_ref.remote_project_dir / "runs" / "real" / run_id
     run_dir = project_dir / "runs" / "real" / run_id
-    runner.upload(run_dir / "result_manifest.json", remote_run_dir / "result_manifest.json")
-    runner.upload(
+    _safe_upload(
+        runner,
+        run_dir / "result_manifest.json",
+        remote_run_dir / "result_manifest.json",
+        prefix="parent result manifest",
+    )
+    _safe_upload(
+        runner,
         run_dir / "metrics" / "metric_result_manifest.json",
         remote_run_dir / "metrics" / "metric_result_manifest.json",
+        prefix="parent metric result manifest",
     )
 
     if issues:
@@ -229,10 +408,14 @@ def run_remote_multi_testbench_adapter(
             metric_result_manifest_path=run_dir / "metrics" / "metric_result_manifest.json",
             issues=issues,
         )
+    aggregate_failed = aggregate_report.status in {
+        "real_check_failed",
+        "metric_check_failed",
+    }
     return AdapterRunResult(
-        status=aggregate_report.status if aggregate_report.status == "succeeded" else "failed",
+        status="failed" if aggregate_failed else "succeeded",
         run_id=run_id,
         result_manifest_path=run_dir / "result_manifest.json",
         metric_result_manifest_path=run_dir / "metrics" / "metric_result_manifest.json",
-        issues=list(aggregate_report.issues),
+        issues=list(aggregate_report.issues) if aggregate_failed else [],
     )

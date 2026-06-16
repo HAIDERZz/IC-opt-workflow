@@ -66,6 +66,8 @@ class SpectreOceanContext:
     metric_request_path: Path
     prepared: PreparedRealRunManifest
     request: MetricExtractionRequest
+    testbench_id: str | None = None
+    corner_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -150,6 +152,7 @@ def run_spectre_ocean_adapter(
     *,
     run_id: str | None = None,
     testbench_id: str | None = None,
+    corner_id: str | None = None,
     runner: CommandRunner | None = None,
     allow_overwrite: bool = False,
 ) -> AdapterRunResult:
@@ -157,6 +160,7 @@ def run_spectre_ocean_adapter(
         project_dir,
         run_id=run_id,
         testbench_id=testbench_id,
+        corner_id=corner_id,
     )
     _reject_symlinks(context.project_dir, context.metrics_dir, "metrics directory")
     _reject_symlinks(context.project_dir, context.psf_dir, "psf directory")
@@ -181,6 +185,9 @@ def run_spectre_ocean_adapter(
         timeout_s=int(context.request.spectre.get("timeout_s", 3600)),
     )
     if spectre_result.return_code != 0:
+        spectre_trace = _build_command_trace(
+            context, execution_mode="local", include_ocean=False,
+        )
         result_manifest_path = _write_result_manifest(
             context,
             status="failed",
@@ -188,6 +195,7 @@ def run_spectre_ocean_adapter(
             completed_at_utc=spectre_result.completed_at_utc,
             include_metric_manifest=False,
             notes="spectre command failed",
+            command_trace=spectre_trace,
         )
         return AdapterRunResult(
             status="failed",
@@ -199,10 +207,18 @@ def run_spectre_ocean_adapter(
 
     ocean_results = _run_ocean_with_retries(context, runner)
     ocean_result = ocean_results[-1]
+    ocean_return_codes_list = [result.return_code for result in ocean_results]
+    metric_trace = _build_command_trace(
+        context,
+        execution_mode="local",
+        ocean_return_code=ocean_result.return_code,
+        ocean_return_codes=ocean_return_codes_list,
+    )
     metric_result = _write_metric_result_manifest(
         context,
         ocean_return_code=ocean_result.return_code,
-        ocean_return_codes=[result.return_code for result in ocean_results],
+        ocean_return_codes=ocean_return_codes_list,
+        command_trace=metric_trace,
     )
     result_manifest_path = _write_result_manifest(
         context,
@@ -211,6 +227,7 @@ def run_spectre_ocean_adapter(
         completed_at_utc=ocean_result.completed_at_utc,
         include_metric_manifest=True,
         notes="spectre command completed",
+        command_trace=metric_trace,
     )
     status = "succeeded" if metric_result.status == "succeeded" else "failed"
     return AdapterRunResult(
@@ -246,10 +263,12 @@ def load_adapter_context(
     *,
     run_id: str | None = None,
     testbench_id: str | None = None,
+    corner_id: str | None = None,
 ) -> SpectreOceanContext:
     project_dir = Path(project_dir)
     selected_run_id = _validate_run_id(run_id or DEFAULT_RUN_ID)
     selected_testbench_id = _validate_testbench_id(testbench_id)
+    selected_corner_id = _validate_corner_id(corner_id)
     try:
         bundle = assert_valid_project(project_dir)
     except ValueError as exc:
@@ -258,6 +277,8 @@ def load_adapter_context(
     run_relative = f"{REAL_RUN_ROOT}/{selected_run_id}"
     if selected_testbench_id is not None:
         run_relative = f"{run_relative}/testbenches/{selected_testbench_id}"
+    if selected_corner_id is not None:
+        run_relative = f"{run_relative}/corners/{selected_corner_id}"
     run_dir = _safe_project_path(project_dir, run_relative, "run directory")
     _reject_symlinks(project_dir, run_dir, "run directory")
     if not run_dir.is_dir():
@@ -390,6 +411,8 @@ def load_adapter_context(
         metric_request_path=request_path,
         prepared=prepared,
         request=request,
+        testbench_id=selected_testbench_id,
+        corner_id=selected_corner_id,
     )
 
 
@@ -533,6 +556,81 @@ def parse_ocean_scalars(path: Path) -> dict[str, OceanScalarRow]:
     return rows
 
 
+def _build_spectre_trace(
+    context: SpectreOceanContext,
+    *,
+    execution_mode: str,
+) -> dict:
+    """Build the command_trace.spectre sub-object.
+
+    *execution_mode* is ``"local"`` or ``"remote"``.  The ``command``
+    field is the sanitized shell-joined body (no csh wrapper, no cshrc,
+    no SSH details).
+    """
+    import shlex
+
+    argv = build_spectre_argv(context)
+    return {
+        "argv": argv,
+        "command": " ".join(shlex.quote(a) for a in argv),
+        "cwd": str(context.input_scs.parent),
+        "timeout_s": int(context.request.spectre.get("timeout_s", 3600)),
+        "settings": {
+            "engine": str(context.request.spectre.get("engine", SPECTRE_ENGINE)),
+            "preset": str(context.request.spectre["preset"]),
+            "threads_per_run": int(context.request.spectre["threads_per_run"]),
+            "output_format": str(context.request.spectre["output_format"]),
+        },
+    }
+
+
+def _build_ocean_trace(
+    context: SpectreOceanContext,
+    *,
+    execution_mode: str,
+    ocean_return_code: int = 0,
+    ocean_return_codes: Sequence[int] | None = None,
+) -> dict:
+    """Build the command_trace.ocean sub-object."""
+    import shlex
+
+    argv = build_ocean_argv(context)
+    return_codes = list(ocean_return_codes or [ocean_return_code])
+    return {
+        "argv": argv,
+        "command": " ".join(shlex.quote(a) for a in argv),
+        "cwd": str(context.project_dir),
+        "timeout_s": int(context.request.spectre.get("timeout_s", 3600)),
+        "mode": context.request.ocean.mode,
+        "return_code": ocean_return_code,
+        "return_codes": return_codes,
+    }
+
+
+def _build_command_trace(
+    context: SpectreOceanContext,
+    *,
+    execution_mode: str,
+    ocean_return_code: int = 0,
+    ocean_return_codes: Sequence[int] | None = None,
+    include_ocean: bool = True,
+) -> dict:
+    """Build the top-level command_trace object for a manifest."""
+    trace: dict = {
+        "schema_version": "1.0",
+        "execution_mode": execution_mode,
+        "spectre": _build_spectre_trace(context, execution_mode=execution_mode),
+    }
+    if include_ocean:
+        trace["ocean"] = _build_ocean_trace(
+            context,
+            execution_mode=execution_mode,
+            ocean_return_code=ocean_return_code,
+            ocean_return_codes=ocean_return_codes,
+        )
+    return trace
+
+
 def build_spectre_argv(context: SpectreOceanContext) -> list[str]:
     """Build the canonical spectre command argv.
 
@@ -601,6 +699,7 @@ def _write_result_manifest(
     completed_at_utc: str,
     include_metric_manifest: bool,
     notes: str,
+    command_trace: dict | None = None,
 ) -> Path:
     spectre_out = f"{context.run_relative}/{PSF_DIR_NAME}/spectre.out"
     spectre_stdout = f"{context.run_relative}/{SPECTRE_STDOUT_NAME}"
@@ -610,6 +709,8 @@ def _write_result_manifest(
         "schema_version": "1.0",
         "run_id": context.run_id,
         "candidate_id": context.prepared.candidate_id,
+        "testbench_id": context.testbench_id,
+        "corner_id": context.corner_id,
         "status": status,
         "started_at_utc": started_at_utc,
         "completed_at_utc": completed_at_utc,
@@ -629,6 +730,8 @@ def _write_result_manifest(
         "metric_result_manifest": None,
         "notes": notes,
     }
+    if command_trace is not None:
+        payload["command_trace"] = command_trace
     if spectre_succeeded:
         payload["result_data"] = {
             "kind": "spectre_psf",
@@ -665,6 +768,7 @@ def _write_metric_result_manifest(
     *,
     ocean_return_code: int,
     ocean_return_codes: Sequence[int] | None = None,
+    command_trace: dict | None = None,
 ) -> MetricManifestWriteResult:
     scalar_path = _project_relative_path(
         context.project_dir,
@@ -773,6 +877,8 @@ def _write_metric_result_manifest(
         "metrics": metrics,
         "issues": issues,
     }
+    if command_trace is not None:
+        payload["command_trace"] = command_trace
     result_path = context.metrics_dir / METRIC_RESULT_MANIFEST_NAME
     _write_json(result_path, payload)
     return MetricManifestWriteResult(
@@ -790,6 +896,7 @@ def write_spectre_result_manifest(
     completed_at_utc: str,
     include_metric_manifest: bool,
     notes: str,
+    command_trace: dict | None = None,
 ) -> Path:
     """Public wrapper around ``_write_result_manifest``.
 
@@ -804,6 +911,7 @@ def write_spectre_result_manifest(
         completed_at_utc=completed_at_utc,
         include_metric_manifest=include_metric_manifest,
         notes=notes,
+        command_trace=command_trace,
     )
 
 
@@ -812,6 +920,7 @@ def write_metric_result_manifest(
     *,
     ocean_return_code: int,
     ocean_return_codes: Sequence[int] | None = None,
+    command_trace: dict | None = None,
 ) -> MetricManifestWriteResult:
     """Public wrapper around ``_write_metric_result_manifest``.
 
@@ -823,6 +932,7 @@ def write_metric_result_manifest(
         context,
         ocean_return_code=ocean_return_code,
         ocean_return_codes=ocean_return_codes,
+        command_trace=command_trace,
     )
 
 
@@ -939,15 +1049,6 @@ def _validate_spectre_request(spectre: dict) -> None:
         raise AdapterPreconditionError(
             "spectre.threads_per_run must be a positive integer"
         )
-    parallel_jobs = spectre.get("parallel_jobs")
-    if (
-        not isinstance(parallel_jobs, int)
-        or isinstance(parallel_jobs, bool)
-        or parallel_jobs <= 0
-    ):
-        raise AdapterPreconditionError(
-            "spectre.parallel_jobs must be a positive integer"
-        )
     timeout_s = spectre.get("timeout_s")
     if not isinstance(timeout_s, int) or isinstance(timeout_s, bool) or timeout_s <= 0:
         raise AdapterPreconditionError("spectre.timeout_s must be a positive integer")
@@ -962,7 +1063,6 @@ def _validate_spectre_settings_match(
         "preset",
         "output_format",
         "threads_per_run",
-        "parallel_jobs",
         "timeout_s",
     ):
         if prepared.spectre.get(key) != request.spectre.get(key):
@@ -983,6 +1083,14 @@ def _validate_testbench_id(testbench_id: str | None) -> str | None:
     if not RESULT_SELECTOR_RE.match(testbench_id):
         raise AdapterPreconditionError(f"testbench_id is unsafe: {testbench_id}")
     return testbench_id
+
+
+def _validate_corner_id(corner_id: str | None) -> str | None:
+    if corner_id is None:
+        return None
+    if not RESULT_SELECTOR_RE.match(corner_id):
+        raise AdapterPreconditionError(f"corner_id is unsafe: {corner_id}")
+    return corner_id
 
 
 def _load_model(path: Path, model_class: type[ModelT], label: str) -> ModelT:

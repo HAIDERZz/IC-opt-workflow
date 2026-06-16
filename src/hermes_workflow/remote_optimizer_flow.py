@@ -3,17 +3,14 @@ from __future__ import annotations
 import json
 from dataclasses import asdict, dataclass
 from pathlib import Path, PurePosixPath
+from types import SimpleNamespace
 from typing import Any, Callable
 
-from hermes_workflow.cli import (
-    CONTINUATION_ACQ_OPTIMIZER_TYPE,
-    CONTINUATION_ACQ_TYPE,
-    CONTINUATION_SURROGATE_TYPE,
-)
 from hermes_workflow.execution_adapters.remote_spectre_ocean import (
     run_remote_multi_testbench_adapter,
     run_remote_spectre_ocean_adapter,
 )
+from hermes_workflow.native_turbo import run_batch_native_turbo_optimization
 from hermes_workflow.openbox_backend import run_openbox_real_optimization
 from hermes_workflow.optimizer_acceptance import check_optimizer_run
 from hermes_workflow.optimizer_completion import summarize_optimizer_run
@@ -29,8 +26,96 @@ from hermes_workflow.package import build_execution_package
 from hermes_workflow.remote_doctor import run_remote_doctor
 from hermes_workflow.remote_prepare import prepare_remote_project_cache
 from hermes_workflow.remote_project import RemoteProjectRef
+from hermes_workflow.run_retention import apply_remote_run_retention
 from hermes_workflow.validate import assert_valid_project
 from hermes_workflow.remote_ssh import RemoteSshRunner
+
+
+def _wrap_with_remote_retention(
+    inner_adapter: Callable[..., Any],
+    *,
+    local_project: Path,
+    ref: RemoteProjectRef,
+    runner: Any,
+) -> Callable[..., Any]:
+    """Wrap an inner remote adapter so retention runs once after it returns.
+
+    Retention is applied per ``run_id`` based on the inner adapter's result
+    status (or any raised exception). On exception, retention still runs and
+    the original exception is re-raised. Retention failures are appended to
+    the result's ``issues`` list when the inner adapter returned successfully.
+    """
+
+    def wrapped(local_project_arg: Path, *args: Any, **kwargs: Any) -> Any:
+        run_id = kwargs.get("run_id")
+        if run_id is None and args:
+            run_id = args[0]
+        adapter_exc: BaseException | None = None
+        result: Any = None
+        try:
+            result = inner_adapter(local_project_arg, *args, **kwargs)
+        except BaseException as exc:  # noqa: BLE001 — must still run retention.
+            adapter_exc = exc
+
+        run_succeeded = (
+            adapter_exc is None
+            and getattr(result, "status", None) == "succeeded"
+        )
+        candidate_id: str | None = None
+        if result is not None:
+            cand = getattr(result, "candidate_id", None)
+            if isinstance(cand, str):
+                candidate_id = cand
+
+        try:
+            decision = apply_remote_run_retention(
+                local_project,
+                remote_ref=ref,
+                runner=runner,
+                run_id=str(run_id) if run_id is not None else "",
+                candidate_id=candidate_id,
+                run_succeeded=run_succeeded,
+            )
+        except Exception as exc:  # noqa: BLE001 — surface but do not crash.
+            if adapter_exc is None and result is not None:
+                issues = getattr(result, "issues", None)
+                if isinstance(issues, list):
+                    issues.append(f"remote run retention raised: {exc}")
+            decision = None
+
+        if (
+            decision is not None
+            and decision.remote_action == "failed"
+            and adapter_exc is None
+            and result is not None
+        ):
+            issues = getattr(result, "issues", None)
+            if isinstance(issues, list):
+                issues.extend(decision.issues)
+
+        if adapter_exc is not None:
+            raise adapter_exc
+        return result
+
+    return wrapped
+
+
+def _remote_product_doctor_already_passed(
+    project_dir: Path,
+    *,
+    cadence_cshrc: Path | None = None,
+) -> SimpleNamespace:
+    """Remote real flow is gated by remote doctor before local optimization."""
+
+    return SimpleNamespace(
+        status="pass",
+        project_dir=str(project_dir),
+        checks=[],
+        issues=[],
+        warnings=[],
+        structured_issues=[],
+        cadence_cshrc=str(cadence_cshrc) if cadence_cshrc is not None else None,
+    )
 
 
 def optimize_remote_project(
@@ -38,9 +123,10 @@ def optimize_remote_project(
     *,
     real: bool,
     remote_cadence_cshrc: PurePosixPath,
-    max_evals: int,
+    max_evals: int | None,
     batch_size: int | None,
     parallel_jobs: int | None,
+    strategy: str | None = None,
     cache_root: Path | None = None,
     runner: Any | None = None,
 ) -> OptimizerFlowReport:
@@ -59,41 +145,63 @@ def optimize_remote_project(
     if prepared.status != "pass":
         raise ValueError("remote prepare failed: " + "; ".join(prepared.issues))
 
-    def remote_openbox(project_dir: Path, **kwargs: object):
-        bundle = assert_valid_project(project_dir)
+    def selected_adapter(local_project: Path, run_id: str, cadence_cshrc: Path) -> object:
+        bundle = assert_valid_project(local_project)
+        if (
+            bundle.testbenches is not None
+            or getattr(bundle, "process_corners", None) is not None
+        ):
+            inner = run_remote_multi_testbench_adapter
+        else:
+            inner = run_remote_spectre_ocean_adapter
 
-        def selected_adapter(local_project: Path, run_id: str, cadence_cshrc: Path) -> object:
-            if bundle.testbenches is not None:
-                return run_remote_multi_testbench_adapter(
-                    local_project,
-                    run_id=run_id,
-                    remote_ref=ref,
-                    remote_cadence_cshrc=remote_cadence_cshrc,
-                    runner=ssh,
-                )
-            return run_remote_spectre_ocean_adapter(
-                local_project,
-                run_id=run_id,
+        def call_inner(local_project_arg: Path, *args: object, **kwargs: object) -> object:
+            return inner(
+                local_project_arg,
+                run_id=kwargs.get("run_id", run_id),
                 remote_ref=ref,
                 remote_cadence_cshrc=remote_cadence_cshrc,
                 runner=ssh,
             )
 
+        wrapped = _wrap_with_remote_retention(
+            call_inner,
+            local_project=local_project,
+            ref=ref,
+            runner=ssh,
+        )
+        return wrapped(local_project, run_id=run_id, cadence_cshrc=cadence_cshrc)
+
+    def remote_openbox(project_dir: Path, **kwargs: object):
         return run_openbox_real_optimization(
             project_dir,
             adapter=selected_adapter,
+            transport_mode="remote",
             **kwargs,
         )
 
-    services = OptimizerFlowServices(run_openbox_real_optimization=remote_openbox)
+    def remote_native_turbo(project_dir: Path, **kwargs: object):
+        return run_batch_native_turbo_optimization(
+            project_dir,
+            adapter=selected_adapter,
+            transport_mode="remote",
+            **kwargs,
+        )
+
+    services = OptimizerFlowServices(
+        run_openbox_real_optimization=remote_openbox,
+        run_batch_native_turbo_optimization=remote_native_turbo,
+        run_product_doctor=_remote_product_doctor_already_passed,
+    )
     report = optimize_project(
         prepared.cache_dir,
         real=True,
         dry_orchestration=False,
-        max_evals=max_evals,
-        batch_size=batch_size,
-        parallel_jobs=parallel_jobs,
-        cadence_cshrc=Path("remote-cadence-env.csh"),
+    max_evals=max_evals,
+    batch_size=batch_size,
+    parallel_jobs=parallel_jobs,
+    strategy=strategy,
+    cadence_cshrc=Path("remote-cadence-env.csh"),
         execution_agent="direct",
         services=services,
     )
@@ -108,11 +216,16 @@ def continue_remote_project(
     remote_cadence_cshrc: PurePosixPath,
     batch_size: int | None,
     parallel_jobs: int | None,
+    strategy: str | None = None,
     cache_root: Path | None = None,
     runner: Any | None = None,
 ) -> OptimizerFlowReport:
     if additional_evals < 1:
         raise ValueError("additional_evals must be >= 1")
+    if strategy is not None:
+        raise ValueError(
+            "--continue continuation uses requirement strategy; remove --strategy"
+        )
     ssh = runner or RemoteSshRunner(ref.ssh_profile)
     prepared = prepare_remote_project_cache(ref, runner=ssh, cache_root=cache_root)
     if prepared.status != "pass":
@@ -120,27 +233,42 @@ def continue_remote_project(
     _sync_remote_history_to_cache(ref, prepared.cache_dir, ssh)
 
     project_root = prepared.cache_dir
+    evaluations_path = project_root / "reports" / "optimizer_evaluations.jsonl"
+    if not evaluations_path.is_file() or evaluations_path.stat().st_size == 0:
+        raise ValueError(
+            "cannot continue without optimizer history: "
+            f"{evaluations_path} is missing or empty"
+        )
     _ensure_execution_manifest(project_root)
 
     def remote_openbox(project_dir: Path, **kwargs: object) -> object:
         bundle = assert_valid_project(project_dir)
 
         def selected_adapter(local_project: Path, run_id: str, cadence_cshrc: Path) -> object:
-            if bundle.testbenches is not None:
-                return run_remote_multi_testbench_adapter(
-                    local_project,
-                    run_id=run_id,
+            if (
+                bundle.testbenches is not None
+                or getattr(bundle, "process_corners", None) is not None
+            ):
+                inner = run_remote_multi_testbench_adapter
+            else:
+                inner = run_remote_spectre_ocean_adapter
+
+            def call_inner(local_project_arg: Path, *args: object, **kwargs: object) -> object:
+                return inner(
+                    local_project_arg,
+                    run_id=kwargs.get("run_id", run_id),
                     remote_ref=ref,
                     remote_cadence_cshrc=remote_cadence_cshrc,
                     runner=ssh,
                 )
-            return run_remote_spectre_ocean_adapter(
-                local_project,
-                run_id=run_id,
-                remote_ref=ref,
-                remote_cadence_cshrc=remote_cadence_cshrc,
+
+            wrapped = _wrap_with_remote_retention(
+                call_inner,
+                local_project=local_project,
+                ref=ref,
                 runner=ssh,
             )
+            return wrapped(local_project, run_id=run_id, cadence_cshrc=cadence_cshrc)
 
         return run_openbox_real_optimization(
             project_dir,
@@ -150,10 +278,13 @@ def continue_remote_project(
             batch_size=batch_size,
             parallel_jobs=parallel_jobs,
             adapter=selected_adapter,
-            surrogate_type=CONTINUATION_SURROGATE_TYPE,
-            acq_type=CONTINUATION_ACQ_TYPE,
-            acq_optimizer_type=CONTINUATION_ACQ_OPTIMIZER_TYPE,
-        )
+            transport_mode="remote",
+            strategy=None,
+        surrogate_type=None,
+        acq_type=None,
+        acq_optimizer_type=None,
+        initial_trials=None,
+    )
 
     report = _run_continuation_closeout(
         project_root,
@@ -211,6 +342,38 @@ def _ensure_execution_manifest(project_dir: Path) -> None:
 
 
 _REPORT_RELATIVE = Path("reports/optimizer_flow_run_report.json")
+
+
+def run_continuation_closeout(
+    project_root: Path,
+    *,
+    openbox_fn: Callable[..., Any],
+    check_fn: Callable[[Path], Any],
+    summarize_fn: Callable[[Path], Any],
+    finalize_fn: Callable[[Path], Any],
+    insight_fn: Callable[[Path], Any],
+    decision_fn: Callable[[Path], Any],
+    additional_evals: int,
+    batch_size: int | None,
+    parallel_jobs: int | None,
+) -> OptimizerFlowReport:
+    """Public alias for the continuation closeout helper.
+
+    Exposed so non-remote entrypoints (e.g. local continuation) can reuse the
+    exact closeout sequence without depending on the leading underscore symbol.
+    """
+    return _run_continuation_closeout(
+        project_root,
+        openbox_fn=openbox_fn,
+        check_fn=check_fn,
+        summarize_fn=summarize_fn,
+        finalize_fn=finalize_fn,
+        insight_fn=insight_fn,
+        decision_fn=decision_fn,
+        additional_evals=additional_evals,
+        batch_size=batch_size,
+        parallel_jobs=parallel_jobs,
+    )
 
 
 def _run_continuation_closeout(

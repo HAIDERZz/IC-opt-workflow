@@ -13,7 +13,48 @@ from tests.test_optimizer_completion import _trace_row, _write_accepted_optimize
 runner = CliRunner()
 
 
-def test_generate_optimizer_insight_report_writes_json_markdown_and_svgs(
+def _write_process_corner_aggregation_report(
+    project_dir: Path,
+    *,
+    run_id: str,
+    status: str,
+    constraint_policy: str = "all_corners",
+    objective_policy: str = "worst_case",
+    selected_corner: str = "ff",
+    worst_corner: str | None = None,
+    corner_objectives: dict[str, float] | None = None,
+    corner_status_counts: dict[str, int] | None = None,
+    corner_metrics: dict[str, dict[str, float]] | None = None,
+    child_statuses: list[dict[str, str]] | None = None,
+) -> None:
+    payload = {
+        "schema_version": "1.0",
+        "status": status,
+        "run_id": run_id,
+        "constraint_policy": constraint_policy,
+        "objective_policy": objective_policy,
+        "selected_corner": selected_corner,
+        "worst_corner": worst_corner or selected_corner,
+        "corner_objectives": corner_objectives or {},
+        "corner_status_counts": corner_status_counts or {},
+        "corner_metrics": corner_metrics or {},
+        "child_statuses": child_statuses or [],
+    }
+    report_path = (
+        project_dir
+        / "runs"
+        / "real"
+        / run_id
+        / "multi_testbench_aggregation_report.json"
+    )
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
+def test_generate_optimizer_insight_report_writes_json_markdown_and_pngs(
     tmp_path: Path,
 ) -> None:
     project_dir = _write_accepted_optimizer_project(tmp_path)
@@ -34,17 +75,17 @@ def test_generate_optimizer_insight_report_writes_json_markdown_and_svgs(
     assert "FN" in payload["observed_relationships"]
     assert "objective" in payload["observed_relationships"]["FN"]
     assert payload["plots"] == {
-        "all_evaluable_fom": "reports/optimizer_visuals/all_evaluable_fom.svg",
+        "all_evaluable_fom": "reports/optimizer_visuals/all_evaluable_fom.png",
         "bottleneck_weighted_score": (
-            "reports/optimizer_visuals/bottleneck_weighted_score.svg"
+            "reports/optimizer_visuals/bottleneck_weighted_score.png"
         ),
-        "constraint_margins": "reports/optimizer_visuals/constraint_margins.svg",
-        "convergence": "reports/optimizer_visuals/convergence.svg",
-        "feasible_convergence": "reports/optimizer_visuals/feasible_convergence.svg",
+        "constraint_margins": "reports/optimizer_visuals/constraint_margins.png",
+        "convergence": "reports/optimizer_visuals/convergence.png",
+        "feasible_convergence": "reports/optimizer_visuals/feasible_convergence.png",
         "parameter_objective_scatter": (
-            "reports/optimizer_visuals/parameter_objective_scatter.svg"
+            "reports/optimizer_visuals/parameter_objective_scatter.png"
         ),
-        "status_distribution": "reports/optimizer_visuals/status_distribution.svg",
+        "status_distribution": "reports/optimizer_visuals/status_distribution.png",
     }
 
     markdown = report.markdown_path.read_text(encoding="utf-8")
@@ -54,8 +95,8 @@ def test_generate_optimizer_insight_report_writes_json_markdown_and_svgs(
     assert "all_evaluable_fom" in markdown
 
     for relative_plot in payload["plots"].values():
-        plot_text = (project_dir / relative_plot).read_text(encoding="utf-8")
-        assert plot_text.startswith("<svg")
+        plot_bytes = (project_dir / relative_plot).read_bytes()
+        assert plot_bytes.startswith(b"\x89PNG\r\n\x1a\n")
 
 
 def test_generate_optimizer_insight_report_records_metric_relationships(
@@ -181,10 +222,10 @@ objective:
     assert payload["constraint_margin_summary"]["rise"]["best_margin_display"] == "12 ps"
     assert payload["constraint_margin_summary"]["DC"]["best_margin_display"] == "80 uW"
     assert payload["plots"]["feasible_convergence"] == (
-        "reports/optimizer_visuals/feasible_convergence.svg"
+        "reports/optimizer_visuals/feasible_convergence.png"
     )
     assert payload["plots"]["constraint_margins"] == (
-        "reports/optimizer_visuals/constraint_margins.svg"
+        "reports/optimizer_visuals/constraint_margins.png"
     )
     markdown = report.markdown_path.read_text(encoding="utf-8")
     assert "IC-native Summary" in markdown
@@ -247,13 +288,60 @@ objective:
     assert ranking["best_candidate"]["objective"] == pytest.approx(math.log(20))
     assert ranking["top_candidates"][0]["run_id"] == "real_001"
     assert ranking["top_candidates"][1]["run_id"] == "real_002"
-    svg = (project_dir / payload["plots"]["all_evaluable_fom"]).read_text(
-        encoding="utf-8"
-    )
-    assert "All Evaluable FoM" in svg
+    png = (project_dir / payload["plots"]["all_evaluable_fom"]).read_bytes()
+    assert png.startswith(b"\x89PNG\r\n\x1a\n")
     markdown = report.markdown_path.read_text(encoding="utf-8")
     assert "Source: `configured_objective`" in markdown
     assert "Configured Objective Ranking" in markdown
+
+
+def test_generate_optimizer_insight_report_respects_maximize_direction(
+    tmp_path: Path,
+) -> None:
+    rows = [
+        _trace_row(
+            evaluation_index=1,
+            run_id="real_001",
+            status="feasible",
+            objective=-0.25,
+        ),
+        _trace_row(
+            evaluation_index=2,
+            run_id="real_002",
+            status="feasible",
+            objective=-0.9,
+        ),
+    ]
+    rows[0]["metrics"] = {"score": 0.25}
+    rows[1]["metrics"] = {"score": 0.9}
+    project_dir = _write_accepted_optimizer_project(tmp_path, rows=rows)
+    (project_dir / "config" / "metrics.yaml").write_text(
+        """
+schema_version: "1.0"
+metrics:
+  - name: score
+    unit: ""
+constraints: []
+objective:
+  direction: maximize
+  expression: "score"
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    report = generate_optimizer_insight_report(project_dir)
+
+    payload = json.loads(report.report_path.read_text(encoding="utf-8"))
+    summary = payload["all_evaluable_fom_summary"]
+    assert summary["direction"] == "maximize"
+    assert summary["best_run_id"] == "real_002"
+    assert summary["best_fom"] == pytest.approx(0.9)
+    assert summary["best_objective"] == pytest.approx(-0.9)
+    ranking = payload["configured_objective_ranking"]
+    assert ranking["direction"] == "maximize"
+    assert ranking["best_candidate"]["run_id"] == "real_002"
+    assert ranking["best_candidate"]["fom"] == pytest.approx(0.9)
+    assert ranking["best_candidate"]["objective"] == pytest.approx(-0.9)
 
 
 def test_generate_optimizer_insight_report_writes_bottleneck_weighted_plot(
@@ -285,7 +373,7 @@ def test_generate_optimizer_insight_report_writes_bottleneck_weighted_plot(
         "MAX_GAIN": 4.5,
         "NF_3G": 11.9,
         "IIP3": 0.5,
-        "P1DB": -1.5,
+        "P1dB": -1.5,
     }
     project_dir = _write_accepted_optimizer_project(tmp_path, rows=rows)
 
@@ -299,13 +387,10 @@ def test_generate_optimizer_insight_report_writes_bottleneck_weighted_plot(
     assert summary["series"][0]["bottleneck_score"] == pytest.approx(0.5)
     assert summary["series"][0]["combined_score"] == pytest.approx(0.5)
     assert payload["plots"]["bottleneck_weighted_score"] == (
-        "reports/optimizer_visuals/bottleneck_weighted_score.svg"
+        "reports/optimizer_visuals/bottleneck_weighted_score.png"
     )
-    svg = (
-        project_dir / payload["plots"]["bottleneck_weighted_score"]
-    ).read_text(encoding="utf-8")
-    assert "Normalized Margin Bottleneck Plot" in svg
-    assert "real_002" in svg
+    png = (project_dir / payload["plots"]["bottleneck_weighted_score"]).read_bytes()
+    assert png.startswith(b"\x89PNG\r\n\x1a\n")
     markdown = report.markdown_path.read_text(encoding="utf-8")
     assert "Normalized Margin Bottleneck Plot" in markdown
 
@@ -329,3 +414,184 @@ def test_generate_optimizer_insight_report_fails_without_traces(tmp_path: Path) 
 
     assert report.status == "fail"
     assert "no optimizer trace rows found" in report.issues
+
+
+def test_generate_optimizer_insight_report_summarizes_process_corners(
+    tmp_path: Path,
+) -> None:
+    rows = [
+        _trace_row(
+            evaluation_index=1,
+            run_id="real_001",
+            status="constraint_failed",
+            objective=3.0,
+        ),
+        _trace_row(
+            evaluation_index=2,
+            run_id="real_002",
+            status="feasible",
+            objective=1.0,
+        ),
+        _trace_row(
+            evaluation_index=3,
+            run_id="real_003",
+            status="real_check_failed",
+            objective=2.0,
+        ),
+    ]
+    project_dir = _write_accepted_optimizer_project(tmp_path, rows=rows)
+
+    _write_process_corner_aggregation_report(
+        project_dir,
+        run_id="real_001",
+        status="constraint_failed",
+        selected_corner="ss",
+        worst_corner="ss",
+        corner_objectives={"tt": 1.3, "ff": 1.8, "ss": 2.1},
+        corner_status_counts={"constraint_failed": 1, "succeeded": 2},
+        corner_metrics={
+            "tt": {"MAX_GAIN": 8.1, "NF_3G": 11.8},
+            "ff": {"MAX_GAIN": 7.7, "NF_3G": 12.0},
+            "ss": {"MAX_GAIN": 6.9, "NF_3G": 12.6},
+        },
+        child_statuses=[{"corner": "ss", "status": "constraint_failed"}],
+    )
+    _write_process_corner_aggregation_report(
+        project_dir,
+        run_id="real_002",
+        status="succeeded",
+        selected_corner="ff",
+        worst_corner="ff",
+        corner_objectives={"tt": 1.0, "ff": 2.5, "ss": 1.5},
+        corner_status_counts={"succeeded": 3},
+        corner_metrics={
+            "tt": {"MAX_GAIN": 8.0, "NF_3G": 11.9},
+            "ff": {"MAX_GAIN": 4.0, "NF_3G": 12.4},
+            "ss": {"MAX_GAIN": 9.0, "NF_3G": 11.7},
+        },
+        child_statuses=[
+            {"corner": "tt", "status": "succeeded"},
+            {"corner": "ff", "status": "succeeded"},
+            {"corner": "ss", "status": "succeeded"},
+        ],
+    )
+    _write_process_corner_aggregation_report(
+        project_dir,
+        run_id="real_003",
+        status="real_check_failed",
+        selected_corner="tt",
+        worst_corner="tt",
+        corner_objectives={"tt": 2.8, "ff": 1.9, "ss": 1.6},
+        corner_status_counts={"real_check_failed": 1, "succeeded": 2},
+        corner_metrics={
+            "tt": {"MAX_GAIN": 3.0, "NF_3G": 13.1},
+            "ff": {"MAX_GAIN": 7.0, "NF_3G": 12.2},
+            "ss": {"MAX_GAIN": 8.4, "NF_3G": 11.8},
+        },
+        child_statuses=[{"corner": "tt", "status": "real_check_failed"}],
+    )
+
+    report = generate_optimizer_insight_report(project_dir)
+
+    payload = json.loads(report.report_path.read_text(encoding="utf-8"))
+    summary = payload["process_corner_summary"]
+    assert summary["enabled"] is True
+    assert summary["constraint_policy"] == "all_corners"
+    assert summary["objective_policy"] == "worst_case"
+    assert summary["selected_corner"] == "ff"
+    assert summary["worst_corner"] == "ff"
+    assert summary["best_candidate_run_id"] == "real_002"
+    assert summary["best_candidate_corner_metrics"] == {
+        "tt": {"MAX_GAIN": 8.0, "NF_3G": 11.9},
+        "ff": {"MAX_GAIN": 4.0, "NF_3G": 12.4},
+        "ss": {"MAX_GAIN": 9.0, "NF_3G": 11.7},
+    }
+    assert summary["corner_objectives"] == {"tt": 1.0, "ff": 2.5, "ss": 1.5}
+    assert summary["corner_status_counts"] == {"succeeded": 3}
+    assert summary["failure_distribution"] == {"ss": 1, "tt": 1}
+
+    markdown = report.markdown_path.read_text(encoding="utf-8")
+    assert "## Process Corner Summary" in markdown
+    assert "- Constraint policy: `all_corners`" in markdown
+    assert "- Objective policy: `worst_case`" in markdown
+    assert "- Worst corner: `ff`" in markdown
+    assert "## Best Candidate Corner Metrics" in markdown
+    assert '- ff: {"MAX_GAIN": 4.0, "NF_3G": 12.4}' in markdown
+    assert "## Corner Failure Distribution" in markdown
+    assert "- ss: 1" in markdown
+    assert "- tt: 1" in markdown
+
+
+def _write_optimizer_effectiveness_audit(
+    project_dir: Path,
+    payload: dict[str, object] | None = None,
+) -> None:
+    audit_payload = payload or {
+        "schema_version": "1.0",
+        "backend": "openbox",
+        "requested_strategy": "openbox_prf_eic",
+        "resolved_strategy": {
+            "surrogate_type": "prf",
+            "acq_type": "eic",
+            "acq_optimizer_type": "local_random",
+            "initial_trials": 20,
+        },
+        "model_replay_evaluation_count": 40,
+        "batches": [
+            {
+                "batch_id": "batch_001",
+                "phase": "bo",
+                "history_size_before": 20,
+                "history_size_after": 40,
+                "feasible_count": 6,
+            }
+        ],
+    }
+    audit_path = project_dir / "reports" / "optimizer_effectiveness_audit.json"
+    audit_path.parent.mkdir(parents=True, exist_ok=True)
+    audit_path.write_text(
+        json.dumps(audit_payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
+def test_optimizer_insight_report_includes_effectiveness_audit(tmp_path: Path) -> None:
+    project_dir = _write_accepted_optimizer_project(tmp_path)
+    _write_optimizer_effectiveness_audit(project_dir)
+
+    report = generate_optimizer_insight_report(project_dir)
+    payload = json.loads(report.report_path.read_text(encoding="utf-8"))
+    markdown = report.markdown_path.read_text(encoding="utf-8")
+
+    assert payload["optimizer_effectiveness_audit"]["status"] == "available"
+    assert payload["optimizer_effectiveness_audit"]["requested_strategy"] == (
+        "openbox_prf_eic"
+    )
+    assert (
+        payload["optimizer_effectiveness_audit"]["resolved_strategy"][
+            "surrogate_type"
+        ]
+        == "prf"
+    )
+    assert (
+        payload["optimizer_effectiveness_audit"]["model_replay_evaluation_count"]
+        == 40
+    )
+    assert "Optimizer effectiveness audit" in markdown
+    assert "optimizer_effectiveness_audit.json" in markdown
+
+
+def test_optimizer_insight_report_marks_invalid_effectiveness_audit_not_available(
+    tmp_path: Path,
+) -> None:
+    project_dir = _write_accepted_optimizer_project(tmp_path)
+    audit_path = project_dir / "reports" / "optimizer_effectiveness_audit.json"
+    audit_path.write_text("{not-json", encoding="utf-8")
+
+    report = generate_optimizer_insight_report(project_dir)
+    payload = json.loads(report.report_path.read_text(encoding="utf-8"))
+    markdown = report.markdown_path.read_text(encoding="utf-8")
+
+    assert payload["optimizer_effectiveness_audit"]["status"] == "not_available"
+    assert "invalid JSON" in payload["optimizer_effectiveness_audit"]["reason"]
+    assert "Optimizer effectiveness audit" in markdown

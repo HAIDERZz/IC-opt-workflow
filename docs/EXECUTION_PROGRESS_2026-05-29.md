@@ -1,5 +1,55 @@
 # Execution Progress 2026-05-29
 
+> Historical command notice: command examples in this progress log may show old
+> workload/resource CLI flags. Current release product first runs read those
+> values only from `opt_requirement.md`; only `ic-opt PROJECT --real --continue N`
+> remains as a product CLI budget delta.
+
+## C-76/C-77 Development Package Alignment 2026-06-13
+
+current_scope: C-76/C-77 Development-Package Alignment.
+
+The development/release-package rule is now explicit in `AGENTS.md`: implement and verify in `ic-auto-opt-workflow` first; use `ic-auto-opt-workflow-v0.1` only as the release/package synchronization target after verification.
+
+C-76 multi-corner implementation from `ic-auto-opt-workflow-v0.1` has been merged back into the development package and aligned with C-77 optimizer modes/effectiveness audit. Key synchronized gaps fixed in the development package: `result_handoff.ResultManifest` accepts C-76 `testbench_id`/`corner_id`, `tools/run_spectre_ocean_adapter.py` forwards `--corner-id`, multi-corner templates include the C-77 recommended strategies, and tracked `vendor/TuRBO` plus `vendor/open-box` are present for product-local optimizer imports.
+
+Verification run in `ic-auto-opt-workflow`: C-76 targeted pytest suite exit code 0; C-77 targeted pytest suite exit code 0; full pytest exit code 0; `rtk proxy ./.venv/bin/python -m ruff check src tests` passed; `rtk proxy ./.venv/bin/python tools/check_development_cadence.py` passed; `rtk proxy git diff --check` passed; stale fail-closed `process_corners` guard search over `src tests tools` returned no matches.
+
+Remaining gap: no fresh live Cadence/Spectre/OCEAN multi-corner practice run has been executed after this alignment. Do not report real multi-corner optimizer effectiveness until that development-package real route is run and inspected.
+
+## C-77 Optimizer Algorithm Modes + Effectiveness Audit Implementation 2026-06-13
+
+C-77 is implemented and verified-only. The change keeps the existing optimizer architecture and adds selectable strategy presets plus runtime audit evidence instead of rewriting candidate evaluation.
+
+Delivered:
+- `openbox_auto`, `openbox_gp_eic`, `openbox_prf_eic`, `turbo_trust_region`, and `random_baseline` strategy presets.
+- OpenBox requested/resolved strategy reporting and advanced override compatibility.
+- Native TuRBO strategy routing through the existing native runner.
+- Random baseline through the existing OpenBox evaluator boundary.
+- `reports/optimizer_effectiveness_audit.json` with batch phase, history size, successful observations, feasible count, best objective, best feasible, duplicate replacement, and continuation replay metadata.
+- Product CLI, remote flow, task package, insight report, status, templates, and user docs surfaced the strategy/audit contract.
+
+Verification:
+
+```text
+rtk proxy ./.venv/bin/python -m pytest tests/test_optimizer_strategy.py tests/test_optimizer_effectiveness.py tests/test_openbox_backend.py tests/test_native_turbo.py tests/test_optimizer_flow.py tests/test_remote_optimizer_flow.py tests/test_optimizer_task_package.py tests/test_optimizer_insights.py tests/test_product_cli.py -q
+117 passed
+rtk proxy ./.venv/bin/python -m pytest tests/test_requirement_intake.py tests/test_schemas.py tests/test_validate.py -q
+75 passed
+rtk proxy ./.venv/bin/python -m pytest tests/test_netlists.py tests/test_package.py tests/test_cli.py -q
+54 passed
+rtk proxy ./.venv/bin/python -m ruff check src tests
+All checks passed
+rtk proxy ./.venv/bin/python tools/check_development_cadence.py
+development cadence check passed
+rtk git diff --check
+passed
+```
+
+Route audit: no Spectre/OCEAN adapter semantics, OCEAN formulas, PSF parsing, multi-testbench aggregation, `parallel_jobs` semantics, or release-package files were changed.
+
+Follow-up verification fixed config-entry gaps where OpenBox fake/real paths honored explicit function overrides but ignored `optimizer.yaml` strategy presets, and top-level optimize/remote/package routing ignored config-only `turbo_trust_region`; regression tests now cover config-file strategy presets across OpenBox fake/real, optimize, remote first-run TuRBO adapter injection, and optimizer task package routing. Post-feedback correction: requirement intake now writes `config/process_corners.yaml`; templates include nominal and explicit multi-corner examples. Explicit multi-corner requirements are parsed and written but fail closed until corner-aware execution and aggregation consume `process_corners.yaml`. Do not claim multi-corner optimizer execution is effective until that path is implemented and verified.
+
 This note preserves the implementation state for continuing Plan A after context compaction or quota reset.
 
 ## Repository State
@@ -10,18 +60,17 @@ This note preserves the implementation state for continuing Plan A after context
 - Baseline commit: `885e97f docs: capture workflow planning baseline`
 - Latest C-3 code commit before docs-only cleanup: `edb107f fix: harden preflight readiness gates`; docs cleanup continues through current HEAD
 - Active plan: `docs/superpowers/plans/2026-05-28-ic-auto-opt-workflow-execution-plan.md`
-- Current scope: C-70 Remote Spectre/OCEAN Local-Parity Design
-- current_scope: C-70 Remote Spectre/OCEAN Local-Parity Design
-- current_scope_exact: C-70 Remote Spectre/OCEAN Local-Parity Design
-- Current status: C-70 is complete and accepted. Remote Spectre/OCEAN now
-  reuses canonical local argv wrappers, captures and uploads command
-  diagnostics from runner stdout/stderr instead of csh redirection, validates
-  required remote artifacts, delegates manifest semantics to local helpers,
-  preserves multi-testbench routing, and has passed both local/unit parity and
-  real remote SSH/Spectre/OCEAN acceptance.
-- Active plan: `docs/superpowers/plans/2026-06-08-remote-spectre-ocean-local-parity.md`
-- Next allowed action: C-70 is complete. Keep future remote work product-narrow:
-  release/docs sync for SSH mode or the next concrete user-facing feedback item.
+- Current scope: C-77 Optimizer Algorithm Modes + Effectiveness Audit Planning
+- current_scope: C-77 Optimizer Algorithm Modes + Effectiveness Audit Planning
+- current_scope_exact: C-77 Optimizer Algorithm Modes + Effectiveness Audit Planning
+- Current status: C-77 algorithm background, design spec, and implementation
+  plan are drafted after completed multi-corner support. No optimizer code has
+  been changed for C-77 yet.
+- Active spec: `docs/superpowers/specs/2026-06-13-optimizer-algorithm-modes-effectiveness-audit-design.md`
+- Active plan: `docs/superpowers/plans/2026-06-13-optimizer-algorithm-modes-effectiveness-audit.md`
+- Next allowed action: Review C-77 algorithm background, design spec, and
+  implementation plan with the user. Do not implement C-77 optimizer code until
+  the user explicitly confirms the plan.
 - Execution method: `superpowers:subagent-driven-development`
 - Dependencies installed in active Python environment on 2026-05-29: `pytest`, `typer`, `pydantic`, `PyYAML`, `ruff`
 

@@ -11,7 +11,7 @@ from hermes_workflow.schemas import (
     ProjectConfig,
     SpectreConfig,
     SpectrePreset,
-    TestbenchesConfig,
+    TestbenchesConfig as BenchesConfigModel,
     VariablesConfig,
 )
 
@@ -86,6 +86,14 @@ def test_spectre_rejects_non_spectre_x_engine() -> None:
         SpectreConfig.model_validate(payload)
 
 
+def test_spectre_rejects_psfascii_output_format() -> None:
+    payload = load_yaml("spectre.yaml")
+    payload["spectre"]["output_format"] = "psfascii"
+
+    with pytest.raises(ValidationError, match="psfxl"):
+        SpectreConfig.model_validate(payload)
+
+
 @pytest.mark.parametrize(
     ("field", "value"),
     [
@@ -128,6 +136,15 @@ def test_optimizer_rejects_numeric_boolean_literal() -> None:
         OptimizerConfig.model_validate(payload)
 
 
+def test_optimizer_rejects_non_string_strategy_as_validation_error() -> None:
+    payload = load_yaml("optimizer.yaml")
+    payload["optimizer"]["algorithm"] = "openbox"
+    payload["optimizer"]["strategy"] = 1
+
+    with pytest.raises(ValidationError, match="optimizer.strategy must be a string"):
+        OptimizerConfig.model_validate(payload)
+
+
 def test_optimizer_accepts_cpu_thread_limit() -> None:
     payload = load_yaml("optimizer.yaml")
     payload["optimizer"]["optimizer_cpu_threads"] = 3
@@ -152,6 +169,59 @@ def test_optimizer_accepts_openbox_algorithm() -> None:
     optimizer = OptimizerConfig.model_validate(payload)
 
     assert optimizer.optimizer.algorithm is OptimizerAlgorithm.OPENBOX
+
+
+def test_optimizer_accepts_openbox_strategy_settings() -> None:
+    payload = load_yaml("optimizer.yaml")
+    payload["optimizer"]["algorithm"] = "openbox"
+    payload["optimizer"]["strategy"] = "openbox_gp_eic"
+    payload["optimizer"]["openbox"] = {
+        "surrogate_type": "gp",
+        "acq_type": "eic",
+        "acq_optimizer_type": "random_scipy",
+        "initial_trials": "auto",
+    }
+
+    optimizer = OptimizerConfig.model_validate(payload)
+
+    assert optimizer.optimizer.strategy.value == "openbox_gp_eic"
+    assert optimizer.optimizer.openbox is not None
+    assert optimizer.optimizer.openbox.initial_trials == "auto"
+
+
+def test_optimizer_accepts_turbo_strategy_settings() -> None:
+    payload = load_yaml("optimizer.yaml")
+    payload["optimizer"]["strategy"] = "turbo_trust_region"
+    payload["optimizer"]["turbo"] = {
+        "snap_to_step": True,
+        "duplicate_handling": "resample",
+    }
+
+    optimizer = OptimizerConfig.model_validate(payload)
+
+    assert optimizer.optimizer.strategy.value == "turbo_trust_region"
+    assert optimizer.optimizer.turbo is not None
+    assert optimizer.optimizer.turbo.duplicate_handling == "resample"
+
+
+def test_optimizer_rejects_incompatible_strategy_for_algorithm() -> None:
+    payload = load_yaml("optimizer.yaml")
+    payload["optimizer"]["strategy"] = "openbox_gp_eic"
+
+    with pytest.raises(
+        ValidationError,
+        match="optimizer.strategy openbox_gp_eic requires optimizer.algorithm=openbox",
+    ):
+        OptimizerConfig.model_validate(payload)
+
+
+def test_optimizer_rejects_openbox_eic_strategy_alias() -> None:
+    payload = load_yaml("optimizer.yaml")
+    payload["optimizer"]["algorithm"] = "openbox"
+    payload["optimizer"]["strategy"] = "openbox_eic"
+
+    with pytest.raises(ValidationError, match="eic is an acquisition function"):
+        OptimizerConfig.model_validate(payload)
 
 
 def test_testbenches_config_rejects_duplicate_ids() -> None:
@@ -182,4 +252,4 @@ def test_testbenches_config_rejects_duplicate_ids() -> None:
     }
 
     with pytest.raises(ValidationError, match="testbench ids must be unique"):
-        TestbenchesConfig.model_validate(payload)
+        BenchesConfigModel.model_validate(payload)

@@ -1,5 +1,10 @@
 # Agent Full E2E Real Optimizer Simulation 2026-06-07
 
+> Historical command notice: command examples in this evidence note may show
+> old workload/resource CLI flags. Current release product first runs read those
+> values only from `opt_requirement.md`; only `ic-opt PROJECT --real --continue N`
+> remains as a product CLI budget delta.
+
 Status: complete, verified-only, stopped for user review.
 
 This simulation tested the complete user -> supervisor agent -> execution agent

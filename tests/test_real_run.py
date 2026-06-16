@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 import pytest
+import yaml
 
 from hermes_workflow import real_run
 from hermes_workflow.approvals import decide_first_real_run
@@ -18,6 +19,7 @@ from hermes_workflow.real_run import prepare_real_run
 from hermes_workflow.requirement_intake import prepare_from_requirement
 from tests.report_helpers import write_pass_reports
 from tests.test_requirement_intake import _copy_multi_testbench_requirement_project
+from tests.test_spectre_ocean_adapter import _create_ready_corner_project
 
 
 TEMPLATE_TEXT = """simulator lang=spectre
@@ -46,6 +48,67 @@ def _approve_project(project_dir: Path) -> None:
         created_at_utc="2026-05-31T00:10:00Z",
     )
     assert instruction["decision"] == "approve_first_real_run"
+
+
+def _write_process_corners_config(
+    project_dir: Path,
+    corner_ids: list[str],
+    *,
+    objective_policy: str = "worst_case",
+    constraint_policy: str = "all_corners",
+) -> None:
+    lines = [
+        'schema_version: "1.0"',
+        f"objective_policy: {objective_policy}",
+        f"constraint_policy: {constraint_policy}",
+        "corners:",
+    ]
+    for corner_id in corner_ids:
+        lines.extend(
+            [
+                f"  - id: {corner_id}",
+                f"    description: {corner_id} corner",
+            ]
+        )
+    (project_dir / "config" / "process_corners.yaml").write_text(
+        "\n".join(lines) + "\n",
+        encoding="utf-8",
+    )
+
+
+def _write_single_testbench_corner_templates(
+    project_dir: Path,
+    corner_ids: list[str],
+) -> None:
+    _write_template(project_dir)
+    template_text = (
+        project_dir / "netlists" / "templates" / "template.scs"
+    ).read_text(encoding="utf-8")
+    for corner_id in corner_ids:
+        corner_template = (
+            project_dir / "netlists" / "corners" / corner_id / "template.scs"
+        )
+        corner_template.parent.mkdir(parents=True, exist_ok=True)
+        corner_template.write_text(template_text, encoding="utf-8")
+
+
+def _create_ready_single_testbench_corner_project(
+    tmp_path: Path,
+    *,
+    corner_ids: list[str],
+    objective_policy: str = "worst_case",
+    constraint_policy: str = "all_corners",
+) -> Path:
+    project_dir = _create_project(tmp_path)
+    _write_process_corners_config(
+        project_dir,
+        corner_ids,
+        objective_policy=objective_policy,
+        constraint_policy=constraint_policy,
+    )
+    _write_single_testbench_corner_templates(project_dir, corner_ids)
+    _approve_project(project_dir)
+    return project_dir
 
 
 def _load_json(path: Path) -> dict:
@@ -256,13 +319,35 @@ def test_prepare_real_run_writes_first_real_run_package(tmp_path: Path) -> None:
         "preset": "ax",
         "output_format": "psfxl",
         "threads_per_run": 10,
-        "parallel_jobs": 10,
         "timeout_s": 3600,
     }
     assert "modify_maestro_setup" in manifest["forbidden_actions"]
     assert not (project_dir / "ledger" / "experiment_ledger.jsonl").exists()
     assert not (project_dir / "state" / "optimizer_state.json").exists()
     assert not (project_dir / "state" / "best_candidate.json").exists()
+
+
+def test_prepare_real_run_omits_parallel_jobs_from_spectre_runtime_contract(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_project(tmp_path)
+    _approve_project(project_dir)
+    _write_template(project_dir)
+
+    prepare_real_run(project_dir, created_at_utc="2026-06-13T00:20:00Z")
+
+    run_dir = project_dir / "runs" / "real" / "real_001"
+    manifest = _load_json(run_dir / "real_run_manifest.json")
+
+    assert "parallel_jobs" not in manifest["spectre"]
+    assert manifest["spectre"]["threads_per_run"] == 10
+    assert manifest["spectre"]["timeout_s"] == 3600
+
+    spectre_yaml = yaml.safe_load(
+        (project_dir / "config" / "spectre.yaml").read_text(encoding="utf-8")
+    )
+    assert "parallel_jobs" in spectre_yaml["spectre"]
+    assert spectre_yaml["spectre"]["parallel_jobs"] == 10
 
 
 def test_prepare_real_run_copies_exported_netlist_sidecars(tmp_path: Path) -> None:
@@ -352,7 +437,6 @@ def test_prepare_real_run_writes_metric_extraction_request(tmp_path: Path) -> No
         "preset": "ax",
         "output_format": "psfxl",
         "threads_per_run": 10,
-        "parallel_jobs": 10,
         "timeout_s": 3600,
     }
     assert request["ocean"] == {
@@ -385,6 +469,24 @@ def test_prepare_real_run_writes_metric_extraction_request(tmp_path: Path) -> No
     assert manifest["metric_extraction_request_sha256"] == sha256_file(request_path)
 
 
+def test_metric_request_omits_parallel_jobs_from_spectre_runtime_contract(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_project(tmp_path)
+    _approve_project(project_dir)
+    _write_template(project_dir)
+
+    prepare_real_run(project_dir, created_at_utc="2026-06-13T00:20:00Z")
+
+    run_dir = project_dir / "runs" / "real" / "real_001"
+    request = _load_json(run_dir / "metric_extraction_request.json")
+
+    assert "parallel_jobs" not in request["spectre"]
+    assert request["spectre"]["output_format"] == "psfxl"
+    assert request["spectre"]["threads_per_run"] == 10
+    assert request["spectre"]["timeout_s"] == 3600
+
+
 def test_prepare_real_run_writes_multi_testbench_child_packages(tmp_path: Path) -> None:
     project_dir = _copy_multi_testbench_requirement_project(tmp_path)
     assert prepare_from_requirement(project_dir).status == "pass"
@@ -400,11 +502,13 @@ def test_prepare_real_run_writes_multi_testbench_child_packages(tmp_path: Path) 
         "IIP3",
     ]
     for testbench_id, metric_name in (("cg_nf", "MAX_GAIN"), ("iip3", "IIP3")):
-        child_dir = run_dir / "testbenches" / testbench_id
+        child_dir = run_dir / "testbenches" / testbench_id / "corners" / "nominal"
         child_input = child_dir / "netlist" / "input.scs"
         child_manifest = _load_json(child_dir / "real_run_manifest.json")
         child_request = _load_json(child_dir / "metric_extraction_request.json")
-        child_prefix = f"runs/real/real_001/testbenches/{testbench_id}"
+        child_prefix = (
+            f"runs/real/real_001/testbenches/{testbench_id}/corners/nominal"
+        )
 
         assert child_input.exists()
         assert (child_dir / "netlist" / "ade_e.scs").exists()
@@ -412,7 +516,7 @@ def test_prepare_real_run_writes_multi_testbench_child_packages(tmp_path: Path) 
         assert child_manifest["candidate_id"] == "real_001"
         assert child_manifest["testbench_id"] == testbench_id
         assert child_manifest["template_scs"] == (
-            f"netlists/testbenches/{testbench_id}/templates/template.scs"
+            f"netlists/testbenches/{testbench_id}/corners/nominal/template.scs"
         )
         assert child_manifest["rendered_input_scs"] == (
             f"{child_prefix}/netlist/input.scs"
@@ -470,14 +574,10 @@ def test_prepare_real_run_requires_ocean_ready_spectre_format(tmp_path: Path) ->
         ),
         encoding="utf-8",
     )
-    _approve_project(project_dir)
     _write_template(project_dir)
 
-    with pytest.raises(
-        ValueError,
-        match="spectre.output_format must be OCEAN-ready for metric extraction: psfascii",
-    ):
-        prepare_real_run(project_dir)
+    with pytest.raises(ValueError, match="spectre.output_format"):
+        _approve_project(project_dir)
 
     assert not (project_dir / "runs" / "real" / "real_001").exists()
 
@@ -635,3 +735,118 @@ def test_prepare_real_run_cleans_partial_run_directory_on_manifest_write_failure
         prepare_real_run(project_dir, created_at_utc="2026-05-31T00:20:00Z")
 
     assert not (project_dir / "runs" / "real" / "real_001").exists()
+
+
+def test_prepare_real_run_produces_corner_aware_package(tmp_path: Path) -> None:
+    project_dir = _create_ready_corner_project(tmp_path)
+
+    package = prepare_real_run(
+        project_dir,
+        testbench_id="iip3",
+        corner_id="ff",
+        created_at_utc="2026-06-06T00:20:00Z",
+    )
+
+    corner_dir = (
+        project_dir
+        / "runs"
+        / "real"
+        / "real_001"
+        / "testbenches"
+        / "iip3"
+        / "corners"
+        / "ff"
+    )
+    assert package.run_id == "real_001"
+    assert package.run_dir == corner_dir
+    assert package.testbench_id == "iip3"
+    assert package.corner_id == "ff"
+    assert package.rendered_input_scs == corner_dir / "netlist" / "input.scs"
+    assert package.manifest_path == corner_dir / "real_run_manifest.json"
+    assert package.metric_request_path == corner_dir / "metric_extraction_request.json"
+    assert (corner_dir / "netlist" / "input.scs").exists()
+    assert (corner_dir / "real_run_manifest.json").exists()
+    manifest = _load_json(corner_dir / "real_run_manifest.json")
+    assert manifest["testbench_id"] == "iip3"
+    assert manifest["corner_id"] == "ff"
+
+
+def test_prepare_real_run_produces_single_testbench_corner_aware_package(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_single_testbench_corner_project(
+        tmp_path,
+        corner_ids=["tt", "ff", "ss"],
+    )
+
+    package = prepare_real_run(
+        project_dir,
+        corner_id="ss",
+        created_at_utc="2026-06-13T00:20:00Z",
+    )
+
+    corner_dir = project_dir / "runs" / "real" / "real_001" / "corners" / "ss"
+    assert package.run_id == "real_001"
+    assert package.testbench_id is None
+    assert package.corner_id == "ss"
+    assert package.rendered_input_scs == corner_dir / "netlist" / "input.scs"
+    assert package.manifest_path == corner_dir / "real_run_manifest.json"
+    assert package.metric_request_path == corner_dir / "metric_extraction_request.json"
+
+
+def test_prepare_real_run_creates_single_testbench_multi_corner_children(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_single_testbench_corner_project(
+        tmp_path,
+        corner_ids=["tt", "ff", "ss"],
+    )
+
+    prepare_real_run(project_dir, created_at_utc="2026-06-13T00:20:00Z")
+
+    for corner_id in ("tt", "ff", "ss"):
+        child_dir = project_dir / "runs" / "real" / "real_001" / "corners" / corner_id
+        assert (child_dir / "real_run_manifest.json").is_file()
+        assert (child_dir / "metric_extraction_request.json").is_file()
+        assert (child_dir / "netlist" / "input.scs").is_file()
+
+
+def test_prepare_real_run_preserves_explicit_single_corner_child_package(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_single_testbench_corner_project(
+        tmp_path,
+        corner_ids=["ss"],
+    )
+
+    prepare_real_run(project_dir, created_at_utc="2026-06-13T00:20:00Z")
+
+    ss_dir = project_dir / "runs" / "real" / "real_001" / "corners" / "ss"
+    assert (ss_dir / "real_run_manifest.json").is_file()
+    assert not (
+        project_dir / "runs" / "real" / "real_001" / "corners" / "nominal"
+    ).exists()
+
+
+def test_prepare_real_run_corner_without_testbench_raises(tmp_path: Path) -> None:
+    project_dir = _create_ready_corner_project(tmp_path)
+
+    with pytest.raises(ValueError, match="corner_id requires testbench_id"):
+        prepare_real_run(
+            project_dir,
+            corner_id="ff",
+            created_at_utc="2026-06-06T00:20:00Z",
+        )
+
+
+def test_real_run_package_defaults_testbench_and_corner_to_none(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_project(tmp_path)
+    _approve_project(project_dir)
+    _write_template(project_dir)
+
+    package = prepare_real_run(project_dir, created_at_utc="2026-06-02T00:20:00Z")
+
+    assert package.testbench_id is None
+    assert package.corner_id is None

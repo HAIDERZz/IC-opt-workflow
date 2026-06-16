@@ -16,6 +16,7 @@ from hermes_workflow.optimizer_artifacts import (
     EVALUATIONS_RELATIVE as OPTIMIZER_EVALUATIONS_RELATIVE,
 )
 from hermes_workflow.optimizer_artifacts import REPORT_RELATIVE as OPTIMIZER_REPORT_RELATIVE
+from hermes_workflow.optimizer_strategy import OptimizerStrategyName
 from hermes_workflow.real_result_record import LEDGER_PATH, OPTIMIZER_STATE_PATH
 from hermes_workflow.validate import assert_valid_project
 
@@ -28,12 +29,14 @@ DEFAULT_OPENBOX_EXECUTION_VENV = "/tmp/ic_auto_opt_openbox_spike/.venv"
 NATIVE_TURBO_REQUIRED_RETURNED_ARTIFACTS = [
     str(NATIVE_TURBO_REPORT_RELATIVE),
     str(NATIVE_TURBO_EVALUATIONS_RELATIVE),
+    "reports/optimizer_effectiveness_audit.json",
     OPTIMIZER_STATE_PATH,
     LEDGER_PATH,
 ]
 OPENBOX_REQUIRED_RETURNED_ARTIFACTS = [
     str(OPTIMIZER_REPORT_RELATIVE),
     str(OPTIMIZER_EVALUATIONS_RELATIVE),
+    "reports/optimizer_effectiveness_audit.json",
     OPTIMIZER_STATE_PATH,
     LEDGER_PATH,
 ]
@@ -47,6 +50,29 @@ SUPERVISOR_CLOSEOUT_ARTIFACTS = [
 ]
 
 
+def _effective_strategy_value(
+    optimizer_settings: object,
+    strategy: str | None,
+) -> str | None:
+    if strategy is not None:
+        return OptimizerStrategyName.from_user_value(strategy).value
+    configured_strategy = getattr(optimizer_settings, "strategy", None)
+    if configured_strategy is None:
+        return None
+    return OptimizerStrategyName.from_user_value(configured_strategy).value
+
+
+def _backend_for_effective_strategy(backend: str, strategy: str | None) -> str:
+    if strategy is None:
+        return backend
+    strategy_name = OptimizerStrategyName.from_user_value(strategy)
+    return (
+        NATIVE_TURBO_BACKEND
+        if strategy_name is OptimizerStrategyName.TURBO_TRUST_REGION
+        else OPENBOX_BACKEND
+    )
+
+
 @dataclass(frozen=True)
 class OptimizerExecutionTaskPackage:
     task_path: Path
@@ -57,24 +83,27 @@ class OptimizerExecutionTaskPackage:
 def build_optimizer_execution_task_package(
     project_dir: Path,
     *,
-    max_evals: int | None,
-    additional_evals: int | None = None,
     cadence_cshrc: Path,
     parallel: bool = True,
     optimizer_backend: str = NATIVE_TURBO_BACKEND,
+    strategy: str | None = None,
     continuation: bool = False,
     created_at_utc: str | None = None,
 ) -> OptimizerExecutionTaskPackage:
     project_dir = Path(project_dir).resolve()
     cadence_cshrc = Path(cadence_cshrc).expanduser().resolve()
     backend = _normalize_backend(optimizer_backend)
+    bundle = assert_valid_project(project_dir)
+    effective_strategy = _effective_strategy_value(bundle.optimizer.optimizer, strategy)
+    backend = _backend_for_effective_strategy(backend, effective_strategy)
+    max_evals = bundle.optimizer.optimizer.max_evaluations
+    additional_evals = None
     _validate_budget(
         backend=backend,
         max_evals=max_evals,
         additional_evals=additional_evals,
         continuation=continuation,
     )
-    bundle = assert_valid_project(project_dir)
     execution_dir = project_dir / "execution_package"
     execution_dir.mkdir(parents=True, exist_ok=True)
 
@@ -83,21 +112,24 @@ def build_optimizer_execution_task_package(
     parallel_jobs = spectre.parallel_jobs if parallel else 1
     command = _command(
         project_dir,
-        max_evals,
-        additional_evals,
         cadence_cshrc,
         parallel,
         backend=backend,
         batch_size=batch_size,
         parallel_jobs=parallel_jobs,
         continuation=continuation,
+        strategy=effective_strategy,
     )
     spectre_settings = {
         "preset": spectre.preset.value,
         "threads_per_run": spectre.threads_per_run,
-        "parallel_jobs": spectre.parallel_jobs,
         "output_format": spectre.output_format,
         "timeout_s": spectre.timeout_s,
+    }
+    scheduler_settings = {
+        "candidate_parallelism": parallel_jobs,
+        "batch_size": batch_size,
+        "inside_candidate_execution": "serial",
     }
     audit_commands = [
         ["hermes-workflow", "check-optimizer-run", str(project_dir)],
@@ -116,11 +148,13 @@ def build_optimizer_execution_task_package(
         "max_evals": max_evals,
         "additional_evals": additional_evals,
         "continuation": continuation,
+        "strategy": effective_strategy,
         "parallel": parallel,
         "batch_size": batch_size,
         "parallel_jobs": parallel_jobs,
         "cadence_cshrc": str(cadence_cshrc),
         "spectre_settings": spectre_settings,
+        "scheduler": scheduler_settings,
         "required_returned_artifacts": _required_returned_artifacts(backend),
         "toolchain_check_command": _toolchain_check_command(backend, cadence_cshrc),
     }
@@ -159,16 +193,14 @@ def _validate_budget(
 ) -> None:
     if continuation and backend != OPENBOX_BACKEND:
         raise ValueError("continuation is only supported for the openbox backend")
-    if continuation:
-        if additional_evals is None:
-            raise ValueError("additional_evals is required for continuation")
-        if additional_evals < 1:
-            raise ValueError("additional_evals must be >= 1")
-        return
     if max_evals is None:
         raise ValueError("max_evals is required")
     if max_evals < 1:
         raise ValueError("max_evals must be >= 1")
+    if continuation:
+        if additional_evals is not None:
+            raise ValueError("additional_evals is no longer accepted for continuation")
+        return
     if additional_evals is not None:
         raise ValueError("additional_evals is only valid for continuation")
 
@@ -197,8 +229,6 @@ def _toolchain_check_command(backend: str, cadence_cshrc: Path) -> list[str] | N
 
 def _command(
     project_dir: Path,
-    max_evals: int | None,
-    additional_evals: int | None,
     cadence_cshrc: Path,
     parallel: bool,
     *,
@@ -206,23 +236,20 @@ def _command(
     batch_size: int,
     parallel_jobs: int,
     continuation: bool,
+    strategy: str | None,
 ) -> list[str]:
     if backend == OPENBOX_BACKEND:
         if continuation:
             command = ["hermes-workflow", "continue-openbox-real", str(project_dir)]
-            command.extend(["--additional-evals", str(additional_evals)])
         else:
             command = ["hermes-workflow", "run-openbox-real", str(project_dir)]
-            command.extend(["--max-evals", str(max_evals)])
-        command.extend(["--batch-size", str(batch_size)])
-        if not continuation:
-            command.extend(["--parallel-jobs", str(parallel_jobs)])
+        if strategy:
+            command.extend(["--strategy", strategy])
         command.extend(["--cadence-cshrc", str(cadence_cshrc)])
         return command
 
     command = ["hermes-workflow", "run-native-turbo", str(project_dir)]
     command.append("--parallel" if parallel else "--sequential")
-    command.extend(["--max-evals", str(max_evals)])
     command.extend(["--cadence-cshrc", str(cadence_cshrc)])
     return command
 
@@ -234,6 +261,7 @@ def _render_task(payload: dict) -> str:
         for audit_command in payload["audit_commands"]
     )
     settings = payload["spectre_settings"]
+    scheduler = payload["scheduler"]
     artifacts = "\n".join(
         f"- `{artifact}`" for artifact in payload["required_returned_artifacts"]
     )
@@ -241,11 +269,18 @@ def _render_task(payload: dict) -> str:
     continuation_note = _continuation_note(payload)
     toolchain_gate = _toolchain_gate(payload)
     execution_environment = _execution_environment(payload)
+    strategy_note = (
+        f"Requested optimizer strategy: `{payload['strategy']}`\n"
+        "Do not silently switch optimizer backend.\n"
+        if payload.get("strategy")
+        else ""
+    )
     return f"""# Optimizer Execution Agent Task
 
 Project: `{payload["project_name"]}`
 Project directory: `{payload["project_dir"]}`
 Created at UTC: `{payload["created_at_utc"]}`
+{strategy_note}
 {toolchain_gate}
 {execution_environment}
 
@@ -273,9 +308,18 @@ Run these after optimizer execution:
 
 - `preset`: `{settings["preset"]}`
 - `threads_per_run`: `{settings["threads_per_run"]}`
-- `parallel_jobs`: `{settings["parallel_jobs"]}`
 - `output_format`: `{settings["output_format"]}`
 - `timeout_s`: `{settings["timeout_s"]}`
+
+## Scheduler Settings
+
+Scheduler parallelism controls how many optimizer candidates run concurrently.
+Testbenches and corners inside one candidate always run serially; this is not a
+Spectre child-runtime knob.
+
+- `candidate_parallelism`: `{scheduler["candidate_parallelism"]}` (parallel_jobs)
+- `batch_size`: `{scheduler["batch_size"]}`
+- `inside_candidate_execution`: `{scheduler["inside_candidate_execution"]}`
 
 ## Required Returned Artifacts
 

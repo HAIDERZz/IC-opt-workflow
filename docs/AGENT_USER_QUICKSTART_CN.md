@@ -140,6 +140,20 @@ execution_package/
 
 ## opt_requirement.md 写什么
 
+当前产品合同：初次真实优化的机器关键变量只能来自 `opt_requirement.md` / 生成的
+config，包括 `max_evaluations`、`batch_size`、`parallel_jobs`、
+`threads_per_run`、`optimizer_cpu_threads`、optimizer strategy、
+initialization、output format、保留策略、metric 公式、约束和多工艺角设置。
+不要在 `ic-opt PROJECT --real` 后追加 `--max-evals`、`--batch-size`、
+`--parallel-jobs`、`--threads` 或 `--strategy`。续跑只保留一个命令行入口：
+`ic-opt PROJECT --real --continue N`，表示追加 N 个评估点，其余配置仍从项目
+requirement/config 继承。
+
+多工艺角通过 `opt_requirement.md` 的 `Process Corners` 配置，不存在
+`--multi-corner` CLI 开关。示例见
+`examples/spectre_maestro_project/opt_requirement.multi_corner.md` 和
+`examples/spectre_maestro_project/opt_requirement.multi_tb_corner.md`。
+
 `opt_requirement.md` 是机器要读的正式需求文件，不是聊天记录。
 
 它要包含：

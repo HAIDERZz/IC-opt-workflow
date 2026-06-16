@@ -1,5 +1,10 @@
 # C-34 Production OpenBox Handoff Dependency Blocker
 
+> Historical command notice: command examples in this debug note may show old
+> workload/resource CLI flags. Current release product first runs read those
+> values only from `opt_requirement.md`; only `ic-opt PROJECT --real --continue N`
+> remains as a product CLI budget delta.
+
 Date: 2026-06-05
 
 ## Scope

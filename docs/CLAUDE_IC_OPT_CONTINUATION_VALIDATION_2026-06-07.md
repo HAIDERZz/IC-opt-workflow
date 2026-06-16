@@ -1,5 +1,10 @@
 # Claude /ic-opt Continuation Validation 2026-06-07
 
+> Historical command notice: command examples in this evidence note may show
+> old workload/resource CLI flags. Current release product first runs read those
+> values only from `opt_requirement.md`; only `ic-opt PROJECT --real --continue N`
+> remains as a product CLI budget delta.
+
 Status: verified-only.
 
 This note records a real product-landing validation using the current Claude

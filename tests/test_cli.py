@@ -1,8 +1,10 @@
 import json
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
+from hermes_workflow import __version__
 from hermes_workflow.cli import app
 from tests.report_helpers import write_pass_reports
 
@@ -14,7 +16,173 @@ def test_cli_version_prints_package_version() -> None:
     result = runner.invoke(app, ["--version"])
 
     assert result.exit_code == 0
-    assert "0.1.0" in result.stdout
+    assert __version__ in result.stdout
+
+
+@pytest.mark.parametrize(
+    ("flag", "value"),
+    [
+        ("--max-evals", "1"),
+        ("--batch-size", "1"),
+        ("--parallel-jobs", "1"),
+    ],
+)
+def test_optimize_command_rejects_cli_workload_resource_overrides(
+    tmp_path: Path, flag: str, value: str
+) -> None:
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    cadence_cshrc = tmp_path / "cadence.csh"
+    cadence_cshrc.write_text("# test\n", encoding="utf-8")
+
+    result = runner.invoke(
+        app,
+        [
+            "optimize",
+            str(project_dir),
+            "--real",
+            "--dry-orchestration",
+            "--cadence-cshrc",
+            str(cadence_cshrc),
+            flag,
+            value,
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert "No such option" in result.output
+
+
+@pytest.mark.parametrize(
+    ("flag", "value"),
+    [
+        ("--max-evals", "1"),
+        ("--batch-size", "1"),
+        ("--parallel-jobs", "1"),
+    ],
+)
+def test_run_openbox_real_rejects_cli_workload_resource_overrides(
+    tmp_path: Path, flag: str, value: str
+) -> None:
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+
+    result = runner.invoke(
+        app,
+        [
+            "run-openbox-real",
+            str(project_dir),
+            flag,
+            value,
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert "No such option" in result.output
+
+
+def test_run_native_turbo_rejects_cli_max_evals_override(tmp_path: Path) -> None:
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+
+    result = runner.invoke(
+        app,
+        [
+            "run-native-turbo",
+            str(project_dir),
+            "--max-evals",
+            "1",
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert "No such option" in result.output
+
+
+@pytest.mark.parametrize(
+    ("flag", "value"),
+    [
+        ("--max-evals", "1"),
+        ("--batch-size", "1"),
+    ],
+)
+def test_run_openbox_fake_rejects_cli_workload_overrides(
+    tmp_path: Path, flag: str, value: str
+) -> None:
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+
+    result = runner.invoke(
+        app,
+        [
+            "run-openbox-fake",
+            str(project_dir),
+            flag,
+            value,
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert "No such option" in result.output
+
+
+@pytest.mark.parametrize(
+    ("flag", "value"),
+    [
+        ("--additional-evals", "1"),
+        ("--batch-size", "1"),
+        ("--parallel-jobs", "1"),
+    ],
+)
+def test_continue_openbox_real_rejects_cli_workload_resource_overrides(
+    tmp_path: Path, flag: str, value: str
+) -> None:
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+
+    result = runner.invoke(
+        app,
+        [
+            "continue-openbox-real",
+            str(project_dir),
+            flag,
+            value,
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert "No such option" in result.output
+
+
+@pytest.mark.parametrize(
+    ("flag", "value"),
+    [
+        ("--max-evals", "1"),
+        ("--additional-evals", "1"),
+    ],
+)
+def test_package_optimizer_task_rejects_cli_workload_overrides(
+    tmp_path: Path, flag: str, value: str
+) -> None:
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    cadence_cshrc = tmp_path / "cadence.csh"
+    cadence_cshrc.write_text("# test\n", encoding="utf-8")
+
+    result = runner.invoke(
+        app,
+        [
+            "package-optimizer-task",
+            str(project_dir),
+            "--cadence-cshrc",
+            str(cadence_cshrc),
+            flag,
+            value,
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert "No such option" in result.output
 
 
 def test_cli_init_and_validate(tmp_path: Path) -> None:
@@ -538,7 +706,11 @@ def test_run_openbox_fake_cli_writes_artifacts(monkeypatch, tmp_path: Path) -> N
         report_path = project_dir / "reports" / "optimizer_run_report.json"
         evaluations_path = project_dir / "reports" / "optimizer_evaluations.jsonl"
 
-    def fake_run(project_dir: Path, *, max_evals: int, batch_size: int) -> FakeResult:
+    seen: dict[str, int | None] = {}
+
+    def fake_run(project_dir: Path, *, max_evals: int | None, batch_size: int | None) -> FakeResult:
+        seen["max_evals"] = max_evals
+        seen["batch_size"] = batch_size
         reports_dir = project_dir / "reports"
         reports_dir.mkdir(parents=True, exist_ok=True)
         (reports_dir / "optimizer_run_report.json").write_text(
@@ -572,14 +744,11 @@ def test_run_openbox_fake_cli_writes_artifacts(monkeypatch, tmp_path: Path) -> N
         [
             "run-openbox-fake",
             str(project_dir),
-            "--max-evals",
-            "4",
-            "--batch-size",
-            "2",
         ],
     )
 
     assert result.exit_code == 0
+    assert seen == {"max_evals": None, "batch_size": None}
     assert "openbox fake optimizer completed: 4 evaluations" in result.output
     assert "report: reports/optimizer_run_report.json" in result.output
     assert "evaluations: reports/optimizer_evaluations.jsonl" in result.output

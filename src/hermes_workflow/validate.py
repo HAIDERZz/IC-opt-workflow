@@ -15,6 +15,7 @@ from hermes_workflow.schemas import (
     MetricsConfig,
     OptimizerAlgorithm,
     OptimizerConfig,
+    ProcessCornerConfig,
     ProjectConfig,
     SpectreConfig,
     TestbenchesConfig,
@@ -32,6 +33,7 @@ CONFIG_MODELS: dict[str, type[BaseModel]] = {
 }
 OPTIONAL_CONFIG_MODELS: dict[str, type[BaseModel]] = {
     "testbenches.yaml": TestbenchesConfig,
+    "process_corners.yaml": ProcessCornerConfig,
 }
 
 INTEGER_RE = re.compile(r"^[+-]?\d+$")
@@ -88,6 +90,7 @@ class ContractBundle:
     project_dir: Path
     project_config: ProjectConfig
     testbenches: TestbenchesConfig | None
+    process_corners: ProcessCornerConfig | None
     variables: VariablesConfig
     metrics: MetricsConfig
     spectre: SpectreConfig
@@ -190,6 +193,11 @@ def _bundle_from_loaded(
         testbenches=(
             _cast_model(TestbenchesConfig, loaded["testbenches.yaml"])
             if "testbenches.yaml" in loaded
+            else None
+        ),
+        process_corners=(
+            _cast_model(ProcessCornerConfig, loaded["process_corners.yaml"])
+            if "process_corners.yaml" in loaded
             else None
         ),
         variables=_cast_model(VariablesConfig, loaded["variables.yaml"]),

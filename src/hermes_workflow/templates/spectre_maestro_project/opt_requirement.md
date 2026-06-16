@@ -90,6 +90,15 @@ direction: minimize
 expression: "(rise + fall) * DC"
 ```
 
+## Process Corners
+
+```yaml
+objective_policy: nominal
+constraint_policy: nominal
+corners:
+  - id: nominal
+```
+
 ## Spectre Settings
 
 ```yaml
@@ -108,6 +117,7 @@ keep_successful_runs: true
 
 ```yaml
 algorithm: openbox
+strategy: openbox_auto
 initialization: sobol
 max_evaluations: 100
 batch_size: 10

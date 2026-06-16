@@ -58,6 +58,8 @@ class ResultManifest(BaseModel):
     schema_version: str
     run_id: str
     candidate_id: str
+    testbench_id: str | None = None
+    corner_id: str | None = None
     status: RealRunResultStatus
     started_at_utc: str
     completed_at_utc: str
@@ -69,6 +71,7 @@ class ResultManifest(BaseModel):
     result_data: ResultData | None = None
     metric_result_manifest: str | None = None
     child_results: list[ChildResultReference] = Field(default_factory=list)
+    command_trace: dict | None = None
     notes: str | None = None
 
     @field_validator("started_at_utc", "completed_at_utc")

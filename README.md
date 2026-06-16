@@ -44,6 +44,30 @@ proves it, and which runtime adapters are still missing, read
 Hermes workflow tooling does not parse PSF data and does not rewrite approved
 OCEAN formulas.
 
+## Current Product Contract
+
+- `opt_requirement.md` is the only product entry for workload, optimizer budget
+  (`max_evaluations`), optimizer batch size, Spectre parallelism
+  (`parallel_jobs`), Spectre threads (`threads_per_run`), optimizer CPU thread
+  limit (`optimizer_cpu_threads`), optimizer strategy, initialization,
+  process-corner policy, output format, retention policy, and metric contracts.
+- The product CLI does not accept initial-run overrides for those values. Do not
+  use or document `--max-evals`, `--batch-size`, `--parallel-jobs`, `--threads`,
+  or `--strategy` on `ic-opt PROJECT --real`.
+- Product continuation keeps one CLI delta: `ic-opt PROJECT --real --continue N`
+  adds `N` more evaluations. All other values are inherited from the project
+  requirement/generated config.
+- Multi-corner optimization is configured in `opt_requirement.md` through
+  `Process Corners`; there is no `--multi-corner` switch. See
+  `examples/spectre_maestro_project/opt_requirement.multi_corner.md` and
+  `examples/spectre_maestro_project/opt_requirement.multi_tb_corner.md`.
+- The production OpenBox strategy combinations are `openbox_auto`,
+  `openbox_gp_eic`, and `openbox_prf_eic`. Native TuRBO
+  `turbo_trust_region` is also supported for mostly continuous trust-region
+  search. See `docs/OPTIMIZER_ALGORITHM_MODES.md` for when to choose each mode.
+- Current release changes and fixed bugs are summarized in
+  `RELEASE_NOTES_v0.1.7.md`.
+
 ## Install
 
 Use one product-level Python environment for the repo and optimizer
@@ -136,7 +160,7 @@ Then run:
 ```bash
 ic-opt --ssh-profile lab /home/user/spectre_opt_prj/Mixer_opt --doctor
 ic-opt --ssh-profile lab /home/user/spectre_opt_prj/Mixer_opt --real
-ic-opt --ssh-profile lab /home/user/spectre_opt_prj/Mixer_opt --continue 40
+ic-opt --ssh-profile lab /home/user/spectre_opt_prj/Mixer_opt --real --continue 40
 ```
 
 The project path is the Linux server path. Reports are written on the server
@@ -173,42 +197,35 @@ candidate level.
 Preferred product command:
 
 ```bash
-./.venv/bin/ic-opt ~/spectre_opt_prj/<project_name> \
-  --real \
-  --max-evals 100 \
-  --batch-size 10 \
-  --parallel-jobs 10
+./.venv/bin/ic-opt ~/spectre_opt_prj/<project_name> --real
 ```
 
 Offline gate check without launching Spectre/OCEAN/OpenBox:
 
 ```bash
-./.venv/bin/ic-opt ~/spectre_opt_prj/<project_name> \
-  --real \
-  --dry-orchestration \
-  --max-evals 100 \
-  --batch-size 10 \
-  --parallel-jobs 10
+./.venv/bin/ic-opt ~/spectre_opt_prj/<project_name> --real --dry-orchestration
 ```
 
-The lower-level implementation command remains available for development and
-audit work:
+The product CLI is the contract for normal users: initial real runs read workload
+and resources from `opt_requirement.md`, and continuation accepts only
+`--continue N` as a CLI delta. Low-level `hermes-workflow` commands are
+development/debugging tools for maintainers inspecting a specific pipeline stage;
+do not present them as product usage and do not use them to override the user's
+requirement contract.
 
 ```bash
 ./.venv/bin/hermes-workflow optimize ~/spectre_opt_prj/<project_name> --real
 ```
 
-For continuation after a completed run, keep resources inherited from the
-project config unless the user explicitly asks for a resource change:
+For product continuation after a completed run:
 
 ```bash
-./.venv/bin/hermes-workflow continue-openbox-real ~/spectre_opt_prj/<project_name> \
-  --additional-evals 40 \
-  --batch-size 10
+./.venv/bin/ic-opt ~/spectre_opt_prj/<project_name> --real --continue 40
 ```
 
-Do not copy `--parallel-jobs` from the first run into continuation commands by
-habit; mixed `parallel_jobs` histories are rejected by the acceptance checker.
+Do not copy workload, resource, or strategy flags into product continuation
+commands. `parallel_jobs`, `batch_size`, optimizer strategy, Spectre settings,
+and retention policy come from `opt_requirement.md` / generated config.
 
 ## Read Results
 
@@ -237,7 +254,7 @@ C-60 real product acceptance used a fresh Mixer multi-testbench project with a
 project-local `cadence_env.csh` and ran:
 
 ```bash
-./.venv/bin/ic-opt PROJECT --real --max-evals 100 --batch-size 10 --parallel-jobs 10
+./.venv/bin/ic-opt PROJECT --real
 ```
 
 It completed 100 real OpenBox/Spectre/OCEAN evaluations, generated OpenBox
@@ -263,6 +280,10 @@ same-CLI subagent delegation.
 - `docs/OPTIMIZER_PRODUCTION_QUICKSTART.md`: shortest production workflow.
 - `docs/AGENT_OPTIMIZER_USAGE_MANUAL.md`: supervisor/execution-agent operating
   manual.
+- `docs/OPTIMIZER_ALGORITHM_MODES.md`: supported optimizer strategies and when
+  to use OpenBox auto, GP+EIC, PRF+EIC, TuRBO, or random baseline.
+- `docs/PROCESS_CORNER_OPTIMIZATION_FLOW_CN.md`: multi-corner aggregation flow
+  and what the optimizer sees.
 - `docs/AGENT_INTEGRATION_STATUS.md`: current implemented agent boundary and
   remaining runtime-specific adapter work.
 - `docs/AGENT_USER_QUICKSTART_CN.md`: beginner-friendly Chinese guide for IC
@@ -274,6 +295,7 @@ same-CLI subagent delegation.
 - `docs/TOOLCHAIN_EXECUTION_REFERENCE.md`: mandatory real-tool execution
   reference for development and debugging.
 - `docs/PRODUCT_RELEASE_CHECKLIST.md`: release sanity checklist.
+- `RELEASE_NOTES_v0.1.7.md`: current release contract and fixed bug summary.
 
 ## Boundaries
 

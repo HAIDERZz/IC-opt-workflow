@@ -1,5 +1,10 @@
 # C-70 Remote Spectre/OCEAN Local-Parity Implementation Plan
 
+> Historical command notice: this old implementation plan may show obsolete
+> workload/resource CLI flags. Current release product first runs read those
+> values only from `opt_requirement.md`; only `ic-opt PROJECT --real --continue N`
+> remains as a product CLI budget delta.
+
 > **For coding agents:** REQUIRED SUB-SKILL: use
 > `superpowers:subagent-driven-development`. The implementation agent must
 > perform its own spec review and code-quality review before asking Codex for

@@ -33,7 +33,7 @@ def test_generate_optimizer_final_summary_writes_user_facing_report(
     assert report.global_optimum_claim is False
     assert report.accepted_candidate["parameters"]["F"] == "20"
     assert report.bottleneck["metric"] == "IIP3"
-    assert "reports/optimizer_visuals/bottleneck_weighted_score.svg" in report.visuals
+    assert "reports/optimizer_visuals/bottleneck_weighted_score.png" in report.visuals
     assert report.report_path == project_dir / "reports/optimizer_final_summary.json"
     assert report.markdown_path == project_dir / "reports/optimizer_final_summary.md"
 
@@ -47,7 +47,7 @@ def test_generate_optimizer_final_summary_writes_user_facing_report(
     assert "real_002" in markdown
     assert "Best observed" in markdown
     assert "IIP3" in markdown
-    assert "reports/optimizer_visuals/bottleneck_weighted_score.svg" in markdown
+    assert "reports/optimizer_visuals/bottleneck_weighted_score.png" in markdown
 
 
 def test_finalize_optimizer_summary_cli_writes_report(tmp_path: Path) -> None:

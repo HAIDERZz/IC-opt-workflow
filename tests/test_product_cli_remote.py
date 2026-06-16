@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path, PurePosixPath
 from types import SimpleNamespace
 
+import pytest
 from typer.testing import CliRunner
 
 from hermes_workflow import product_cli
@@ -36,7 +37,8 @@ def test_ic_opt_remote_doctor_does_not_resolve_local_cadence_env(monkeypatch, tm
     assert result.exit_code == 0, result.output
     assert calls[0]["ref"].ssh_profile == "lab"
     assert calls[0]["ref"].remote_project_dir == PurePosixPath("/remote/project")
-    assert "remote doctor completed" in result.output
+    assert "doctor completed" in result.output
+    assert "transport: remote" in result.output
     assert "remote report: /remote/project/reports/ic_opt_doctor_report.json" in result.output
 
 
@@ -65,6 +67,7 @@ def test_ic_opt_remote_real_calls_optimize_remote_project(monkeypatch, tmp_path:
 
     assert result.exit_code == 0, result.output
     assert calls[0]["ref"].ssh_profile == "lab"
+    assert calls[0]["max_evals"] is None
     assert "remote optimizer flow completed" in result.output
     assert "recommended: real_001" in result.output
 
@@ -86,10 +89,58 @@ def test_ic_opt_remote_continue_routes_additional_evals(monkeypatch, tmp_path: P
 
     result = runner.invoke(
         product_cli.app,
-        ["--ssh-profile", "lab", "/remote/project", "--continue", "40"],
+        ["--ssh-profile", "lab", "/remote/project", "--real", "--continue", "40"],
     )
 
     assert result.exit_code == 0, result.output
     assert "remote continuation completed" in result.output
     assert "recommended: real_141" in result.output
     assert calls[0]["additional_evals"] == 40
+    assert calls[0]["strategy"] is None
+
+
+def test_ic_opt_remote_continue_without_real_fails(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(
+        product_cli,
+        "continue_remote_project",
+        lambda *a, **kw: pytest.fail("continue_remote_project must not be called without --real"),
+    )
+    result = runner.invoke(
+        product_cli.app,
+        ["--ssh-profile", "lab", "/remote/project", "--continue", "40"],
+    )
+    assert result.exit_code != 0
+    assert "--continue" in result.output and "--real" in result.output
+
+
+def test_ic_opt_remote_continue_with_strategy_fails(monkeypatch, tmp_path: Path) -> None:
+    """`--strategy` is no longer a product CLI option for remote continuation
+    either."""
+    monkeypatch.setattr(
+        product_cli,
+        "continue_remote_project",
+        lambda *a, **kw: pytest.fail("strategy override must be rejected"),
+    )
+    result = runner.invoke(
+        product_cli.app,
+        ["--ssh-profile", "lab", "/remote/project", "--real", "--continue", "40", "--strategy", "openbox_gp_eic"],
+    )
+    assert result.exit_code != 0
+    assert "--strategy" in result.output
+
+
+def test_ic_opt_remote_real_with_strategy_fails(monkeypatch) -> None:
+    """Remote initial real run also rejects --strategy at the CLI layer."""
+    monkeypatch.setattr(
+        product_cli,
+        "optimize_remote_project",
+        lambda *a, **kw: pytest.fail(
+            "optimize_remote_project must not be called when --strategy is passed"
+        ),
+    )
+    result = runner.invoke(
+        product_cli.app,
+        ["--ssh-profile", "lab", "/remote/project", "--real", "--strategy", "openbox_gp_eic"],
+    )
+    assert result.exit_code != 0
+    assert "--strategy" in result.output

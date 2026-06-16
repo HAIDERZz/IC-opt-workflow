@@ -213,6 +213,100 @@ def test_prepare_next_real_run_refuses_optimizer_state_drift(tmp_path: Path) -> 
         prepare_next_real_run(project_dir)
 
 
+def test_prepare_next_real_run_accepts_b09_state_with_recorded_observation_count(
+    tmp_path: Path,
+) -> None:
+    """B-09 contract: state.current_evaluations is attempted count, ledger
+    row count must match state.recorded_observation_count, NOT
+    state.current_evaluations."""
+    project_dir = _create_ready_project(tmp_path)
+    _record_real_001(project_dir)
+
+    state_path = project_dir / "state" / "optimizer_state.json"
+    state = _load_json(state_path)
+    # Simulate B-09 multi-eval state: 3 attempted, 1 recorded, 2 failed.
+    # Ledger still has only 1 usable observation (the one recorded above).
+    state["current_evaluations"] = 3
+    state["recorded_observation_count"] = 1
+    state["failed_evaluation_count"] = 2
+    state["status_counts"] = {"feasible": 1, "metric_check_failed": 2}
+    state["progress_source"] = "reports/optimizer_evaluations.jsonl"
+    _write_json(state_path, state)
+
+    # Should NOT raise -- B-09 state is internally consistent with ledger.
+    package = prepare_next_real_run(
+        project_dir, created_at_utc="2026-06-02T00:50:00Z"
+    )
+    assert package.run_id == "real_002"
+
+
+def test_prepare_next_real_run_rejects_b09_state_with_recorded_count_mismatch(
+    tmp_path: Path,
+) -> None:
+    """If recorded_observation_count is present, it MUST equal ledger row count."""
+    project_dir = _create_ready_project(tmp_path)
+    _record_real_001(project_dir)
+
+    state_path = project_dir / "state" / "optimizer_state.json"
+    state = _load_json(state_path)
+    state["current_evaluations"] = 3
+    state["recorded_observation_count"] = 0  # WRONG: ledger has 1 row.
+    state["failed_evaluation_count"] = 3
+    _write_json(state_path, state)
+
+    with pytest.raises(
+        ValueError,
+        match=r"recorded_observation_count disagrees with ledger row count",
+    ):
+        prepare_next_real_run(project_dir)
+
+
+def test_prepare_next_real_run_legacy_state_without_recorded_count_still_checks_current_evaluations(
+    tmp_path: Path,
+) -> None:
+    """Legacy (pre-B-09) state lacks recorded_observation_count; the old
+    current_evaluations vs ledger rule must still hold for backward compat."""
+    project_dir = _create_ready_project(tmp_path)
+    _record_real_001(project_dir)
+
+    state_path = project_dir / "state" / "optimizer_state.json"
+    state = _load_json(state_path)
+    state["current_evaluations"] = 5  # mismatched against 1 ledger row
+    state.pop("recorded_observation_count", None)
+    state.pop("failed_evaluation_count", None)
+    state.pop("status_counts", None)
+    state.pop("progress_source", None)
+    _write_json(state_path, state)
+
+    with pytest.raises(
+        ValueError,
+        match=r"current_evaluations disagrees with ledger row count",
+    ):
+        prepare_next_real_run(project_dir)
+
+
+def test_prepare_next_real_run_legacy_state_consistent_with_ledger_passes(
+    tmp_path: Path,
+) -> None:
+    """Legacy state with current_evaluations == len(ledger) must keep passing."""
+    project_dir = _create_ready_project(tmp_path)
+    _record_real_001(project_dir)
+
+    state_path = project_dir / "state" / "optimizer_state.json"
+    state = _load_json(state_path)
+    state.pop("recorded_observation_count", None)
+    state.pop("failed_evaluation_count", None)
+    state.pop("status_counts", None)
+    state.pop("progress_source", None)
+    # current_evaluations == 1 == len(ledger_rows)
+    _write_json(state_path, state)
+
+    package = prepare_next_real_run(
+        project_dir, created_at_utc="2026-06-02T00:50:00Z"
+    )
+    assert package.run_id == "real_002"
+
+
 def test_prepare_next_real_run_refuses_completed_state(tmp_path: Path) -> None:
     project_dir = _create_ready_project(tmp_path)
     _record_real_001(project_dir)

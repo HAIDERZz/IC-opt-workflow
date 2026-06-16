@@ -1,5 +1,10 @@
 # Optimizer Execution-Agent Task Packet MVP Implementation Plan
 
+> Historical command notice: this old implementation plan may show obsolete
+> workload/resource CLI flags. Current release product first runs read those
+> values only from `opt_requirement.md`; only `ic-opt PROJECT --real --continue N`
+> remains as a product CLI budget delta.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Generate a standard Hermes optimizer execution-agent task packet for the proven `run-native-turbo --parallel` real-tool acceptance flow.

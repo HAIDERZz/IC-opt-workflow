@@ -22,6 +22,14 @@ from hermes_workflow.validate import validate_project_files
 FIXTURE_ROOT = Path(__file__).parent / "fixtures" / "requirement_intake"
 VALID_PROJECT = FIXTURE_ROOT / "valid_project"
 VALID_MAESTRO_POINT = FIXTURE_ROOT / "valid_maestro_point"
+TEMPLATE_OPT_REQUIREMENT = (
+    Path(__file__).resolve().parents[1]
+    / "src"
+    / "hermes_workflow"
+    / "templates"
+    / "spectre_maestro_project"
+    / "opt_requirement.md"
+)
 
 
 def _copy_requirement_project(tmp_path: Path) -> Path:
@@ -233,6 +241,211 @@ def test_prepare_from_requirement_renders_existing_contracts(tmp_path: Path) -> 
     assert metrics["metrics"][0]["ocean"]["expected_value_type"] == "real_scalar"
     optimizer = yaml.safe_load((project_dir / "config" / "optimizer.yaml").read_text(encoding="utf-8"))
     assert optimizer["optimizer"]["algorithm"] == "openbox"
+    assert "strategy" not in optimizer["optimizer"]
+
+
+def test_prepare_from_requirement_preserves_openbox_strategy_settings(tmp_path: Path) -> None:
+    project_dir = _copy_requirement_project(tmp_path)
+    text = (project_dir / "opt_requirement.md").read_text(encoding="utf-8")
+    optimizer_yaml = """algorithm: openbox
+strategy: openbox_gp_eic
+initialization: sobol
+max_evaluations: 100
+batch_size: 10
+random_seed: 20260528
+failure_penalty: 1000000.0
+deduplicate_candidates: true
+openbox:
+  surrogate_type: gp
+  acq_type: eic
+  acq_optimizer_type: random_scipy
+  initial_trials: 12
+"""
+    text = _replace_section_yaml(text, "Optimizer Settings", optimizer_yaml)
+    (project_dir / "opt_requirement.md").write_text(text, encoding="utf-8")
+
+    report = prepare_from_requirement(project_dir)
+
+    assert report.status == "pass"
+    optimizer = yaml.safe_load((project_dir / "config" / "optimizer.yaml").read_text(encoding="utf-8"))
+    assert optimizer["optimizer"]["strategy"] == "openbox_gp_eic"
+    assert optimizer["optimizer"]["openbox"] == {
+        "surrogate_type": "gp",
+        "acq_type": "eic",
+        "acq_optimizer_type": "random_scipy",
+        "initial_trials": 12,
+    }
+
+
+def test_requirement_intake_writes_process_corners_and_optimizer_strategy(
+    tmp_path: Path,
+) -> None:
+    project_dir = _copy_requirement_project(tmp_path)
+    text = (project_dir / "opt_requirement.md").read_text(encoding="utf-8")
+    process_corners = """## Process Corners
+
+```yaml
+objective_policy: worst_case
+constraint_policy: all_corners
+corners:
+  - id: tt
+    model_section: Post_simu_top_tt
+    variables:
+      temperature: "27"
+  - id: ss
+    model_section: Post_simu_top_ss
+    variables:
+      temperature: "125"
+```
+
+"""
+    text = text.replace("## Spectre Settings\n", process_corners + "## Spectre Settings\n")
+    optimizer_yaml = """
+algorithm: openbox
+strategy: openbox_prf_eic
+initialization: sobol
+max_evaluations: 40
+batch_size: 5
+random_seed: 20260528
+failure_penalty: 1000000.0
+deduplicate_candidates: true
+openbox:
+  surrogate_type: prf
+  acq_type: eic
+  acq_optimizer_type: local_random
+  initial_trials: auto
+"""
+    text = _replace_section_yaml(text, "Optimizer Settings", optimizer_yaml.strip())
+    (project_dir / "opt_requirement.md").write_text(text, encoding="utf-8")
+
+    report = prepare_from_requirement(project_dir)
+
+    assert report.status == "pass", report.issues
+    corners = yaml.safe_load(
+        (project_dir / "config" / "process_corners.yaml").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert corners == {
+        "schema_version": "1.0",
+        "objective_policy": "worst_case",
+        "constraint_policy": "all_corners",
+        "corners": [
+            {
+                "id": "tt",
+                "model_section": "Post_simu_top_tt",
+                "variables": {"temperature": "27"},
+            },
+            {
+                "id": "ss",
+                "model_section": "Post_simu_top_ss",
+                "variables": {"temperature": "125"},
+            },
+        ],
+    }
+    optimizer = yaml.safe_load(
+        (project_dir / "config" / "optimizer.yaml").read_text(encoding="utf-8")
+    )
+    assert optimizer["optimizer"]["strategy"] == "openbox_prf_eic"
+    assert optimizer["optimizer"]["openbox"]["surrogate_type"] == "prf"
+
+
+def test_requirement_intake_defaults_missing_process_corners_to_nominal(
+    tmp_path: Path,
+) -> None:
+    project_dir = _copy_requirement_project(tmp_path)
+
+    report = prepare_from_requirement(project_dir)
+
+    assert report.status == "pass", report.issues
+    corners = yaml.safe_load(
+        (project_dir / "config" / "process_corners.yaml").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert corners == {
+        "schema_version": "1.0",
+        "objective_policy": "nominal",
+        "constraint_policy": "nominal",
+        "corners": [{"id": "nominal"}],
+    }
+    assert validate_project_files(project_dir).ok
+
+
+def test_prepare_from_requirement_preserves_turbo_strategy_settings(tmp_path: Path) -> None:
+    project_dir = _copy_requirement_project(tmp_path)
+    text = (project_dir / "opt_requirement.md").read_text(encoding="utf-8")
+    optimizer_yaml = """algorithm: turbo
+strategy: turbo_trust_region
+initialization: sobol
+max_evaluations: 100
+batch_size: 10
+random_seed: 20260528
+failure_penalty: 1000000.0
+deduplicate_candidates: true
+turbo:
+  snap_to_step: true
+  duplicate_handling: resample
+"""
+    text = _replace_section_yaml(text, "Optimizer Settings", optimizer_yaml)
+    (project_dir / "opt_requirement.md").write_text(text, encoding="utf-8")
+
+    report = prepare_from_requirement(project_dir)
+
+    assert report.status == "pass"
+    optimizer = yaml.safe_load((project_dir / "config" / "optimizer.yaml").read_text(encoding="utf-8"))
+    assert optimizer["optimizer"]["strategy"] == "turbo_trust_region"
+    assert optimizer["optimizer"]["turbo"] == {
+        "snap_to_step": True,
+        "duplicate_handling": "resample",
+    }
+
+
+def test_optimizer_requirement_template_defaults_to_openbox_auto_strategy() -> None:
+    text = TEMPLATE_OPT_REQUIREMENT.read_text(encoding="utf-8")
+
+    assert "strategy: openbox_auto" in text
+    assert "## Process Corners" in text
+
+
+def test_optimizer_requirement_template_includes_multi_corner_variants() -> None:
+    template_dir = TEMPLATE_OPT_REQUIREMENT.parent
+    multi_corner = (template_dir / "opt_requirement.multi_corner.md").read_text(
+        encoding="utf-8"
+    )
+    multi_tb_corner = (
+        template_dir / "opt_requirement.multi_tb_corner.md"
+    ).read_text(encoding="utf-8")
+
+    assert "## Process Corners" in multi_corner
+    assert "objective_policy: worst_case" in multi_corner
+    assert "strategy: openbox_gp_eic" in multi_corner
+    assert "## Process Corners" in multi_tb_corner
+    assert "strategy: openbox_prf_eic" in multi_tb_corner
+
+
+def test_optimizer_requirement_template_default_strategy_prepares(tmp_path: Path) -> None:
+    project_dir = _copy_requirement_project(tmp_path)
+    text = TEMPLATE_OPT_REQUIREMENT.read_text(encoding="utf-8").replace(
+        "/absolute/path/to/maestro/results/maestro/Interactive.N/1/LIB_CELL_1",
+        VALID_MAESTRO_POINT.as_posix(),
+    )
+    (project_dir / "opt_requirement.md").write_text(text, encoding="utf-8")
+
+    report = prepare_from_requirement(project_dir)
+
+    assert report.status == "pass"
+    optimizer = yaml.safe_load(
+        (project_dir / "config" / "optimizer.yaml").read_text(encoding="utf-8")
+    )
+    assert optimizer["optimizer"]["algorithm"] == "openbox"
+    assert optimizer["optimizer"]["strategy"] == "openbox_auto"
+    corners = yaml.safe_load(
+        (project_dir / "config" / "process_corners.yaml").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert corners["corners"] == [{"id": "nominal"}]
 
 
 def test_prepare_from_requirement_allows_formula_only_metric(tmp_path: Path) -> None:

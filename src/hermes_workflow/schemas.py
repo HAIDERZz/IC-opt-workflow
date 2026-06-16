@@ -88,6 +88,31 @@ class OptimizerAlgorithm(StrEnum):
     RANDOM = "random"
 
 
+class OptimizerStrategy(StrEnum):
+    OPENBOX_AUTO = "openbox_auto"
+    OPENBOX_GP_EIC = "openbox_gp_eic"
+    OPENBOX_PRF_EIC = "openbox_prf_eic"
+    TURBO_TRUST_REGION = "turbo_trust_region"
+    RANDOM_BASELINE = "random_baseline"
+
+    @classmethod
+    def from_user_value(cls, value: object) -> "OptimizerStrategy":
+        if isinstance(value, cls):
+            return value
+        if not isinstance(value, str):
+            raise ValueError("optimizer.strategy must be a string")
+        if value in {"openbox_eic", "openbox-eic"}:
+            raise ValueError(
+                "eic is an acquisition function, not an optimizer strategy; "
+                "use openbox_gp_eic or openbox_prf_eic"
+            )
+        try:
+            return cls(value)
+        except ValueError as exc:
+            allowed = ", ".join(member.value for member in cls)
+            raise ValueError(f"optimizer.strategy must be one of {allowed}") from exc
+
+
 class InitializationMethod(StrEnum):
     SOBOL = "sobol"
     LATIN_HYPERCUBE = "latin_hypercube"
@@ -133,6 +158,33 @@ class TestbenchesConfig(StrictModel):
         ids = [testbench.id for testbench in self.testbenches]
         if len(ids) != len(set(ids)):
             raise ValueError("testbench ids must be unique")
+        return self
+
+
+class ProcessCorner(StrictModel):
+    id: str
+    model_section: str | None = None
+    model_file: str | None = None
+    variables: dict[str, str] | None = None
+    description: str | None = None
+
+    @field_validator("id")
+    @classmethod
+    def _id_is_identifier(cls, value: str) -> str:
+        return validate_name(value, "corner id")
+
+
+class ProcessCornerConfig(StrictModel):
+    schema_version: Literal["1.0"]
+    objective_policy: Literal["nominal", "worst_case"]
+    constraint_policy: Literal["nominal", "all_corners"]
+    corners: list[ProcessCorner] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def _corner_ids_are_unique(self) -> "ProcessCornerConfig":
+        ids = [corner.id for corner in self.corners]
+        if len(ids) != len(set(ids)):
+            raise ValueError("corner ids must be unique")
         return self
 
 
@@ -268,7 +320,7 @@ class MetricsConfig(StrictModel):
 class SpectreSettings(StrictModel):
     engine: Literal["spectre_x"]
     preset: SpectrePreset
-    output_format: Literal["psfascii", "psfxl"]
+    output_format: Literal["psfxl"]
     threads_per_run: StrictInt = Field(default=10, ge=1)
     parallel_jobs: StrictInt = Field(ge=1)
     timeout_s: StrictInt = Field(gt=0)
@@ -282,8 +334,32 @@ class SpectreConfig(StrictModel):
     spectre: SpectreSettings
 
 
+class OpenBoxOptimizerSettings(StrictModel):
+    surrogate_type: (
+        Literal["auto", "gp", "prf", "gp_rbf", "sk_prf", "lightgbm"] | None
+    ) = None
+    acq_type: Literal["auto", "ei", "eic", "pi", "lcb"] | None = None
+    acq_optimizer_type: Literal["auto", "random_scipy", "local_random"] | None = None
+    initial_trials: StrictInt | Literal["auto"] | None = None
+
+    @field_validator("initial_trials")
+    @classmethod
+    def _initial_trials_must_be_positive(
+        cls, value: StrictInt | Literal["auto"] | None
+    ) -> StrictInt | Literal["auto"] | None:
+        if isinstance(value, int) and value < 1:
+            raise ValueError("optimizer.openbox.initial_trials must be >= 1")
+        return value
+
+
+class TurboOptimizerSettings(StrictModel):
+    snap_to_step: Literal[True] = True
+    duplicate_handling: Literal["resample"] = "resample"
+
+
 class OptimizerSettings(StrictModel):
     algorithm: OptimizerAlgorithm
+    strategy: OptimizerStrategy | None = None
     initialization: InitializationMethod
     max_evaluations: StrictInt = Field(ge=1)
     batch_size: StrictInt = Field(ge=1)
@@ -291,11 +367,53 @@ class OptimizerSettings(StrictModel):
     optimizer_cpu_threads: StrictInt = Field(default=4, ge=1)
     failure_penalty: StrictFloat = Field(gt=0)
     deduplicate_candidates: StrictBool
+    openbox: OpenBoxOptimizerSettings | None = None
+    turbo: TurboOptimizerSettings | None = None
+
+    @field_validator("strategy", mode="before")
+    @classmethod
+    def _parse_strategy(cls, value: object) -> object:
+        if value is None:
+            return None
+        return OptimizerStrategy.from_user_value(value)
 
     @field_validator("deduplicate_candidates")
     @classmethod
     def _deduplicate_candidates_must_be_true(cls, value: bool) -> bool:
         return validate_fixed_bool(value, True, "deduplicate_candidates")
+
+    @model_validator(mode="after")
+    def _strategy_settings_are_compatible(self) -> "OptimizerSettings":
+        if self.strategy in {
+            OptimizerStrategy.OPENBOX_AUTO,
+            OptimizerStrategy.OPENBOX_GP_EIC,
+            OptimizerStrategy.OPENBOX_PRF_EIC,
+        } and self.algorithm is not OptimizerAlgorithm.OPENBOX:
+            raise ValueError(
+                f"optimizer.strategy {self.strategy.value} requires "
+                "optimizer.algorithm=openbox"
+            )
+        if (
+            self.strategy is OptimizerStrategy.TURBO_TRUST_REGION
+            and self.algorithm is not OptimizerAlgorithm.TURBO
+        ):
+            raise ValueError(
+                "optimizer.strategy turbo_trust_region requires "
+                "optimizer.algorithm=turbo"
+            )
+        if (
+            self.strategy is OptimizerStrategy.RANDOM_BASELINE
+            and self.algorithm is not OptimizerAlgorithm.RANDOM
+        ):
+            raise ValueError(
+                "optimizer.strategy random_baseline requires "
+                "optimizer.algorithm=random"
+            )
+        if self.openbox is not None and self.algorithm is not OptimizerAlgorithm.OPENBOX:
+            raise ValueError("optimizer.openbox requires optimizer.algorithm=openbox")
+        if self.turbo is not None and self.algorithm is not OptimizerAlgorithm.TURBO:
+            raise ValueError("optimizer.turbo requires optimizer.algorithm=turbo")
+        return self
 
 
 class OptimizerConfig(StrictModel):
@@ -355,6 +473,10 @@ class OptimizerState(StrictModel):
     status: str
     started_at_utc: str
     updated_at_utc: str
+    recorded_observation_count: StrictInt | None = None
+    failed_evaluation_count: StrictInt | None = None
+    status_counts: dict[str, StrictInt] = Field(default_factory=dict)
+    progress_source: str | None = None
 
     @field_validator("status")
     @classmethod

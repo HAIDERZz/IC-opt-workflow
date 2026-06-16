@@ -16,6 +16,14 @@ Do not use "Hermes agent" as a role name. In this project, Hermes means workflow
 
 ## Current Development Cadence
 
+- `ic-auto-opt-workflow` is the authoritative development package. Implement,
+  verify, and review new features there first. `ic-auto-opt-workflow-v0.1` is a
+  release/package synchronization target only after the development package has
+  passed the relevant verification. Do not continue feature development directly
+  in `ic-auto-opt-workflow-v0.1`; if release-package code is ahead, first merge
+  that completed work back into `ic-auto-opt-workflow`, verify the development
+  package baseline, then resume new work from the development package.
+
 - Follow the active plan and task number exactly. Read this file, the active design spec, the active implementation plan, the current progress files, and the relevant top-level plan before changing code.
 - Use `superpowers:subagent-driven-development` for implementation-plan tasks when it materially reduces risk. This project overrides the generic "continuous execution" guidance: stop after each task is implemented, verified, committed if appropriate, and recorded unless the user explicitly asks to run multiple tasks without stopping.
 - Use codegraph during Subagent-Driven or code-changing work to locate affected modules, symbols, and dependency paths. For docs-only, environment-gate, or practice-record tasks, codegraph is optional; use `rg`/targeted file reads unless code paths are actually being changed.

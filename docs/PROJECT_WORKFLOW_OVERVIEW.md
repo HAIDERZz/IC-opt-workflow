@@ -380,7 +380,7 @@ hermes-workflow mock-run projects/bridge_test_inv --max-evaluations 4
 
 C-5.5 已在真实工具 adapter 前验证双 agent 行为：一个模拟 execution-agent 写 returned result package，另一个模拟 Hermes/supervisor 只相信 `check-real-run` 的机器可读报告。
 
-C-6 已把 Spectre + OCEAN metric result contract 固化进项目文件：`metrics.yaml` 中的公式为权威输入；Maestro/ADE 读取出来的公式只能作为草稿；执行 agent 必须原样交给 OCEAN 计算；Hermes 只验证结果文件合同和 scalar/provenance，不在 Python 中计算 PSF。C-6 也将真实 metric extraction 的 OCEAN-readable PSF 格式收敛到 `psfxl` 路线；历史 `psfascii` 只保留为旧合同允许值，不是 C-6 真实 OCEAN metric backend 的 ready format。
+C-6 已把 Spectre + OCEAN metric result contract 固化进项目文件：`metrics.yaml` 中的公式为权威输入；Maestro/ADE 读取出来的公式只能作为草稿；执行 agent 必须原样交给 OCEAN 计算；Hermes 只验证结果文件合同和 scalar/provenance，不在 Python 中计算 PSF。真实 metric extraction 的 OCEAN-readable PSF 格式已收敛到 `psfxl` 路线；历史 `psfascii` 只作为旧设计记录保留，不是当前 schema 或真实 OCEAN metric backend 的允许格式。
 
 C-7 已将 physical tool boundary 接到 execution agent 侧：`supervisor agent -> Hermes workflow tooling -> execution agent -> C-7 adapter -> Hermes workflow checks`。自动化测试只使用 fake runners；真实 Cadence smoke 继续保留在 local-only evidence 目录，不作为 CI 前提。
 
