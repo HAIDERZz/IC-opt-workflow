@@ -7,9 +7,11 @@ from typing import Annotated, NoReturn
 import typer
 
 from hermes_workflow.diagnostics import parse_diagnostics, format_diagnostics_for_cli
+from hermes_workflow.fix_run_flow import run_fix_run_project
 from hermes_workflow.optimizer_continuation_flow import continue_local_project
 from hermes_workflow.optimizer_flow import optimize_project
 from hermes_workflow.product_doctor import run_product_doctor
+from hermes_workflow.requirement_intake import check_requirement
 from hermes_workflow.remote_doctor import run_remote_doctor
 from hermes_workflow.remote_optimizer_flow import (
     continue_remote_project,
@@ -290,6 +292,31 @@ def main(
         _print_report_issues(report)
         _echo_report_path(project_dir, report.report_path)
         raise typer.Exit(code=1)
+
+    # --- Fix-run dispatch ---
+    if (project_dir / "opt_requirement.md").exists():
+        try:
+            intake = check_requirement(project_dir)
+        except Exception:
+            intake = None
+        if intake is not None and getattr(intake, "workflow_mode", None) == "fix_run":
+            try:
+                fix_report = run_fix_run_project(
+                    project_dir,
+                    real=real,
+                    cadence_cshrc=resolved_cadence_cshrc,
+                )
+            except (OSError, RuntimeError, ValueError) as exc:
+                _exit_with_error(exc)
+            if fix_report.status == "pass":
+                typer.echo("fix-run flow completed")
+                _echo_report_path(
+                    project_dir,
+                    project_dir / "reports" / "fix_run_report.json",
+                )
+                return
+            typer.echo("fix-run flow failed")
+            raise typer.Exit(code=1)
 
     try:
         report = optimize_project(
