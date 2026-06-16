@@ -8,7 +8,7 @@ from typing import Callable
 
 
 DEFAULT_OPENBOX_EXECUTION_VENV = Path("/tmp/ic_auto_opt_openbox_spike/.venv")
-DEFAULT_CADENCE_CSHRC = Path("/home/zzchen/cadence_ic231_env.csh")
+DEFAULT_CADENCE_CSHRC = Path("~/.ic-opt/cadence_env.csh")
 
 
 @dataclass(frozen=True)

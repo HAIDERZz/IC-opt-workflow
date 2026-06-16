@@ -25,6 +25,9 @@ from hermes_workflow.validate import assert_valid_project
 
 RUN_ID_RE = re.compile(r"^real_[0-9]{3}$")
 RESULT_SELECTOR_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+WAVEFORM_RESULT_RE = re.compile(r'\?result\s+"([^"]+)"')
+UNSAFE_EXPRESSION_RE = re.compile(r"outfile\(|system\(|\{\{")
+SAFE_IDENTIFIER_RE = re.compile(r"[^A-Za-z0-9_]")
 DEFAULT_RUN_ID = "real_001"
 REAL_RUN_ROOT = "runs/real"
 METRIC_REQUEST_NAME = "metric_extraction_request.json"
@@ -44,6 +47,7 @@ OCEAN_STDOUT_NAME = "ocean.stdout"
 OCEAN_STDERR_NAME = "ocean.stderr"
 OCEAN_SCALARS_NAME = "ocean_scalars.tsv"
 METRIC_RESULT_MANIFEST_NAME = "metric_result_manifest.json"
+WAVEFORM_EXPORT_MANIFEST_NAME = "waveform_export_manifest.json"
 OCEAN_MAX_ATTEMPTS = 3
 
 ModelT = TypeVar("ModelT", bound=BaseModel)
@@ -147,6 +151,52 @@ class SubprocessCommandRunner:
         )
 
 
+class CshrcCommandRunner:
+    """Wrap canonical argv in a ``csh -fc 'source <cshrc>; cd <cwd>; <body>'``
+    command so local Spectre/OCEAN runs inherit the Cadence environment.
+
+    This mirrors the remote adapter's cshrc-sourcing pattern (see
+    ``remote_spectre_ocean.py``), keeping local and remote execution
+    environments consistent. The ``command_trace`` is built separately from
+    the canonical argv (via ``build_spectre_argv``/``build_ocean_argv``), so
+    no cshrc path, ``source`` text, or ``csh -fc`` wrapper leaks into traces.
+    """
+
+    def __init__(
+        self,
+        cadence_cshrc: Path,
+        *,
+        inner: CommandRunner | None = None,
+    ) -> None:
+        self._cshrc = Path(cadence_cshrc)
+        self._inner: CommandRunner = inner or SubprocessCommandRunner()
+
+    def run(
+        self,
+        argv: list[str],
+        *,
+        cwd: Path,
+        stdout_path: Path,
+        stderr_path: Path,
+        timeout_s: int,
+    ) -> CommandResult:
+        import shlex
+
+        body = " ".join(shlex.quote(a) for a in argv)
+        wrapper = (
+            f"source {shlex.quote(str(self._cshrc))}; "
+            f"cd {shlex.quote(str(cwd))}; "
+            f"{body}"
+        )
+        return self._inner.run(
+            ["csh", "-fc", wrapper],
+            cwd=cwd,
+            stdout_path=stdout_path,
+            stderr_path=stderr_path,
+            timeout_s=timeout_s,
+        )
+
+
 def run_spectre_ocean_adapter(
     project_dir: Path,
     *,
@@ -154,6 +204,7 @@ def run_spectre_ocean_adapter(
     testbench_id: str | None = None,
     corner_id: str | None = None,
     runner: CommandRunner | None = None,
+    cadence_cshrc: Path | None = None,
     allow_overwrite: bool = False,
 ) -> AdapterRunResult:
     context = load_adapter_context(
@@ -166,9 +217,13 @@ def run_spectre_ocean_adapter(
     _reject_symlinks(context.project_dir, context.psf_dir, "psf directory")
     context.metrics_dir.mkdir(parents=True, exist_ok=True)
     context.psf_dir.mkdir(parents=True, exist_ok=True)
+    if context.request.waveform_exports:
+        (context.metrics_dir / "waveforms").mkdir(parents=True, exist_ok=True)
     _reject_output_file_symlinks(context)
     _assert_overwrite_policy(context, allow_overwrite=allow_overwrite)
     runner = runner or SubprocessCommandRunner()
+    if cadence_cshrc is not None:
+        runner = CshrcCommandRunner(cadence_cshrc, inner=runner)
 
     script_path = _project_relative_path(
         context.project_dir,
@@ -197,6 +252,13 @@ def run_spectre_ocean_adapter(
             notes="spectre command failed",
             command_trace=spectre_trace,
         )
+        if context.request.waveform_exports:
+            waveform_results = _build_waveform_export_results(
+                context, ocean_failed=True,
+            )
+            _write_waveform_export_manifest(
+                context, waveform_results, command_trace=spectre_trace,
+            )
         return AdapterRunResult(
             status="failed",
             run_id=context.run_id,
@@ -220,6 +282,14 @@ def run_spectre_ocean_adapter(
         ocean_return_codes=ocean_return_codes_list,
         command_trace=metric_trace,
     )
+    if context.request.waveform_exports:
+        ocean_failed = ocean_result.return_code != 0
+        waveform_results = _build_waveform_export_results(
+            context, ocean_failed=ocean_failed,
+        )
+        _write_waveform_export_manifest(
+            context, waveform_results, command_trace=metric_trace,
+        )
     result_manifest_path = _write_result_manifest(
         context,
         status="succeeded",
@@ -416,6 +486,90 @@ def load_adapter_context(
     )
 
 
+def _render_waveform_export_lines(context: SpectreOceanContext) -> list[str]:
+    """Generate SKILL lines for waveform CSV exports.
+
+    Reads ``waveform_exports`` from the request payload (may be empty).
+    For each export entry, validates the expression and emits SKILL code
+    that evaluates the expression and writes the waveform data as CSV.
+    """
+    lines: list[str] = []
+    for wf in context.request.waveform_exports:
+        _validate_emitted_field(wf.name, f"waveform export {wf.name} name")
+        _validate_emitted_field(
+            wf.expression_sha256,
+            f"waveform export {wf.name} expression_sha256",
+        )
+
+        # Safety check: reject dangerous expressions
+        if UNSAFE_EXPRESSION_RE.search(wf.expression):
+            if "outfile(" in wf.expression:
+                raise AdapterPreconditionError(
+                    f"waveform export {wf.name} expression contains outfile("
+                )
+            if "system(" in wf.expression:
+                raise AdapterPreconditionError(
+                    f"waveform export {wf.name} expression contains system("
+                )
+            if "{{" in wf.expression:
+                raise AdapterPreconditionError(
+                    f"waveform export {wf.name} expression contains template placeholder"
+                )
+
+        # Derive a safe SKILL variable name from the export name
+        safe_name = SAFE_IDENTIFIER_RE.sub("_", wf.name)
+
+        lines.append(f"; waveform export: {wf.name}")
+        lines.append(f"; expression_sha256: {wf.expression_sha256}")
+
+        # Check for ?result "RESULT_NAME" pattern and emit selectResult
+        result_match = WAVEFORM_RESULT_RE.search(wf.expression)
+        if result_match:
+            result_name = result_match.group(1)
+            _validate_result_selector(
+                result_name,
+                f"waveform export {wf.name} result from expression",
+            )
+            lines.append(f"selectResult('{result_name})")
+
+        # Evaluate the expression
+        lines.append(f"hermesWave_{safe_name} = {wf.expression}")
+        lines.append(f"if(hermesWave_{safe_name} then")
+
+        # Create the output directory if needed
+        csv_posix = _posix_path(wf.csv_output_file)
+        csv_abs = _project_relative_path(context.project_dir, csv_posix)
+        csv_parent = csv_abs.parent
+        csv_parent_posix = _posix_path(
+            str(csv_parent.relative_to(context.project_dir))
+        )
+        lines.append(
+            f'  hermesWaveDir_{safe_name} = '
+            f'isDir("{csv_parent_posix}") || '
+            f'system("mkdir -p {csv_parent_posix}") == 0'
+        )
+
+        # Open the output file
+        lines.append(
+            f'  hermesWaveOut_{safe_name} = outfile("{csv_posix}" "w")'
+        )
+
+        # ocnPrint the waveform data as CSV
+        lines.append(
+            f"  ocnPrint(?output hermesWaveOut_{safe_name} "
+            f'?separator "," ?numberNotation \'scientific '
+            f"hermesWave_{safe_name})"
+        )
+
+        # Close the output file
+        lines.append(f"  close(hermesWaveOut_{safe_name})")
+        lines.append("else")
+        lines.append(f"  ; waveform export {wf.name} returned nil")
+        lines.append(")")
+
+    return lines
+
+
 def render_ocean_replay_script(context: SpectreOceanContext) -> str:
     scalar_path = _posix_path(context.request.ocean.scalar_output_file)
     psf_path = _posix_path(context.request.expected_psf_dir)
@@ -476,6 +630,9 @@ def render_ocean_replay_script(context: SpectreOceanContext) -> str:
                 ")",
             ]
         )
+
+    # Waveform CSV export lines (after scalar metrics, before close/exit)
+    lines.extend(_render_waveform_export_lines(context))
 
     lines.extend(["close(out)", "exit()"])
     return "\n".join(lines) + "\n"
@@ -886,6 +1043,143 @@ def _write_metric_result_manifest(
         status=manifest_status,
         issues=issues,
     )
+
+
+def _build_waveform_export_results(
+    context: SpectreOceanContext,
+    *,
+    ocean_failed: bool,
+) -> list[dict]:
+    """Build waveform export result entries for each waveform export request.
+
+    When *ocean_failed* is True, all exports are marked as failed.
+    Otherwise, each CSV file is checked for existence and non-empty size.
+    """
+    results: list[dict] = []
+    for wf in context.request.waveform_exports:
+        if ocean_failed:
+            results.append({
+                "name": wf.name,
+                "expression": wf.expression,
+                "expression_sha256": wf.expression_sha256,
+                "output_format": wf.output_format,
+                "csv_path": _waveform_csv_relative(context, wf.csv_output_file),
+                "status": "fail",
+                "issues": ["ocean command failed"],
+            })
+            continue
+        csv_abs = _project_relative_path(context.project_dir, wf.csv_output_file)
+        csv_relative = _waveform_csv_relative(context, wf.csv_output_file)
+        if csv_abs.exists() and csv_abs.stat().st_size > 0:
+            results.append({
+                "name": wf.name,
+                "expression": wf.expression,
+                "expression_sha256": wf.expression_sha256,
+                "output_format": wf.output_format,
+                "csv_path": csv_relative,
+                "status": "pass",
+                "issues": [],
+            })
+        else:
+            issue_msg = (
+                "csv output file is empty"
+                if csv_abs.exists()
+                else "csv output file is missing"
+            )
+            results.append({
+                "name": wf.name,
+                "expression": wf.expression,
+                "expression_sha256": wf.expression_sha256,
+                "output_format": wf.output_format,
+                "csv_path": csv_relative,
+                "status": "fail",
+                "issues": [issue_msg],
+            })
+    return results
+
+
+def _waveform_csv_relative(context: SpectreOceanContext, csv_output_file: str) -> str:
+    """Convert a project-absolute CSV path to a path relative to the child run directory."""
+    csv_posix = PurePosixPath(csv_output_file)
+    run_prefix = PurePosixPath(context.run_relative)
+    if csv_posix.is_relative_to(run_prefix):
+        return str(csv_posix.relative_to(run_prefix))
+    return csv_output_file
+
+
+def _write_waveform_export_manifest(
+    context: SpectreOceanContext,
+    waveform_results: list[dict],
+    *,
+    command_trace: dict | None = None,
+) -> Path:
+    """Build and persist a waveform export manifest in the metrics directory.
+
+    *waveform_results* is a list of dicts, each with at least ``name``,
+    ``expression``, ``expression_sha256``, ``output_format``, ``csv_path``,
+    ``status``, and ``issues``.
+    """
+    # Derive model_section from corner context
+    model_section = ""
+    corner_variables: dict[str, str] = {}
+    if context.corner_id is not None:
+        try:
+            from hermes_workflow.schemas import ProcessCornerConfig
+
+            corner_config_path = (
+                context.project_dir / "config" / "process_corners.yaml"
+            )
+            if corner_config_path.exists():
+                import yaml
+
+                corner_payload = yaml.safe_load(
+                    corner_config_path.read_text(encoding="utf-8")
+                )
+                corner_cfg = ProcessCornerConfig.model_validate(corner_payload)
+                for corner in corner_cfg.corners:
+                    if corner.id == context.corner_id:
+                        model_section = corner.model_section or ""
+                        if corner.variables is not None:
+                            corner_variables = dict(corner.variables)
+                        break
+        except Exception:
+            pass
+
+    # Get parameters from the candidate file
+    parameters: dict[str, str] = {}
+    candidate_path = context.run_dir / "candidate.json"
+    if not candidate_path.exists():
+        # For child runs, candidate.json is in the root run dir
+        root_run_dir = context.project_dir / "runs" / "real" / context.run_id
+        candidate_path = root_run_dir / "candidate.json"
+    if candidate_path.exists():
+        try:
+            candidate = json.loads(candidate_path.read_text(encoding="utf-8"))
+            raw_params = candidate.get("parameters", {})
+            if isinstance(raw_params, dict):
+                parameters = {k: str(v) for k, v in raw_params.items()}
+        except (json.JSONDecodeError, ValueError):
+            pass
+
+    payload = {
+        "schema_version": "1.0",
+        "workflow_mode": "fix_run",
+        "run_id": context.run_id,
+        "candidate_id": context.request.candidate_id,
+        "testbench_id": context.testbench_id or "",
+        "corner_id": context.corner_id or "",
+        "model_section": model_section,
+        "corner_variables": corner_variables,
+        "parameters": parameters,
+        "exports": waveform_results,
+        "psf_dir": "psf",
+        "ocean_log": "metrics/ocean.log",
+    }
+    if command_trace is not None:
+        payload["command_trace"] = command_trace
+    manifest_path = context.metrics_dir / WAVEFORM_EXPORT_MANIFEST_NAME
+    _write_json(manifest_path, payload)
+    return manifest_path
 
 
 def write_spectre_result_manifest(

@@ -25,12 +25,12 @@ skills/
 vendor/
 tests/
 tools/
-RELEASE_NOTES_v0.1.7.md
+RELEASE_NOTES_v0.1.8.md
 LICENSE
 ```
 
 `tests/` is intentionally kept so developers can verify parser, workflow,
-optimizer, reporting, and agent skill behavior.
+optimizer, reporting, fix-run, and agent skill behavior.
 
 ## Do Not Publish User Artifacts
 
@@ -67,6 +67,12 @@ python3 -m venv .venv
 git diff --check -- . ':!vendor' ':!.serena'
 ```
 
+Run at least the focused fix-run tests before publishing v0.1.8:
+
+```bash
+./.venv/bin/python -m pytest tests/test_fix_run_docs.py tests/test_requirement_intake_fix_run.py tests/test_fix_run_flow.py tests/test_remote_fix_run_flow.py tests/test_remote_spectre_ocean_waveform.py -q
+```
+
 Use the site's Python 3.11+ command if `python3` is older than 3.11.
 
 Run a sensitive-path scan from the parent directory before pushing. Use markers
@@ -86,10 +92,10 @@ From the package root:
 ```bash
 git status --short
 git add .
-git commit -m "release: v0.1.7"
+git commit -m "release: v0.1.8"
 git push origin main
-git tag -f v0.1.7
-git push -f origin v0.1.7
+git tag v0.1.8
+git push origin v0.1.8
 ```
 
-Use `RELEASE_NOTES_v0.1.7.md` for GitHub release notes.
+Use `RELEASE_NOTES_v0.1.8.md` for GitHub release notes.

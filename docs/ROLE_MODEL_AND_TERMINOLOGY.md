@@ -9,8 +9,9 @@ User -> opt_requirement.md -> ic-opt CLI -> Spectre/OCEAN/optimizer -> artifacts
 ## User
 
 The user owns circuit intent and approves machine-critical inputs in
-`opt_requirement.md`: variables, metrics, constraints, objective, simulator
-resources, optimizer settings, and process corners.
+`opt_requirement.md`: workflow mode, variables, metrics, constraints,
+objective, fixed points, waveform exports, simulator resources, optimizer
+settings, and process corners.
 
 ## Agent
 
@@ -24,6 +25,7 @@ The agent may:
 - run `ic-opt PROJECT_DIR --real --continue N`
 - inspect reports and manifests
 - explain the selected candidate and warnings
+- explain fix-run waveform CSV evidence and child failures
 
 The agent must not:
 
@@ -48,8 +50,10 @@ reports/project_doctor_report.json
 reports/license_probe_report.json
 reports/optimizer_run_report.json
 reports/optimizer_decision_report.md
+reports/fix_run_report.json
 runs/**/result_manifest.json
 runs/**/metric_result_manifest.json
+runs/**/waveform_export_manifest.json
 ```
 
 Multi-testbench and multi-corner runs also write parent aggregate manifests.
@@ -59,3 +63,9 @@ Multi-testbench and multi-corner runs also write parent aggregate manifests.
 Optimizer reports identify the best observed feasible candidate under the
 configured objective and process-corner policy. This is not a proof of global
 optimality.
+
+## Fix-Run Result
+
+Fix-run reports identify whether each requested fixed point and child
+testbench/corner completed. They are characterization evidence, not optimizer
+recommendations.

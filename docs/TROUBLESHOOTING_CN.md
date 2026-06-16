@@ -50,18 +50,25 @@ reports/license_probe_report.json
 - `lmstat` 不可用
 - license server 不可达
 
-## OCEAN metric 失败
+## OCEAN metric 或 waveform export 失败
 
 查看 child artifact：
 
 ```text
 runs/**/metric_result_manifest.json
+runs/**/waveform_export_manifest.json
 runs/**/metrics/ocean.log
 ```
 
 `ocean_expression` 会被复制进 OCEAN replay script。不要把 ADE/Maestro 已验证公式
-改写成另一种方言。当前 optimizer metric path 需要标量结果；完整 waveform CSV
-导出应走 characterization/export workflow。
+改写成另一种方言。optimizer metric path 需要标量结果；完整 waveform CSV 导出应走
+fix-run 的 `Waveform Exports`。
+
+正确的 pnoise waveform expression 形式是：
+
+```text
+getData("NF" ?result "pnoise")
+```
 
 ## 并行数和线程数
 
@@ -85,6 +92,12 @@ reports/project_doctor_report.json
 reports/license_probe_report.json
 reports/optimizer_run_report.json
 reports/optimizer_decision_report.md
+reports/fix_run_report.json
 runs/**/result_manifest.json
 runs/**/metric_result_manifest.json
+runs/**/waveform_export_manifest.json
 ```
+
+fix-run 成功时，`reports/fix_run_report.json` 应显示 `workflow_mode: fix_run`。
+如果请求 waveform CSV，每个成功 child 都应有 waveform export manifest 和 CSV 文件。
+fix-run 不应生成 optimizer state 或 optimizer decision report。

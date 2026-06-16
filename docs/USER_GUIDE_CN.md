@@ -1,19 +1,27 @@
-# IC Auto Opt Workflow v0.1.7 使用说明
+# IC Auto Opt Workflow v0.1.8 使用说明
 
-IC Auto Opt 用 `opt_requirement.md` 描述一次 IC 优化任务。工具根据这个文件准备
-Spectre/OCEAN 仿真、调用优化器、聚合 metric，并写出过程文件和报告。
+IC Auto Opt 用 `opt_requirement.md` 描述一次真实 Spectre/OCEAN 工作流。当前
+release 支持两种模式：
 
-常用入口：
+- `optimize`：运行优化器，搜索满足约束的候选参数
+- `fix_run`：运行用户指定的固定参数点，导出指定 waveform CSV，不创建优化器状态
+
+两种模式都通过 `opt_requirement.md` 的 `Workflow.mode` 选择。没有单独的 fix-run
+命令行开关。
+
+## 常用入口
 
 ```bash
 ic-opt PROJECT_DIR --doctor
 ic-opt PROJECT_DIR --real
 ic-opt PROJECT_DIR --real --continue N
+ic-opt --ssh-profile PROFILE PROJECT_DIR --doctor
+ic-opt --ssh-profile PROFILE PROJECT_DIR --real
 ```
 
-`--continue N` 是保留的追加仿真入口。初次运行的预算、batch size、并行数、
+`--continue N` 只用于已经存在的优化任务。初次运行的预算、batch size、并行数、
 Spectre 线程数、优化器 CPU 限制、算法、策略、初始化、工艺角、输出格式、
-metric 公式和约束都来自 `opt_requirement.md`。
+metric 公式、固定点和 waveform export 都来自 `opt_requirement.md`。
 
 ## 安装
 
@@ -68,24 +76,29 @@ PROJECT_DIR/
 <maestro_point_root>/netlist/input.scs
 ```
 
-## 四个 Requirement 模板
+## Requirement 模板
 
 ```text
 examples/spectre_maestro_project/opt_requirement.md
 examples/spectre_maestro_project/opt_requirement.multi_corner.md
 examples/spectre_maestro_project/opt_requirement.multi_testbench.md
 examples/spectre_maestro_project/opt_requirement.multi_tb_corner.md
+examples/spectre_maestro_project/opt_requirement.fix_run.md
 ```
 
-这四个模板来自同一个已验证 Mixer requirement。真实路径已替换为占位路径。
-使用时复制其中一个为项目里的 `opt_requirement.md`，再替换 Maestro point root、
-变量范围、约束和公式。
+`opt_requirement.fix_run.md` 以真实跑通的 15-corner Mixer requirement 为结构基准。
+使用时把它复制为项目根目录的 `opt_requirement.md`，替换 Maestro point root、
+固定参数点、corner 变量和 waveform export。
 
-## `opt_requirement.md` 写什么
+## 优化模式
+
+优化 requirement 可以省略 `Workflow` section；省略时默认 `mode: optimize`。
+
+优化 requirement 写：
 
 - Maestro/ADE point root 和 testbench 路由
 - design variables、范围和 step
-- OCEAN metric 表达式
+- OCEAN scalar metric 表达式
 - constraints 和 objective
 - Spectre 设置：`parallel_jobs`、`threads_per_run`、`output_format: psfxl`
 - 优化器设置：`algorithm`、`strategy`、`max_evaluations`、`batch_size`
@@ -94,30 +107,36 @@ examples/spectre_maestro_project/opt_requirement.multi_tb_corner.md
 - license probe 和 artifact 保留策略
 - `Process Corners`，如果需要多工艺角
 
-## 优化算法
-
 生产使用时，把下面三种策略看成并列选择：
 
-```yaml
-algorithm: openbox
-strategy: openbox_gp_eic
-```
-
-```yaml
-algorithm: openbox
-strategy: openbox_prf_eic
-```
-
-```yaml
-algorithm: turbo
-strategy: turbo_trust_region
-```
-
-TuRBO 适合变量 step 较细的场景，例如约 `0.1u`，因为连续候选点 snap 到合法网格
-后的扰动很小。finger count 这类粗整数、类别变量或大量重复 snap 点的空间，优先
-考虑 `openbox_prf_eic`。
+- `algorithm: openbox`, `strategy: openbox_gp_eic`
+- `algorithm: openbox`, `strategy: openbox_prf_eic`
+- `algorithm: turbo`, `strategy: turbo_trust_region`
 
 `random_baseline` 用于诊断，不作为生产优化策略。
+
+## Fix-Run 模式
+
+fix-run requirement 必须写：
+
+```yaml
+schema_version: "1.0"
+mode: fix_run
+starting_run_id: real_001
+```
+
+并包含：
+
+- `Fixed Points`：用户指定的一个或多个候选点
+- `Waveform Exports`：需要导出的 waveform CSV，例如
+  `getData("NF" ?result "pnoise")`
+- `Spectre Settings`、`Process Corners` 和 approval checklist
+
+fix-run 不运行优化器，不生成 `state/optimizer_state.json`，也不生成
+`reports/optimizer_decision_report.md`。
+
+示例中的 `temperature` 只是传给 netlist 的普通参数名，workflow 不会把它特殊映射成
+Spectre simulator option。
 
 ## 多工艺角
 
@@ -143,52 +162,30 @@ corners:
 
 流程说明见 `docs/PROCESS_CORNER_OPTIMIZATION_FLOW_CN.md`。
 
-## Local 运行
-
-```bash
-./.venv/bin/ic-opt PROJECT_DIR --doctor
-./.venv/bin/ic-opt PROJECT_DIR --real
-./.venv/bin/ic-opt PROJECT_DIR --real --continue N
-```
-
-## Remote 运行
-
-Remote 模式让本地负责优化器和报告，让远程 Linux EDA 服务器执行 Spectre/OCEAN：
-
-```bash
-./.venv/bin/ic-opt --ssh-profile PROFILE PROJECT_DIR --doctor
-./.venv/bin/ic-opt --ssh-profile PROFILE PROJECT_DIR --real
-./.venv/bin/ic-opt --ssh-profile PROFILE PROJECT_DIR --real --continue N
-```
-
-`PROFILE` 是本机 SSH 配置里的 profile。
-
 ## 看结果
 
-主要报告：
+优化报告：
 
 ```text
 reports/project_doctor_report.json
 reports/license_probe_report.json
 reports/optimizer_run_report.json
 reports/optimizer_decision_report.md
-```
-
-真实仿真过程文件：
-
-```text
 runs/**/result_manifest.json
 runs/**/metric_result_manifest.json
 ```
 
-验收时检查：
+fix-run 报告：
 
-- algorithm、strategy、initialization、random_seed 是否来自 requirement
-- budget、batch size、并行数、Spectre 线程数、optimizer CPU cap 是否生效
-- `output_format: psfxl` 是否生效
-- license probe 是否执行并写入报告
-- `command_trace` 是否记录 sanitized Spectre/OCEAN argv
-- 多工艺角结果是否按 configured policy 聚合
+```text
+reports/fix_run_report.json
+runs/real/real_001/testbenches/<tb>/corners/<corner>/result_manifest.json
+runs/real/real_001/testbenches/<tb>/corners/<corner>/metrics/metric_result_manifest.json
+runs/real/real_001/testbenches/<tb>/corners/<corner>/metrics/waveform_export_manifest.json
+runs/real/real_001/testbenches/<tb>/corners/<corner>/metrics/waveforms/<name>.csv
+```
+
+验收时不要只看退出码。必须检查报告和 child artifacts。
 
 ## Agent 使用
 

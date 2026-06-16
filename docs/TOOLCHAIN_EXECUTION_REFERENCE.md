@@ -1,7 +1,8 @@
 # Toolchain Execution Reference
 
 Use this before running Virtuoso, Spectre, OCEAN, OpenBox, native TuRBO,
-license probes, or optimizer commands from the release package.
+license probes, optimizer commands, or fix-run commands from the release
+package.
 
 ## Product Commands
 
@@ -15,10 +16,10 @@ ic-opt --ssh-profile PROFILE PROJECT_DIR --real
 ic-opt --ssh-profile PROFILE PROJECT_DIR --real --continue N
 ```
 
-`opt_requirement.md` supplies initial-run budget, batch size, Spectre
-parallelism, Spectre thread count, optimizer CPU cap, algorithm, strategy,
-initialization, process corners, output format, metric formulas, objective, and
-constraints.
+`opt_requirement.md` supplies workflow mode, initial-run budget, batch size,
+Spectre parallelism, Spectre thread count, optimizer CPU cap, algorithm,
+strategy, initialization, process corners, output format, metric formulas,
+objective, constraints, fixed points, and waveform exports.
 
 ## Product Environment
 
@@ -60,10 +61,12 @@ reports/project_doctor_report.json
 reports/license_probe_report.json
 reports/optimizer_run_report.json
 reports/optimizer_decision_report.md
+reports/fix_run_report.json
 state/optimizer_state.json
 ledger/experiment_ledger.jsonl
 runs/**/result_manifest.json
 runs/**/metric_result_manifest.json
+runs/**/waveform_export_manifest.json
 ```
 
 For multi-corner projects, inspect parent aggregate manifests and confirm each
@@ -75,3 +78,7 @@ or secrets.
 
 For CPU-limit audit, confirm optimizer reports include `runtime_thread_limits`
 with requested and effective thread evidence.
+
+For fix-run, confirm `reports/fix_run_report.json` reports
+`workflow_mode: fix_run`, expected child counts, waveform CSV paths when
+requested, and no optimizer state or optimizer decision report.

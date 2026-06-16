@@ -1,7 +1,7 @@
-# Optimizer Production Handoff Guide
+# Production Handoff Guide
 
-Use this guide when handing a real IC optimization project to an operator or
-agent.
+Use this guide when handing a real IC optimization or fix-run project to an
+operator or agent.
 
 ## Product Commands
 
@@ -13,15 +13,16 @@ ic-opt --ssh-profile PROFILE PROJECT_DIR --doctor
 ic-opt --ssh-profile PROFILE PROJECT_DIR --real
 ```
 
-Initial-run optimizer, resource, Spectre, metric, retention, and process-corner
-values come from `PROJECT_DIR/opt_requirement.md` and generated config. Do not
-ask an operator or agent to supply those values on the CLI.
+Initial-run optimizer, fix-run, resource, Spectre, metric, waveform export,
+retention, and process-corner values come from `PROJECT_DIR/opt_requirement.md`
+and generated config. Do not ask an operator or agent to supply those values on
+the CLI.
 
 ## Agent Role
 
 The agent may read `skills/ic-opt/SKILL.md`, run the product CLI, and inspect
-artifacts. It must not choose candidate points, rewrite formulas, parse PSF in
-Python, or change the search space.
+artifacts. It must not choose optimizer candidate points, rewrite formulas,
+parse PSF in Python, change the search space, or invent fix-run fixed points.
 
 ## Required Evidence
 
@@ -32,8 +33,10 @@ reports/project_doctor_report.json
 reports/license_probe_report.json
 reports/optimizer_run_report.json
 reports/optimizer_decision_report.md
+reports/fix_run_report.json
 runs/**/result_manifest.json
 runs/**/metric_result_manifest.json
+runs/**/waveform_export_manifest.json
 ```
 
 For multi-testbench or multi-corner runs, inspect parent aggregate manifests.
@@ -42,6 +45,10 @@ Artifacts must show algorithm, strategy, initialization, random seed, budget,
 batch size, parallelism, Spectre threads, optimizer CPU cap, process corners,
 `output_format: psfxl`, license probe behavior, and sanitized Spectre/OCEAN
 `command_trace`.
+
+For fix-run, artifacts must show `workflow_mode: fix_run`, expected child
+counts, waveform CSV exports when requested, and absence of optimizer state and
+optimizer decision reports.
 
 ## Optimizer Modes
 
@@ -53,6 +60,8 @@ Set the strategy in `opt_requirement.md`:
 
 TuRBO works best when legal variable steps are fine enough that snapping to the
 legal grid is a small perturbation, for example about `0.1u`.
+
+Fix-run does not use optimizer modes.
 
 ## Fail-Closed Conditions
 

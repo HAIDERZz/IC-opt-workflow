@@ -13,9 +13,12 @@ from hermes_workflow.execution_adapters.spectre_ocean import (
     RESULT_MANIFEST_NAME,
     SPECTRE_STDERR_NAME,
     SPECTRE_STDOUT_NAME,
+    WAVEFORM_EXPORT_MANIFEST_NAME,
     AdapterRunResult,
     _build_command_trace,
+    _build_waveform_export_results,
     _project_relative_path,
+    _write_waveform_export_manifest,
     build_ocean_argv,
     build_spectre_argv,
     load_adapter_context,
@@ -203,6 +206,26 @@ def run_remote_spectre_ocean_adapter(
             command_trace=spectre_trace,
         )
 
+    # Download waveform CSV files from metrics/waveforms/ if they exist.
+    # Missing waveform artifacts are not an error -- they may not be
+    # configured for this run.
+    try:
+        runner.download_tree(
+            remote_run_dir / "metrics" / "waveforms",
+            context.metrics_dir / "waveforms",
+        )
+    except Exception:
+        pass  # graceful: waveform directory may not exist
+
+    # Download waveform export manifest if it exists.
+    try:
+        runner.download(
+            remote_run_dir / "metrics" / WAVEFORM_EXPORT_MANIFEST_NAME,
+            context.metrics_dir / WAVEFORM_EXPORT_MANIFEST_NAME,
+        )
+    except Exception:
+        pass  # graceful: waveform manifest may not exist
+
     # Write ocean diagnostics locally from the LAST attempt (the one that
     # determined success/failure) and upload to remote.  Written after
     # download_tree so that the captured output is not overwritten by the
@@ -275,6 +298,36 @@ def run_remote_spectre_ocean_adapter(
         remote_run_dir / "metrics" / METRIC_RESULT_MANIFEST_NAME,
         prefix="metric result manifest",
     )
+
+    # Waveform export manifest: the remote OCEAN replay never writes this
+    # Python-side artifact. If waveform exports are configured and the
+    # manifest was not produced on (or downloaded from) the remote, generate
+    # it locally by reusing the same helper the local adapter uses, so the
+    # manifest schema cannot drift between local and remote. The CSV files
+    # were already downloaded into metrics/waveforms/.
+    local_waveform_manifest = context.metrics_dir / WAVEFORM_EXPORT_MANIFEST_NAME
+    if (
+        context.request.waveform_exports
+        and not local_waveform_manifest.is_file()
+    ):
+        ocean_failed = ocean_result.return_code != 0
+        waveform_results = _build_waveform_export_results(
+            context, ocean_failed=ocean_failed,
+        )
+        _write_waveform_export_manifest(
+            context, waveform_results, command_trace=full_trace,
+        )
+
+    # Upload the waveform export manifest (downloaded or locally generated)
+    # back to the remote so the remote project tree is self-consistent.
+    if local_waveform_manifest.is_file():
+        _safe_upload(
+            runner,
+            local_waveform_manifest,
+            remote_run_dir / "metrics" / WAVEFORM_EXPORT_MANIFEST_NAME,
+            prefix="waveform export manifest",
+            issues=metric_result.issues,
+        )
 
     status = "succeeded" if metric_result.status == "succeeded" else "failed"
     return AdapterRunResult(

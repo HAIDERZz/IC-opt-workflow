@@ -4,20 +4,21 @@ Use this before publishing a release package.
 
 ## Product Contract
 
-First real run:
+First real workflow run:
 
 ```bash
 ./.venv/bin/ic-opt PROJECT_DIR --real
 ```
 
-Continuation:
+Continuation for existing optimizer runs:
 
 ```bash
 ./.venv/bin/ic-opt PROJECT_DIR --real --continue N
 ```
 
-Initial-run optimizer, resource, Spectre, metric, retention, and process-corner
-settings come from `PROJECT_DIR/opt_requirement.md` and generated config files.
+Initial-run optimizer, fix-run, resource, Spectre, metric, waveform export,
+retention, and process-corner settings come from
+`PROJECT_DIR/opt_requirement.md` and generated config files.
 
 ## Environment
 
@@ -44,19 +45,21 @@ Entrypoints:
 
 ## Release Examples
 
-Keep these examples current:
+Keep these examples current and mirrored into package templates:
 
 ```text
 examples/spectre_maestro_project/opt_requirement.md
 examples/spectre_maestro_project/opt_requirement.multi_testbench.md
 examples/spectre_maestro_project/opt_requirement.multi_corner.md
 examples/spectre_maestro_project/opt_requirement.multi_tb_corner.md
+examples/spectre_maestro_project/opt_requirement.fix_run.md
+src/hermes_workflow/templates/spectre_maestro_project/opt_requirement.fix_run.md
 ```
 
 Requirement examples must parse with current requirement intake. Placeholder
 path failures are acceptable; schema/field failures are not.
 
-## Real Run Acceptance
+## Real Optimization Acceptance
 
 Prove:
 
@@ -72,6 +75,18 @@ Prove:
   candidate when feasible evidence exists
 - reports do not claim a mathematical global optimum
 
+## Real Fix-Run Acceptance
+
+Prove:
+
+- `reports/fix_run_report.json` reports pass
+- `workflow_mode` is `fix_run`
+- the child count matches the expected testbench/corner combinations
+- each successful child has result, scalar metric, waveform export, and CSV
+  artifacts when waveform exports are requested
+- optimizer state and optimizer decision report are not created
+- failures are reported through `child_issues`, not hidden by the parent report
+
 ## Documentation
 
 Before publishing:
@@ -82,7 +97,7 @@ Before publishing:
   examples describe the same CLI contract
 - check markdown code fences
 - check user-facing docs do not advertise stale CLI controls
-- keep `RELEASE_NOTES_v0.1.7.md` as the release summary
+- keep `RELEASE_NOTES_v0.1.8.md` as the release summary
 
 ## Files That Must Not Be Released
 

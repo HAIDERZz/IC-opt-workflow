@@ -1,6 +1,7 @@
-# Optimizer Production Quickstart
+# Production Quickstart
 
-Use this path for a real Maestro-exported Spectre/OCEAN optimization project.
+Use this path for a real Maestro-exported Spectre/OCEAN optimization or
+fix-run project.
 
 ## Install
 
@@ -28,9 +29,10 @@ PROJECT_DIR/
 └── context/
 ```
 
-`opt_requirement.md` supplies budget, batch size, Spectre resources, optimizer
-CPU cap, algorithm, strategy, initialization, output format, testbenches,
-process corners, metrics, objective, and constraints.
+`opt_requirement.md` supplies workflow mode, budget, batch size, Spectre
+resources, optimizer CPU cap, algorithm, strategy, initialization, output
+format, testbenches, process corners, metrics, objective, constraints, fixed
+points, and waveform exports.
 
 For each testbench, run one known-good Maestro/ADE point first. Put the point
 root in `opt_requirement.md`; it must contain:
@@ -46,7 +48,11 @@ examples/spectre_maestro_project/opt_requirement.md
 examples/spectre_maestro_project/opt_requirement.multi_corner.md
 examples/spectre_maestro_project/opt_requirement.multi_testbench.md
 examples/spectre_maestro_project/opt_requirement.multi_tb_corner.md
+examples/spectre_maestro_project/opt_requirement.fix_run.md
 ```
+
+Use `opt_requirement.fix_run.md` for fixed-point characterization and waveform
+CSV export. It is based on a real validated 15-corner Mixer requirement.
 
 ## Configure Cadence
 
@@ -97,6 +103,7 @@ reports/project_doctor_report.json
 reports/license_probe_report.json
 reports/optimizer_run_report.json
 reports/optimizer_decision_report.md
+reports/fix_run_report.json
 ```
 
 For real Spectre/OCEAN evidence, inspect:
@@ -104,9 +111,14 @@ For real Spectre/OCEAN evidence, inspect:
 ```text
 runs/**/result_manifest.json
 runs/**/metric_result_manifest.json
+runs/**/waveform_export_manifest.json
 ```
 
 For multi-testbench or multi-corner runs, inspect parent aggregate manifests.
+
+For fix-run, verify `reports/fix_run_report.json`, waveform export manifests,
+and CSV files under each successful child run. Fix-run must not create
+optimizer state or optimizer decision reports.
 
 ## Agent Use
 

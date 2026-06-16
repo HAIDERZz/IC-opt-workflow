@@ -22,18 +22,32 @@ from hermes_workflow.schemas import (
     VariableKind,
     VariablesConfig,
 )
+from hermes_workflow.fix_run_models import WaveformExportsConfig
 
 
 CONFIG_MODELS: dict[str, type[BaseModel]] = {
     "project_config.yaml": ProjectConfig,
     "variables.yaml": VariablesConfig,
-    "metrics.yaml": MetricsConfig,
     "spectre.yaml": SpectreConfig,
-    "optimizer.yaml": OptimizerConfig,
 }
+OPTIMIZER_REQUIRED_CONFIGS: tuple[str, ...] = (
+    "metrics.yaml",
+    "optimizer.yaml",
+)
+FIX_RUN_REQUIRED_CONFIGS: tuple[str, ...] = (
+    "fixed_points.yaml",
+)
+# Fix-run also requires at least one of these; checked separately.
+FIX_RUN_ONE_OF_CONFIGS: tuple[str, ...] = (
+    "metrics.yaml",
+    "waveform_exports.yaml",
+)
 OPTIONAL_CONFIG_MODELS: dict[str, type[BaseModel]] = {
+    "metrics.yaml": MetricsConfig,
+    "optimizer.yaml": OptimizerConfig,
     "testbenches.yaml": TestbenchesConfig,
     "process_corners.yaml": ProcessCornerConfig,
+    "waveform_exports.yaml": WaveformExportsConfig,
 }
 
 INTEGER_RE = re.compile(r"^[+-]?\d+$")
@@ -92,9 +106,10 @@ class ContractBundle:
     testbenches: TestbenchesConfig | None
     process_corners: ProcessCornerConfig | None
     variables: VariablesConfig
-    metrics: MetricsConfig
+    metrics: MetricsConfig | None
     spectre: SpectreConfig
-    optimizer: OptimizerConfig
+    optimizer: OptimizerConfig | None
+    waveform_exports: WaveformExportsConfig | None = None
 
 
 def validate_project_files(project_dir: Path) -> ValidationReport:
@@ -127,6 +142,7 @@ def _load_config_models(
 ) -> dict[str, BaseModel]:
     loaded: dict[str, BaseModel] = {}
     config_dir = project_dir / "config"
+    workflow_mode = _detect_workflow_mode(config_dir)
 
     for file_name, model in CONFIG_MODELS.items():
         config_path = config_dir / file_name
@@ -156,6 +172,38 @@ def _load_config_models(
             loaded[file_name] = model.model_validate(payload)
         except ValidationError as exc:
             issues.extend(_validation_error_issues(project_dir, config_path, exc))
+
+    # Mode-specific required configs.
+    mode_required = (
+        FIX_RUN_REQUIRED_CONFIGS
+        if workflow_mode == "fix_run"
+        else OPTIMIZER_REQUIRED_CONFIGS
+    )
+    for file_name in mode_required:
+        config_path = config_dir / file_name
+        if not config_path.exists():
+            issues.append(
+                ValidationIssue(
+                    file=_display_file(project_dir, config_path),
+                    path="",
+                    message="required config file is missing",
+                )
+            )
+    if workflow_mode == "fix_run":
+        if not any(
+            (config_dir / file_name).exists()
+            for file_name in FIX_RUN_ONE_OF_CONFIGS
+        ):
+            issues.append(
+                ValidationIssue(
+                    file="config/metrics.yaml or config/waveform_exports.yaml",
+                    path="",
+                    message=(
+                        "fix-run requires at least one of metrics.yaml or "
+                        "waveform_exports.yaml"
+                    ),
+                )
+            )
 
     for file_name, model in OPTIONAL_CONFIG_MODELS.items():
         config_path = config_dir / file_name
@@ -201,9 +249,22 @@ def _bundle_from_loaded(
             else None
         ),
         variables=_cast_model(VariablesConfig, loaded["variables.yaml"]),
-        metrics=_cast_model(MetricsConfig, loaded["metrics.yaml"]),
+        metrics=(
+            _cast_model(MetricsConfig, loaded["metrics.yaml"])
+            if "metrics.yaml" in loaded
+            else None
+        ),
         spectre=_cast_model(SpectreConfig, loaded["spectre.yaml"]),
-        optimizer=_cast_model(OptimizerConfig, loaded["optimizer.yaml"]),
+        optimizer=(
+            _cast_model(OptimizerConfig, loaded["optimizer.yaml"])
+            if "optimizer.yaml" in loaded
+            else None
+        ),
+        waveform_exports=(
+            _cast_model(WaveformExportsConfig, loaded["waveform_exports.yaml"])
+            if "waveform_exports.yaml" in loaded
+            else None
+        ),
     )
 
 
@@ -211,9 +272,11 @@ def _validate_contract_bundle(bundle: ContractBundle) -> list[ValidationIssue]:
     issues: list[ValidationIssue] = []
     issues.extend(_validate_netlist_paths(bundle.project_config))
     issues.extend(_validate_variables(bundle.variables))
-    issues.extend(_validate_metrics(bundle.metrics, bundle.testbenches))
-    issues.extend(_validate_objective_expression(bundle.metrics))
-    issues.extend(_validate_optimizer_contract(bundle))
+    if bundle.metrics is not None:
+        issues.extend(_validate_metrics(bundle.metrics, bundle.testbenches))
+        issues.extend(_validate_objective_expression(bundle.metrics))
+    if bundle.optimizer is not None:
+        issues.extend(_validate_optimizer_contract(bundle))
     return issues
 
 
@@ -634,6 +697,8 @@ def _eval_ast(node: ast.AST, metrics: dict[str, float]) -> float:
 
 def _validate_optimizer_contract(bundle: ContractBundle) -> list[ValidationIssue]:
     issues: list[ValidationIssue] = []
+    if bundle.optimizer is None:
+        return issues
     optimizer = bundle.optimizer.optimizer
     spectre = bundle.spectre.spectre
 
@@ -683,6 +748,28 @@ def _display_file(project_dir: Path, config_path: Path) -> str:
         return config_path.relative_to(project_dir).as_posix()
     except ValueError:
         return config_path.as_posix()
+
+
+def _detect_workflow_mode(config_dir: Path) -> str:
+    """Detect workflow mode from config/workflow.yaml.
+
+    Falls back to ``fix_run`` if ``fixed_points.yaml`` exists but
+    ``workflow.yaml`` does not (defensive — keeps fix-run shape recognized).
+    Defaults to ``optimize`` otherwise. Malformed YAML defaults to
+    ``optimize`` so the standard required-config validator still runs."""
+    workflow_path = config_dir / "workflow.yaml"
+    if workflow_path.exists():
+        try:
+            payload = yaml.safe_load(workflow_path.read_text(encoding="utf-8"))
+        except yaml.YAMLError:
+            return "optimize"
+        if isinstance(payload, dict):
+            mode = payload.get("mode")
+            if isinstance(mode, str):
+                return mode
+    if (config_dir / "fixed_points.yaml").exists():
+        return "fix_run"
+    return "optimize"
 
 
 def _cast_model(model_type: type[Any], model: BaseModel) -> Any:

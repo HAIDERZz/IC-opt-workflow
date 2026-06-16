@@ -451,3 +451,50 @@ tran tran stop=10n
 
     assert report.status == PassFail.PASS
     assert not (project_dir / "netlists" / "testbenches" / "tb1" / "corners").exists()
+
+
+def test_corner_variables_are_generic_not_temperature_special_cased() -> None:
+    """B-FIXRUN-04: Process Corners.variables must use the generic parameter
+    rewrite path for ANY variable name. An arbitrary (non-temperature) variable
+    must be injected identically to temperature, proving no special-casing."""
+    source_text = """simulator lang=spectre
+include "/path/to/toplevel.scs" section=Post_simu_top_tt
+parameters temperature=27 F=20 vdd=900m
+"""
+    # Use only arbitrary (non-temperature) variable names.
+    corner = ProcessCorner(
+        id="ss",
+        model_section="Post_simu_top_ss",
+        variables={"F": "40", "vdd": "850m"},
+    )
+
+    result = render_corner_netlist_template(source_text, corner, "tt")
+
+    assert "F=40" in result
+    assert "vdd=850m" in result
+    # temperature is untouched (not special-cased to follow simulatorOptions).
+    assert "temperature=27" in result
+    assert "section=Post_simu_top_ss" in result
+    assert "section=Post_simu_top_tt" not in result
+
+
+def test_corner_model_section_switches_per_corner() -> None:
+    """B-FIXRUN-04: model_section must switch per corner via the generic
+    include-section substitution."""
+    source_text = """simulator lang=spectre
+include "/path/to/toplevel.scs" section=Post_simu_top_tt
+parameters temperature=27
+"""
+    tt = ProcessCorner(id="tt", model_section="Post_simu_top_tt")
+    ss = ProcessCorner(id="ss", model_section="Post_simu_top_ss")
+    ff = ProcessCorner(id="ff", model_section="Post_simu_top_ff")
+
+    assert "section=Post_simu_top_tt" in render_corner_netlist_template(
+        source_text, tt, "tt"
+    )
+    assert "section=Post_simu_top_ss" in render_corner_netlist_template(
+        source_text, ss, "tt"
+    )
+    assert "section=Post_simu_top_ff" in render_corner_netlist_template(
+        source_text, ff, "tt"
+    )

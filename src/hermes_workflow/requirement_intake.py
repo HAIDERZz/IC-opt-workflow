@@ -22,6 +22,10 @@ from hermes_workflow.schemas import (
     TestbenchesConfig,
     VariablesConfig,
 )
+from hermes_workflow.fix_run_models import (
+    FixedPointsConfig,
+    WaveformExportsConfig,
+)
 from hermes_workflow.requirement_semantics import validate_requirement_semantics
 from hermes_workflow.diagnostics import Diagnostic, DiagnosticSeverity
 
@@ -38,6 +42,17 @@ REQUIRED_SECTIONS = [
 ]
 OPTIONAL_SECTIONS = [
     "Process Corners",
+    "Workflow",
+    "Fixed Points",
+    "Waveform Exports",
+]
+FIX_RUN_REQUIRED_SECTIONS = [
+    "Project",
+    "Maestro Source",
+    "Design Variables",
+    "Spectre Settings",
+    "Fixed Points",
+    "Approval Checklist",
 ]
 APPROVAL_FIELDS = [
     "metric_formulas_user_approved",
@@ -55,6 +70,8 @@ CONFIG_FILE_MODELS: dict[str, type[BaseModel]] = {
 OPTIONAL_CONFIG_FILE_MODELS: dict[str, type[BaseModel]] = {
     "testbenches.yaml": TestbenchesConfig,
     "process_corners.yaml": ProcessCornerConfig,
+    "fixed_points.yaml": FixedPointsConfig,
+    "waveform_exports.yaml": WaveformExportsConfig,
 }
 
 
@@ -96,6 +113,7 @@ class RequirementIntakeReport:
     sections: dict[str, Any]
     constraints_md_present: bool
     constraints_md_sha256: str | None
+    workflow_mode: str = "optimize"
 
 
 @dataclass(frozen=True)
@@ -127,7 +145,7 @@ def prepare_from_requirement(project_dir: str | Path) -> RequirementPreparationR
     if intake.status != "pass":
         return RequirementPreparationReport(status="fail", issues=intake.issues)
 
-    config_payloads = render_config_payloads(intake.sections)
+    config_payloads = render_config_payloads(intake.sections, workflow_mode=intake.workflow_mode)
     write_config_payloads(project_root, config_payloads)
     import_reports = _import_requirement_netlists(project_root, intake.sections)
     import_issues = [
@@ -146,19 +164,15 @@ def prepare_from_requirement(project_dir: str | Path) -> RequirementPreparationR
     return RequirementPreparationReport(status="pass", issues=[])
 
 
-def render_config_payloads(sections: dict[str, Any]) -> dict[str, dict[str, Any]]:
+def render_config_payloads(sections: dict[str, Any], *, workflow_mode: str = "optimize") -> dict[str, dict[str, Any]]:
     project = _dict_section(sections, "Project")
     maestro = _dict_section(sections, "Maestro Source")
     testbenches = _testbench_sources(maestro)
     primary_testbench = testbenches[0]
     variables = _list_section(sections, "Design Variables")
-    metrics = _list_section(sections, "Metrics")
-    constraints = _list_section(sections, "Constraints")
-    objective = _dict_section(sections, "Objective")
     spectre = _dict_section(sections, "Spectre Settings")
-    optimizer = _dict_section(sections, "Optimizer Settings")
 
-    payloads = {
+    payloads: dict[str, dict[str, Any]] = {
         "project_config.yaml": {
             "schema_version": "1.0",
             "project": {
@@ -191,21 +205,54 @@ def render_config_payloads(sections: dict[str, Any]) -> dict[str, dict[str, Any]
             "schema_version": "1.0",
             "variables": variables,
         },
-        "metrics.yaml": {
-            "schema_version": "1.0",
-            "metrics": [_metric_payload(metric) for metric in metrics],
-            "constraints": constraints,
-            "objective": objective,
-        },
         "spectre.yaml": {
             "schema_version": "1.0",
             "spectre": spectre,
         },
-        "optimizer.yaml": {
+    }
+
+    if workflow_mode == "fix_run":
+        # fix_run: render workflow.yaml, fixed_points.yaml,
+        # waveform_exports.yaml (if present), metrics.yaml (if Metrics
+        # present), process_corners.yaml. Do NOT render optimizer.yaml.
+        workflow = _dict_section(sections, "Workflow")
+        payloads["workflow.yaml"] = workflow
+
+        fixed_points = _dict_section(sections, "Fixed Points")
+        payloads["fixed_points.yaml"] = fixed_points
+
+        if "Waveform Exports" in sections:
+            waveform_exports = _dict_section(sections, "Waveform Exports")
+            payloads["waveform_exports.yaml"] = waveform_exports
+
+        if "Metrics" in sections:
+            metrics = _list_section(sections, "Metrics")
+            constraints = _list_section(sections, "Constraints") if "Constraints" in sections else []
+            objective = _dict_section(sections, "Objective") if "Objective" in sections else {}
+            payloads["metrics.yaml"] = {
+                "schema_version": "1.0",
+                "metrics": [_metric_payload(metric) for metric in metrics],
+                "constraints": constraints,
+                "objective": objective,
+            }
+    else:
+        # optimize mode: existing behavior
+        metrics = _list_section(sections, "Metrics")
+        constraints = _list_section(sections, "Constraints")
+        objective = _dict_section(sections, "Objective")
+        optimizer = _dict_section(sections, "Optimizer Settings")
+
+        payloads["metrics.yaml"] = {
+            "schema_version": "1.0",
+            "metrics": [_metric_payload(metric) for metric in metrics],
+            "constraints": constraints,
+            "objective": objective,
+        }
+        payloads["optimizer.yaml"] = {
             "schema_version": "1.0",
             "optimizer": optimizer,
-        },
-    }
+        }
+
     if "testbenches" in maestro:
         payloads["testbenches.yaml"] = {
             "schema_version": "1.0",
@@ -229,7 +276,7 @@ def render_config_payloads(sections: dict[str, Any]) -> dict[str, dict[str, Any]
             "constraint_policy": "nominal",
             "corners": [{"id": "nominal"}],
         }
-    _validate_config_payloads(payloads)
+    _validate_config_payloads(payloads, workflow_mode=workflow_mode)
     return payloads
 
 
@@ -399,7 +446,7 @@ def parse_requirement_text(
 
     constraints_sha = hashlib.sha256(constraints_text.encode("utf-8")).hexdigest() if constraints_text is not None else None
 
-    raw_sections, section_issues, section_diagnostics = _extract_required_sections(
+    raw_sections, section_issues, section_diagnostics, workflow_mode = _extract_required_sections(
         requirement_text
     )
     issues.extend(section_issues)
@@ -420,7 +467,7 @@ def parse_requirement_text(
 
     if not issues:
         issues.extend(_validate_approval_checklist(sections))
-        issues.extend(_validate_required_fields(sections))
+        issues.extend(_validate_required_fields(sections, workflow_mode=workflow_mode))
         if not issues:
             semantic_issues = validate_requirement_semantics(sections)
             issues.extend(semantic_issues)
@@ -430,7 +477,7 @@ def parse_requirement_text(
             )
         if not issues:
             try:
-                render_config_payloads(sections)
+                render_config_payloads(sections, workflow_mode=workflow_mode)
             except (KeyError, TypeError, ValueError, ValidationError) as exc:
                 issues.append(f"rendered config validation failed: {exc}")
         for maestro_root in _maestro_point_roots(sections):
@@ -461,6 +508,7 @@ def parse_requirement_text(
         sections=sections,
         constraints_md_present=constraints_text is not None,
         constraints_md_sha256=constraints_sha,
+        workflow_mode=workflow_mode,
     )
 
 
@@ -506,7 +554,7 @@ def _parse_and_validate_requirement(project_dir: Path) -> RequirementIntakeRepor
 
 def _extract_required_sections(
     text: str,
-) -> tuple[dict[str, str], list[str], list[Diagnostic]]:
+) -> tuple[dict[str, str], list[str], list[Diagnostic], str]:
     headings: list[tuple[str, int, int]] = []
     issues: list[str] = []
     structured_issues: list[Diagnostic] = []
@@ -519,11 +567,31 @@ def _extract_required_sections(
             headings.append((name, offset, offset + len(line)))
         offset += len(line)
 
-    counts = {name: 0 for name in REQUIRED_SECTIONS}
+    # Detect workflow mode from Workflow section if present
+    workflow_mode = "optimize"
+    workflow_heading_indices = [
+        i for i, (name, _s, _e) in enumerate(headings) if name == "Workflow"
+    ]
+    if workflow_heading_indices:
+        idx = workflow_heading_indices[0]
+        content_start = headings[idx][2]
+        content_end = (
+            headings[idx + 1][1] if idx + 1 < len(headings) else len(text)
+        )
+        workflow_text = text[content_start:content_end]
+        workflow_payload, workflow_issues = _parse_section_yaml("Workflow", workflow_text)
+        if not workflow_issues and isinstance(workflow_payload, dict):
+            workflow_mode = workflow_payload.get("mode", "optimize")
+
+    required_sections = (
+        FIX_RUN_REQUIRED_SECTIONS if workflow_mode == "fix_run" else REQUIRED_SECTIONS
+    )
+
+    counts = {name: 0 for name in required_sections}
     for name, _start, _end in headings:
         if name in counts:
             counts[name] += 1
-    for name in REQUIRED_SECTIONS:
+    for name in required_sections:
         if counts[name] == 0:
             issues.append(f"required section is missing: {name}")
             structured_issues.append(
@@ -572,15 +640,15 @@ def _extract_required_sections(
                 )
             )
     if issues:
-        return {}, issues, structured_issues
+        return {}, issues, structured_issues, workflow_mode
 
     sections: dict[str, str] = {}
     for index, (name, _start, content_start) in enumerate(headings):
-        if name not in REQUIRED_SECTIONS and name not in OPTIONAL_SECTIONS:
+        if name not in required_sections and name not in OPTIONAL_SECTIONS:
             continue
         content_end = headings[index + 1][1] if index + 1 < len(headings) else len(text)
         sections[name] = text[content_start:content_end]
-    return sections, [], structured_issues
+    return sections, [], structured_issues, workflow_mode
 
 
 def _parse_section_yaml(name: str, text: str) -> tuple[Any, list[str]]:
@@ -787,7 +855,7 @@ def _validate_approval_checklist(sections: dict[str, Any]) -> list[str]:
     return issues
 
 
-def _validate_required_fields(sections: dict[str, Any]) -> list[str]:
+def _validate_required_fields(sections: dict[str, Any], *, workflow_mode: str = "optimize") -> list[str]:
     required = {
         "Project": ["project_name", "backend"],
         "Objective": ["direction", "expression"],
@@ -813,6 +881,14 @@ def _validate_required_fields(sections: dict[str, Any]) -> list[str]:
         ],
     }
     issues: list[str] = []
+
+    if workflow_mode == "fix_run":
+        # Skip Objective, Constraints, Optimizer Settings required-field checks
+        required = {
+            k: v for k, v in required.items()
+            if k not in ("Objective", "Constraints", "Optimizer Settings")
+        }
+
     for section, fields in required.items():
         payload = _dict_section(sections, section)
         for field in fields:
@@ -853,9 +929,50 @@ def _validate_required_fields(sections: dict[str, Any]) -> list[str]:
         ]:
             if field not in maestro:
                 issues.append(f"Maestro Source.{field} is required")
-    for section in ("Design Variables", "Metrics", "Constraints"):
-        if not isinstance(sections.get(section), list):
-            issues.append(f"{section} must be a YAML list")
+    if workflow_mode == "fix_run":
+        # Validate Fixed Points section
+        fixed_points = sections.get("Fixed Points")
+        if isinstance(fixed_points, dict):
+            if "points" not in fixed_points or not isinstance(fixed_points["points"], list):
+                issues.append("Fixed Points.points is required and must be a list")
+            else:
+                # Validate parameter names are in Design Variables
+                variable_names = {
+                    v["name"] for v in sections.get("Design Variables", []) if isinstance(v, dict)
+                }
+                for point in fixed_points["points"]:
+                    if not isinstance(point, dict):
+                        continue
+                    params = point.get("parameters", {})
+                    for param_name in params:
+                        if param_name not in variable_names:
+                            issues.append(
+                                f"Fixed Points parameter '{param_name}' is not a declared Design Variable"
+                            )
+                    missing = variable_names - set(params.keys())
+                    if missing:
+                        for missing_name in sorted(missing):
+                            issues.append(
+                                f"Fixed Points point '{point.get('candidate_id', '?')}' "
+                                f"is missing Design Variable '{missing_name}'"
+                            )
+        # Validate at least one of Metrics or Waveform Exports is present
+        has_metrics = "Metrics" in sections
+        has_waveform_exports = "Waveform Exports" in sections
+        if not has_metrics and not has_waveform_exports:
+            issues.append(
+                "fix_run mode requires at least one of Metrics or Waveform Exports"
+            )
+        # Metrics must be a list if present
+        if has_metrics and not isinstance(sections.get("Metrics"), list):
+            issues.append("Metrics must be a YAML list")
+        # Design Variables must be a list
+        if not isinstance(sections.get("Design Variables"), list):
+            issues.append("Design Variables must be a YAML list")
+    else:
+        for section in ("Design Variables", "Metrics", "Constraints"):
+            if not isinstance(sections.get(section), list):
+                issues.append(f"{section} must be a YAML list")
     return issues
 
 
@@ -884,14 +1001,24 @@ def _metric_payload(metric: dict[str, Any]) -> dict[str, Any]:
     return payload
 
 
-def _validate_config_payloads(payloads: dict[str, dict[str, Any]]) -> None:
+def _validate_config_payloads(payloads: dict[str, dict[str, Any]], *, workflow_mode: str = "optimize") -> None:
     for file_name, model in CONFIG_FILE_MODELS.items():
+        if file_name not in payloads:
+            continue
         model.model_validate(payloads[file_name])
     optional_models: dict[str, BaseModel] = {}
     for file_name, model in OPTIONAL_CONFIG_FILE_MODELS.items():
         if file_name in payloads:
             optional_models[file_name] = model.model_validate(payloads[file_name])
-    if "testbenches.yaml" in optional_models:
+
+    # Validate fix-run specific config files
+    if workflow_mode == "fix_run":
+        if "fixed_points.yaml" in payloads:
+            FixedPointsConfig.model_validate(payloads["fixed_points.yaml"])
+        if "waveform_exports.yaml" in payloads:
+            WaveformExportsConfig.model_validate(payloads["waveform_exports.yaml"])
+
+    if "testbenches.yaml" in optional_models and "metrics.yaml" in payloads:
         _validate_metric_testbench_routes(
             MetricsConfig.model_validate(payloads["metrics.yaml"]),
             _cast_config(TestbenchesConfig, optional_models["testbenches.yaml"]),
@@ -995,6 +1122,7 @@ def _write_requirement_report(
         "sections": sorted(report.sections),
         "constraints_md_present": report.constraints_md_present,
         "constraints_md_sha256": report.constraints_md_sha256,
+        "workflow_mode": report.workflow_mode,
     }
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 

@@ -1568,3 +1568,513 @@ def test_local_transient_ocean_failure_command_trace_has_retry_return_codes(
     ocean_trace = metric_manifest["command_trace"]["ocean"]
     assert ocean_trace["return_codes"] == [35, 0]
     assert ocean_trace["return_code"] == 0
+
+
+# ── Waveform CSV export tests ─────────────────────────────────────────
+
+
+def _add_waveform_exports_to_request(
+    project_dir: Path,
+    waveform_exports: list[dict],
+) -> None:
+    """Add waveform_exports entries to the metric extraction request and refresh hashes."""
+    run_dir = project_dir / "runs" / "real" / "real_001"
+    request_path = run_dir / "metric_extraction_request.json"
+    request = _load_json(request_path)
+    request["waveform_exports"] = waveform_exports
+    _write_json(request_path, request)
+    _refresh_metric_request_hash(run_dir)
+
+
+def test_render_ocean_replay_script_emits_ocn_print_for_waveform_exports(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_real_run_project(tmp_path)
+    expression = 'getData("NF" ?result "pnoise")'
+    _add_waveform_exports_to_request(project_dir, [
+        {
+            "name": "nf_pnoise",
+            "testbench": "cg_nf",
+            "expression": expression,
+            "expression_sha256": expression_sha256(expression),
+            "output_format": "csv",
+            "nil_policy": "fail",
+            "csv_output_file": "runs/real/real_001/metrics/waveforms/nf_pnoise.csv",
+        }
+    ])
+
+    context = load_adapter_context(project_dir)
+    script = render_ocean_replay_script(context)
+
+    assert "ocnPrint" in script
+    assert "hermesWave_nf_pnoise" in script
+    assert "; waveform export: nf_pnoise" in script
+
+
+def test_render_ocean_replay_script_preserves_waveform_expression_verbatim(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_real_run_project(tmp_path)
+    expression = 'getData("NF" ?result "pnoise")'
+    _add_waveform_exports_to_request(project_dir, [
+        {
+            "name": "nf_pnoise",
+            "testbench": "cg_nf",
+            "expression": expression,
+            "expression_sha256": expression_sha256(expression),
+            "output_format": "csv",
+            "nil_policy": "fail",
+            "csv_output_file": "runs/real/real_001/metrics/waveforms/nf_pnoise.csv",
+        }
+    ])
+
+    context = load_adapter_context(project_dir)
+    script = render_ocean_replay_script(context)
+
+    # Expression must appear exactly as-is, NOT rewritten
+    assert expression in script
+
+
+def test_render_ocean_replay_script_waveform_writes_to_csv_path(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_real_run_project(tmp_path)
+    expression = 'getData("NF" ?result "pnoise")'
+    csv_path = "runs/real/real_001/metrics/waveforms/nf_pnoise.csv"
+    _add_waveform_exports_to_request(project_dir, [
+        {
+            "name": "nf_pnoise",
+            "testbench": "cg_nf",
+            "expression": expression,
+            "expression_sha256": expression_sha256(expression),
+            "output_format": "csv",
+            "nil_policy": "fail",
+            "csv_output_file": csv_path,
+        }
+    ])
+
+    context = load_adapter_context(project_dir)
+    script = render_ocean_replay_script(context)
+
+    # The posix path must appear in the SKILL script
+    assert csv_path in script
+    # ocnPrint must use comma separator and scientific notation
+    assert "?separator \",\"" in script
+    assert "?numberNotation 'scientific" in script
+
+
+def test_render_ocean_replay_script_rejects_outfile_in_waveform_expression(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_real_run_project(tmp_path)
+    expression = 'outfile("/tmp/evil")'
+    _add_waveform_exports_to_request(project_dir, [
+        {
+            "name": "bad_export",
+            "testbench": "cg_nf",
+            "expression": expression,
+            "expression_sha256": expression_sha256(expression),
+            "output_format": "csv",
+            "nil_policy": "fail",
+            "csv_output_file": "runs/real/real_001/metrics/waveforms/bad_export.csv",
+        }
+    ])
+
+    context = load_adapter_context(project_dir)
+
+    with pytest.raises(AdapterPreconditionError, match="outfile\\("):
+        render_ocean_replay_script(context)
+
+
+def test_render_ocean_replay_script_rejects_system_in_waveform_expression(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_real_run_project(tmp_path)
+    expression = 'system("rm -rf /")'
+    _add_waveform_exports_to_request(project_dir, [
+        {
+            "name": "bad_export",
+            "testbench": "cg_nf",
+            "expression": expression,
+            "expression_sha256": expression_sha256(expression),
+            "output_format": "csv",
+            "nil_policy": "fail",
+            "csv_output_file": "runs/real/real_001/metrics/waveforms/bad_export.csv",
+        }
+    ])
+
+    context = load_adapter_context(project_dir)
+
+    with pytest.raises(AdapterPreconditionError, match="system\\("):
+        render_ocean_replay_script(context)
+
+
+def test_render_ocean_replay_script_rejects_template_placeholders_in_waveform_expression(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_real_run_project(tmp_path)
+    expression = "getData({{signal_name}})"
+    _add_waveform_exports_to_request(project_dir, [
+        {
+            "name": "bad_export",
+            "testbench": "cg_nf",
+            "expression": expression,
+            "expression_sha256": expression_sha256(expression),
+            "output_format": "csv",
+            "nil_policy": "fail",
+            "csv_output_file": "runs/real/real_001/metrics/waveforms/bad_export.csv",
+        }
+    ])
+
+    context = load_adapter_context(project_dir)
+
+    with pytest.raises(AdapterPreconditionError, match="template placeholder"):
+        render_ocean_replay_script(context)
+
+
+def test_render_ocean_replay_script_scalar_output_unchanged_without_waveform_exports(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_real_run_project(tmp_path)
+
+    context = load_adapter_context(project_dir)
+    script = render_ocean_replay_script(context)
+
+    # No waveform export content should appear
+    assert "ocnPrint" not in script
+    assert "waveform export" not in script
+    # Standard scalar metric content should still be there
+    assert "openResults" in script
+    assert "selectResult" in script
+    assert "close(out)" in script
+
+
+# ── Waveform export manifest tests ─────────────────────────────────────
+
+
+class FakeSuccessRunnerWithWaveforms(FakeSuccessRunner):
+    """FakeSuccessRunner that also creates CSV files for waveform exports."""
+
+    def run(
+        self,
+        argv: list[str],
+        *,
+        cwd: Path,
+        stdout_path: Path,
+        stderr_path: Path,
+        timeout_s: int,
+    ) -> CommandResult:
+        result = super().run(
+            argv,
+            cwd=cwd,
+            stdout_path=stdout_path,
+            stderr_path=stderr_path,
+            timeout_s=timeout_s,
+        )
+        if argv[0] == "ocean":
+            metrics_dir = _metrics_dir_from_ocean_argv(cwd, argv)
+            request = _load_json(metrics_dir.parent / "metric_extraction_request.json")
+            for wf in request.get("waveform_exports", []):
+                csv_abs = cwd / wf["csv_output_file"]
+                csv_abs.parent.mkdir(parents=True, exist_ok=True)
+                csv_abs.write_text("x,y\n0.0,1.0\n1e-12,2.0\n", encoding="utf-8")
+        return result
+
+
+def _waveform_exports() -> list[dict]:
+    expression = 'getData("NF" ?result "pnoise")'
+    return [
+        {
+            "name": "nf_pnoise",
+            "testbench": "cg_nf",
+            "expression": expression,
+            "expression_sha256": expression_sha256(expression),
+            "output_format": "csv",
+            "nil_policy": "fail",
+            "csv_output_file": "runs/real/real_001/metrics/waveforms/nf_pnoise.csv",
+        }
+    ]
+
+
+def test_waveform_export_manifest_written_on_success(tmp_path: Path) -> None:
+    """Successful local OCEAN run with waveform exports writes metrics/waveform_export_manifest.json."""
+    project_dir = _create_ready_real_run_project(tmp_path)
+    _add_waveform_exports_to_request(project_dir, _waveform_exports())
+    runner = FakeSuccessRunnerWithWaveforms()
+
+    run_spectre_ocean_adapter(project_dir, runner=runner)
+
+    manifest_path = (
+        project_dir
+        / "runs"
+        / "real"
+        / "real_001"
+        / "metrics"
+        / "waveform_export_manifest.json"
+    )
+    assert manifest_path.exists(), "waveform_export_manifest.json must be written"
+    manifest = _load_json(manifest_path)
+    assert manifest["schema_version"] == "1.0"
+    assert manifest["workflow_mode"] == "fix_run"
+    assert manifest["run_id"] == "real_001"
+    assert manifest["candidate_id"] == "real_001"
+    assert manifest["testbench_id"] is None or isinstance(manifest["testbench_id"], str)
+    assert manifest["corner_id"] is None or isinstance(manifest["corner_id"], str)
+    assert isinstance(manifest["model_section"], str)
+    assert isinstance(manifest["corner_variables"], dict)
+    assert isinstance(manifest["parameters"], dict)
+    assert isinstance(manifest["exports"], list)
+    assert manifest["psf_dir"] == "psf"
+    assert manifest["ocean_log"] == "metrics/ocean.log"
+    assert "command_trace" in manifest
+
+
+def test_waveform_export_manifest_contains_export_results(tmp_path: Path) -> None:
+    """Manifest exports contain waveform export results with pass/fail status."""
+    project_dir = _create_ready_real_run_project(tmp_path)
+    _add_waveform_exports_to_request(project_dir, _waveform_exports())
+    runner = FakeSuccessRunnerWithWaveforms()
+
+    run_spectre_ocean_adapter(project_dir, runner=runner)
+
+    manifest_path = (
+        project_dir
+        / "runs"
+        / "real"
+        / "real_001"
+        / "metrics"
+        / "waveform_export_manifest.json"
+    )
+    manifest = _load_json(manifest_path)
+    assert len(manifest["exports"]) == 1
+    export = manifest["exports"][0]
+    assert export["name"] == "nf_pnoise"
+    assert export["status"] == "pass"
+    assert export["csv_path"] is not None
+    assert export["issues"] == []
+
+
+def test_waveform_export_manifest_marks_missing_csv_as_failed(tmp_path: Path) -> None:
+    """Missing CSV after OCEAN return code zero marks the export as failed in the manifest."""
+    project_dir = _create_ready_real_run_project(tmp_path)
+    _add_waveform_exports_to_request(project_dir, _waveform_exports())
+    runner = FakeSuccessRunner()  # does NOT create CSV files
+
+    run_spectre_ocean_adapter(project_dir, runner=runner)
+
+    manifest_path = (
+        project_dir
+        / "runs"
+        / "real"
+        / "real_001"
+        / "metrics"
+        / "waveform_export_manifest.json"
+    )
+    assert manifest_path.exists()
+    manifest = _load_json(manifest_path)
+    assert len(manifest["exports"]) == 1
+    export = manifest["exports"][0]
+    assert export["status"] == "fail"
+    assert any("csv" in issue.lower() or "missing" in issue.lower() for issue in export["issues"])
+
+
+def test_waveform_export_manifest_written_on_ocean_failure(tmp_path: Path) -> None:
+    """OCEAN failure still writes a waveform export manifest with all exports marked as failed."""
+    project_dir = _create_ready_real_run_project(tmp_path)
+    _add_waveform_exports_to_request(project_dir, _waveform_exports())
+    runner = FakeOceanFailureRunner()
+
+    result = run_spectre_ocean_adapter(project_dir, runner=runner)
+
+    assert result.status == "failed"
+    manifest_path = (
+        project_dir
+        / "runs"
+        / "real"
+        / "real_001"
+        / "metrics"
+        / "waveform_export_manifest.json"
+    )
+    assert manifest_path.exists()
+    manifest = _load_json(manifest_path)
+    assert len(manifest["exports"]) == 1
+    export = manifest["exports"][0]
+    assert export["status"] == "fail"
+
+
+def test_waveform_export_manifest_coexists_with_metric_result_manifest(
+    tmp_path: Path,
+) -> None:
+    """Existing metric_result_manifest.json remains valid alongside the waveform manifest."""
+    project_dir = _create_ready_real_run_project(tmp_path)
+    _add_waveform_exports_to_request(project_dir, _waveform_exports())
+    runner = FakeSuccessRunnerWithWaveforms()
+
+    run_spectre_ocean_adapter(project_dir, runner=runner)
+
+    metrics_dir = project_dir / "runs" / "real" / "real_001" / "metrics"
+    metric_result_path = metrics_dir / "metric_result_manifest.json"
+    waveform_manifest_path = metrics_dir / "waveform_export_manifest.json"
+    assert metric_result_path.exists(), "metric_result_manifest.json must still be written"
+    assert waveform_manifest_path.exists(), "waveform_export_manifest.json must be written"
+    metric_manifest = _load_json(metric_result_path)
+    assert metric_manifest["status"] == "succeeded"
+
+
+def test_no_waveform_export_manifest_without_waveform_exports(tmp_path: Path) -> None:
+    """No waveform_export_manifest.json is written when the request has no waveform exports."""
+    project_dir = _create_ready_real_run_project(tmp_path)
+    runner = FakeSuccessRunner()
+
+    run_spectre_ocean_adapter(project_dir, runner=runner)
+
+    manifest_path = (
+        project_dir
+        / "runs"
+        / "real"
+        / "real_001"
+        / "metrics"
+        / "waveform_export_manifest.json"
+    )
+    assert not manifest_path.exists()
+
+
+class _RecordingInnerRunner:
+    """Records every argv it receives and returns success with no artifacts."""
+
+    def __init__(self) -> None:
+        self.recorded: list[list[str]] = []
+
+    def run(
+        self,
+        argv: list[str],
+        *,
+        cwd: Path,
+        stdout_path: Path,
+        stderr_path: Path,
+        timeout_s: int,
+    ) -> CommandResult:
+        self.recorded.append(list(argv))
+        stdout_path.write_text("recording runner stdout\n", encoding="utf-8")
+        stderr_path.write_text("", encoding="utf-8")
+        return CommandResult(
+            return_code=0,
+            started_at_utc="2026-06-17T00:00:00Z",
+            completed_at_utc="2026-06-17T00:00:01Z",
+        )
+
+
+def test_cshrc_command_runner_wraps_argv_with_source_and_cd(tmp_path: Path) -> None:
+    """CshrcCommandRunner must wrap the canonical argv in a csh -fc command
+    that sources the cshrc and cds into the working directory, mirroring the
+    remote adapter pattern. Locks in B-FIXRUN-01."""
+    from hermes_workflow.execution_adapters.spectre_ocean import CshrcCommandRunner
+
+    cshrc = tmp_path / "cadence_env.csh"
+    cshrc.write_text("# fake cshrc\n", encoding="utf-8")
+    inner = _RecordingInnerRunner()
+    runner = CshrcCommandRunner(cshrc, inner=inner)
+
+    cwd = tmp_path / "netlist"
+    cwd.mkdir()
+    stdout = tmp_path / "out.log"
+    stderr = tmp_path / "err.log"
+    runner.run(
+        ["spectre", "-64", "input.scs", "+preset=ax"],
+        cwd=cwd,
+        stdout_path=stdout,
+        stderr_path=stderr,
+        timeout_s=3600,
+    )
+
+    assert len(inner.recorded) == 1
+    wrapped = inner.recorded[0]
+    assert wrapped[0] == "csh"
+    assert wrapped[1] == "-fc"
+    wrapper_body = wrapped[2]
+    assert "source" in wrapper_body
+    assert str(cshrc) in wrapper_body
+    assert "cd" in wrapper_body
+    assert str(cwd) in wrapper_body
+    # The canonical spectre body is preserved inside the wrapper.
+    assert "spectre" in wrapper_body
+    assert "input.scs" in wrapper_body
+
+
+def test_run_spectre_ocean_adapter_uses_cshrc_runner_when_cadence_cshrc_given(
+    tmp_path: Path,
+) -> None:
+    """When cadence_cshrc is passed, the local adapter must execute spectre
+    inside a cshrc-sourced shell (not a bare subprocess). The inner runner
+    receives a csh -fc wrapped command. Locks in B-FIXRUN-01."""
+    from hermes_workflow.execution_adapters.spectre_ocean import (
+        run_spectre_ocean_adapter,
+    )
+
+    project_dir = _create_ready_real_run_project(tmp_path)
+    cshrc = tmp_path / "cadence_env.csh"
+    cshrc.write_text("# fake cshrc\n", encoding="utf-8")
+    inner = _RecordingInnerRunner()
+
+    try:
+        run_spectre_ocean_adapter(project_dir, cadence_cshrc=cshrc, runner=inner)
+    except Exception:
+        # The recording runner does not create spectre/ocean artifacts, so the
+        # adapter may raise downstream. We only care that the FIRST recorded
+        # command was csh-wrapped.
+        pass
+
+    assert inner.recorded, "adapter did not invoke the runner"
+    first = inner.recorded[0]
+    assert first[0] == "csh"
+    assert first[1] == "-fc"
+    assert "source" in first[2]
+    assert str(cshrc) in first[2]
+
+
+def test_run_spectre_ocean_adapter_command_trace_does_not_leak_cshrc(
+    tmp_path: Path,
+) -> None:
+    """Even when cadence_cshrc is used, command_trace must contain the
+    sanitized canonical argv only — no cshrc path, no 'source', no csh wrapper.
+    Locks in B-FIXRUN-01 sanitization."""
+    from hermes_workflow.execution_adapters.spectre_ocean import (
+        run_spectre_ocean_adapter,
+    )
+
+    project_dir = _create_ready_real_run_project(tmp_path)
+    cshrc = tmp_path / "cadence_env.csh"
+    cshrc.write_text("# fake cshrc\n", encoding="utf-8")
+
+    class _ArtifactCreatingInner(_RecordingInnerRunner):
+        def run(self, argv, *, cwd, stdout_path, stderr_path, timeout_s):
+            self.recorded.append(list(argv))
+            stdout_path.write_text("ok\n", encoding="utf-8")
+            stderr_path.write_text("", encoding="utf-8")
+            # Create minimal spectre artifacts so the adapter proceeds.
+            psf_dir = project_dir / "runs" / "real" / "real_001" / "psf"
+            psf_dir.mkdir(parents=True, exist_ok=True)
+            (psf_dir / "spectre.out").write_text("fake\n", encoding="utf-8")
+            return CommandResult(
+                return_code=0,
+                started_at_utc="2026-06-17T00:00:00Z",
+                completed_at_utc="2026-06-17T00:00:01Z",
+            )
+
+    try:
+        run_spectre_ocean_adapter(
+            project_dir, cadence_cshrc=cshrc, runner=_ArtifactCreatingInner()
+        )
+    except Exception:
+        pass
+
+    result_manifest = _load_json(
+        project_dir / "runs" / "real" / "real_001" / "result_manifest.json"
+    )
+    trace = result_manifest.get("command_trace", {})
+    trace_json = json.dumps(trace)
+    assert str(cshrc) not in trace_json
+    assert "source" not in trace_json
+    assert "csh -fc" not in trace_json
+    # Canonical argv preserved.
+    assert trace["spectre"]["argv"][0] == "spectre"

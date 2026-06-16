@@ -1,9 +1,14 @@
 # IC Auto Opt Workflow
 
-`ic-auto-opt-workflow` runs requirement-driven IC optimization for
-Maestro-exported Spectre/OCEAN projects. It prepares netlists, runs approved
-Spectre/OCEAN evaluations, aggregates metrics, and writes optimizer reports for
-local or remote execution.
+`ic-auto-opt-workflow` is a requirement-driven workflow for real IC
+Spectre/OCEAN work. It supports two product modes:
+
+- optimization: run an optimizer over approved design variables and metrics
+- fix-run: run user-specified fixed design points and export requested
+  waveform CSV artifacts without creating optimizer state
+
+Both modes are selected in `PROJECT_DIR/opt_requirement.md`. The product CLI
+does not use a separate fix-run switch.
 
 ## Product Entry
 
@@ -13,13 +18,13 @@ Doctor check:
 ic-opt /path/to/project --doctor
 ```
 
-First real optimization run:
+Run the workflow described by `opt_requirement.md`:
 
 ```bash
 ic-opt /path/to/project --real
 ```
 
-Continue an existing run:
+Continue an existing optimization run:
 
 ```bash
 ic-opt /path/to/project --real --continue N
@@ -32,11 +37,11 @@ ic-opt --ssh-profile PROFILE /remote/project --doctor
 ic-opt --ssh-profile PROFILE /remote/project --real
 ```
 
-`--continue N` is the only CLI value that changes the number of new
-evaluations. First-run budget, batch size, parallelism, Spectre thread count,
-optimizer CPU cap, algorithm, strategy, initialization, process corners,
-output format, retention, objective, constraints, and metric routes all come
-from `opt_requirement.md`.
+`--continue N` is only for existing optimizer runs. First-run budget, batch
+size, parallelism, Spectre thread count, optimizer CPU cap, algorithm, strategy,
+initialization, process corners, output format, retention, objective,
+constraints, fixed points, waveform exports, and metric routes all come from
+`opt_requirement.md`.
 
 ## Project Directory
 
@@ -52,12 +57,51 @@ and `context/` for notes, screenshots, or previous reports. Generated
 directories such as `config/`, `netlists/`, `runs/`, `reports/`, `ledger/`, and
 `state/` are created by the workflow.
 
-## Requirement Scope
+## Requirement Templates
 
-`opt_requirement.md` defines:
+Start from one of these examples:
+
+```text
+examples/spectre_maestro_project/opt_requirement.md
+examples/spectre_maestro_project/opt_requirement.multi_corner.md
+examples/spectre_maestro_project/opt_requirement.multi_testbench.md
+examples/spectre_maestro_project/opt_requirement.multi_tb_corner.md
+examples/spectre_maestro_project/opt_requirement.fix_run.md
+```
+
+The fix-run template is based on the real validated 15-corner Mixer
+requirement. Replace only project-specific paths and circuit values.
+
+## Workflow Modes
+
+Optimization mode:
+
+```yaml
+Workflow:
+  mode: optimize
+```
+
+If the `Workflow` section is omitted, the requirement is treated as an
+optimization requirement for backward compatibility.
+
+Fix-run mode:
+
+```yaml
+Workflow:
+  mode: fix_run
+  starting_run_id: real_001
+```
+
+Fix-run requirements include `Fixed Points` and optional `Waveform Exports`
+sections. They do not include optimizer settings and do not create
+`state/optimizer_state.json` or `reports/optimizer_decision_report.md`.
+
+## Optimization Requirements
+
+Optimization `opt_requirement.md` files define:
 
 - Maestro/ADE point roots and testbench routes
-- OCEAN metric expressions
+- OCEAN scalar metric expressions
 - design variables, legal ranges, and steps
 - objective and constraints
 - `max_evaluations` and `batch_size`
@@ -68,30 +112,31 @@ directories such as `config/`, `netlists/`, `runs/`, `reports/`, `ledger/`, and
 - license probe, retention, and artifact policy
 - Process Corners and multi-corner policies
 
-Start from one of these examples:
-
-```text
-examples/spectre_maestro_project/opt_requirement.md
-examples/spectre_maestro_project/opt_requirement.multi_corner.md
-examples/spectre_maestro_project/opt_requirement.multi_testbench.md
-examples/spectre_maestro_project/opt_requirement.multi_tb_corner.md
-```
-
-## Optimizer Modes
-
-Treat these production strategies as peer choices:
+Production strategy choices are peers:
 
 - `algorithm: openbox`, `strategy: openbox_gp_eic`
 - `algorithm: openbox`, `strategy: openbox_prf_eic`
 - `algorithm: turbo`, `strategy: turbo_trust_region`
 
-TuRBO is a good fit when legal variable steps are fine enough that snapping a
-continuous candidate to the legal grid is a small perturbation, for example
-about `0.1u`. Prefer OpenBox PRF+EIC for coarse finger-count-style grids,
-categorical choices, or spaces that produce many duplicate snapped candidates.
-
 `random_baseline` is for diagnostics. See
 `docs/OPTIMIZER_ALGORITHM_MODES.md`.
+
+## Fix-Run Requirements
+
+Fix-run `opt_requirement.md` files define:
+
+- `Workflow.mode: fix_run`
+- one or more fixed candidate points
+- Maestro/ADE point roots and testbench routes
+- Spectre settings and Process Corners
+- optional waveform CSV exports, for example
+  `getData("NF" ?result "pnoise")`
+- the same approval checklist used by real optimization runs
+
+The 15-corner fix-run example uses TT/SS/FF model sections and five corner
+variable values per section. The `temperature` field in that example is a
+generic netlist parameter override; the workflow does not special-case that
+name.
 
 ## Install
 
@@ -144,7 +189,7 @@ reporting success.
 
 ## Workflow Evidence
 
-For real workflow acceptance, inspect:
+Optimization evidence:
 
 ```text
 reports/project_doctor_report.json
@@ -155,15 +200,27 @@ runs/**/result_manifest.json
 runs/**/metric_result_manifest.json
 ```
 
-Multi-testbench and multi-corner runs also write parent aggregate manifests.
-Artifacts record requirement pass-through, command traces, license probe
-status, optimizer CPU thread-limit audit, selected candidate, and reported
-metrics.
+Fix-run evidence:
+
+```text
+reports/fix_run_report.json
+runs/real/real_001/testbenches/<tb>/corners/<corner>/result_manifest.json
+runs/real/real_001/testbenches/<tb>/corners/<corner>/metrics/metric_result_manifest.json
+runs/real/real_001/testbenches/<tb>/corners/<corner>/metrics/waveform_export_manifest.json
+runs/real/real_001/testbenches/<tb>/corners/<corner>/metrics/waveforms/<name>.csv
+```
+
+Multi-testbench and multi-corner optimization runs also write parent aggregate
+manifests. Artifacts record requirement pass-through, command traces, license
+probe status, selected candidate, and reported metrics.
 
 ## Current Release
 
-Version `0.1.7` includes:
+Version `0.1.8` includes:
 
+- local and remote fix-run workflow support
+- waveform CSV export manifests for fix-run child runs
+- requirement template `opt_requirement.fix_run.md`
 - requirement-driven local and remote optimization
 - OpenBox GP+EIC, OpenBox PRF+EIC, and native TuRBO
 - multi-testbench and multi-corner support
@@ -173,4 +230,4 @@ Version `0.1.7` includes:
 - optimizer CPU thread-limit runtime audit
 - release examples and agent skill guidance synchronized with the current CLI
 
-See `RELEASE_NOTES_v0.1.7.md`.
+See `RELEASE_NOTES_v0.1.8.md`.

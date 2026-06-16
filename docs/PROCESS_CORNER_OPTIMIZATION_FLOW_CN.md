@@ -62,6 +62,10 @@ parameters -> aggregate objective/status -> optimizer history
 
 OpenBox 和 native TuRBO 都使用这个聚合 observation 生成下一批候选参数。
 
+fix-run 也可以使用同一个 `Process Corners` 结构，但它不会生成 optimizer
+observation，也不会进入下一批候选参数；它只记录每个固定点在各 child 上的仿真、
+metric 和 waveform export 结果。
+
 ## 验收时看什么
 
 真实验收时检查：
@@ -71,6 +75,7 @@ runs/**/result_manifest.json
 runs/**/metric_result_manifest.json
 parent aggregate manifest
 reports/optimizer_decision_report.md
+reports/fix_run_report.json
 ```
 
 重点核对：
@@ -80,3 +85,4 @@ reports/optimizer_decision_report.md
 - `constraint_policy: all_corners` 下每个 corner 的约束结果都有证据
 - 下一批参数使用的是聚合 observation
 - 报告没有把 best observed feasible candidate 写成全局最优
+- fix-run 报告没有创建 optimizer state 或 optimizer decision report

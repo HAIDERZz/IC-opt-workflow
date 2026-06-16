@@ -3,9 +3,9 @@
 agent 操作当前版本的 IC Auto Opt 时，只做三件事：读取
 `opt_requirement.md`、调用产品 CLI、检查过程文件后汇报。
 
-`opt_requirement.md` 是初次运行的唯一配置入口。预算、并行数、Spectre 线程数、
-优化器 CPU 限制、算法、策略、初始化、工艺角、输出格式、metric 公式和约束都在
-这个文件里。
+`opt_requirement.md` 是初次运行的唯一配置入口。它通过 `Workflow.mode` 选择
+优化或 fix-run。预算、并行数、Spectre 线程数、优化器 CPU 限制、算法、策略、
+初始化、工艺角、输出格式、metric 公式、固定点和 waveform export 都在这个文件里。
 
 ## 命令
 
@@ -42,6 +42,14 @@ ic-opt --ssh-profile PROFILE PROJECT_DIR --real --continue N
 - Process Corners 和 multi-corner policy
 - retention、license check、artifact policy
 
+fix-run requirement 还包含：
+
+- `Workflow.mode: fix_run`
+- `Fixed Points`
+- `Waveform Exports`
+
+fix-run 不创建 optimizer state，也不写 optimizer decision report。
+
 ## 优化策略
 
 生产使用时，把下面三种策略看成并列选择：
@@ -68,6 +76,27 @@ examples/spectre_maestro_project/opt_requirement.multi_tb_corner.md
 agent 需要报告 objective policy、constraint policy、被选中的 run、各 corner
 聚合结果，以及 worst-case 或 all-corners 约束判断。
 
+## Fix-Run
+
+fix-run 使用同一个产品命令：
+
+```bash
+ic-opt PROJECT_DIR --real
+ic-opt --ssh-profile PROFILE PROJECT_DIR --real
+```
+
+使用模板：
+
+```text
+examples/spectre_maestro_project/opt_requirement.fix_run.md
+```
+
+正确的 pnoise waveform expression 形式是：
+
+```text
+getData("NF" ?result "pnoise")
+```
+
 ## 必查过程文件
 
 不要只看退出码。真实 workflow 验收至少看：
@@ -82,6 +111,14 @@ runs/**/metric_result_manifest.json
 ```
 
 multi-testbench / multi-corner 项目还要看 parent aggregate manifest。
+
+fix-run 项目必须看：
+
+```text
+reports/fix_run_report.json
+runs/real/real_001/testbenches/<tb>/corners/<corner>/metrics/waveform_export_manifest.json
+runs/real/real_001/testbenches/<tb>/corners/<corner>/metrics/waveforms/<name>.csv
+```
 
 重点核对 requirement 变量是否传递并生效：算法、策略、初始化、随机种子、budget、
 batch size、并行数、Spectre 线程数、optimizer CPU cap、process corners、

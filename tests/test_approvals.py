@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from hermes_workflow.approvals import decide_first_real_run
+from hermes_workflow.approvals import decide_first_real_run, decide_fix_run_real_run
 from hermes_workflow.package import build_execution_package, create_project_from_template
 from tests.report_helpers import write_json, write_pass_reports
 
@@ -28,6 +28,45 @@ def test_approval_gate_writes_approve_instruction(tmp_path: Path) -> None:
     assert payload["reason"] == "config validation and preflight reports passed"
     assert "run_standalone_spectre_optimizer" in payload["allowed_actions"]
     assert payload["approved_config_hashes"]["config/project_config.yaml"]
+
+
+def test_fix_run_approval_does_not_require_optimizer_preflight_reports(
+    tmp_path: Path,
+) -> None:
+    project_dir = tmp_path / "fix_run_test_inv"
+    create_project_from_template(project_dir)
+    (project_dir / "config" / "workflow.yaml").write_text(
+        "schema_version: '1.0'\nmode: fix_run\nstarting_run_id: real_001\n",
+        encoding="utf-8",
+    )
+    (project_dir / "config" / "fixed_points.yaml").write_text(
+        "\n".join(
+            [
+                "schema_version: '1.0'",
+                "points:",
+                "  - candidate_id: user_point_001",
+                "    parameters:",
+                "      FN: '2'",
+                "      WN: 0.3u",
+                "      FP: '2'",
+                "      WP: 0.3u",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    build_execution_package(project_dir, created_at_utc="2026-06-16T00:00:00Z")
+
+    instruction = decide_fix_run_real_run(
+        project_dir,
+        created_at_utc="2026-06-16T00:10:00Z",
+    )
+
+    assert instruction["decision"] == "approve_first_real_run"
+    assert instruction["reason"] == "fix-run config validation passed"
+    assert "prepare_fixed_candidate_real_run" in instruction["allowed_actions"]
+    assert "run_standalone_spectre_optimizer" in instruction["forbidden_actions"]
+    assert not (project_dir / "reports" / "dry_run_report.json").exists()
 
 
 def test_approval_gate_writes_reject_instruction_when_preflight_fails(
@@ -280,3 +319,53 @@ def test_approval_gate_handles_missing_project_dir_for_instruction(
     )
     assert instruction["decision"] == "reject_first_real_run"
     assert (project_dir / "supervisor_instruction.json").exists()
+
+
+def test_optimizer_approval_still_requires_preflight_reports(tmp_path: Path) -> None:
+    """Optimizer mode must keep its full preflight gate even after the
+    fix-run approval was added. This locks in that the fix did not
+    weaken the optimizer path."""
+    project_dir = tmp_path / "optimizer_preflight_regression"
+    create_project_from_template(project_dir)
+    build_execution_package(project_dir, created_at_utc="2026-06-16T00:00:00Z")
+    # Intentionally do NOT call write_pass_reports — preflight is missing.
+
+    instruction = decide_first_real_run(
+        project_dir,
+        created_at_utc="2026-06-16T00:10:00Z",
+    )
+
+    assert instruction["decision"] == "reject_first_real_run"
+    assert "required preflight reports missing" in instruction["reason"]
+    assert "reports/dry_run_report.json" in instruction["reason"]
+    assert "state/health_check.json" in instruction["reason"]
+
+
+def test_fix_run_approval_uses_distinct_allowed_actions(tmp_path: Path) -> None:
+    """fix-run approval must NOT grant the optimizer-only action
+    ``run_standalone_spectre_optimizer``; it must grant the fix-run-only
+    action ``prepare_fixed_candidate_real_run``."""
+    project_dir = tmp_path / "fix_run_distinct_actions"
+    create_project_from_template(project_dir)
+    (project_dir / "config" / "workflow.yaml").write_text(
+        "schema_version: '1.0'\nmode: fix_run\nstarting_run_id: real_001\n",
+        encoding="utf-8",
+    )
+    (project_dir / "config" / "fixed_points.yaml").write_text(
+        "schema_version: '1.0'\npoints:\n"
+        "  - candidate_id: user_point_001\n"
+        "    parameters:\n"
+        "      FN: '2'\n      WN: 0.3u\n      FP: '2'\n      WP: 0.3u\n",
+        encoding="utf-8",
+    )
+    build_execution_package(project_dir, created_at_utc="2026-06-16T00:00:00Z")
+
+    instruction = decide_fix_run_real_run(
+        project_dir,
+        created_at_utc="2026-06-16T00:10:00Z",
+    )
+
+    assert instruction["decision"] == "approve_first_real_run"
+    assert "prepare_fixed_candidate_real_run" in instruction["allowed_actions"]
+    assert "run_standalone_spectre_optimizer" not in instruction["allowed_actions"]
+    assert "run_standalone_spectre_optimizer" in instruction["forbidden_actions"]

@@ -64,6 +64,47 @@ def decide_first_real_run(
     return _write_instruction(project_dir, instruction)
 
 
+def decide_fix_run_real_run(
+    project_dir: Path,
+    *,
+    created_at_utc: str | None = None,
+) -> dict:
+    created_at = created_at_utc or (
+        datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    )
+    project_dir = Path(project_dir)
+    validation_report = validate_project_files(project_dir)
+    manifest_path = project_dir / "execution_package" / "execution_manifest.json"
+    if not manifest_path.exists():
+        return _write_instruction(
+            project_dir,
+            _reject(created_at, "execution manifest is missing", {}),
+        )
+
+    approved_hashes, manifest_error = _load_approved_config_hashes(manifest_path)
+    if manifest_error is not None:
+        return _write_instruction(
+            project_dir,
+            _reject(created_at, manifest_error, approved_hashes),
+        )
+    if not validation_report.ok:
+        return _write_instruction(
+            project_dir,
+            _reject(created_at, validation_report.format(), approved_hashes),
+        )
+
+    instruction = {
+        "schema_version": "1.0",
+        "created_at_utc": created_at,
+        "decision": "approve_first_real_run",
+        "reason": "fix-run config validation passed",
+        "allowed_actions": ["prepare_fixed_candidate_real_run"],
+        "forbidden_actions": ["run_standalone_spectre_optimizer"],
+        "approved_config_hashes": approved_hashes,
+    }
+    return _write_instruction(project_dir, instruction)
+
+
 def _reject(created_at_utc: str, reason: str, approved_hashes: dict[str, str]) -> dict:
     return {
         "schema_version": "1.0",

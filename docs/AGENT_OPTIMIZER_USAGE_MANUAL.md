@@ -1,10 +1,11 @@
-# Agent Optimizer Usage Manual
+# Agent Workflow Usage Manual
 
-This manual describes how an agent should operate IC Auto Opt v0.1.7.
+This manual describes how an agent should operate IC Auto Opt v0.1.8.
 
 The agent is an operator and report reader. It should use the product CLI,
 inspect workflow artifacts, and report evidence. It should not invent optimizer
-settings, rewrite formulas, or choose candidate points by hand.
+settings, rewrite formulas, choose candidate points by hand, or treat a command
+exit code as workflow acceptance.
 
 ## Project Inputs
 
@@ -23,10 +24,15 @@ workflow.
 ## Requirement Contract
 
 `opt_requirement.md` is the only product entry for initial-run
-machine-critical settings:
+machine-critical settings. It selects the workflow mode:
+
+- `mode: optimize` for optimizer runs
+- `mode: fix_run` for fixed-point characterization and waveform CSV export
+
+Optimization values stay in `opt_requirement.md`:
 
 - Maestro/ADE point roots and testbench routes
-- OCEAN metric expressions
+- OCEAN scalar metric expressions
 - design variables, ranges, and legal steps
 - constraints and objective
 - `max_evaluations` and `batch_size`
@@ -34,11 +40,17 @@ machine-critical settings:
 - `optimizer_cpu_threads`
 - `algorithm`, `strategy`, `initialization`, and `random_seed`
 - `output_format: psfxl`
-- retention policy
-- license probe requirement
-- Process Corners and multi-corner policies
+- retention policy, license probe, and Process Corners
 
-The product CLI keeps one value-changing continuation entry:
+Fix-run values also stay in `opt_requirement.md`:
+
+- fixed candidate points
+- Spectre settings and Process Corners
+- waveform exports such as `getData("NF" ?result "pnoise")`
+- approval checklist
+
+The product CLI keeps one value-changing continuation entry for existing
+optimizer runs:
 
 ```bash
 ic-opt PROJECT_DIR --real --continue N
@@ -75,24 +87,25 @@ Cadence setup path.
 The agent should:
 
 - read `opt_requirement.md` before running
+- identify whether the workflow mode is optimize or fix-run
 - run doctor before real execution when validating an environment
 - use product CLI commands instead of low-level developer commands
 - inspect reports and manifests before reporting success
-- report command status, evaluation counts, selected run id, corner policy,
-  recommended parameters, metrics, warnings, and artifact paths
+- report command status, failed child count, run id, corner policy, metrics,
+  waveform CSV paths, warnings, and artifact paths
 
 The agent must not:
 
 - ask the user to restate formulas, variable ranges, Spectre resources,
-  optimizer settings, or process corners in chat
+  optimizer settings, fixed points, waveform exports, or process corners in chat
 - add CLI overrides for budget, batch size, parallelism, Spectre threads,
   optimizer CPU cap, algorithm, strategy, initialization, output format,
-  retention, objective, constraints, or corners
-- hand-pick candidate points
+  retention, objective, constraints, fixed points, waveform exports, or corners
+- hand-pick optimizer candidate points
 - rewrite OCEAN formulas
 - parse PSF in Python
 - change the search space, objective, constraints, or metric routes
-- treat a zero exit code as acceptance without artifact inspection
+- claim a fix-run succeeded without inspecting `reports/fix_run_report.json`
 
 ## Optimizer Modes
 
@@ -103,29 +116,35 @@ Production strategy choices:
 - `algorithm: turbo`, `strategy: turbo_trust_region`
 
 TuRBO is a fit when legal variable steps are fine enough that snapping a
-continuous candidate to the legal grid is a small perturbation, for example
-about `0.1u`. Prefer `openbox_prf_eic` for coarse integer grids, categorical
-choices, or duplicate-heavy snapped spaces.
+continuous candidate to the legal grid is a small perturbation. Prefer
+`openbox_prf_eic` for coarse integer grids, categorical choices, or
+duplicate-heavy snapped spaces.
 
 `random_baseline` is diagnostic.
 
-## Multi-Corner Runs
+## Fix-Run Artifact Checklist
 
-Multi-corner optimization is configured in the `Process Corners` section of
-`opt_requirement.md`. Use:
+For fix-run workflows, inspect:
 
 ```text
-examples/spectre_maestro_project/opt_requirement.multi_corner.md
-examples/spectre_maestro_project/opt_requirement.multi_tb_corner.md
+reports/fix_run_report.json
+runs/real/real_001/testbenches/<tb>/corners/<corner>/result_manifest.json
+runs/real/real_001/testbenches/<tb>/corners/<corner>/metrics/metric_result_manifest.json
+runs/real/real_001/testbenches/<tb>/corners/<corner>/metrics/waveform_export_manifest.json
+runs/real/real_001/testbenches/<tb>/corners/<corner>/metrics/waveforms/<name>.csv
 ```
 
-The agent should inspect aggregate artifacts and report objective policy,
-constraint policy, selected run, corner-level metrics, and worst-case or
-all-corners constraint result.
+Confirm:
 
-## Artifact Acceptance Checklist
+- `workflow_mode` is `fix_run`
+- expected testbench/corner child count matches the requirement
+- waveform exports were written for every successful child
+- all failures appear in `child_issues`
+- optimizer state and optimizer decision reports were not created
 
-For real workflow acceptance, inspect at least:
+## Optimization Artifact Checklist
+
+For optimizer workflows, inspect:
 
 ```text
 reports/project_doctor_report.json

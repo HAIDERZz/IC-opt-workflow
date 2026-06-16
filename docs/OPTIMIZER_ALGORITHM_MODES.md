@@ -4,6 +4,10 @@ Optimizer mode is part of `opt_requirement.md`. Product CLI flags do not
 override algorithm, strategy, budget, batch size, Spectre parallelism, or
 optimizer CPU limits for a first run.
 
+This document applies to `Workflow.mode: optimize`. `Workflow.mode: fix_run`
+does not use an optimizer strategy; it runs fixed points and records
+Spectre/OCEAN artifacts.
+
 ## Production Choices
 
 Use one of these production strategy pairs:

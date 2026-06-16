@@ -71,3 +71,90 @@ def test_check_project_ready_cli_fails_for_missing_project(
 
     assert result.exit_code == 1
     assert "project readiness: fail" in result.output
+
+
+def _make_fix_run_readiness_project(tmp_path: Path) -> Path:
+    """Build a fix-run-shape project from the multi-testbench requirement,
+    then strip optimizer-only configs and add fix-run configs."""
+    import yaml as _yaml
+
+    project_dir = _copy_multi_testbench_requirement_project(tmp_path)
+    prepare_from_requirement(project_dir)
+    (project_dir / "config" / "optimizer.yaml").unlink()
+    (project_dir / "config" / "metrics.yaml").unlink()
+    (project_dir / "config" / "workflow.yaml").write_text(
+        "schema_version: '1.0'\nmode: fix_run\nstarting_run_id: real_001\n",
+        encoding="utf-8",
+    )
+    variables = _yaml.safe_load(
+        (project_dir / "config" / "variables.yaml").read_text(encoding="utf-8")
+    )
+    parameters = {var["name"]: str(var["lower"]) for var in variables["variables"]}
+    (project_dir / "config" / "fixed_points.yaml").write_text(
+        _yaml.safe_dump(
+            {
+                "schema_version": "1.0",
+                "points": [
+                    {"candidate_id": "user_point_001", "parameters": parameters},
+                ],
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    (project_dir / "config" / "waveform_exports.yaml").write_text(
+        _yaml.safe_dump(
+            {
+                "schema_version": "1.0",
+                "exports": [
+                    {
+                        "name": "nf_pnoise",
+                        "testbench": "cg_nf",
+                        "expression": 'getData("NF" ?result "pnoise")',
+                        "output_format": "csv",
+                        "nil_policy": "fail",
+                    },
+                ],
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    return project_dir
+
+
+def test_check_project_ready_accepts_fix_run_project(tmp_path: Path) -> None:
+    """A fix-run project (with workflow.yaml and fixed_points.yaml, but no
+    optimizer.yaml or metrics.yaml) must pass the project readiness check.
+    It needs at least one of metrics.yaml or waveform_exports.yaml; here we
+    have waveform_exports.yaml."""
+    project_dir = _make_fix_run_readiness_project(tmp_path)
+
+    report = check_project_ready(project_dir)
+
+    assert report.status == "pass", report.issues
+
+
+def test_check_project_ready_fix_run_requires_fixed_points(tmp_path: Path) -> None:
+    project_dir = _make_fix_run_readiness_project(tmp_path)
+    (project_dir / "config" / "fixed_points.yaml").unlink()
+
+    report = check_project_ready(project_dir)
+
+    assert report.status == "fail"
+    assert any("fixed_points.yaml" in issue for issue in report.issues)
+
+
+def test_check_project_ready_optimizer_mode_still_requires_optimizer_yaml(
+    tmp_path: Path,
+) -> None:
+    """Optimizer mode (no workflow.yaml at all, or mode=optimize) must keep
+    treating optimizer.yaml as required. Locks in the regression boundary."""
+    project_dir = _copy_multi_testbench_requirement_project(tmp_path)
+    prepare_from_requirement(project_dir)
+    (project_dir / "config" / "optimizer.yaml").unlink()
+
+    report = check_project_ready(project_dir)
+
+    assert report.status == "fail"
+    assert any("optimizer.yaml" in issue for issue in report.issues)

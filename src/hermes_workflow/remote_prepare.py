@@ -47,7 +47,12 @@ def prepare_remote_project_cache(
     if report.status != "pass":
         return RemotePrepareResult(status="fail", cache_dir=cache_dir, issues=report.issues)
 
-    write_config_payloads(cache_dir, render_config_payloads(report.sections))
+    write_config_payloads(
+        cache_dir,
+        render_config_payloads(
+            report.sections, workflow_mode=report.workflow_mode
+        ),
+    )
     try:
         _download_remote_netlists(cache_dir, report.sections, runner)
     except RuntimeError as exc:

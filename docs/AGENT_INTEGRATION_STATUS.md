@@ -26,13 +26,16 @@ ic-opt --ssh-profile PROFILE PROJECT_DIR --real
 ## Current Capability
 
 - local and remote real optimization through `ic-opt`
+- local and remote fix-run through `Workflow.mode: fix_run`
 - local and remote doctor gates with license probe support
 - requirement-driven budget, batch size, parallel jobs, Spectre threads,
   optimizer CPU cap, algorithm, strategy, initialization, output format,
-  retention, testbench routes, and process-corner settings
+  retention, fixed points, waveform exports, testbench routes, and
+  process-corner settings
 - continuation through `--continue N`
 - OpenBox GP+EIC, OpenBox PRF+EIC, and native TuRBO
 - multi-testbench and multi-corner candidate evaluation
+- fix-run waveform CSV export manifests and `reports/fix_run_report.json`
 - sanitized Spectre/OCEAN `command_trace` in child and aggregate manifests
 - optimizer CPU thread-limit audit in optimizer reports
 

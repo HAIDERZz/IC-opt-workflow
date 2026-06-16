@@ -18,6 +18,12 @@ REQUIRED_CONFIGS = (
     "spectre.yaml",
     "optimizer.yaml",
 )
+FIX_RUN_REQUIRED_CONFIGS = (
+    "project_config.yaml",
+    "variables.yaml",
+    "spectre.yaml",
+    "fixed_points.yaml",
+)
 
 
 @dataclass(frozen=True)
@@ -72,12 +78,25 @@ def _check_configs(
     checks: list[dict[str, str]],
     issues: list[str],
 ) -> None:
+    workflow_mode = _workflow_mode(project_root)
+    required_configs = (
+        FIX_RUN_REQUIRED_CONFIGS
+        if workflow_mode == "fix_run"
+        else REQUIRED_CONFIGS
+    )
     missing: list[str] = []
-    for file_name in REQUIRED_CONFIGS:
+    for file_name in required_configs:
         rel_path = Path("config") / file_name
         if not (project_root / rel_path).exists():
             missing.append(rel_path.as_posix())
             issues.append(f"missing required config file: {rel_path.as_posix()}")
+    if workflow_mode == "fix_run" and not (
+        (project_root / "config" / "metrics.yaml").exists()
+        or (project_root / "config" / "waveform_exports.yaml").exists()
+    ):
+        rel_path = "config/metrics.yaml or config/waveform_exports.yaml"
+        missing.append(rel_path)
+        issues.append(f"missing required config file: {rel_path}")
     if missing:
         _add_check(
             checks,
@@ -87,6 +106,22 @@ def _check_configs(
         )
         return
     _add_check(checks, "config_files", "pass", "required config files are present")
+
+
+def _workflow_mode(project_root: Path) -> str:
+    if (project_root / "config" / "fixed_points.yaml").exists():
+        return "fix_run"
+    workflow_path = project_root / "config" / "workflow.yaml"
+    if not workflow_path.exists():
+        return "optimize"
+    try:
+        payload = yaml.safe_load(workflow_path.read_text(encoding="utf-8"))
+    except yaml.YAMLError:
+        return "optimize"
+    if not isinstance(payload, dict):
+        return "optimize"
+    mode = payload.get("mode")
+    return str(mode) if mode is not None else "optimize"
 
 
 def _check_contract_validation(

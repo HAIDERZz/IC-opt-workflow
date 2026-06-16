@@ -153,6 +153,7 @@ def test_build_execution_package_writes_execution_task(tmp_path: Path) -> None:
         encoding="utf-8"
     )
     assert "# Execution Agent Task" in task_text
+    assert "Claude Code" not in task_text
     assert "Project: `bridge_test_inv`" in task_text
     assert "Backend: `maestro_exported_spectre_deck`" in task_text
     assert "Spectre X preset: `ax`" in task_text
@@ -238,3 +239,84 @@ def test_build_execution_package_cleans_up_on_failure_and_retry_succeeds(
     assert manifest.path.exists()
     for file_name in CONFIG_FILE_NAMES:
         assert (execution_dir / "config" / file_name).exists()
+
+
+def _convert_to_fix_run_project(project_dir: Path) -> None:
+    """Convert an optimizer template project to fix-run shape in place."""
+    import yaml as _yaml
+
+    (project_dir / "config" / "optimizer.yaml").unlink()
+    (project_dir / "config" / "metrics.yaml").unlink()
+    (project_dir / "config" / "workflow.yaml").write_text(
+        "schema_version: '1.0'\nmode: fix_run\nstarting_run_id: real_001\n",
+        encoding="utf-8",
+    )
+    variables = _yaml.safe_load(
+        (project_dir / "config" / "variables.yaml").read_text(encoding="utf-8")
+    )
+    parameters = {var["name"]: str(var["lower"]) for var in variables["variables"]}
+    (project_dir / "config" / "fixed_points.yaml").write_text(
+        _yaml.safe_dump(
+            {
+                "schema_version": "1.0",
+                "points": [
+                    {"candidate_id": "user_point_001", "parameters": parameters},
+                ],
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    (project_dir / "config" / "waveform_exports.yaml").write_text(
+        _yaml.safe_dump(
+            {
+                "schema_version": "1.0",
+                "exports": [
+                    {
+                        "name": "nf_pnoise",
+                        "testbench": "cg_nf",
+                        "expression": 'getData("NF" ?result "pnoise")',
+                        "output_format": "csv",
+                        "nil_policy": "fail",
+                    },
+                ],
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+
+def test_build_execution_package_accepts_fix_run_project(tmp_path: Path) -> None:
+    """Fix-run projects (no optimizer.yaml, no metrics.yaml) must build the
+    execution package successfully and include fix-run configs in the
+    immutable hash list."""
+    project_dir = tmp_path / "fix_run_pkg"
+    create_project_from_template(project_dir)
+    _convert_to_fix_run_project(project_dir)
+
+    manifest = build_execution_package(
+        project_dir, created_at_utc="2026-06-16T00:00:00Z"
+    )
+
+    assert manifest.path.exists()
+    immutable = manifest.payload["immutable_config_files"]
+    assert "config/fixed_points.yaml" in immutable
+    assert "config/workflow.yaml" in immutable
+    assert "config/waveform_exports.yaml" in immutable
+    assert "config/optimizer.yaml" not in immutable
+    assert "config/metrics.yaml" not in immutable
+
+
+def test_build_execution_package_fix_run_requires_fixed_points(
+    tmp_path: Path,
+) -> None:
+    """A project declaring workflow.mode=fix_run but missing fixed_points.yaml
+    must fail validation when building the execution package."""
+    project_dir = tmp_path / "fix_run_pkg_no_points"
+    create_project_from_template(project_dir)
+    _convert_to_fix_run_project(project_dir)
+    (project_dir / "config" / "fixed_points.yaml").unlink()
+
+    with pytest.raises(ValueError):
+        build_execution_package(project_dir, created_at_utc="2026-06-16T00:00:00Z")
