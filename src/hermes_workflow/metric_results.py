@@ -7,6 +7,8 @@ from collections import Counter
 from hashlib import sha256
 from pathlib import Path, PurePosixPath
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from hermes_workflow.package import sha256_file
@@ -129,6 +131,18 @@ class MetricRequestEntry(BaseModel):
     non_finite_policy: str
 
 
+class WaveformExportRequestEntry(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    testbench: str
+    expression: str
+    expression_sha256: str
+    output_format: Literal["csv"]
+    nil_policy: Literal["fail", "skip"]
+    csv_output_file: str
+
+
 class MetricExtractionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -142,6 +156,7 @@ class MetricExtractionRequest(BaseModel):
     spectre: dict
     ocean: MetricRequestOcean
     metrics: list[MetricRequestEntry]
+    waveform_exports: list[WaveformExportRequestEntry] = Field(default_factory=list)
     forbidden_actions: list[str] = Field(default_factory=list)
 
 

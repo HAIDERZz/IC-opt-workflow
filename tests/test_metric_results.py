@@ -9,8 +9,13 @@ import pytest
 from pydantic import ValidationError
 
 from hermes_workflow.approvals import decide_first_real_run
+from hermes_workflow.fix_run_models import WaveformExportResult
 from hermes_workflow.metric_requests import expression_sha256
-from hermes_workflow.metric_results import check_metric_results
+from hermes_workflow.metric_results import (
+    MetricExtractionRequest,
+    WaveformExportRequestEntry,
+    check_metric_results,
+)
 from hermes_workflow.package import (
     build_execution_package,
     create_project_from_template,
@@ -851,3 +856,152 @@ def test_check_metric_results_rejects_non_numeric_json_metric_value(
 
     assert report.status == MetricResultCheckStatus.FAIL
     assert expected_issue in report.issues
+
+
+# ---------------------------------------------------------------------------
+# WaveformExportRequestEntry model tests
+# ---------------------------------------------------------------------------
+
+
+def test_waveform_export_request_entry_validates_csv_output_format():
+    entry = WaveformExportRequestEntry(
+        name="nf_pnoise",
+        testbench="cg_nf",
+        expression='getData("NF" ?result "pnoise")',
+        expression_sha256=expression_sha256('getData("NF" ?result "pnoise")'),
+        output_format="csv",
+        nil_policy="fail",
+        csv_output_file="runs/real/real_001/metrics/waveforms/nf_pnoise.csv",
+    )
+    assert entry.output_format == "csv"
+    assert entry.name == "nf_pnoise"
+
+
+def test_waveform_export_request_entry_rejects_psfascii_output_format():
+    with pytest.raises(ValidationError, match="output_format"):
+        WaveformExportRequestEntry(
+            name="nf_pnoise",
+            testbench="cg_nf",
+            expression='getData("NF" ?result "pnoise")',
+            expression_sha256=expression_sha256('getData("NF" ?result "pnoise")'),
+            output_format="psfascii",
+            nil_policy="fail",
+            csv_output_file="runs/real/real_001/metrics/waveforms/nf_pnoise.csv",
+        )
+
+
+def test_metric_extraction_request_with_empty_waveform_exports_is_valid():
+    """Backward compat: MetricExtractionRequest with no waveform_exports should work."""
+    payload = {
+        "schema_version": "1.0",
+        "run_id": "real_001",
+        "candidate_id": "real_001",
+        "backend": "spectre_ocean_batch",
+        "prepared_input_scs": "runs/real/real_001/netlist/input.scs",
+        "prepared_input_sha256": "abc123",
+        "expected_psf_dir": "runs/real/real_001/psf",
+        "spectre": {
+            "engine": "spectre_x",
+            "preset": "ax",
+            "output_format": "psfxl",
+            "threads_per_run": 10,
+            "timeout_s": 600,
+        },
+        "ocean": {
+            "mode": "nograph_replay",
+            "script_file": "runs/real/real_001/metrics/metric_probe.ocn",
+            "log_file": "runs/real/real_001/metrics/ocean.log",
+            "scalar_output_file": "runs/real/real_001/metrics/ocean_scalars.tsv",
+        },
+        "metrics": [
+            {
+                "name": "rise",
+                "unit": "s",
+                "required_signals": [],
+                "expression": 'value(VT("/net1") 1n)',
+                "expression_sha256": expression_sha256('value(VT("/net1") 1n)'),
+                "expression_source": "user_approved",
+                "source_reference": "test",
+                "expected_value_type": "real_scalar",
+                "nil_policy": "fail",
+                "non_finite_policy": "fail",
+            }
+        ],
+        "forbidden_actions": [],
+    }
+    req = MetricExtractionRequest.model_validate(payload)
+    assert req.waveform_exports == []
+
+
+def test_metric_extraction_request_with_populated_waveform_exports_validates():
+    payload = {
+        "schema_version": "1.0",
+        "run_id": "real_001",
+        "candidate_id": "real_001",
+        "backend": "spectre_ocean_batch",
+        "prepared_input_scs": "runs/real/real_001/netlist/input.scs",
+        "prepared_input_sha256": "abc123",
+        "expected_psf_dir": "runs/real/real_001/psf",
+        "spectre": {
+            "engine": "spectre_x",
+            "preset": "ax",
+            "output_format": "psfxl",
+            "threads_per_run": 10,
+            "timeout_s": 600,
+        },
+        "ocean": {
+            "mode": "nograph_replay",
+            "script_file": "runs/real/real_001/metrics/metric_probe.ocn",
+            "log_file": "runs/real/real_001/metrics/ocean.log",
+            "scalar_output_file": "runs/real/real_001/metrics/ocean_scalars.tsv",
+        },
+        "metrics": [
+            {
+                "name": "rise",
+                "unit": "s",
+                "required_signals": [],
+                "expression": 'value(VT("/net1") 1n)',
+                "expression_sha256": expression_sha256('value(VT("/net1") 1n)'),
+                "expression_source": "user_approved",
+                "source_reference": "test",
+                "expected_value_type": "real_scalar",
+                "nil_policy": "fail",
+                "non_finite_policy": "fail",
+            }
+        ],
+        "waveform_exports": [
+            {
+                "name": "nf_pnoise",
+                "testbench": "cg_nf",
+                "expression": 'getData("NF" ?result "pnoise")',
+                "expression_sha256": expression_sha256('getData("NF" ?result "pnoise")'),
+                "output_format": "csv",
+                "nil_policy": "fail",
+                "csv_output_file": (
+                    "runs/real/real_001/metrics/waveforms/nf_pnoise.csv"
+                ),
+            }
+        ],
+        "forbidden_actions": [],
+    }
+    req = MetricExtractionRequest.model_validate(payload)
+    assert len(req.waveform_exports) == 1
+    assert req.waveform_exports[0].name == "nf_pnoise"
+    assert req.waveform_exports[0].output_format == "csv"
+
+
+def test_waveform_export_result_serializes_and_deserializes():
+    result = WaveformExportResult(
+        name="nf_pnoise",
+        expression='getData("NF" ?result "pnoise")',
+        expression_sha256=expression_sha256('getData("NF" ?result "pnoise")'),
+        output_format="csv",
+        csv_path="runs/real/real_001/metrics/waveforms/nf_pnoise.csv",
+        status="pass",
+        issues=[],
+    )
+    serialized = result.model_dump_json()
+    deserialized = WaveformExportResult.model_validate_json(serialized)
+    assert deserialized.name == "nf_pnoise"
+    assert deserialized.status == "pass"
+    assert deserialized.csv_path == "runs/real/real_001/metrics/waveforms/nf_pnoise.csv"

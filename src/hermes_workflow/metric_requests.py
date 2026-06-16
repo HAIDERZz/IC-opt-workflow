@@ -25,6 +25,7 @@ def build_metric_extraction_request(
     prepared_input_sha256: str,
     run_prefix: str | None = None,
     metrics_subset: Sequence[Any] | None = None,
+    waveform_exports: Sequence[Any] | None = None,
 ) -> dict:
     spectre = bundle.spectre.spectre
     if spectre.output_format not in OCEAN_READY_FORMATS:
@@ -34,7 +35,7 @@ def build_metric_extraction_request(
         )
 
     metrics = []
-    selected_metrics = metrics_subset or bundle.metrics.metrics
+    selected_metrics = metrics_subset if metrics_subset is not None else bundle.metrics.metrics
     for metric in selected_metrics:
         if metric.ocean is None:
             raise ValueError(f"metric {metric.name} is missing ocean formula")
@@ -56,7 +57,26 @@ def build_metric_extraction_request(
         metrics.append(entry)
 
     run_prefix = run_prefix or f"runs/real/{run_id}"
-    return {
+
+    if not metrics and not waveform_exports:
+        raise ValueError(
+            "must provide at least one scalar metric or waveform export"
+        )
+
+    wf_entries = []
+    for wf in waveform_exports or []:
+        wf_entry = {
+            "name": wf.name,
+            "testbench": wf.testbench,
+            "expression": wf.expression,
+            "expression_sha256": expression_sha256(wf.expression),
+            "output_format": wf.output_format,
+            "nil_policy": wf.nil_policy,
+            "csv_output_file": f"{run_prefix}/metrics/waveforms/{wf.name}.csv",
+        }
+        wf_entries.append(wf_entry)
+
+    result = {
         "schema_version": "1.0",
         "run_id": run_id,
         "candidate_id": candidate_id,
@@ -86,3 +106,6 @@ def build_metric_extraction_request(
             "write_results_outside_run_dir",
         ],
     }
+    if wf_entries:
+        result["waveform_exports"] = wf_entries
+    return result
