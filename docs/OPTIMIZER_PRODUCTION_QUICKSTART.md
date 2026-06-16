@@ -1,8 +1,8 @@
-# Optimizer production quickstart
+# Optimizer Production Quickstart
 
 Use this path for a real Maestro-exported Spectre/OCEAN optimization project.
 
-## 1. Install the product environment
+## Install
 
 From the release root:
 
@@ -19,7 +19,7 @@ Check the entrypoints:
 ./.venv/bin/hermes-workflow --help
 ```
 
-## 2. Prepare the project
+## Prepare The Project
 
 ```text
 PROJECT_DIR/
@@ -28,10 +28,9 @@ PROJECT_DIR/
 └── context/
 ```
 
-`opt_requirement.md` is the machine-readable optimization request. It supplies
-budget, batch size, Spectre resources, optimizer CPU cap, algorithm, strategy,
-initialization, output format, testbenches, process corners, metrics,
-objective, and constraints.
+`opt_requirement.md` supplies budget, batch size, Spectre resources, optimizer
+CPU cap, algorithm, strategy, initialization, output format, testbenches,
+process corners, metrics, objective, and constraints.
 
 For each testbench, run one known-good Maestro/ADE point first. Put the point
 root in `opt_requirement.md`; it must contain:
@@ -40,7 +39,16 @@ root in `opt_requirement.md`; it must contain:
 <maestro_point_root>/netlist/input.scs
 ```
 
-## 3. Configure Cadence
+Start from one of:
+
+```text
+examples/spectre_maestro_project/opt_requirement.md
+examples/spectre_maestro_project/opt_requirement.multi_corner.md
+examples/spectre_maestro_project/opt_requirement.multi_testbench.md
+examples/spectre_maestro_project/opt_requirement.multi_tb_corner.md
+```
+
+## Configure Cadence
 
 Provide a `csh`/`tcsh` setup file through one of:
 
@@ -53,7 +61,7 @@ IC_OPT_CADENCE_CSHRC
 
 The setup must expose `spectre`, `ocean`, and license tools.
 
-## 4. Run
+## Run
 
 Doctor gate:
 
@@ -73,21 +81,22 @@ Continuation:
 ./.venv/bin/ic-opt PROJECT_DIR --real --continue N
 ```
 
-Remote run:
+Remote:
 
 ```bash
+./.venv/bin/ic-opt --ssh-profile PROFILE PROJECT_DIR --doctor
 ./.venv/bin/ic-opt --ssh-profile PROFILE PROJECT_DIR --real
 ```
 
-## 5. Read the reports
+## Read Reports
 
 Start with:
 
 ```text
-reports/optimizer_decision_report.md
-reports/optimizer_run_report.json
 reports/project_doctor_report.json
 reports/license_probe_report.json
+reports/optimizer_run_report.json
+reports/optimizer_decision_report.md
 ```
 
 For real Spectre/OCEAN evidence, inspect:
@@ -99,7 +108,7 @@ runs/**/metric_result_manifest.json
 
 For multi-testbench or multi-corner runs, inspect parent aggregate manifests.
 
-## 6. Agent use
+## Agent Use
 
 Give the agent:
 

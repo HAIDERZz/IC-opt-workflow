@@ -1,10 +1,6 @@
-# Multi-Testbench Optimization Requirement
+# Multi-Testbench Single-Corner Optimization Requirement
 
-Use this reference when one optimizer candidate needs metrics from more than
-one Maestro/ADE testbench. Each `maestro_point_root` must point to a
-single-point Maestro/ADE result directory that contains `netlist/input.scs`.
-The same evaluation model also supports a single testbench; use this file only
-when one candidate needs metrics from multiple Maestro/ADE setups.
+Template derived from the verified Mixer requirement. This mode evaluates one candidate through several Maestro/ADE testbenches at their source point corners.
 
 ## Project
 
@@ -18,32 +14,30 @@ backend: maestro_exported_spectre_deck
 
 ```yaml
 testbenches:
-  - id: cg_nf
-    maestro_point_root: /absolute/path/to/CG_NF_Test/point_root
-    virtuoso_library: MixerLib
-    cell: Mixer
-    design_view: schematic
-    maestro_view: maestro
-    test_name: CG_NF_Test
-    corner: Nominal
-
-  - id: iip3
-    maestro_point_root: /absolute/path/to/IIP3_Test/point_root
-    virtuoso_library: MixerLib
-    cell: Mixer
-    design_view: schematic
-    maestro_view: maestro
-    test_name: IIP3_Test
-    corner: Nominal
-
-  - id: p1db
-    maestro_point_root: /absolute/path/to/P1dB_Test/point_root
-    virtuoso_library: MixerLib
-    cell: Mixer
-    design_view: schematic
-    maestro_view: maestro
-    test_name: P1dB_Test
-    corner: Nominal
+- id: cg_nf
+  maestro_point_root: /absolute/path/to/CG_NF_Test/point_root
+  virtuoso_library: Virtuoso_Bridge_test
+  cell: MixerCS_PSS_CG_Noise
+  design_view: schematic
+  maestro_view: maestro
+  test_name: Mixer_CS_CG_NF
+  corner: Nominal
+- id: iip3
+  maestro_point_root: /absolute/path/to/IIP3_Test/point_root
+  virtuoso_library: Virtuoso_Bridge_test
+  cell: MixerCS_PSS_IIP3
+  design_view: schematic
+  maestro_view: maestro
+  test_name: Mixer_CS_IIP3
+  corner: Nominal
+- id: p1db
+  maestro_point_root: /absolute/path/to/P1dB_Test/point_root
+  virtuoso_library: Virtuoso_Bridge_test
+  cell: MixerCS_PSS_P1dB
+  design_view: schematic
+  maestro_view: maestro
+  test_name: P1dB_Test
+  corner: Nominal
 ```
 
 ## Design Variables
@@ -51,24 +45,44 @@ testbenches:
 ```yaml
 - name: F
   kind: integer
-  lower: "14"
-  upper: "30"
-  step: "2"
+  lower: '20'
+  upper: '30'
+  step: '2'
 - name: W
   kind: continuous_step
-  lower: "0.4u"
-  upper: "2u"
-  step: "0.2u"
+  lower: 0.6u
+  upper: 1.2u
+  step: 0.2u
 - name: L
   kind: continuous_step
-  lower: "30n"
-  upper: "50n"
-  step: "10n"
+  lower: 30n
+  upper: 40n
+  step: 10n
 - name: VB_LO
   kind: continuous_step
-  lower: "150m"
-  upper: "350m"
-  step: "20m"
+  lower: 280m
+  upper: 400m
+  step: 20m
+- name: FCS
+  kind: integer
+  lower: '40'
+  upper: '56'
+  step: '2'
+- name: WCS
+  kind: continuous_step
+  lower: 0.6u
+  upper: 1.2u
+  step: 0.2u
+- name: LCS
+  kind: continuous_step
+  lower: 30n
+  upper: 50n
+  step: 10n
+- name: VB_RF
+  kind: continuous_step
+  lower: 300m
+  upper: 440m
+  step: 20m
 ```
 
 ## Metrics
@@ -77,24 +91,20 @@ testbenches:
 - name: BW
   unit: Hz
   testbench: cg_nf
-  ocean_expression: bandwidth(db(((vh('pac "/IF_P" '-1) - vh('pac "/IF_N" '-1)) / (vh('pac "/RF_P" '(0)) - vh('pac "/RF_N" '(0))))) 3 "low")
-
+  ocean_expression: bandwidth(db((harmonic((v("/IF_P" ?result "pac") - v("/IF_N" ?result "pac")) '-1) / harmonic(drplPacVolGnExpDen("(v(\"/RF_P\" ?result \"pac\")-v(\"/RF_N\" ?result \"pac\"))" '(0) nil) '-1))) 3 "low")
 - name: MAX_GAIN
   unit: dB
   testbench: cg_nf
-  ocean_expression: ymax(ymax(db(((vh('pac "/IF_P" '-1) - vh('pac "/IF_N" '-1)) / (vh('pac "/RF_P" '(0)) - vh('pac "/RF_N" '(0)))))))
-
+  ocean_expression: ymax(db((harmonic((v("/IF_P" ?result "pac") - v("/IF_N" ?result "pac")) '-1) / harmonic(drplPacVolGnExpDen("(v(\"/RF_P\" ?result \"pac\")-v(\"/RF_N\" ?result \"pac\"))" '(0) nil) '-1))))
 - name: NF_3G
   unit: dB
   testbench: cg_nf
   ocean_expression: value(getData("NF" ?result "pnoise") 3e+09)
-
 - name: IIP3
   unit: dBm
   testbench: iip3
   ocean_expression: rapidIIPN("pac_ip3")
-
-- name: P1DB
+- name: P1dB
   unit: dBm
   testbench: p1db
   ocean_expression: compressionVRI((v("/IF_P" ?result "pss_fd") - v("/IF_N" ?result "pss_fd")) '1 ?rport resultParam("PORT2:r" ?result "pss_fd") ?gcomp 1)
@@ -105,26 +115,26 @@ testbenches:
 ```yaml
 - metric: BW
   op: gt
-  value: "19e9 Hz"
+  value: 28e9 Hz
 - metric: MAX_GAIN
   op: gt
-  value: "4 dB"
+  value: 5.5 dB
 - metric: NF_3G
   op: lt
-  value: "12 dB"
+  value: 9 dB
 - metric: IIP3
   op: gt
-  value: "0 dBm"
-- metric: P1DB
+  value: 1 dBm
+- metric: P1dB
   op: gt
-  value: "-2 dBm"
+  value: -6 dBm
 ```
 
 ## Objective
 
 ```yaml
 direction: minimize
-expression: "NF_3G * 1e9 / (BW*MAX_GAIN*IIP3*P1DB) "
+expression: -(0.1*min(max(0,min(1,10*(ln(BW/28e9)/ln(10))/0.6)),max(0,min(1,(MAX_GAIN-5.5)/2)),max(0,min(1,(9-NF_3G)/0.7)),max(0,min(1,(IIP3-1)/2)),max(0,min(1,(P1dB+6)/1.5)))+0.8*(0.1*max(0,min(1,10*(ln(BW/28e9)/ln(10))/0.6))+0.10*max(0,min(1,(MAX_GAIN-5.5)/2))+0.30*max(0,min(1,(9-NF_3G)/0.7))+0.20*max(0,min(1,(IIP3-1)/2))+0.30*max(0,min(1,(P1dB+6)/1.5))))
 ```
 
 ## Spectre Settings
@@ -134,8 +144,8 @@ engine: spectre_x
 preset: ax
 output_format: psfxl
 threads_per_run: 10
-parallel_jobs: 12
-timeout_s: 3600
+parallel_jobs: 10
+timeout_s: 7200
 require_license_check: true
 keep_failed_runs: true
 keep_successful_runs: true
@@ -144,12 +154,13 @@ keep_successful_runs: true
 ## Optimizer Settings
 
 ```yaml
-algorithm: openbox
+algorithm: turbo
+strategy: turbo_trust_region
 initialization: sobol
-max_evaluations: 100
+max_evaluations: 30
 batch_size: 10
 random_seed: 20260528
-optimizer_cpu_threads: 4
+optimizer_cpu_threads: 32
 failure_penalty: 1000000.0
 deduplicate_candidates: true
 ```

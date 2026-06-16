@@ -1,16 +1,16 @@
-# Product release checklist
+# Product Release Checklist
 
 Use this before publishing a release package.
 
-## Product contract
+## Product Contract
 
-The first real run uses:
+First real run:
 
 ```bash
 ./.venv/bin/ic-opt PROJECT_DIR --real
 ```
 
-Continuation uses:
+Continuation:
 
 ```bash
 ./.venv/bin/ic-opt PROJECT_DIR --real --continue N
@@ -42,7 +42,7 @@ Entrypoints:
 ./.venv/bin/hermes-workflow --help
 ```
 
-## Release examples
+## Release Examples
 
 Keep these examples current:
 
@@ -53,35 +53,38 @@ examples/spectre_maestro_project/opt_requirement.multi_corner.md
 examples/spectre_maestro_project/opt_requirement.multi_tb_corner.md
 ```
 
-## Real run acceptance
+Requirement examples must parse with current requirement intake. Placeholder
+path failures are acceptable; schema/field failures are not.
 
-A real acceptance run should prove:
+## Real Run Acceptance
 
-- `reports/optimizer_run_report.json` reports pass;
+Prove:
+
+- `reports/optimizer_run_report.json` reports pass
 - generated `config/optimizer.yaml` and `config/spectre.yaml` match
-  `opt_requirement.md`;
-- child result and metric manifests contain sanitized `command_trace`;
+  `opt_requirement.md`
+- child result and metric manifests contain sanitized `command_trace`
 - aggregate manifests include expected child evidence for multi-testbench or
-  multi-corner projects;
+  multi-corner projects
 - optimizer reports include `runtime_thread_limits` when
-  `optimizer_cpu_threads` is set;
+  `optimizer_cpu_threads` is set
 - `reports/optimizer_decision_report.md` reports a best observed feasible
-  candidate when feasible evidence exists;
-- reports do not claim a mathematical global optimum.
+  candidate when feasible evidence exists
+- reports do not claim a mathematical global optimum
 
 ## Documentation
 
 Before publishing:
 
 - remove engineering logs, debug records, superpowers plans, build artifacts,
-  test cache files, and raw tool evidence from the release package;
+  test cache files, and raw tool evidence from the release package
 - check that README, release notes, user guides, agent docs, skills, and
-  examples describe the same CLI contract;
-- check markdown code fences;
-- check that user-facing docs do not advertise stale CLI controls;
-- keep `RELEASE_NOTES_v0.1.7.md` as the release summary.
+  examples describe the same CLI contract
+- check markdown code fences
+- check user-facing docs do not advertise stale CLI controls
+- keep `RELEASE_NOTES_v0.1.7.md` as the release summary
 
-## Files that must not be released
+## Files That Must Not Be Released
 
 Do not publish raw `input.scs`, protected sidecars, encrypted PDK includes,
 PSF/raw simulator databases, full Cadence logs, user proprietary Maestro point

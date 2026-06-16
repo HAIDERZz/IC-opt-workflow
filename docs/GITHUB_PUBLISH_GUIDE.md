@@ -1,27 +1,23 @@
 # GitHub Publishing Guide
 
-This guide is for publishing the v0.1 source package to GitHub for the first
-time.
-
-## Target Repository
-
-Current intended repository:
+Target repository:
 
 ```text
 HAIDERZz/IC-opt-workflow
 ```
 
-The repository is released under the MIT License. Keep proprietary Cadence,
-PDK, and project artifacts out of the source repository.
+The project is released under the MIT License. Keep proprietary Cadence, PDK,
+and project artifacts out of the source repository.
 
-## What To Publish
+## Publish Contents
 
-Publish the source repository contents:
+Publish source-package contents such as:
 
 ```text
 README.md
 pyproject.toml
 requirements-product.txt
+requirements-advanced.txt
 src/
 docs/
 examples/
@@ -29,17 +25,16 @@ skills/
 vendor/
 tests/
 tools/
-RELEASE_NOTES_v0.1.md
+RELEASE_NOTES_v0.1.7.md
 LICENSE
 ```
 
-`tests/` is intentionally kept in the GitHub source repository so other
-developers can verify parser, workflow, optimizer, reporting, and agent skill
-behavior.
+`tests/` is intentionally kept so developers can verify parser, workflow,
+optimizer, reporting, and agent skill behavior.
 
-## What Not To Publish
+## Do Not Publish User Artifacts
 
-Do not commit user/project generated artifacts:
+Do not commit:
 
 ```text
 .venv/
@@ -65,10 +60,11 @@ From the package root:
 
 ```bash
 python3 -m venv .venv
-./.venv/bin/python -m pip install --upgrade pip
+./.venv/bin/python -m pip install --upgrade pip setuptools wheel
 ./.venv/bin/python -m pip install -r requirements-product.txt
-./.venv/bin/python -m pytest tests/test_product_cli.py tests/test_requirement_intake.py tests/test_openbox_backend.py tests/test_optimizer_task_package.py tests/test_toolchain_env.py -q
-./.venv/bin/python -m ruff check src tools
+./.venv/bin/python -m pytest -q
+./.venv/bin/python -m ruff check src tests
+git diff --check -- . ':!vendor' ':!.serena'
 ```
 
 Use the site's Python 3.11+ command if `python3` is older than 3.11.
@@ -83,37 +79,17 @@ grep -R -n "<LOCAL_HOME_MARKER>\\|<USER_NAME>\\|<PRIVATE_TMP_PREFIX>\\|<PRIVATE_
 
 Expected result: no output.
 
-## First Git Push
+## Push
 
 From the package root:
 
 ```bash
-git init
+git status --short
 git add .
-git commit -m "release: v0.1.0"
-git branch -M main
-git remote add origin git@github.com:HAIDERZz/IC-opt-workflow.git
-git push -u origin main
+git commit -m "release: v0.1.7"
+git push origin main
+git tag -f v0.1.7
+git push -f origin v0.1.7
 ```
 
-If SSH is not configured, use the HTTPS remote instead:
-
-```bash
-git remote add origin https://github.com/HAIDERZz/IC-opt-workflow.git
-```
-
-## Optional v0.1 Tag And Release
-
-After the first push:
-
-```bash
-git tag v0.1.0
-git push origin v0.1.0
-```
-
-Then create a GitHub release from tag `v0.1.0` and use
-`RELEASE_NOTES_v0.1.md` as the release notes.
-
-## License Status
-
-The project uses the MIT License. See `LICENSE`.
+Use `RELEASE_NOTES_v0.1.7.md` for GitHub release notes.

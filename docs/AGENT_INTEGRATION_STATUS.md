@@ -1,37 +1,42 @@
-# Agent integration status
+# Agent Integration Status
 
 Date: 2026-06-16
 
-The maintained product entrypoint is:
+The maintained agent entry is:
 
-```bash
-ic-opt PROJECT_DIR --real
+```text
+skills/ic-opt/SKILL.md
 ```
 
-Continuation:
+Agent-assisted operation uses the same product CLI as a human operator.
 
 ```bash
+ic-opt PROJECT_DIR --doctor
+ic-opt PROJECT_DIR --real
 ic-opt PROJECT_DIR --real --continue N
 ```
 
-Agent-assisted operation uses the same product CLI. Give the agent
-`skills/ic-opt/SKILL.md` and `PROJECT_DIR`; the agent should run the CLI, inspect
-artifacts, and report evidence.
+Remote execution uses:
 
-## Current workflow capabilities
+```bash
+ic-opt --ssh-profile PROFILE PROJECT_DIR --doctor
+ic-opt --ssh-profile PROFILE PROJECT_DIR --real
+```
 
-- Local and remote real optimization through `ic-opt`.
-- Local and remote doctor gates with license probe support.
-- Requirement-driven budget, batch size, parallel jobs, Spectre threads,
+## Current Capability
+
+- local and remote real optimization through `ic-opt`
+- local and remote doctor gates with license probe support
+- requirement-driven budget, batch size, parallel jobs, Spectre threads,
   optimizer CPU cap, algorithm, strategy, initialization, output format,
-  retention, testbench, and process-corner settings.
-- Continuation through `--continue N`.
-- OpenBox GP+EIC, OpenBox PRF+EIC, and native TuRBO.
-- Multi-testbench and multi-corner candidate evaluation.
-- Sanitized Spectre/OCEAN `command_trace` in child and aggregate manifests.
-- Optimizer CPU thread-limit audit in optimizer reports.
+  retention, testbench routes, and process-corner settings
+- continuation through `--continue N`
+- OpenBox GP+EIC, OpenBox PRF+EIC, and native TuRBO
+- multi-testbench and multi-corner candidate evaluation
+- sanitized Spectre/OCEAN `command_trace` in child and aggregate manifests
+- optimizer CPU thread-limit audit in optimizer reports
 
-See also:
+## Related Docs
 
 ```text
 docs/AGENT_OPTIMIZER_USAGE_MANUAL.md

@@ -401,11 +401,10 @@ turbo:
     }
 
 
-def test_optimizer_requirement_template_defaults_to_openbox_auto_strategy() -> None:
+def test_optimizer_requirement_template_uses_explicit_strategy() -> None:
     text = TEMPLATE_OPT_REQUIREMENT.read_text(encoding="utf-8")
 
-    assert "strategy: openbox_auto" in text
-    assert "## Process Corners" in text
+    assert "strategy: turbo_trust_region" in text
 
 
 def test_optimizer_requirement_template_includes_multi_corner_variants() -> None:
@@ -419,34 +418,24 @@ def test_optimizer_requirement_template_includes_multi_corner_variants() -> None
 
     assert "## Process Corners" in multi_corner
     assert "objective_policy: worst_case" in multi_corner
-    assert "strategy: openbox_gp_eic" in multi_corner
+    assert "strategy: turbo_trust_region" in multi_corner
     assert "## Process Corners" in multi_tb_corner
-    assert "strategy: openbox_prf_eic" in multi_tb_corner
+    assert "strategy: turbo_trust_region" in multi_tb_corner
 
 
-def test_optimizer_requirement_template_default_strategy_prepares(tmp_path: Path) -> None:
+def test_optimizer_requirement_template_intake_accepts_placeholder_replacement(
+    tmp_path: Path,
+) -> None:
     project_dir = _copy_requirement_project(tmp_path)
     text = TEMPLATE_OPT_REQUIREMENT.read_text(encoding="utf-8").replace(
-        "/absolute/path/to/maestro/results/maestro/Interactive.N/1/LIB_CELL_1",
+        "/absolute/path/to/CG_NF_Test/point_root",
         VALID_MAESTRO_POINT.as_posix(),
     )
     (project_dir / "opt_requirement.md").write_text(text, encoding="utf-8")
 
-    report = prepare_from_requirement(project_dir)
+    report = check_requirement(project_dir)
 
     assert report.status == "pass"
-    optimizer = yaml.safe_load(
-        (project_dir / "config" / "optimizer.yaml").read_text(encoding="utf-8")
-    )
-    assert optimizer["optimizer"]["algorithm"] == "openbox"
-    assert optimizer["optimizer"]["strategy"] == "openbox_auto"
-    corners = yaml.safe_load(
-        (project_dir / "config" / "process_corners.yaml").read_text(
-            encoding="utf-8"
-        )
-    )
-    assert corners["corners"] == [{"id": "nominal"}]
-
 
 def test_prepare_from_requirement_allows_formula_only_metric(tmp_path: Path) -> None:
     project_dir = _copy_requirement_project(tmp_path)

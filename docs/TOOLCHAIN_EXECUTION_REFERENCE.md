@@ -1,11 +1,9 @@
-# Toolchain execution reference
+# Toolchain Execution Reference
 
-Date: 2026-06-16
+Use this before running Virtuoso, Spectre, OCEAN, OpenBox, native TuRBO,
+license probes, or optimizer commands from the release package.
 
-Use this before running Virtuoso, Spectre, OCEAN, OpenBox, native TuRBO, license
-probes, or optimizer commands from the release package.
-
-## Product commands
+## Product Commands
 
 ```bash
 ic-opt PROJECT_DIR --doctor
@@ -22,23 +20,23 @@ parallelism, Spectre thread count, optimizer CPU cap, algorithm, strategy,
 initialization, process corners, output format, metric formulas, objective, and
 constraints.
 
-## Product environment
+## Product Environment
 
 Install from the release root:
 
 ```bash
 python3 -m venv .venv
-.venv/bin/python -m pip install --upgrade pip setuptools wheel
-.venv/bin/python -m pip install -r requirements-product.txt
+./.venv/bin/python -m pip install --upgrade pip setuptools wheel
+./.venv/bin/python -m pip install -r requirements-product.txt
 ```
 
 Import check:
 
 ```bash
-.venv/bin/python -c "import openbox, turbo, torch, gpytorch, scipy, threadpoolctl, hermes_workflow; print('product optimizer env ok')"
+./.venv/bin/python -c "import openbox, turbo, torch, gpytorch, scipy, threadpoolctl, hermes_workflow; print('product optimizer env ok')"
 ```
 
-## Cadence environment
+## Cadence Environment
 
 `ic-opt` discovers the user-approved Cadence setup in this order:
 
@@ -51,9 +49,9 @@ IC_OPT_CADENCE_CSHRC
 
 Do not infer shell startup files. Do not hardcode a Spectre version.
 
-## Real workflow evidence
+## Real Workflow Evidence
 
-After a real run, inspect files:
+After a real run, inspect:
 
 ```text
 config/optimizer.yaml
