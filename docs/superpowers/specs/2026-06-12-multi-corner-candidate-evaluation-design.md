@@ -52,7 +52,7 @@ candidate -> tb1/tb2/tb3 -> tt/ff/ss -> metrics
 
 ## Non-Negotiable Invariants
 
-1. No new `--multi-corner` CLI flag.
+1. Multi-corner coverage is declared through `Process Corners` in `opt_requirement.md`.
 2. `parallel_jobs` remains candidate-level concurrency.
 3. Testbench and corner execution inside one candidate is serial by default.
 4. Runtime concurrency must not multiply by `testbench_count` or

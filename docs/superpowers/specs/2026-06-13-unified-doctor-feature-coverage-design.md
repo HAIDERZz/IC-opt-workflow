@@ -64,7 +64,7 @@ mode, resource settings, and dirty state.
 - Do not rewrite OCEAN formulas, objective expressions, variable ranges, or
   process-corner definitions.
 - Do not add a new `--local-doctor` or `--remote-doctor` command.
-- Do not add `--multi-corner` CLI flags.
+- Configure multi-corner coverage through `Process Corners` in `opt_requirement.md`.
 - Do not change candidate/testbench/corner execution semantics.
 - Do not create a Python virtualenv inside user project directories.
 - Do not sync implementation changes into `ic-auto-opt-workflow-v0.1` until the

@@ -149,8 +149,7 @@ initialization、output format、保留策略、metric 公式、约束和多工�
 `ic-opt PROJECT --real --continue N`，表示追加 N 个评估点，其余配置仍从项目
 requirement/config 继承。
 
-多工艺角通过 `opt_requirement.md` 的 `Process Corners` 配置，不存在
-`--multi-corner` CLI 开关。示例见
+多工艺角通过 `opt_requirement.md` 的 `Process Corners` 配置。示例见
 `examples/spectre_maestro_project/opt_requirement.multi_corner.md` 和
 `examples/spectre_maestro_project/opt_requirement.multi_tb_corner.md`。
 

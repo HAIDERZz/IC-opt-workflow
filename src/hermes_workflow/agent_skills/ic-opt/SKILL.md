@@ -176,9 +176,8 @@ Remote parallelism guidance:
 - High values such as 24 or 36 can trigger SSH server limits, for example
   `kex_exchange_identification: Connection closed by remote host`. Treat those
   as remote transport/tool failures, not circuit-performance failures.
-- Multi-corner is enabled only from `opt_requirement.md` / generated config.
-  There is no `--multi-corner` CLI switch. If the section is absent, preserve
-  legacy single-corner behavior.
+- Multi-corner is enabled from `opt_requirement.md` / generated config. If the
+  section is absent, preserve legacy single-corner behavior.
 - Monte Carlo is not part of this real-run optimization loop. Treat it as a
   follow-up validation step, not a replacement for `Process Corners`.
 - `optimizer_cpu_threads` limits optimizer-side Python/OpenBox CPU use; it does

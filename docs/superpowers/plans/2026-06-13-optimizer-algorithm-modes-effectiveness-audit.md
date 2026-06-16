@@ -6,7 +6,7 @@ Development must continue from `ic-auto-opt-workflow`. `ic-auto-opt-workflow-v0.
 
 After C-77 implementation, C-76 multi-corner execution/aggregation/reporting code from `ic-auto-opt-workflow-v0.1` was synchronized back into the development package. C-77 optimizer strategy presets and optimizer effectiveness audit were preserved. Fresh targeted verification in the development package passed for both the C-76 multi-corner suite and the C-77 optimizer strategy/audit suite; full pytest, `ruff check src tests`, development cadence check, and `git diff --check` also passed.
 
-Remaining verification gap: no fresh live Cadence/Spectre/OCEAN multi-corner optimizer practice run has been executed after this alignment. Do not claim real multi-corner optimizer effectiveness until that development-package real route is run and inspected.
+Remaining verification gap: claim real multi-corner optimizer effectiveness only after a fresh live Cadence/Spectre/OCEAN multi-corner optimizer practice run has completed and its artifacts have been inspected.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

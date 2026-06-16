@@ -32,8 +32,7 @@ metric 公式、约束和多工艺角设置。不要在 `ic-opt PROJECT --real` 
 `--max-evals`、`--batch-size`、`--parallel-jobs`、`--threads` 或 `--strategy`。
 续跑只保留 `ic-opt PROJECT --real --continue N`，表示追加 N 个评估点。
 
-多工艺角通过 `opt_requirement.md` 的 `Process Corners` 配置，不存在
-`--multi-corner` CLI 开关。示例见
+多工艺角通过 `opt_requirement.md` 的 `Process Corners` 配置。示例见
 `examples/spectre_maestro_project/opt_requirement.multi_corner.md` 和
 `examples/spectre_maestro_project/opt_requirement.multi_tb_corner.md`。
 
@@ -495,9 +494,8 @@ ic-opt --ssh-profile eda-lab /remote/path/to/Mixer_opt --real --continue 20
 同一份策略也会清理远程 `<remote_project_dir>/runs/real/<run_id>`，仅在产物已下载
 完毕后执行。
 
-多 corner 只通过 `opt_requirement.md` 里的 `Process Corners` 配置启用，
-没有 `--multi-corner` 命令行开关；如果不写这个 section，就保持原来的单 corner
-行为。Monte Carlo 仍然不在这条 real-run 优化主流程里，建议作为后优化验证步骤。
+多 corner 通过 `opt_requirement.md` 里的 `Process Corners` 配置启用。如果不写这个
+section，就保持原来的单 corner 行为。Monte Carlo 建议作为后优化验证步骤。
 
 如果远程 Cadence 环境文件不叫 `cadence_env.csh`，传入远程路径：
 
