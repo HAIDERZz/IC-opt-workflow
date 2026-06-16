@@ -1,68 +1,34 @@
-# Opt Requirement README
+# Writing `opt_requirement.md`
 
-This file explains how to write `opt_requirement.md` for an IC optimization
-project.
+`opt_requirement.md` is the contract for a first optimizer run. Put optimizer
+budget, batch size, Spectre parallelism, Spectre threads, optimizer CPU limit,
+algorithm choice, metric formulas, bounds, and process corners in this file.
+Do not use command-line flags to override those values for the first run.
 
-The goal is to make user input file-based and repeatable. Do not describe the
-optimization only in chat. Put machine-critical settings in
-`opt_requirement.md`, then let Hermes render the standard YAML contracts and
-import the Maestro/ADE netlist bundle.
+The product command-line entry kept for run extension is continuation:
+`ic-opt <project> --continue N`.
 
-## Project Directory
+## Example Files
 
-Recommended user-created directory:
+This directory contains four requirement templates. They are generated from the
+same verified Mixer requirement and use the same OCEAN formulas after replacing
+private Maestro result paths with placeholders.
 
-```text
-~/spectre_opt_prj/<project_name>/
-├── opt_requirement.md
-├── constraints.md
-└── context/
-```
+| File | Use when |
+| --- | --- |
+| `opt_requirement.md` | one testbench, source point corner |
+| `opt_requirement.multi_corner.md` | one testbench, multiple process corners |
+| `opt_requirement.multi_testbench.md` | multiple testbenches, source point corner |
+| `opt_requirement.multi_tb_corner.md` | multiple testbenches, multiple process corners |
+| `opt_requirement.fix_run.md` | fixed-point simulation, no optimizer |
 
-User-owned files:
-
-- `opt_requirement.md`: required, canonical optimization request.
-- `constraints.md`: optional supervisor-agent guidance.
-- `context/`: optional notes, screenshots, prior reports, or circuit context.
-
-Generated/imported files:
-
-```text
-config/
-netlists/exported/
-netlists/templates/
-reports/
-runs/
-ledger/
-state/
-execution_package/
-```
-
-Do not hand-build these generated directories unless a task explicitly asks you
-to.
-
-## Basic Workflow
-
-1. Build and run one known-good Maestro/ADE single-point testbench.
-2. Find the resulting `maestro_point_root`.
-3. Write `opt_requirement.md` in the project directory.
-4. Optionally write `constraints.md`.
-5. Run:
-
-```bash
-hermes-workflow check-requirement ~/spectre_opt_prj/<project_name>
-hermes-workflow prepare-from-requirement ~/spectre_opt_prj/<project_name>
-hermes-workflow validate ~/spectre_opt_prj/<project_name>
-hermes-workflow check-project-ready ~/spectre_opt_prj/<project_name>
-```
-
-For the full production command sequence, including optimizer execution,
-decision recording, final summary generation, and continuation boundaries, read
-`docs/OPTIMIZER_PRODUCTION_QUICKSTART.md`.
+For a real project, copy one template to `<project>/opt_requirement.md`, then
+replace `maestro_point_root`, project metadata, variable bounds, constraints,
+and metric formulas with values from your circuit.
 
 ## Required Sections
 
-`opt_requirement.md` must contain these headings exactly once:
+Each required section must appear once and contain one fenced `yaml` block.
 
 ```text
 Project
@@ -76,54 +42,97 @@ Optimizer Settings
 Approval Checklist
 ```
 
-Each section must contain exactly one fenced `yaml` block.
+Multi-corner templates also include:
+
+```text
+Process Corners
+```
 
 ## Maestro Source
 
-`maestro_point_root` is the important field. It should point to the Maestro/ADE
-single-point result directory that contains `netlist/input.scs`.
-
-The following fields are metadata used for traceability and reports:
+Single-testbench projects use a top-level Maestro source:
 
 ```yaml
+maestro_point_root: /absolute/path/to/CG_NF_Test/point_root
 virtuoso_library: Virtuoso_Bridge_test
-cell: bridge_test_inv
+cell: MixerCS_PSS_CG_Noise
 design_view: schematic
 maestro_view: maestro
-test_name: tran_dc_test
+test_name: Mixer_CS_CG_NF
 corner: Nominal
 ```
 
-Use the real values when known. `test_name` and `corner` do not change Spectre
-or OCEAN execution; they identify which Maestro setup the imported netlist came
-from.
+Multi-testbench projects use `testbenches:`. Each metric then uses a
+`testbench:` routing key.
 
-For circuits that need multiple Maestro/ADE testbenches for one candidate, use
-`opt_requirement.multi_testbench.md` as the reference. In that form,
-`Maestro Source` contains a `testbenches:` list, and each metric declares a
-`testbench:` routing key. The routing key only decides which child Spectre/OCEAN
-run evaluates the formula; it is not part of the OCEAN expression.
-
-The workflow supports one or more testbenches. A single testbench is the normal
-special case and can use the simpler top-level `maestro_point_root` form. Use
-`testbenches:` only when one candidate's metrics must be collected from multiple
-Maestro/ADE point roots. The file format has no fixed maximum count; simulation
-time, license availability, disk usage, and `parallel_jobs` are the practical
-limits.
-
-After `prepare-from-requirement`, multi-testbench projects should pass:
-
-```bash
-hermes-workflow check-project-ready ~/spectre_opt_prj/<project_name>
+```yaml
+testbenches:
+  - id: cg_nf
+    maestro_point_root: /absolute/path/to/CG_NF_Test/point_root
+    virtuoso_library: Virtuoso_Bridge_test
+    cell: MixerCS_PSS_CG_Noise
+    design_view: schematic
+    maestro_view: maestro
+    test_name: Mixer_CS_CG_NF
+    corner: Nominal
 ```
 
-Before the first optimizer run, the expected readiness is
-`ready_for_first_run`. After optimizer closeout and final summary generation,
-the expected readiness is `ready_for_closeout_review`.
+`maestro_point_root` must be the Maestro/ADE result point directory that
+contains `netlist/input.scs`. Do not point to `input.scs` directly.
+
+## Process Corners
+
+Use `Process Corners` when the same candidate must be evaluated across several
+model sections or corner variables.
+
+```yaml
+objective_policy: worst_case
+constraint_policy: all_corners
+corners:
+  - id: tt
+    model_section: Post_simu_top_tt
+    variables:
+      temperature: '27'
+  - id: ss
+    model_section: Post_simu_top_ss
+    variables:
+      temperature: '125'
+  - id: ff
+    model_section: Post_simu_top_ff
+    variables:
+      temperature: '-40'
+```
+
+Inside one candidate, the workflow runs each `testbench x corner` child and
+aggregates the child metric results according to the objective and constraint
+policies.
+
+## Design Variables
+
+Every variable is a separate YAML list item.
+
+```yaml
+- name: W
+  kind: continuous_step
+  lower: 0.6u
+  upper: 1.2u
+  step: 0.2u
+- name: F
+  kind: integer
+  lower: '20'
+  upper: '30'
+  step: '2'
+```
+
+Supported kinds are `integer` and `continuous_step`. Variable names must match
+the top-level `parameters` statement in the imported Spectre deck.
 
 ## Metrics
 
-The minimum metric format is:
+`ocean_expression` is copied into the OCEAN replay script. Hermes does not
+rewrite or reinterpret Calculator/OCEAN formulas.
+
+Single-testbench metric:
 
 ```yaml
 - name: NF_3G
@@ -131,251 +140,39 @@ The minimum metric format is:
   ocean_expression: value(getData("NF" ?result "pnoise") 3e+09)
 ```
 
-`name` is the optimizer metric name. In the example above, `NF_3G` means the
-noise figure sampled at 3 GHz. It does not need to match the internal OCEAN data
-object name.
-
-Optional fields:
+Multi-testbench metric:
 
 ```yaml
-  result: pnoise
-  required_signals:
-    - /IF_P
-    - /IF_N
+- name: NF_3G
+  unit: dB
+  testbench: cg_nf
+  ocean_expression: value(getData("NF" ?result "pnoise") 3e+09)
 ```
 
-- `result` is only a `selectResult(...)` hint for formulas that need it. If the
-  formula already contains an explicit result selector, such as
-  `getData("NF" ?result "pnoise")`, omit `result`.
-- `required_signals` is only a human/audit diagnostic hint. It is not used to
-  decide whether the formula is correct and is not required for dataset-style
-  formulas.
+If the expression already names its result, such as
+`getData("NF" ?result "pnoise")`, do not add a separate `result:` hint.
 
-Never rewrite an ADE/Maestro-approved formula into another dialect just to fill
-these optional fields. The authoritative metric is `ocean_expression`.
+The optimizer metric path expects scalar values. Full waveform CSV export is a
+separate characterization/export workflow, not an optimizer scalar metric.
 
-## Design Variables
+## Constraints And Objective
 
-Every variable must be a separate YAML list item:
+Constraints reference metric names.
 
 ```yaml
-- name: W
-  kind: continuous_step
-  lower: "0.4u"
-  upper: "2u"
-  step: "0.2u"
-- name: L
-  kind: continuous_step
-  lower: "30n"
-  upper: "50n"
-  step: "10n"
-```
-
-Do not put two variable names in the same item. Duplicate YAML keys are rejected
-because they can silently overwrite earlier values.
-
-`prepare-from-requirement` renders `config/*.yaml`, imports the Maestro
-netlist bundle, and generates `netlists/templates/template.scs` through the
-existing netlist templating path.
-
-It does not run Spectre, OCEAN, Virtuoso, OpenBox, or an execution agent.
-
-## Maestro Point Root
-
-Provide the point-root directory, not a hand-picked `input.scs`.
-
-Expected shape:
-
-```text
-maestro_point_root/
-├── netlist/
-│   ├── input.scs
-│   ├── ade_e.scs
-│   └── ...
-└── psf/
-    └── ...
-```
-
-Typical example:
-
-```text
-/path/to/simulation/<lib>/<cell>/maestro/results/maestro/Interactive.9/1/<lib>_<cell>_1
-```
-
-Hermes copies the full `maestro_point_root/netlist/` bundle into
-`netlists/exported/`. Users should not choose sidecar files manually.
-
-Maestro netlists may contain symlinks such as:
-
-```text
-netlist/exprOutputs.log -> ../../../exprOutputs.log.15.0.1
-```
-
-Hermes materializes safe Maestro-history symlinks as regular files. Unsafe
-symlinks are rejected.
-
-## Required `opt_requirement.md` Structure
-
-The file must contain these sections exactly once:
-
-```text
-# Optimization Requirement
-## Project
-## Maestro Source
-## Design Variables
-## Metrics
-## Constraints
-## Objective
-## Spectre Settings
-## Optimizer Settings
-## Approval Checklist
-```
-
-Each `##` section must contain exactly one fenced YAML block:
-
-````markdown
-## Project
-
-```yaml
-project_name: bridge_test_inv
-description: Optimize inverter sizing from an existing Maestro testbench
-backend: maestro_exported_spectre_deck
-```
-````
-
-Free prose outside YAML blocks is allowed, but Hermes only reads the fenced
-YAML blocks.
-
-## Section Reference
-
-### Project
-
-```yaml
-project_name: bridge_test_inv
-description: Optimize inverter sizing from an existing Maestro testbench
-backend: maestro_exported_spectre_deck
-```
-
-Rules:
-
-- `project_name` must be a simple identifier: letters, numbers, underscore,
-  not starting with a number.
-- `backend` must be `maestro_exported_spectre_deck`.
-
-### Maestro Source
-
-```yaml
-maestro_point_root: /absolute/path/to/maestro/results/maestro/Interactive.9/1/LIB_CELL_1
-virtuoso_library: Virtuoso_Bridge_test
-cell: bridge_test_inv
-design_view: schematic
-maestro_view: maestro
-test_name: tran_dc_test
-corner: Nominal
-```
-
-Rules:
-
-- `maestro_point_root` must contain `netlist/input.scs`.
-- Use an absolute path.
-- Do not point directly to `input.scs`.
-- Do not point directly to `psf/`.
-
-### Design Variables
-
-```yaml
-- name: FN
-  kind: integer
-  lower: "2"
-  upper: "12"
-  step: "1"
-- name: WN
-  kind: continuous_step
-  lower: "0.3u"
-  upper: "3u"
-  step: "0.2u"
-```
-
-Supported `kind` values:
-
-- `integer`
-- `continuous_step`
-
-Rules:
-
-- Variable names must match `[A-Za-z_][A-Za-z0-9_]*`.
-- Values should be strings.
-- Continuous values must use Spectre-safe attached unit suffixes:
-  - good: `"0.3u"`
-  - bad: `"0.3 um"`
-- Every listed variable must appear exactly once in the top-level
-  `parameters` statement of the imported `input.scs`.
-- Variables are independent optimization variables in this contract.
-
-### Metrics
-
-```yaml
-- name: rise
-  unit: s
-  result: tran
-  ocean_expression: riseTime(VT("/VOUT") 0 nil 0.9 nil 10 90 nil "time")
-  required_signals:
-    - /VOUT
-```
-
-Rules:
-
-- `name` is the metric identifier used by constraints and objective.
-- `result` is the OCEAN result/analysis name, such as `tran`, `dc`, `ac`,
-  `pss`, or `pac`.
-- `ocean_expression` is copied exactly into the metric contract.
-- Hermes does not rewrite OCEAN formulas.
-- Python must not reimplement Calculator/OCEAN formulas.
-- `required_signals` documents the expected result signals for review and
-  failure diagnosis.
-
-### Constraints
-
-```yaml
-- metric: rise
+- metric: NF_3G
   op: lt
-  value: "80e-12 s"
+  value: 9 dB
 ```
 
-Supported operators:
-
-- `lt`
-- `le`
-- `gt`
-- `ge`
-
-Rules:
-
-- `metric` must reference a metric declared in `## Metrics`.
-- Values should include units when that helps user review.
-- Constraints define feasibility. The optimizer should first seek feasible
-  points, then compare objective values among feasible points.
-
-### Objective
+The objective expression references metric names, not OCEAN signals.
 
 ```yaml
 direction: minimize
-expression: "(rise + fall) * DC"
+expression: -(0.2*min(max(0,min(1,10*(ln(BW/28e9)/ln(10))/0.6)),max(0,min(1,(MAX_GAIN-5.5)/2)),max(0,min(1,(9-NF_3G)/0.7)))+0.8*(0.20*max(0,min(1,10*(ln(BW/28e9)/ln(10))/0.6))+0.30*max(0,min(1,(MAX_GAIN-5.5)/2))+0.50*max(0,min(1,(9-NF_3G)/0.7))))
 ```
 
-Supported directions:
-
-- `minimize`
-- `maximize`
-
-Rules:
-
-- Expression may use metric names and arithmetic operators.
-- Do not call functions in the objective expression.
-- Do not reference undeclared metrics.
-- This is the FoM comparison expression, not an OCEAN formula.
-
-### Spectre Settings
+## Spectre Settings
 
 ```yaml
 engine: spectre_x
@@ -383,45 +180,45 @@ preset: ax
 output_format: psfxl
 threads_per_run: 10
 parallel_jobs: 10
-timeout_s: 3600
+timeout_s: 7200
 require_license_check: true
 keep_failed_runs: true
 keep_successful_runs: true
 ```
 
-Rules:
+`threads_per_run` maps to Spectre `+mt`. `parallel_jobs` is candidate-level
+Spectre process concurrency. Keep `batch_size <= parallel_jobs`.
 
-- `preset` maps to Spectre X preset, for example `ax`.
-- `threads_per_run` maps to Spectre `+mt` for a single Spectre process.
-- `parallel_jobs` is the maximum number of Spectre processes launched at the
-  same time.
-- Keep `batch_size <= parallel_jobs`.
-- Do not confuse `threads_per_run` with optimizer batch parallelism.
+`output_format` is `psfxl`.
 
-### Optimizer Settings
+## Optimizer Settings
 
 ```yaml
-algorithm: openbox
+algorithm: turbo
+strategy: turbo_trust_region
 initialization: sobol
-max_evaluations: 100
+max_evaluations: 30
 batch_size: 10
 random_seed: 20260528
+optimizer_cpu_threads: 32
 failure_penalty: 1000000.0
 deduplicate_candidates: true
 ```
 
-Recommended algorithm:
+Production strategy choices:
 
-- `openbox`
+- `algorithm: openbox`, `strategy: openbox_gp_eic`
+- `algorithm: openbox`, `strategy: openbox_prf_eic`
+- `algorithm: turbo`, `strategy: turbo_trust_region`
 
-Rules:
+TuRBO is suitable when legal variable steps are fine enough that snapping a
+continuous candidate to the legal grid is a small perturbation, for example
+about `0.1u`. Avoid TuRBO for coarse finger-count-style grids or spaces that
+produce many duplicate snapped candidates.
 
-- `max_evaluations` is the total budget for the run.
-- `batch_size` is how many candidates the optimizer asks for per batch.
-- `deduplicate_candidates` must be `true`.
-- Use a fixed `random_seed` for reproducibility.
+`random_baseline` is for diagnostics, not production optimization.
 
-### Approval Checklist
+## Approval Checklist
 
 ```yaml
 metric_formulas_user_approved: true
@@ -430,100 +227,76 @@ variable_bounds_user_approved: true
 spectre_resource_settings_user_approved: true
 ```
 
-All values must be `true`.
+All values must be `true` before real-tool execution.
 
-This is intentional. It prevents accidental real-tool execution when formulas,
-source path, bounds, or resource settings have not been reviewed.
+## Fix-Run Mode
 
-## `constraints.md`
+Fix-run mode runs Spectre/OCEAN simulations at user-specified design points
+without an optimizer. Use it for characterization, verification, or waveform
+export at known parameter values.
 
-`constraints.md` is optional. It is for supervisor-agent guidance, not direct
-contract generation.
+Set `Workflow.mode` to `fix_run` in `opt_requirement.md`:
 
-Good uses:
-
-- runtime budget preference;
-- when to continue optimization;
-- when to stop and ask the user;
-- preferred report emphasis;
-- known circuit caveats;
-- user-level design intent.
-
-Bad uses:
-
-- hidden metric formulas;
-- hidden Spectre settings;
-- hidden optimizer bounds;
-- hidden hard constraints.
-
-If a rule affects actual execution, put it in `opt_requirement.md`.
-
-## Common Failures
-
-### `opt_requirement.md is missing`
-
-The project directory does not contain `opt_requirement.md`.
-
-### `required section is missing`
-
-One of the required headings is absent or misspelled.
-
-### `must contain exactly one fenced yaml block`
-
-Each required section needs exactly one block beginning with:
-
-````markdown
 ```yaml
-````
-
-and ending with:
-
-````markdown
+## Workflow
+schema_version: "1.0"
+mode: fix_run
+starting_run_id: real_001
 ```
-````
 
-### `maestro_point_root/netlist/input.scs is missing`
-
-The path is not a valid Maestro point root. Check that you provided the point
-directory, not `psf/` and not `input.scs`.
-
-### `approved variable was not found in top-level parameters`
-
-The variable exists in `opt_requirement.md`, but the imported `input.scs` does
-not expose it in the top-level `parameters` statement.
-
-### `must use a Spectre-safe attached unit suffix`
-
-Use `"0.3u"`, not `"0.3 um"`.
-
-## Minimal Command Check
-
-After writing `opt_requirement.md`, run:
+Run with the same command used for optimizer runs:
 
 ```bash
-hermes-workflow check-requirement ~/spectre_opt_prj/<project_name>
+ic-opt PROJECT --real
 ```
 
-After it passes, run:
+The workflow detects `mode: fix_run` from the requirement file and dispatches
+the fix-run path instead of the optimizer loop.
 
-```bash
-hermes-workflow prepare-from-requirement ~/spectre_opt_prj/<project_name>
-```
+### What Comes From the Requirement File
 
-Expected generated files include:
+- `Design Variables` — parameter declarations (bounds and steps)
+- `Fixed Points` — one or more design points to simulate
+- `Process Corners` — corners for each point (optional)
+- `Waveform Exports` — OCEAN expressions to export as CSV
+
+### Fix-Run Output
+
+The output is a simulation archive, not an optimization report. There is no
+`optimizer.yaml`, no `optimizer_state.json`, and no
+`optimizer_decision_report.md`. Instead, inspect:
 
 ```text
-config/project_config.yaml
-config/variables.yaml
-config/metrics.yaml
-config/spectre.yaml
-config/optimizer.yaml
-netlists/exported/input.scs
-netlists/templates/template.scs
-reports/requirement_intake_report.json
-reports/maestro_point_import_report.json
-reports/netlist_preparation_report.json
+runs/**/result_manifest.json
+runs/**/metric_result_manifest.json
+runs/**/waveform_export_manifest.json
 ```
 
-Only after this bootstrap path passes should the user approve a real
-Spectre/OCEAN single-point smoke or optimizer run.
+### Required Sections for Fix-Run
+
+```text
+Workflow
+Project
+Maestro Source
+Design Variables
+Spectre Settings
+Fixed Points
+Approval Checklist
+```
+
+At least one of `Metrics` or `Waveform Exports` must be present. `Optimizer
+Settings`, `Constraints`, and `Objective` are not required in fix-run mode.
+
+## Check The File
+
+Run:
+
+```bash
+hermes-workflow check-requirement <project>
+hermes-workflow prepare-from-requirement <project>
+hermes-workflow validate <project>
+hermes-workflow check-project-ready <project>
+```
+
+For production optimizer execution, read
+`docs/OPTIMIZER_PRODUCTION_QUICKSTART.md`.
