@@ -25,6 +25,7 @@ def test_cli_version_prints_package_version() -> None:
         ("--max-evals", "1"),
         ("--batch-size", "1"),
         ("--parallel-jobs", "1"),
+        ("--execution-agent", "legacy-agent"),
     ],
 )
 def test_optimize_command_rejects_cli_workload_resource_overrides(
@@ -392,7 +393,6 @@ def test_cli_approve_help_uses_generic_preflight_language() -> None:
 
     assert result.exit_code == 0
     assert "Project directory with preflight reports" in result.stdout
-    assert "Claude preflight reports" not in result.stdout
 
 
 def test_cli_preapproval_flow_can_approve_without_real_execution(

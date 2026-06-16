@@ -145,13 +145,6 @@ def main(
             ),
         ),
     ] = None,
-    execution_agent: Annotated[
-        str,
-        typer.Option(
-            "--execution-agent",
-            help="Execution mode: direct or claude.",
-        ),
-    ] = "direct",
     ssh_profile: Annotated[
         str | None,
         typer.Option("--ssh-profile", help="OpenSSH profile for remote Linux EDA server."),
@@ -301,7 +294,6 @@ def main(
             parallel_jobs=None,
             cadence_cshrc=resolved_cadence_cshrc,
             strategy=None,
-            execution_agent=execution_agent,
         )
     except (OSError, RuntimeError, ValueError) as exc:
         _exit_with_error(exc)

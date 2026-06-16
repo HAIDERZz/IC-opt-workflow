@@ -39,7 +39,6 @@ def test_optimize_remote_project_runs_doctor_prepare_openbox_and_sync(tmp_path: 
         calls.append("optimize_project")
         assert project_dir == cache_dir
         assert kwargs["real"] is True
-        assert kwargs["execution_agent"] == "direct"
         doctor = kwargs["services"].run_product_doctor(
             project_dir,
             cadence_cshrc=kwargs["cadence_cshrc"],

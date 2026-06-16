@@ -153,7 +153,6 @@ def test_build_execution_package_writes_execution_task(tmp_path: Path) -> None:
         encoding="utf-8"
     )
     assert "# Execution Agent Task" in task_text
-    assert "Claude Code" not in task_text
     assert "Project: `bridge_test_inv`" in task_text
     assert "Backend: `maestro_exported_spectre_deck`" in task_text
     assert "Spectre X preset: `ax`" in task_text

@@ -410,7 +410,6 @@ def test_optimizer_execution_task_keeps_forbidden_actions_in_forbidden_section(
     )[0]
     forbidden_actions = task_text.split("## Forbidden Actions", 1)[1]
 
-    assert "Claude Code" not in task_text
     assert "hand-pick" not in required_behavior
     assert "parse PSF" not in required_behavior
     assert "rewrite OCEAN" not in required_behavior

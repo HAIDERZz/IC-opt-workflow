@@ -1,80 +1,63 @@
-# Release Notes v0.1.7
+# Release notes v0.1.7
 
 Date: 2026-06-16
 
-## Current Product Contract
+## Product contract
 
-- Initial real optimization reads machine-critical settings only from
-  `opt_requirement.md` / generated config: `max_evaluations`, `batch_size`,
-  `parallel_jobs`, `threads_per_run`, `optimizer_cpu_threads`, optimizer
-  strategy, initialization, process corners, output format, retention policy,
-  metric formulas, and constraints.
-- Product CLI continuation keeps one budget delta:
-  `ic-opt PROJECT --real --continue N`.
-- Do not pass initial-run workload/resource/optimizer overrides such as
-  `--max-evals`, `--batch-size`, `--parallel-jobs`, `--threads`, or
-  `--strategy` to `ic-opt PROJECT --real`.
+`opt_requirement.md` is the only source for initial-run optimizer and simulator
+settings. This includes budget, batch size, candidate parallelism, Spectre
+thread count, optimizer CPU cap, algorithm, strategy, initialization, random
+seed, output format, process corners, metric formulas, objective, constraints,
+and retention policy.
 
-## Capabilities
+The product CLI keeps one budget delta for existing runs:
 
-- Multi-corner real optimization is configured in `opt_requirement.md` under
-  `Process Corners`, using `corners`, `objective_policy`, and
-  `constraint_policy`.
-- Release examples include:
-  - `examples/spectre_maestro_project/opt_requirement.multi_corner.md`
-  - `examples/spectre_maestro_project/opt_requirement.multi_tb_corner.md`
-- Supported production strategy choices are peers:
-  - `algorithm: openbox`, `strategy: openbox_gp_eic`
-  - `algorithm: openbox`, `strategy: openbox_prf_eic`
-  - `algorithm: turbo`, `strategy: turbo_trust_region`
-- `openbox_auto` is the default automatic OpenBox mode when the user has not
-  selected a strategy. `random_baseline` is diagnostic only.
-- Use `turbo_trust_region` when legal variable steps are fine enough that
-  snapping continuous TuRBO candidates is a small perturbation, for example
-  about `0.1u`; avoid it for coarse steps, finger-count-like integers, and
-  categorical choices.
-- `docs/OPTIMIZER_ALGORITHM_MODES.md` explains strategy selection.
-- `docs/PROCESS_CORNER_OPTIMIZATION_FLOW_CN.md` explains multi-corner
-  aggregation and what the optimizer sees.
+```bash
+ic-opt PROJECT_DIR --real --continue N
+```
 
-## Fixed Bugs And Contract Hardening
+Use `--ssh-profile PROFILE` to select a remote execution profile. Use
+`--cadence-cshrc PATH` only when the project does not already provide the
+Cadence setup file.
 
-- B-01: removed product CLI strategy override from the initial-run contract.
-- B-03/B-04: remote timeout and parent aggregate simulator metadata are carried
-  from requirement/config into real artifacts.
-- B-05: `require_license_check` now runs real local/remote license probes and
-  fails closed when required.
-- B-07: optimizer `initialization` now passes through to OpenBox and native
-  TuRBO, including seeded Sobol behavior.
-- B-08: `output_format` contract is fail-closed to `psfxl`; `psfascii` is not
-  accepted by product requirement intake.
-- B-10: local/remote Spectre/OCEAN manifests include sanitized command traces.
-- Parent aggregate traceability: multi-testbench/multi-corner parent manifests
-  include child command-trace references.
-- B-11: optimizer CPU thread-limit runtime audit records requested/effective
-  threads, threadpool/Torch state, and local/remote transport mode.
+## Main changes
 
-## Dependencies
+- Added real local and remote doctor gates with Spectre/license probe reports.
+- Tightened metric flow to `output_format: psfxl`.
+- Added sanitized Spectre/OCEAN `command_trace` to child and aggregate
+  manifests.
+- Added runtime audit for optimizer CPU thread limits.
+- Added requirement-driven OpenBox initialization pass-through.
+- Fixed Sobol initialization so `random_seed` affects native TuRBO Sobol
+  samples while keeping same-seed reproducibility.
+- Added multi-testbench and multi-corner release examples.
+- Updated `skills/ic-opt/SKILL.md` to use the current `ic-opt` product CLI.
 
-- `vendor/open-box`
-- `vendor/TuRBO`
-- TuRBO/Sobol/runtime-audit dependencies in product requirements:
-  `scipy`, `threadpoolctl`, `torch`, and `gpytorch`.
+## Optimizer modes
 
-## Validation Summary
+Production strategies:
 
-- Dev full pytest: `1075 passed, 13 warnings`.
-- Dev ruff: `All checks passed!`.
-- Release package pytest: `1075 passed, 13 warnings`.
-- Release package ruff: `All checks passed!`.
-- Dev/release `src/hermes_workflow` and `tests` are synced, excluding cache and
-  local state directories.
+- `algorithm: openbox`, `strategy: openbox_gp_eic`
+- `algorithm: openbox`, `strategy: openbox_prf_eic`
+- `algorithm: turbo`, `strategy: turbo_trust_region`
+
+`openbox_auto` is the default automatic OpenBox mode. `random_baseline` is for
+diagnostics. TuRBO fits search spaces where legal variable steps are fine enough
+that snapping continuous candidates to the legal grid is a small perturbation,
+for example about `0.1u`.
+
+## Release checks
+
+- Release package test suite: `1075 passed, 13 warnings`.
+- Ruff: all checks passed.
+- Dev and release source/tests were synchronized before packaging.
 
 ## Boundaries
 
-- Cadence Virtuoso, Spectre, OCEAN, PDK files, and simulator licenses are not
-  included.
-- Users must provide valid Maestro/ADE point roots and a working Cadence setup
-  file such as `cadence_env.csh`.
-- The optimizer reports the best observed feasible point under the configured
-  objective/policy. It does not claim a mathematical global optimum.
+Cadence Virtuoso, Spectre, OCEAN, PDK files, and simulator licenses are not
+included. Users must provide valid Maestro/ADE point roots and a working
+Cadence setup file.
+
+The optimizer reports the best observed feasible point under the configured
+objective and process-corner policy. It does not claim a mathematical global
+optimum.

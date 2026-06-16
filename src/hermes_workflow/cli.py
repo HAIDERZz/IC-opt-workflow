@@ -1,5 +1,4 @@
 import json
-from importlib.resources import as_file, files
 from pathlib import Path
 from typing import Annotated, NoReturn
 
@@ -7,12 +6,6 @@ import typer
 
 from hermes_workflow import __version__
 import hermes_workflow.toolchain_env as toolchain_env
-from hermes_workflow.agent_runtime import (
-    SUPPORTED_RUNTIMES,
-    default_runtime_home,
-    inspect_runtime_adapter,
-    install_runtime_adapter,
-)
 from hermes_workflow.approvals import decide_first_real_run
 from hermes_workflow.dry_run import run_dry_run
 from hermes_workflow.health import write_preflight_health
@@ -98,84 +91,6 @@ def main(
 def _exit_with_error(exc: Exception) -> NoReturn:
     typer.echo(str(exc))
     raise typer.Exit(code=1)
-
-
-@app.command("install-runtime-adapter")
-def install_runtime_adapter_command(
-    runtime: Annotated[
-        str,
-        typer.Argument(help="Agent runtime to install: claude or opencode."),
-    ],
-    target_home: Annotated[
-        Path | None,
-        typer.Option(
-            "--target-home",
-            help="Runtime config home. Defaults to the runtime's user config dir.",
-        ),
-    ] = None,
-    force: Annotated[
-        bool,
-        typer.Option("--force", help="Replace existing adapter files."),
-    ] = False,
-) -> None:
-    try:
-        report = install_runtime_adapter(
-            runtime,
-            target_home=target_home,
-            force=force,
-        )
-    except (OSError, ValueError) as exc:
-        _exit_with_error(exc)
-
-    typer.echo(f"runtime: {report.runtime}")
-    typer.echo(f"target_home: {report.target_home}")
-    for path in report.installed:
-        typer.echo(f"installed: {path}")
-    for path in report.skipped:
-        typer.echo(f"skipped_existing: {path}")
-    if report.skipped and not force:
-        typer.echo("use --force to replace skipped files")
-
-
-@app.command("runtime-adapter-status")
-def runtime_adapter_status_command(
-    runtime: Annotated[
-        str | None,
-        typer.Argument(help="Optional runtime: claude or opencode."),
-    ] = None,
-    target_home: Annotated[
-        Path | None,
-        typer.Option(
-            "--target-home",
-            help="Runtime config home. Defaults to each runtime's user config dir.",
-        ),
-    ] = None,
-) -> None:
-    runtimes = [runtime] if runtime is not None else list(SUPPORTED_RUNTIMES)
-    try:
-        for item in runtimes:
-            home = target_home or default_runtime_home(item)
-            result = inspect_runtime_adapter(
-                item,
-                target_home=home,
-            )
-            typer.echo(f"runtime: {result.runtime}")
-            typer.echo(f"target_home: {result.target_home}")
-            for path in result.present:
-                typer.echo(f"present: {path}")
-            for path in result.missing:
-                typer.echo(f"missing: {path}")
-    except (OSError, ValueError) as exc:
-        _exit_with_error(exc)
-
-
-@app.command("agent-skill-path")
-def agent_skill_path_command() -> None:
-    skill = files("hermes_workflow").joinpath("agent_skills/ic-opt/SKILL.md")
-    with as_file(skill) as path:
-        if not path.is_file():
-            raise typer.Exit(code=1)
-        typer.echo(path)
 
 
 def _recovery_report_fingerprint(project_dir: Path) -> tuple[int, int] | None:
@@ -426,7 +341,7 @@ def preflight_health_command(
 def package_command(
     project_dir: Annotated[
         Path,
-        typer.Argument(help="Project directory to package for Claude Code."),
+        typer.Argument(help="Project directory to package for optimizer execution."),
     ],
 ) -> None:
     try:
@@ -1068,13 +983,6 @@ def optimize_command(
             help="User/project Cadence cshrc sourced before real execution.",
         ),
     ] = ...,
-    execution_agent: Annotated[
-        str,
-        typer.Option(
-            "--execution-agent",
-            help="Execution mode: direct or claude.",
-        ),
-    ] = "direct",
 ) -> None:
     try:
         report = optimize_project(
@@ -1085,7 +993,6 @@ def optimize_command(
             batch_size=None,
             parallel_jobs=None,
             cadence_cshrc=cadence_cshrc,
-            execution_agent=execution_agent,
         )
     except (OSError, RuntimeError, ValueError) as exc:
         _exit_with_error(exc)
