@@ -316,14 +316,17 @@ Resource meanings:
 - `threads_per_run`: Spectre `+mt` threads per simulation.
 - `optimizer_cpu_threads`: Python/OpenBox optimizer CPU thread limit.
 
-Use `openbox_auto` as the default strategy unless the user already knows they
-need something else. Choose `openbox_gp_eic` for mostly continuous, smooth,
-constraint-aware IC optimization where local surrogate accuracy matters. Choose
-`openbox_prf_eic` for stepped, integer-heavy, mixed, or failure-prone spaces
-where PRF is usually more robust. Keep `turbo_trust_region` for mostly
-continuous searches that still benefit from trust-region local improvement even
-when a few variables have steps. Use `random_baseline` only for sanity checks,
-pipeline debugging, or algorithm comparisons.
+Use `openbox_auto` only as the default automatic mode. Treat
+`openbox_gp_eic`, `openbox_prf_eic`, and `turbo_trust_region` as peer
+production strategy choices. Choose `openbox_gp_eic` for smooth,
+low-to-medium-dimensional constraint-aware IC optimization. Choose
+`openbox_prf_eic` for stepped, integer-heavy, mixed, high-failure, or
+non-smooth spaces. Choose `turbo_trust_region` only when legal variable
+steps are fine enough that snapping continuous TuRBO candidates is a
+small perturbation, for example about `0.1u`; avoid it for coarse steps,
+finger-count-like integers, and categorical choices. Use
+`random_baseline` only for sanity checks, pipeline debugging, or
+algorithm comparisons.
 
 `optimizer_cpu_threads` changes runtime and machine load, not optimizer
 correctness. After the run, inspect

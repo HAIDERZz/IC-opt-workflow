@@ -256,13 +256,16 @@ per-run decision report at `state/run_retention/<run_id>.json` are retained
 regardless of these settings. For remote runs, the same policy also cleans
 the remote project's `runs/real/<run_id>` after artifacts are downloaded.
 
-Default to `openbox_auto` unless the user already knows they need a specific
-mode. Choose `openbox_gp_eic` for mostly continuous, smooth, constraint-aware
-IC optimization where local surrogate quality matters. Choose
-`openbox_prf_eic` for stepped, integer-heavy, mixed, or failure-prone search
-spaces. Keep `turbo_trust_region` for mostly continuous problems that still
-benefit from trust-region local improvement even when a few variables have
-steps. Use `random_baseline` only for sanity checks, pipeline debugging, or
+Use `openbox_auto` only as the default automatic mode. Treat
+`openbox_gp_eic`, `openbox_prf_eic`, and `turbo_trust_region` as peer
+production strategy choices. Choose `openbox_gp_eic` for smooth,
+low-to-medium-dimensional constraint-aware IC optimization. Choose
+`openbox_prf_eic` for stepped, integer-heavy, mixed, high-failure, or
+non-smooth spaces. Choose `turbo_trust_region` only when legal variable
+steps are fine enough that snapping continuous TuRBO candidates is a
+small perturbation, for example about `0.1u`; avoid it for coarse steps,
+finger-count-like integers, and categorical choices. Use
+`random_baseline` only for sanity checks, pipeline debugging, or
 algorithm comparisons.
 
 `optimizer.optimizer_cpu_threads` changes runtime and host load, not optimizer

@@ -55,12 +55,11 @@ Installer/check commands:
 ./.venv/bin/hermes-workflow runtime-adapter-status
 ```
 
-## Implemented Core
-
 - Product `ic-opt PROJECT_DIR --real` flow.
 - Local and remote doctor gates, including real license probe when required.
-- OpenBox auto, OpenBox GP+EIC, OpenBox PRF+EIC, native TuRBO, and random
-  diagnostic baseline routing.
+- Peer production strategy routing for `openbox_gp_eic`,
+  `openbox_prf_eic`, and `turbo_trust_region`; `openbox_auto` is the
+  default automatic mode and `random_baseline` is diagnostic only.
 - Multi-testbench and multi-corner candidate evaluation.
 - Requirement-driven initialization pass-through for OpenBox and native TuRBO.
 - Sanitized Spectre/OCEAN command trace in child and aggregate manifests.

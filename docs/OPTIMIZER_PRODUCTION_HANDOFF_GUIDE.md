@@ -55,17 +55,22 @@ Before any real run, verify:
   `IC_OPT_CADENCE_CSHRC` points to the user-approved Cadence setup.
 - `ic-opt PROJECT_DIR --doctor` passes when `require_license_check: true`.
 - `ic-opt PROJECT_DIR --real --dry-orchestration` passes before a long run.
-
 ## Backend Selection
 
-Backend choice is made in `opt_requirement.md`:
+Backend choice is made in `opt_requirement.md`. Production strategy
+choices are peers:
 
-- OpenBox auto: `algorithm: openbox`, `strategy: openbox_auto`
-- OpenBox GP+EIC: `algorithm: openbox`, `strategy: openbox_gp_eic`
-- OpenBox PRF+EIC: `algorithm: openbox`, `strategy: openbox_prf_eic`
-- Native TuRBO: `algorithm: turbo`, `strategy: turbo_trust_region`
-- Random diagnostic baseline: `algorithm: random`, `strategy: random_baseline`
+- `algorithm: openbox`, `strategy: openbox_gp_eic`
+- `algorithm: openbox`, `strategy: openbox_prf_eic`
+- `algorithm: turbo`, `strategy: turbo_trust_region`
 
+`openbox_auto` is the default automatic OpenBox mode when the user has
+not selected a strategy. `random_baseline` is diagnostic only. Use TuRBO
+only when legal variable steps are fine enough that snapping is a small
+perturbation, for example about `0.1u`; avoid it for coarse steps,
+finger-count-like integers, and categorical choices.
+
+Use `docs/OPTIMIZER_ALGORITHM_MODES.md` when explaining tradeoffs.
 Use `docs/OPTIMIZER_ALGORITHM_MODES.md` when explaining tradeoffs.
 
 ## Multi-Corner Handoff
