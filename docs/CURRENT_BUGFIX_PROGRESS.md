@@ -21,6 +21,24 @@ Last updated: 2026-06-16
   artifact inspection prove requirement variables propagated through generated
   config, backend execution, process/state files, reports, and manifests.
 
+## 2026-06-16 Release v0.1.7 Agent/Skill Cleanup
+
+Current release-package direction:
+
+- The user-facing agent skill lives only at `skills/ic-opt/SKILL.md`.
+- `src/` is product code only; no `src/hermes_workflow/agent_skills` package-data skill remains.
+- Old Claude/OpenCode runtime adapter assets and commands are removed from the release package.
+- Old execution-agent handoff code paths are removed from release `optimizer_flow`, product CLI wiring, tests, and docs.
+- Release docs should describe the correct current workflow directly, without calling out obsolete flags or historical mistakes.
+
+Verification in `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow-v0.1`:
+
+- `PYTHONPATH=src ../ic-auto-opt-workflow/.venv/bin/python -m pytest -q` exited 0.
+- `PYTHONPATH=src ../ic-auto-opt-workflow/.venv/bin/python -m ruff check src tests` passed.
+- `git diff --check -- . ':!vendor' ':!.serena'` passed.
+- Grep for `Claude|claude|OpenCode|opencode|agent_runtime|agent_skills|claude_skills|install-runtime-adapter|runtime-adapter|agent-skill-path|execution_agent_handoff` returned no release-package matches outside `vendor/.git`.
+- Grep for `--execution-agent|execution_agent|execution-agent` returns only negative tests that assert the old option is rejected.
+
 ## Code-Level Accepted In Dev
 
 ### B-01 Product CLI `--strategy` removal
@@ -331,6 +349,115 @@ Workflow acceptance still required:
 ### `require_license_check` (old deferred note: superseded)
 
 Status: now implemented as B-05 code-level fix (see above).
+
+## 2026-06-16 Fix-Run Simulation Workflow Implementation
+
+Status: code-level verified in development package; workflow-level acceptance pending real Spectre/OCEAN run.
+
+Scope: Implement `fix_run` workflow mode that runs user-specified design points through existing real Spectre/OCEAN infrastructure and archives PSF data, scalar metrics, waveform CSV exports, command traces, and manifests — without entering optimizer logic.
+
+Key principle: `ic-opt PROJECT --real` remains the only CLI entry. Workflow mode is selected by `opt_requirement.md` `Workflow.mode: fix_run`.
+
+### Tasks Completed (TDD with subagent-driven development)
+
+**Task 1: Fix-Run Models** (`feat: add fix-run config models`)
+- Created `src/hermes_workflow/fix_run_models.py` with 10 Pydantic models:
+  `WorkflowMode`, `WorkflowSettings`, `FixedPoint`, `FixedPointsConfig`,
+  `WaveformExport`, `WaveformExportsConfig`, `WaveformExportResult`,
+  `WaveformExportManifest`, `FixRunPointReport` (with `ChildRunIssue`),
+  `FixRunReport`
+- Tests: `tests/test_fix_run_models.py` — 20 tests pass
+- Spec gap fixed: added `ChildRunIssue` for testbench/corner issue grouping
+
+**Task 2: Requirement Intake Workflow-Aware** (`feat: support fix-run requirement intake`)
+- Modified `src/hermes_workflow/requirement_intake.py`:
+  - Added `Workflow`, `Fixed Points`, `Waveform Exports` to optional sections
+  - Mode detection: `Workflow.mode` → `fix_run` or `optimize` (default)
+  - Mode-specific required sections and field validation
+  - Mode-specific config rendering (no `optimizer.yaml` for fix-run)
+  - Added `workflow_mode` field to `RequirementIntakeReport`
+- Tests: `tests/test_requirement_intake_fix_run.py` — 12 tests pass
+- All 32 existing intake tests still pass
+
+**Task 3: Waveform Exports in Metric Requests** (`feat: include waveform exports in metric requests`)
+- Modified `src/hermes_workflow/metric_requests.py`: added `waveform_exports` to request payload
+- Modified `src/hermes_workflow/metric_results.py`: added `WaveformExportRequestEntry` model and `waveform_exports` field to `MetricExtractionRequest`
+- Tests: `tests/test_metric_requests.py` — 6 tests, `tests/test_metric_results.py` — 5 new tests
+
+**Task 4: OCEAN Waveform CSV Rendering** (`feat: render waveform csv exports in ocean replay`)
+- Modified `src/hermes_workflow/execution_adapters/spectre_ocean.py`:
+  - Added `_render_waveform_export_lines()` for `ocnPrint` CSV export
+  - Expression safety validation (rejects `outfile(`, `system(`, `{{`)
+  - Creates `metrics/waveforms/` directory
+- Tests: `tests/test_spectre_ocean_adapter.py` — 7 new tests (78 total)
+
+**Task 5: Waveform Export Manifests** (`feat: persist waveform export manifests`)
+- Modified `spectre_ocean.py`: added `_write_waveform_export_manifest()` for local persistence
+- Modified `metric_results.py`: added optional manifest validation
+- Tests: 6 new adapter tests + 3 new metric_results tests
+
+**Task 6: Local Fix-Run Orchestration** (`feat: add local fix-run workflow`)
+- Created `src/hermes_workflow/fix_run_flow.py`: `run_fix_run_project()` entry point
+- Modified `src/hermes_workflow/product_cli.py`: dispatches to fix-run when `Workflow.mode: fix_run`
+- Tests: `tests/test_fix_run_flow.py` — 7 tests, `tests/test_product_cli.py` — 2 tests
+
+**Task 7: Remote Fix-Run Orchestration** (`feat: add remote fix-run workflow`)
+- Created `src/hermes_workflow/remote_fix_run_flow.py`: `run_remote_fix_run_project()` entry point
+- Modified `src/hermes_workflow/execution_adapters/remote_spectre_ocean.py`: downloads waveform CSVs and manifests
+- Modified `product_cli.py`: remote dispatch to fix-run
+- Tests: `tests/test_remote_fix_run_flow.py` — 6 tests, `tests/test_remote_spectre_ocean_waveform.py` — 3 tests
+
+**Task 8: Documentation and Examples** (`docs: add fix-run requirement example`)
+- Created `examples/spectre_maestro_project/opt_requirement.fix_run.md`
+- Created `src/hermes_workflow/templates/spectre_maestro_project/opt_requirement.fix_run.md` (identical)
+- Updated: `OPT_REQUIREMENT_README.md`, `USER_GUIDE_CN.md`, `TOOLCHAIN_EXECUTION_REFERENCE.md`, `PRODUCT_RELEASE_CHECKLIST.md`, `skills/ic-opt/SKILL.md`
+- Tests: `tests/test_fix_run_docs.py` — 11 tests
+
+**Task 9: Code-Level Verification**
+- Focused tests: 257 passed
+- Full pytest: 1164 passed, 1 pre-existing unrelated failure in `test_agent_skill.py`
+- Ruff: All checks passed
+- `git diff --check`: clean
+- Release package: NOT modified
+
+### Files Created
+- `src/hermes_workflow/fix_run_models.py`
+- `src/hermes_workflow/fix_run_flow.py`
+- `src/hermes_workflow/remote_fix_run_flow.py`
+- `tests/test_fix_run_models.py`
+- `tests/test_requirement_intake_fix_run.py`
+- `tests/test_metric_requests.py` (new)
+- `tests/test_remote_fix_run_flow.py`
+- `tests/test_remote_spectre_ocean_waveform.py`
+- `tests/test_fix_run_flow.py`
+- `tests/test_product_cli.py` (new)
+- `tests/test_fix_run_docs.py`
+- `examples/spectre_maestro_project/opt_requirement.fix_run.md`
+- `src/hermes_workflow/templates/spectre_maestro_project/opt_requirement.fix_run.md`
+
+### Files Modified
+- `src/hermes_workflow/requirement_intake.py`
+- `src/hermes_workflow/metric_requests.py`
+- `src/hermes_workflow/metric_results.py`
+- `src/hermes_workflow/execution_adapters/spectre_ocean.py`
+- `src/hermes_workflow/execution_adapters/remote_spectre_ocean.py`
+- `src/hermes_workflow/product_cli.py`
+- `tests/test_metric_results.py`
+- `tests/test_spectre_ocean_adapter.py`
+- `examples/spectre_maestro_project/OPT_REQUIREMENT_README.md`
+- `docs/USER_GUIDE_CN.md`
+- `docs/TOOLCHAIN_EXECUTION_REFERENCE.md`
+- `docs/PRODUCT_RELEASE_CHECKLIST.md`
+- `skills/ic-opt/SKILL.md`
+
+### Workflow Acceptance Still Required
+- At least one real local fix-run with Spectre/OCEAN
+- At least one real remote fix-run
+- Verify 1 fixed point across 30 corners (3 process sections x 10 temperatures)
+- Verify each corner has: PSF, OCEAN log, waveform CSV, waveform_export_manifest.json, command_trace
+- Randomly inspect tt, ss, ff corners for correct model_section, temperature, parameters, expression, CSV path
+- Verify no optimizer_state or optimizer decision/final reports are generated
+- If real environment is temporarily unavailable, must explicitly mark workflow acceptance as NOT complete
 
 ## Recommended Next Task
 
@@ -1280,3 +1407,133 @@ Known documentation boundary:
 - `docs/toolchain_evidence` contains historical Cadence evidence files. It is
   excluded from documentation contract sync checks because it is raw tool
   evidence, not current release usage documentation.
+## 2026-06-16 Runtime Adapter Maintenance Check
+
+Scope: verify whether `hermes-workflow install-runtime-adapter` is still
+compatible with the current `ic-opt` product contract.
+
+Finding: the installer/status mechanism was still functional, but the installed
+Claude/OpenCode agent content was stale. The old assets still described the
+runtime-native subagent route as the main path and included broken markdown or
+shell snippets. Some user-facing docs also promoted runtime adapter installation
+as the first path instead of the current product CLI plus `skills/ic-opt/SKILL.md`
+route.
+
+Fix:
+
+- Rewrote `skills/ic-opt/SKILL.md` as the current agent contract.
+- Rewrote `claude_skills/ic-opt/SKILL.md` to match the current product CLI,
+  requirement-only initial-run settings, remote profile behavior, psfxl,
+  license probe, command trace, CPU thread cap, and artifact inspection.
+- Rewrote OpenCode command/agent assets under `agent_runtime/opencode/`.
+- Updated `README.md`, `agent_runtime/README.md`, `claude_skills/README.md`,
+  `docs/AGENT_INTEGRATION_STATUS.md`,
+  `docs/AGENT_OPTIMIZER_USAGE_MANUAL.md`,
+  `docs/AGENT_USER_QUICKSTART_CN.md`, and
+  `docs/OPTIMIZER_PRODUCTION_QUICKSTART.md`.
+- Extended `tests/test_agent_runtime.py` so installed assets and the main skill
+  must contain the current contract and must not reintroduce old CLI/runtime
+  entry strings.
+
+Verification:
+
+- Dev: `./.venv/bin/python -m pytest tests/test_agent_runtime.py -q` passed.
+- Dev smoke: installed Claude/OpenCode adapters into
+  `/tmp/ic_opt_runtime_adapter_check_20260616`, then
+  `runtime-adapter-status` reported all expected assets present.
+- Dev smoke content grep: installed assets contained `opt_requirement.md`,
+  `--continue N`, `--ssh-profile PROFILE`, `output_format: psfxl`,
+  `command_trace`, `license_probe_report.json`, `optimizer CPU cap`,
+  `Process Corners`, `openbox_gp_eic`, `openbox_prf_eic`,
+  `turbo_trust_region`, and `0.1u`; stale runtime/CLI strings were absent.
+- Release: copied the same source/docs/tests into
+  `ic-auto-opt-workflow-v0.1`.
+- Release: `../ic-auto-opt-workflow/.venv/bin/python -m pytest
+  tests/test_agent_runtime.py -q` passed from the release worktree.
+- Release smoke: with `PYTHONPATH=src`, installed Claude/OpenCode adapters into
+  `/tmp/ic_opt_runtime_adapter_release_check_20260616`, then
+  `runtime-adapter-status` reported all expected assets present and content grep
+  matched the same current-contract checks.
+
+Decision: the adapter entrypoint can remain in the codebase as an optional
+asset installer. It should not be promoted as the primary user path. The primary
+agent path is: give the agent `skills/ic-opt/SKILL.md` and `PROJECT_DIR`; the
+agent operates `ic-opt PROJECT_DIR --real` / `--continue N` and verifies
+workflow artifacts.
+
+## 2026-06-16 Release Documentation Cleanup
+
+Scope: clean the release package documentation so GitHub users see only current
+v0.1.7 docs, not historical engineering logs.
+
+Actions in `ic-auto-opt-workflow-v0.1`:
+
+- Removed release-package historical/debug documentation: old Claude handoff
+  notes, execution progress logs, compact resume checkpoint, debug directories,
+  superpowers plans/specs, simulations, toolchain evidence, build artifacts,
+  pytest cache files, old release notes, and stale architecture/status notes.
+- Reduced release markdown/txt files to the current publishable set, excluding
+  vendored third-party docs.
+- Rewrote current docs that were stale or visibly generated:
+  `RELEASE_NOTES_v0.1.7.md`, `README.md`,
+  `docs/AGENT_INTEGRATION_STATUS.md`,
+  `docs/OPTIMIZER_PRODUCTION_QUICKSTART.md`,
+  `docs/OPTIMIZER_PRODUCTION_HANDOFF_GUIDE.md`,
+  `docs/TOOLCHAIN_EXECUTION_REFERENCE.md`,
+  `docs/USER_GUIDE_CN.md`, `docs/TROUBLESHOOTING_CN.md`,
+  `docs/ROLE_MODEL_AND_TERMINOLOGY.md`,
+  `docs/PROCESS_CORNER_OPTIMIZATION_FLOW_CN.md`, and
+  `docs/PRODUCT_RELEASE_CHECKLIST.md`.
+- Synchronized `src/hermes_workflow/agent_skills/ic-opt/SKILL.md` with the
+  current release `skills/ic-opt/SKILL.md`, so the package no longer carries
+  two conflicting skill contracts.
+
+Verification:
+
+- Release docs grep, excluding `vendor/`, has no matches for stale product CLI
+  strings, old runtime/subagent entry claims, deleted historical document names,
+  or the humanizer hard-pattern scan terms used in this pass.
+- Markdown fence balance check passed for all release markdown/txt files outside
+  `vendor/`.
+- `../ic-auto-opt-workflow/.venv/bin/python -m pytest
+  tests/test_agent_runtime.py -q` passed from the release worktree.
+- `../ic-auto-opt-workflow/.venv/bin/python -m ruff check
+  tests/test_agent_runtime.py` passed.
+- `git diff --check -- . ':!vendor' ':!.serena'` passed in the release
+  worktree.
+
+## 2026-06-16 Release requirement templates and docs resync
+
+Reason: release examples and docs had drifted from the verified real workflow requirement. The most serious drift was an invalid OCEAN example `getData("NF" "pnoise")`; the verified requirement and OCEAN probe use `getData("NF" ?result "pnoise")`.
+
+Verified mother requirement used for regeneration:
+`/home/zzchen/.ic-opt/remote_runs/zzchen@10.113.216.131/1fc85e90d34cd484/opt_requirement.md`.
+
+Evidence for using this as the mother requirement:
+- project contains generated `config/*.yaml` and real run artifacts;
+- `runs/real` contains 30 `metric_result_manifest.json` files;
+- `cg_nf/tt/psf` from `real_028` was opened by real OCEAN;
+- OCEAN confirmed `getData("NF" ?result "pnoise")` returns a waveform with 561 points and can be exported to CSV;
+- `getData("NF" "pnoise")` fails in OCEAN with `getData: extra arguments or keyword missing - ("pnoise")`.
+
+Actions completed:
+- Regenerated four release/dev requirement templates from the verified Mixer requirement:
+  - single testbench, single corner: `opt_requirement.md`;
+  - single testbench, multi-corner: `opt_requirement.multi_corner.md`;
+  - multi-testbench, single corner: `opt_requirement.multi_testbench.md`;
+  - multi-testbench, multi-corner: `opt_requirement.multi_tb_corner.md`.
+- Synchronized release examples and packaged templates for the four requirement files.
+- Rewrote `OPT_REQUIREMENT_README.md`, root `README.md`, release notes, user guide, agent docs, optimizer mode guide, process-corner guide, troubleshooting guide, toolchain reference, handoff guide, release checklist, role terminology, GitHub publishing guide, contributing guide, requirements files, example metric notes, constraints guidance, and `skills/ic-opt/SKILL.md`.
+- Removed user-facing doc references to stale runtime adapter/Claude skill entry points, stale CLI override flags, `psfascii`, `openbox_auto` as recommended/default mode, and the wrong NF formula.
+- Updated requirement-intake tests so the release tests validate the current explicit-strategy templates instead of old `openbox_auto` expectations.
+
+Verification:
+- Four release requirement templates parse under current `check-requirement`; expected failures are only placeholder `maestro_point_root/netlist/input.scs is missing` messages.
+- Release examples and packaged templates have identical hashes for `METRICS.md`, `OPT_REQUIREMENT_README.md`, `constraints.md`, and the four requirement templates.
+- Release product docs grep has no matches for wrong NF formula, stale runtime/agent paths, stale CLI override strings, `psfascii`, or `openbox_auto` in user-facing docs.
+- Markdown code-fence balance check passed.
+- `requirements-product.txt` parses with pip dry-run using `--no-deps --no-build-isolation`.
+- Release targeted test: `PYTHONPATH=src ../ic-auto-opt-workflow/.venv/bin/python -m pytest tests/test_requirement_intake.py -q` passed.
+- Release full test: `PYTHONPATH=src ../ic-auto-opt-workflow/.venv/bin/python -m pytest -q` exited 0.
+- Release lint: `PYTHONPATH=src ../ic-auto-opt-workflow/.venv/bin/python -m ruff check src tests` passed.
+- Release/dev whitespace check: `git diff --check -- . ':!vendor' ':!.serena'` passed.
