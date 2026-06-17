@@ -6,8 +6,6 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from hermes_workflow.approvals import decide_first_real_run
-from hermes_workflow.package import build_execution_package, create_project_from_template
 from hermes_workflow.real_run import prepare_real_run
 from hermes_workflow.reports import (
     RealRunCheckFlags,
@@ -16,41 +14,14 @@ from hermes_workflow.reports import (
     RealRunResultStatus,
 )
 from hermes_workflow.result_handoff import check_real_run
-from tests.report_helpers import write_pass_reports
-
-
-TEMPLATE_TEXT = """simulator lang=spectre
-parameters FN={{FN}} WN={{WN}} FP={{FP}} WP={{WP}}
-tran tran stop=10n
-"""
-
-
-def _create_project(tmp_path: Path) -> Path:
-    project_dir = tmp_path / "bridge_test_inv"
-    create_project_from_template(project_dir)
-    return project_dir
-
-
-def _write_template(project_dir: Path, text: str = TEMPLATE_TEXT) -> None:
-    template_path = project_dir / "netlists" / "templates" / "template.scs"
-    template_path.parent.mkdir(parents=True, exist_ok=True)
-    template_path.write_text(text, encoding="utf-8")
-
-
-def _approve_project(project_dir: Path) -> None:
-    build_execution_package(project_dir, created_at_utc="2026-06-01T00:00:00Z")
-    write_pass_reports(project_dir)
-    instruction = decide_first_real_run(
-        project_dir,
-        created_at_utc="2026-06-01T00:10:00Z",
-    )
-    assert instruction["decision"] == "approve_first_real_run"
+from tests.project_factory import create_approved_generic_project
 
 
 def _prepare_real_run_project(tmp_path: Path):
-    project_dir = _create_project(tmp_path)
-    _approve_project(project_dir)
-    _write_template(project_dir)
+    project_dir = create_approved_generic_project(
+        tmp_path,
+        created_at_utc="2026-06-01T00:00:00Z",
+    )
     package = prepare_real_run(
         project_dir,
         created_at_utc="2026-06-01T00:20:00Z",

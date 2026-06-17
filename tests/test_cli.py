@@ -12,6 +12,16 @@ from tests.report_helpers import write_pass_reports
 runner = CliRunner()
 
 
+# Inverter-shaped netlist template used by the template-based CLI tests below
+# (these tests drive `hermes-workflow init`, which materializes the release
+# template project with FN/WN/FP/WP variables). Owned locally rather than
+# imported from tests.test_metric_results, which has migrated off the template.
+TEMPLATE_TEXT = """simulator lang=spectre
+parameters FN={{FN}} WN={{WN}} FP={{FP}} WP={{WP}}
+tran tran stop=10n
+"""
+
+
 def test_cli_version_prints_package_version() -> None:
     result = runner.invoke(app, ["--version"])
 
@@ -600,7 +610,6 @@ def test_cli_check_metric_results_passes_for_valid_fake_ocean_results(
     tmp_path: Path,
 ) -> None:
     from tests.test_metric_results import (
-        TEMPLATE_TEXT,
         _load_json,
         _write_metric_result_manifest,
         _write_result_manifest,

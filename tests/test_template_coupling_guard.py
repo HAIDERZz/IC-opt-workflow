@@ -11,7 +11,6 @@ ALLOWED_TEMPLATE_CALLERS = {
     "tests/test_approvals.py",
     "tests/test_dry_run.py",
     "tests/test_fix_run_flow.py",
-    "tests/test_metric_results.py",
     "tests/test_mock_optimizer.py",
     "tests/test_multi_testbench_aggregation.py",
     "tests/test_native_turbo.py",
@@ -26,7 +25,6 @@ ALLOWED_TEMPLATE_CALLERS = {
     "tests/test_remote_fix_run_flow.py",
     "tests/test_remote_optimizer_flow.py",
     "tests/test_remote_spectre_ocean.py",
-    "tests/test_result_handoff.py",
     "tests/test_run_retention.py",
     "tests/test_spectre_ocean_adapter.py",
 }

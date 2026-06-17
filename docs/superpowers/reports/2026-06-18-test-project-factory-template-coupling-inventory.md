@@ -1,14 +1,16 @@
 # Test Project Factory Template Coupling Inventory
 
 Date: 2026-06-18
-Phase: 1 (factory + guard + first migration wave)
+Phases: 1 (factory + guard + first wave) and 2 (real-run handoff + metric-result contracts)
 
 This inventory records the state of direct `create_project_from_template()` usage
-across `tests/` after Phase 1 of the Test Project Factory and Template Coupling
+across `tests/` after Phases 1-2 of the Test Project Factory and Template Coupling
 Cleanup. The generic factory (`tests/project_factory.py`) and the coupling guard
-(`tests/test_template_coupling_guard.py`) are in place. Phase 1 migrates the files
-that are genuinely decoupled from circuit-specific template contents and explicitly
-defers files that still depend on them.
+(`tests/test_template_coupling_guard.py`) are in place. Phase 1 migrated the files
+that are genuinely decoupled from circuit-specific template contents; Phase 2
+migrated the real-run handoff and metric-result contract tests by deriving
+incidental metric names from generated request files rather than hardcoding them.
+Remaining coupled files are explicitly deferred.
 
 ## Status summary
 
@@ -18,7 +20,41 @@ defers files that still depend on them.
   non-allowlisted direct usage of `create_project_from_template`).
 - `create_project_from_template()` remains the product/template API and is untouched.
 
-## Migrated in this wave
+## Phase 2 status
+
+Migrated away from direct `create_project_from_template()` usage:
+
+- tests/test_result_handoff.py — now uses `create_approved_generic_project()` +
+  `prepare_real_run()`; result-handoff setup no longer overlays an `FN/WN/FP/WP`
+  template. All `check_real_run()` contract assertions are preserved (30 tests);
+  the simulator-setting drift tests still detect real drift against the generic
+  factory's `spectre.yaml` (`output_format=psfxl`, `threads_per_run=2`).
+- tests/test_metric_results.py — now uses `create_approved_generic_project()` +
+  `prepare_real_run()`; expected-issue strings and assertions derive the metric
+  name from `metric_extraction_request.json` (via new `_first_metric_name()` /
+  `_metric_names()` helpers) instead of hardcoding `rise`; standalone
+  `MetricExtractionRequest` model payloads use `metric_gain`; the waveform-export
+  manifest uses `VAR_INT`/`VAR_WIDTH` parameters; the malformed-shape test uses
+  `not_a_metric_list`. 56 tests preserved; no assertion was weakened.
+
+Both files were removed from `ALLOWED_TEMPLATE_CALLERS`.
+
+### Scope note (test_cli.py)
+
+Deleting `TEMPLATE_TEXT` from `tests/test_metric_results.py` (Phase 2 plan Task 3
+Step 2) exposed a latent cross-test coupling: `tests/test_cli.py` imported
+`TEMPLATE_TEXT` from `tests.test_metric_results` for its intentionally
+template-based CLI test (`test_cli_check_metric_results_passes_for_valid_fake_ocean_results`,
+which drives `hermes-workflow init` to materialize the release template). To keep
+the full suite green without re-introducing circuit-specific content into the
+migrated file, `tests/test_cli.py` was given its own module-level `TEMPLATE_TEXT`
+(matching the convention every other test file already follows) and the
+cross-test import was trimmed to the three still-shared helpers
+(`_load_json`, `_write_result_manifest`, `_write_metric_result_manifest`). This is
+the only change outside the original four-file scope; it is behavior-preserving
+(`test_cli.py` remains template-based; it is not migrated).
+
+## Migrated in Phase 1
 
 These files no longer call `create_project_from_template()` and were removed from
 `ALLOWED_TEMPLATE_CALLERS`:
@@ -32,8 +68,11 @@ These files no longer call `create_project_from_template()` and were removed fro
 
 ## Intentionally template-based (do not migrate)
 
-These tests verify template copy/packaging/init behavior and must keep using
-`create_project_from_template()`:
+These tests intentionally depend on the packaged release template:
+`tests/test_package.py` calls `create_project_from_template()` directly;
+`tests/test_cli.py` drives `hermes-workflow init`, which materializes the release
+template through the CLI (no direct call). Neither should be migrated to the
+generic factory.
 
 - tests/test_package.py — template tree, packaged resources, `init` semantics.
 - tests/test_cli.py — `hermes-workflow init` product behavior.
@@ -50,25 +89,12 @@ Task 3 Step 5 ("do not change tests that intentionally exercise four-variable
 optimizer behavior; leave those for a later wave"), they are deferred and remain in
 the guard allowlist.
 
-- tests/test_metric_results.py — couples to the template's example metric name
-  `rise` (the generic factory uses `metric_gain`/`metric_power`): ~17 references
-  keyed on `rise`, including `persisted["metrics"]["rise"]["status"]`,
-  `"requested metric is missing from metric results: rise"`,
-  `"duplicate metric in metric results: rise"`, and a parametrize block of
-  `"metric rise ..."` expected-issue strings. Migration requires renaming the
-  example metric throughout. (This file does not use a `rise`/`fall`/`DC` triple;
-  that coupling belongs to the real-run files below — `test_next_real_run.py`,
-  `test_real_run.py`, `test_real_run_recovery.py`.)
 - tests/test_next_real_run.py — asserts deterministic optimizer-init candidate
   `parameters == {"FN":"11","FP":"11","WN":"0.3u","WP":"2.9u"}` (4 variables) plus
   the `rise/fall/DC` metric result manifest.
 - tests/test_real_run.py — asserts `manifest["project_name"] == "bridge_test_inv"`,
   candidate `{"FN":"2","WN":"0.3u","FP":"2","WP":"0.3u"}`, rendered `"FN=2"`, and
   `set(request_metrics) == {"rise","fall","DC"}`.
-- tests/test_result_handoff.py — overlays an `FN/WN/FP/WP` template then calls
-  `prepare_real_run`, which would reject the template against a `VAR_INT/VAR_WIDTH`
-  config. Assertions themselves are largely name-agnostic, so this is the closest
-  next candidate: migrating it only requires updating the module template overlay.
 - tests/test_real_run_recovery.py — same `FN/WN/FP/WP` template + `rise/fall/DC`
   manifests + manual retry `parameters {"FN":...}`.
 - tests/test_approvals.py (optional per plan) — 13 call sites with packaging +
@@ -78,8 +104,6 @@ the guard allowlist.
 
 ### Real-run and metric-handoff contracts (closest, lowest-risk next)
 
-- tests/test_result_handoff.py — name-agnostic assertions; needs template overlay update only.
-- tests/test_metric_results.py — needs 2-metric rewrite of example metrics.
 - tests/test_next_real_run.py — needs candidate-value assertions generalized.
 - tests/test_real_run.py — needs project-name, candidate, and metric-name generalization.
 - tests/test_real_run_recovery.py — needs template + metric + retry-parameter generalization.
@@ -124,12 +148,27 @@ the guard allowlist.
 The allowlist must shrink monotonically; the guard prevents any new unreviewed
 direct usage from being introduced.
 
-## Verification (Phase 1)
+## Verification
 
-- `PYTHONPATH=src .venv/bin/python -m pytest tests/test_project_factory.py -q` -> `3 passed`
-- `PYTHONPATH=src .venv/bin/python -m pytest tests/test_template_coupling_guard.py -q` -> `1 passed`
-- `PYTHONPATH=src .venv/bin/python -m pytest tests/test_project_factory.py tests/test_template_coupling_guard.py tests/test_health.py tests/test_optimizer_flow.py tests/test_metric_results.py tests/test_next_real_run.py tests/test_real_run.py tests/test_result_handoff.py tests/test_real_run_recovery.py -q` -> `199 passed`
-- `PYTHONPATH=src .venv/bin/python -m pytest -q` -> `1197 passed`
-- `PYTHONPATH=src .venv/bin/python -m ruff check src tests` -> `All checks passed!`
+### Phase 2
+
+- `pytest tests/test_result_handoff.py -q` -> `30 passed`
+- `pytest tests/test_metric_results.py -q` -> `56 passed`
+- `pytest tests/test_project_factory.py tests/test_template_coupling_guard.py -q` -> `4 passed`
+- `pytest tests/test_project_factory.py tests/test_template_coupling_guard.py tests/test_health.py tests/test_optimizer_flow.py tests/test_result_handoff.py tests/test_metric_results.py -q` -> `102 passed`
+- `pytest -q` -> `1197 passed`
+- `ruff check src tests` -> `All checks passed!`
+- `git diff --check` -> clean
+- `git -C ../ic-auto-opt-workflow-v0.1 status --short` -> clean (release checkout untouched)
+- grep `create_project_from_template|bridge_test_inv|FN|WN|FP|WP` over `tests/test_result_handoff.py tests/test_metric_results.py` -> no matches
+- grep `"rise"` over `tests/test_metric_results.py` -> no matches
+
+### Phase 1 (historical)
+
+- `pytest tests/test_project_factory.py -q` -> `3 passed`
+- `pytest tests/test_template_coupling_guard.py -q` -> `1 passed`
+- `pytest tests/test_project_factory.py tests/test_template_coupling_guard.py tests/test_health.py tests/test_optimizer_flow.py tests/test_metric_results.py tests/test_next_real_run.py tests/test_real_run.py tests/test_result_handoff.py tests/test_real_run_recovery.py -q` -> `199 passed`
+- `pytest -q` -> `1197 passed`
+- `ruff check src tests` -> `All checks passed!`
 - `git diff --check` -> clean
 - `git -C ../ic-auto-opt-workflow-v0.1 status --short` -> clean (release checkout untouched)
