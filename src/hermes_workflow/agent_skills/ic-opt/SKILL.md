@@ -1,6 +1,6 @@
 ---
 name: ic-opt
-description: Operate IC Auto Opt Workflow from a project directory. Trigger when the user asks to run "/ic-opt PROJECT --doctor", "/ic-opt PROJECT --real", "/ic-opt PROJECT --real --continue M", "/ic-opt --ssh-profile PROFILE PROJECT --real", or asks an agent to optimize a Spectre/Maestro/ADE IC project with ic-opt. The default path is one current agent running the deterministic ic-opt CLI and explaining reports; same-runtime subagent execution is optional only when explicitly requested.
+description: Operate IC Auto Opt Workflow from a project directory. Trigger when the user asks to run "/ic-opt PROJECT --doctor", "/ic-opt PROJECT --real", "/ic-opt PROJECT --real --continue N", "/ic-opt --ssh-profile PROFILE PROJECT --real", or asks an agent to optimize a Spectre/Maestro/ADE IC project with ic-opt. The default path is one current agent running the deterministic ic-opt CLI and explaining reports; same-runtime subagent execution is optional only when explicitly requested.
 ---
 
 # IC Auto Opt Agent Operator
@@ -33,14 +33,14 @@ Accept these forms:
 ```text
 /ic-opt PROJECT --doctor
 /ic-opt PROJECT --real [--cadence-cshrc PATH]
-/ic-opt PROJECT --real --continue M [--cadence-cshrc PATH]
+/ic-opt PROJECT --real --continue N [--cadence-cshrc PATH]
 /ic-opt --ssh-profile PROFILE REMOTE_PROJECT --doctor
 /ic-opt --ssh-profile PROFILE REMOTE_PROJECT --real [--cadence-cshrc PATH]
-/ic-opt --ssh-profile PROFILE REMOTE_PROJECT --real --continue M [--cadence-cshrc PATH]
+/ic-opt --ssh-profile PROFILE REMOTE_PROJECT --real --continue N [--cadence-cshrc PATH]
 ```
 
 If the user gives only a project path and asks to optimize, use `--real`.
-If the user says "add/run/continue M more points", use `--real --continue M`.
+If the user says "add/run/continue N more points", use `--real --continue N`.
 If the user asks to check readiness, use `--doctor`.
 If the user says the project is on a remote EDA server, use remote mode with
 `--ssh-profile PROFILE`. `PROFILE` is any OpenSSH target the local machine can
@@ -49,11 +49,10 @@ missing, ask only for the profile name. Do not collect passwords. Tell the user
 to configure passwordless SSH, accept the host key once with `ssh PROFILE true`,
 and verify `ssh -o BatchMode=yes PROFILE true`.
 
-`ic-opt` is the product contract. Do not add workload/resource/optimizer override
-flags such as `--max-evals`, `--batch-size`, `--parallel-jobs`, `--threads`,
-`--strategy`, `--surrogate-type`, `--acq-type`, or `--acq-optimizer-type`.
-Those values come from `opt_requirement.md` / generated config. Low-level
-`hermes-workflow` commands are development/debugging tools only.
+`ic-opt` is the product contract. Do not add workload, resource, or optimizer
+override flags to the user-facing command. Those values come from
+`opt_requirement.md` / generated config. Low-level `hermes-workflow` commands
+are development/debugging tools only.
 
 When explaining optimizer modes, treat the three production strategy choices as
 peers: `algorithm: openbox` with `strategy: openbox_gp_eic`,
@@ -143,7 +142,7 @@ ic-opt PROJECT --real [user flags]
 For continuation:
 
 ```bash
-ic-opt PROJECT --real --continue M [user flags]
+ic-opt PROJECT_DIR --real --continue N [user flags]
 ```
 
 For remote projects:
@@ -151,7 +150,7 @@ For remote projects:
 ```bash
 ic-opt --ssh-profile PROFILE REMOTE_PROJECT --doctor
 ic-opt --ssh-profile PROFILE REMOTE_PROJECT --real [user flags]
-ic-opt --ssh-profile PROFILE REMOTE_PROJECT --real --continue M [user flags]
+ic-opt --ssh-profile PROFILE REMOTE_PROJECT --real --continue N [user flags]
 ```
 
 In remote mode, `REMOTE_PROJECT` is the project directory on the Linux EDA
@@ -187,6 +186,53 @@ Do not translate continuation into a lower-level `hermes-workflow` command for
 normal users. Do not restart from scratch unless the user changed variables,
 constraints, objective, metric formulas, or Maestro point roots.
 
+## Workflow Verification
+
+Do not treat successful command exit as full workflow acceptance. Inspect:
+
+```text
+PROJECT/reports/project_doctor_report.json
+PROJECT/reports/license_probe_report.json
+PROJECT/reports/optimizer_run_report.json
+PROJECT/reports/optimizer_decision_report.md
+PROJECT/runs/**/result_manifest.json
+PROJECT/runs/**/metric_result_manifest.json
+```
+
+Confirm requirement values reached artifacts and execution:
+
+- algorithm, strategy, initialization, and random seed
+- budget and batch size
+- parallelism, Spectre threads, and optimizer CPU cap
+- process corners
+- `output_format: psfxl`
+- license probe behavior
+- sanitized Spectre/OCEAN `command_trace`
+
+## Fix-Run Mode
+
+When `Workflow.mode` is `fix_run` in `opt_requirement.md`, the same `ic-opt
+PROJECT --real` entry point runs Spectre/OCEAN at the design points listed in
+`Fixed Points` and exports waveforms from `Waveform Exports`. No optimizer loop
+runs. Do not add separate CLI flags for fix-run.
+
+In fix-run mode, `Spectre Settings.parallel_jobs` controls how many
+testbench/corner child runs for one fixed point may run concurrently.
+`Spectre Settings.threads_per_run` remains the thread count for each Spectre
+process. Fixed points are still processed serially in this version. There is no
+CLI override for fix-run parallelism.
+
+Fix-run output is a simulation archive, not an optimization report. Do not
+expect `optimizer.yaml`, `optimizer_state.json`, or
+`optimizer_decision_report.md`. Inspect:
+
+```text
+PROJECT/reports/fix_run_report.json
+PROJECT/runs/**/result_manifest.json
+PROJECT/runs/**/metric_result_manifest.json
+PROJECT/runs/**/waveform_export_manifest.json
+```
+
 ## Optional Subagent Mode
 
 If the user explicitly requests native subagent execution:
@@ -200,7 +246,7 @@ If the user explicitly requests native subagent execution:
    or for continuation:
 
    ```bash
-   ic-opt PROJECT --real --continue M [user flags] --dry-orchestration
+   ic-opt PROJECT --real --continue N [user flags] --dry-orchestration
    ```
 
 2. Dispatch the same-runtime native subagent, if available, with only:

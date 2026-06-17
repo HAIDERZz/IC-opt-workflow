@@ -1,142 +1,343 @@
 ---
 name: ic-opt
-description: Operate IC Auto Opt from a project directory. Use when the user asks an agent to doctor, run, continue, inspect, or explain a local or remote Spectre/Maestro/ADE optimization project.
+description: Operate IC Auto Opt Workflow from a project directory. Trigger when the user asks to run "/ic-opt PROJECT --doctor", "/ic-opt PROJECT --real", "/ic-opt PROJECT --real --continue N", "/ic-opt --ssh-profile PROFILE PROJECT --real", or asks an agent to optimize a Spectre/Maestro/ADE IC project with ic-opt. The default path is one current agent running the deterministic ic-opt CLI and explaining reports; same-runtime subagent execution is optional only when explicitly requested.
 ---
 
 # IC Auto Opt Agent Operator
 
-Operate the `ic-opt` product CLI and inspect artifacts. The agent is an
-operator and report interpreter:
+Use this skill to operate `ic-opt` for a user. The product is a deterministic
+CLI workflow; the agent is the operator and report interpreter.
+
+This skill is platform-neutral. It can be used by any agent runtime that can run
+shell commands and read files.
+
+Default route:
 
 ```text
-User -> agent -> ic-opt CLI -> reports/artifacts -> agent explains result
+User -> current agent -> ic-opt CLI -> reports -> current agent explains result
 ```
 
-`PROJECT_DIR/opt_requirement.md` is the source of truth for initial-run
-machine-critical settings. Optional human guidance can live in
-`PROJECT_DIR/constraints.md`.
+Optional advanced route:
 
-## Do Not Override Requirement Values
+```text
+User -> current agent -> same-runtime native subagent -> ic-opt CLI
+```
+
+Use the optional route only when the user explicitly asks for subagent execution
+and the current runtime provides a native task/subagent tool.
+
+## User Commands
+
+Accept these forms:
+
+```text
+/ic-opt PROJECT --doctor
+/ic-opt PROJECT --real [--cadence-cshrc PATH]
+/ic-opt PROJECT --real --continue N [--cadence-cshrc PATH]
+/ic-opt --ssh-profile PROFILE REMOTE_PROJECT --doctor
+/ic-opt --ssh-profile PROFILE REMOTE_PROJECT --real [--cadence-cshrc PATH]
+/ic-opt --ssh-profile PROFILE REMOTE_PROJECT --real --continue N [--cadence-cshrc PATH]
+```
+
+If the user gives only a project path and asks to optimize, use `--real`.
+If the user says "add/run/continue N more points", use `--real --continue N`.
+If the user asks to check readiness, use `--doctor`.
+If the user says the project is on a remote EDA server, use remote mode with
+`--ssh-profile PROFILE`. `PROFILE` is any OpenSSH target the local machine can
+use, preferably a `~/.ssh/config` alias such as `eda-lab`. If the SSH profile is
+missing, ask only for the profile name. Do not collect passwords. Tell the user
+to configure passwordless SSH, accept the host key once with `ssh PROFILE true`,
+and verify `ssh -o BatchMode=yes PROFILE true`.
+
+`ic-opt` is the product contract. Do not add workload, resource, or optimizer
+override flags to the user-facing command. Those values come from
+`opt_requirement.md` / generated config. Low-level `hermes-workflow` commands
+are development/debugging tools only.
+
+When explaining optimizer modes, treat the three production strategy choices as
+peers: `algorithm: openbox` with `strategy: openbox_gp_eic`,
+`algorithm: openbox` with `strategy: openbox_prf_eic`, and `algorithm: turbo`
+with `strategy: turbo_trust_region`. `openbox_auto` is the default automatic
+mode, and `random_baseline` is diagnostic only. Use TuRBO when legal variable
+steps are fine enough that snapping continuous candidates to the legal grid is a
+small perturbation, for example about `0.1u`; avoid it for coarse steps,
+finger-count-like integers, categorical choices, and duplicate-heavy snapped
+spaces.
 
 Do not ask the user to restate formulas, variables, metric routes, testbench
-paths, Spectre resources, optimizer settings, or process corners in chat.
+paths, Spectre resources, or optimizer settings. Those belong in
+`PROJECT/opt_requirement.md` and optional `PROJECT/constraints.md`.
 
-Do not add CLI overrides for optimizer budget, batch size, candidate
-parallelism, Spectre threads, optimizer CPU cap, algorithm, strategy,
-initialization, output format, retention, objective, constraints, or corners.
+## Mandatory Preflight Gate
 
-`--continue N` is the only CLI value that changes the number of new simulations.
-Use it only for an existing run.
-
-`--ssh-profile PROFILE` selects the remote execution profile. It is not an
-optimizer or resource override.
-
-Do not hand-pick candidate points, rewrite OCEAN formulas, parse PSF in Python,
-change the search space, or hardcode a Spectre version.
-
-## Commands
-
-Local:
+Before any fresh `--real` run, run doctor first unless the user explicitly says
+doctor already passed for the same unchanged project:
 
 ```bash
-ic-opt PROJECT_DIR --doctor
-ic-opt PROJECT_DIR --real
-ic-opt PROJECT_DIR --real --continue N
+ic-opt PROJECT --doctor
 ```
 
-Remote:
+For remote projects:
 
 ```bash
-ic-opt --ssh-profile PROFILE PROJECT_DIR --doctor
-ic-opt --ssh-profile PROFILE PROJECT_DIR --real
-ic-opt --ssh-profile PROFILE PROJECT_DIR --real --continue N
+ic-opt --ssh-profile PROFILE REMOTE_PROJECT --doctor
 ```
 
-Use `--cadence-cshrc PATH` only when the project does not already provide the
-Cadence setup path.
+Treat doctor as the structured requirement and project-folder check. It catches
+common `opt_requirement.md` mistakes, missing Maestro/ADE point roots, missing
+`cadence_env.csh`, broken SSH readiness, and generated-config errors before
+real Spectre/OCEAN work starts.
+For local projects, `ic-opt PROJECT --doctor` is a standalone product doctor
+route. Do not add `--real`, and do not interpret a local doctor failure as an
+optimizer-run failure.
 
-## Requirement Fields
+If doctor fails:
 
-Initial-run values stay in `opt_requirement.md`, including:
+- stop before `--real`;
+- report the failing item and the exact file/path involved;
+- if the JSON report has `structured_issues`, report `code`, `stage`,
+  `likely_cause`, `recommended_action`, and `evidence` before falling back to
+  plain `issues`;
+- tell the user what to fix in `opt_requirement.md`, `constraints.md`,
+  `cadence_env.csh`, SSH, or Maestro/ADE point roots;
+- do not silently rewrite OCEAN formulas, variable ranges, FoM, or resource
+  settings.
 
-- `max_evaluations`, `batch_size`
-- Spectre `parallel_jobs`, `threads_per_run`
-- `optimizer_cpu_threads`
-- `algorithm`, `strategy`, `initialization`, `random_seed`
-- `output_format: psfxl`
-- testbenches, metric routes, objective, constraints
-- Process Corners and multi-corner policies
+For continuation, doctor is optional when the existing run history is already
+accepted and the user only asks to add points. Run doctor again if the user
+changed variables, constraints, FoM, metric formulas, testbench paths, or remote
+profile.
 
-## Optimizer Modes
+## Locate The CLI
 
-### Fix-Run Mode
-
-When `Workflow.mode` is `fix_run` in `opt_requirement.md`, the dispatch
-path runs Spectre/OCEAN at the design points listed in `Fixed Points` and
-exports waveforms from `Waveform Exports`. No optimizer loop runs.
+Use the first available command:
 
 ```bash
-ic-opt PROJECT_DIR --real
+"$IC_OPT_WORKFLOW_REPO/.venv/bin/ic-opt"
+"$PWD/.venv/bin/ic-opt"        # when PWD is the workflow repo
+ic-opt                         # when installed on PATH
 ```
 
-The same CLI entry detects the mode from the requirement file. Do not add
-separate CLI flags for fix-run.
+If no command is available, tell the user to install IC Auto Opt Workflow or set
+`IC_OPT_WORKFLOW_REPO`. Do not create a Python virtualenv inside the user
+project directory.
 
-Fix-run output is a simulation archive, not an optimization report. Do not
-expect `optimizer.yaml`, `optimizer_state.json`, or
-`optimizer_decision_report.md`. Inspect:
+## Default Flow
 
-```text
-runs/**/result_manifest.json
-runs/**/metric_result_manifest.json
-runs/**/waveform_export_manifest.json
+For doctor:
+
+```bash
+ic-opt PROJECT --doctor
 ```
 
-### Optimization Mode
+Stop after doctor and report pass/fail plus the failing item if any.
 
-Production strategy choices:
+For real optimization:
 
-- `algorithm: openbox`, `strategy: openbox_gp_eic`
-- `algorithm: openbox`, `strategy: openbox_prf_eic`
-- `algorithm: turbo`, `strategy: turbo_trust_region`
+```bash
+ic-opt PROJECT --doctor
+ic-opt PROJECT --real [user flags]
+```
 
-TuRBO is a fit when legal variable steps are fine enough that snapping a
-continuous candidate to the legal grid is a small perturbation, for example
-about `0.1u`. Prefer `openbox_prf_eic` for coarse integer grids, categorical
-choices, or duplicate-heavy snapped spaces.
+For continuation:
 
-`random_baseline` is diagnostic.
+```bash
+ic-opt PROJECT_DIR --real --continue N [user flags]
+```
+
+For remote projects:
+
+```bash
+ic-opt --ssh-profile PROFILE REMOTE_PROJECT --doctor
+ic-opt --ssh-profile PROFILE REMOTE_PROJECT --real [user flags]
+ic-opt --ssh-profile PROFILE REMOTE_PROJECT --real --continue N [user flags]
+```
+
+In remote mode, `REMOTE_PROJECT` is the project directory on the Linux EDA
+server. Do not copy the project locally unless the user explicitly requests a
+backup. Do not install this Python package, OpenBox, or a virtualenv on the EDA
+server. The local CLI mirrors reports under
+`~/.ic-opt/remote_runs/<ssh-profile>/<project-hash>/reports/` and also uploads
+reports back to `REMOTE_PROJECT/reports/`.
+Before a remote real run, prefer `ic-opt --ssh-profile PROFILE REMOTE_PROJECT
+--doctor`. If SSH fails, report the exact SSH readiness command the user should
+fix first instead of changing optimizer settings.
+
+Remote parallelism guidance:
+
+- `parallel_jobs` is candidate-level concurrency, not per-testbench concurrency.
+- Multi-testbench candidates run their configured testbenches inside each
+  candidate; if `Process Corners` is enabled, each candidate also walks corners
+  serially inside that same candidate. Increasing `parallel_jobs` multiplies
+  total remote tool pressure.
+- For normal remote multi-testbench or multi-corner use, prefer conservative
+  `Spectre Settings.parallel_jobs` values such as `4` to `8` in `opt_requirement.md`.
+- High values such as 24 or 36 can trigger SSH server limits, for example
+  `kex_exchange_identification: Connection closed by remote host`. Treat those
+  as remote transport/tool failures, not circuit-performance failures.
+- Multi-corner is enabled from `opt_requirement.md` / generated config. If the
+  section is absent, preserve legacy single-corner behavior.
+- Monte Carlo is not part of this real-run optimization loop. Treat it as a
+  follow-up validation step, not a replacement for `Process Corners`.
+- `optimizer_cpu_threads` limits optimizer-side Python/OpenBox CPU use; it does
+  not limit Spectre/OCEAN process count or SSH connection count.
+
+Do not translate continuation into a lower-level `hermes-workflow` command for
+normal users. Do not restart from scratch unless the user changed variables,
+constraints, objective, metric formulas, or Maestro point roots.
 
 ## Workflow Verification
 
 Do not treat successful command exit as full workflow acceptance. Inspect:
 
 ```text
-reports/project_doctor_report.json
-reports/license_probe_report.json
-reports/optimizer_run_report.json
-reports/optimizer_decision_report.md
-runs/**/result_manifest.json
-runs/**/metric_result_manifest.json
+PROJECT/reports/project_doctor_report.json
+PROJECT/reports/license_probe_report.json
+PROJECT/reports/optimizer_run_report.json
+PROJECT/reports/optimizer_decision_report.md
+PROJECT/runs/**/result_manifest.json
+PROJECT/runs/**/metric_result_manifest.json
 ```
-
-For multi-testbench or multi-corner runs, inspect parent aggregate manifests.
 
 Confirm requirement values reached artifacts and execution:
 
-- algorithm, strategy, initialization, random seed
-- budget, batch size
-- parallelism, Spectre threads
-- optimizer CPU cap
+- algorithm, strategy, initialization, and random seed
+- budget and batch size
+- parallelism, Spectre threads, and optimizer CPU cap
 - process corners
 - `output_format: psfxl`
 - license probe behavior
 - sanitized Spectre/OCEAN `command_trace`
 
-Report pass/fail state, failed evaluation counts, selected run id, selected
-corner or worst-case policy, recommended parameters, metrics, warnings, and
-artifact paths.
+## Fix-Run Mode
 
-If doctor or real execution fails, report the failing item and relevant report
-path. Do not continue by changing formulas, selecting candidates manually, or
-editing the requirement without explicit user direction.
+When `Workflow.mode` is `fix_run` in `opt_requirement.md`, the same `ic-opt
+PROJECT --real` entry point runs Spectre/OCEAN at the design points listed in
+`Fixed Points` and exports waveforms from `Waveform Exports`. No optimizer loop
+runs. Do not add separate CLI flags for fix-run.
+
+In fix-run mode, `Spectre Settings.parallel_jobs` controls how many
+testbench/corner child runs for one fixed point may run concurrently.
+`Spectre Settings.threads_per_run` remains the thread count for each Spectre
+process. Fixed points are still processed serially in this version. There is no
+CLI override for fix-run parallelism.
+
+Fix-run output is a simulation archive, not an optimization report. Do not
+expect `optimizer.yaml`, `optimizer_state.json`, or
+`optimizer_decision_report.md`. Inspect:
+
+```text
+PROJECT/reports/fix_run_report.json
+PROJECT/runs/**/result_manifest.json
+PROJECT/runs/**/metric_result_manifest.json
+PROJECT/runs/**/waveform_export_manifest.json
+```
+
+## Optional Subagent Mode
+
+If the user explicitly requests native subagent execution:
+
+1. Run the dry orchestration gate:
+
+   ```bash
+   ic-opt PROJECT --real [user flags] --dry-orchestration
+   ```
+
+   or for continuation:
+
+   ```bash
+   ic-opt PROJECT --real --continue N [user flags] --dry-orchestration
+   ```
+
+2. Dispatch the same-runtime native subagent, if available, with only:
+
+   ```text
+   Read PROJECT/execution_package/OPTIMIZER_EXECUTION_TASK.md and
+   PROJECT/execution_package/optimizer_execution_manifest.json.
+   Run only the approved command from the manifest. Do not hand-pick
+   candidates, rewrite formulas, parse PSF, change resources, or invoke another
+   CLI agent. Report command status and artifact paths.
+   ```
+
+3. The current agent remains responsible for closeout and explanation.
+
+If native subagent support is unavailable, report that clearly and use the
+default single-agent CLI route only if the user agrees or did not require a
+subagent.
+
+## Hard Boundaries
+
+- Do not hand-pick candidate points.
+- Do not rewrite OCEAN formulas.
+- Do not parse PSF in Python.
+- Do not hardcode a Spectre version.
+- Do not create a per-project Python virtualenv.
+- In remote mode, do not install Python packages on the remote EDA server.
+- Do not silently change `parallel_jobs`, `threads_per_run`, precision, or FoM.
+- Do not skip doctor before a fresh real run on a new or changed project.
+- Do not poll every optimizer batch; report start, unexpected failure,
+  completion, and only low-frequency heartbeat status for long runs.
+- Do not present failed candidates as the primary recommendation when feasible
+  candidates exist.
+- Do not claim global optimum. Say "best observed" unless there is an exhaustive
+  proof.
+
+## Report To User
+
+After `--real` or `--continue`, read:
+
+```text
+PROJECT/reports/optimizer_decision_report.md
+PROJECT/reports/optimizer_insight_report.md
+```
+
+For remote mode, prefer the local mirrored report path printed by `ic-opt`.
+If the local mirror is unavailable, read the same files under
+`REMOTE_PROJECT/reports/` through SSH.
+
+Summarize only:
+
+- whether the flow passed;
+- evaluation count and status counts;
+- recommended action and run id;
+- recommended parameters and metrics;
+- bottleneck and warnings;
+- when present, the `Process Corner Summary` policy, selected/worst corner, and
+  any corner-clustered failures from `optimizer_insight_report.md`;
+- whether the result is best observed only;
+- whether to accept, continue, inspect failures, revise constraints/FoM, or
+  expand the search space;
+- report paths.
+
+If a step fails, report the failed step and relevant artifact path. Do not
+continue by inventing candidates or editing formulas.
+
+## Common Error Triage
+
+Use `docs/TROUBLESHOOTING_CN.md` for the full table. The short rules are:
+
+- When consuming a report, prefer `structured_issues` when present; use `issues`
+  only as fallback for older or non-updated reports. For each report item, report
+  the diagnostic `code`, `stage`, `likely_cause`, `recommended_action`, and
+  `evidence` if present.
+- If a doctor report has structured error severity (`severity: error`), do not
+  run `--real` until the reported file/path is fixed.
+- Warning diagnostics may be shown for planning (such as high `parallel_jobs`),
+  but they do not require immediate stop unless the user has resource limits.
+
+- `opt_requirement.md` parse/validation failure: run `--doctor`, point the user
+  to the exact section/key, and stop before real tools.
+- `maestro_point_root` errors: the path must be the leaf Maestro/ADE run
+  directory containing `netlist/input.scs` and `psf/`.
+- OCEAN metric `non_scalar` or non-finite scalar: the formula returned a
+  waveform/list/undefined value for that candidate; ask the user to fix the
+  OCEAN scalar expression or metric definition.
+- `Host key verification failed`: ask the user to run `ssh PROFILE true` once
+  and accept the correct host key.
+- `Permission denied` or BatchMode SSH failure: passwordless SSH is not ready;
+  ask the user to fix `authorized_keys` or `~/.ssh/config`.
+- `kex_exchange_identification` / remote SSH connection closed under high
+  parallelism: lower `parallel_jobs` to 4-8 for normal remote runs.
+- `result_manifest.json missing`: with current versions this should not happen
+  for handled tool/SSH failures. If it appears, tell the user to update the
+  package and preserve the run directory for debugging.
