@@ -87,7 +87,7 @@ engine: spectre_x
 preset: ax
 output_format: psfxl
 threads_per_run: 10
-parallel_jobs: 1
+parallel_jobs: 8
 timeout_s: 7200
 require_license_check: true
 keep_failed_runs: true

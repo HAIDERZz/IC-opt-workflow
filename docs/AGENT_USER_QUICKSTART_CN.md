@@ -50,6 +50,10 @@ fix-run requirement 还包含：
 
 fix-run 不创建 optimizer state，也不写 optimizer decision report。
 
+fix-run 中 `parallel_jobs` 是同一个 fixed point 内 testbench/corner child 的并发数；
+`threads_per_run` 是每个 Spectre 子进程的线程数。fixed points 仍串行执行，agent
+不能添加 CLI 参数来覆盖这个值。
+
 ## 优化策略
 
 生产使用时，把下面三种策略看成并列选择：

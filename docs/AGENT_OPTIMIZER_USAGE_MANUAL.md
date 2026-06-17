@@ -49,6 +49,11 @@ Fix-run values also stay in `opt_requirement.md`:
 - waveform exports such as `getData("NF" ?result "pnoise")`
 - approval checklist
 
+For fix-run, Spectre `parallel_jobs` is child-level concurrency inside one
+fixed point: at most that many testbench/corner child Spectre/OCEAN runs are in
+flight. `threads_per_run` remains per Spectre process. Fixed points are still
+processed serially, and agents must not invent a CLI override for this setting.
+
 The product CLI keeps one value-changing continuation entry for existing
 optimizer runs:
 
@@ -138,6 +143,7 @@ Confirm:
 
 - `workflow_mode` is `fix_run`
 - expected testbench/corner child count matches the requirement
+- `parallel_jobs` and `threads_per_run` were inherited from the requirement
 - waveform exports were written for every successful child
 - all failures appear in `child_issues`
 - optimizer state and optimizer decision reports were not created

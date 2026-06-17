@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import json
+import threading
+import time
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -159,6 +161,64 @@ def _mock_prepare_result(project_dir: Path, run_id: str = "real_001") -> MagicMo
         run_dir=project_dir / "runs" / "real" / run_id,
         testbench_id=None,
         corner_id=None,
+    )
+
+
+def _write_fix_run_child_dirs(
+    project_dir: Path,
+    *,
+    run_id: str = "real_001",
+    testbench_id: str = "cg_nf",
+    corner_ids: tuple[str, str, str] = ("tt", "ss", "ff"),
+) -> None:
+    for corner_id in corner_ids:
+        child_dir = (
+            project_dir
+            / "runs"
+            / "real"
+            / run_id
+            / "testbenches"
+            / testbench_id
+            / "corners"
+            / corner_id
+        )
+        child_dir.mkdir(parents=True, exist_ok=True)
+
+
+def _set_spectre_parallel_jobs(project_dir: Path, parallel_jobs: int) -> None:
+    spectre_path = project_dir / "config" / "spectre.yaml"
+    payload = yaml.safe_load(spectre_path.read_text(encoding="utf-8"))
+    payload["spectre"]["parallel_jobs"] = parallel_jobs
+    spectre_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+
+def _strip_optimizer_configs_for_fix_run(project_dir: Path) -> None:
+    """A genuine fix-run project does not carry optimizer-only configs.
+    Removing metrics.yaml/optimizer.yaml avoids the optimizer contract check
+    (batch_size <= parallel_jobs) when lowering parallel_jobs in tests. A
+    minimal waveform_exports.yaml keeps the fix-run contract valid (at least
+    one of metrics.yaml or waveform_exports.yaml)."""
+    for name in ("optimizer.yaml", "metrics.yaml"):
+        path = project_dir / "config" / name
+        if path.exists():
+            path.unlink()
+    (project_dir / "config" / "waveform_exports.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": "1.0",
+                "exports": [
+                    {
+                        "name": "nf_pnoise",
+                        "testbench": "cg_nf",
+                        "expression": 'getData("NF" ?result "pnoise")',
+                        "output_format": "csv",
+                        "nil_policy": "fail",
+                    }
+                ],
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
     )
 
 
@@ -644,3 +704,179 @@ def test_fix_run_flow_passes_cadence_cshrc_to_adapter(tmp_path: Path) -> None:
     # The adapter must have been called with cadence_cshrc=<cshrc path>.
     adapter_kwargs = mock_adapter.call_args.kwargs
     assert adapter_kwargs.get("cadence_cshrc") == cshrc
+
+
+# ---------------------------------------------------------------------------
+# Fix-run child-level parallelism (Spectre Settings.parallel_jobs)
+# ---------------------------------------------------------------------------
+def test_fix_run_uses_parallel_jobs_for_child_runs(tmp_path: Path) -> None:
+    from hermes_workflow.fix_run_flow import run_fix_run_project
+
+    project_dir = _create_fix_run_project(tmp_path)
+    _strip_optimizer_configs_for_fix_run(project_dir)
+    _set_spectre_parallel_jobs(project_dir, 2)
+
+    active = 0
+    max_active = 0
+    lock = threading.Lock()
+
+    def prepare_side_effect(*args, **kwargs):
+        run_id = kwargs["run_id"]
+        _write_fix_run_child_dirs(project_dir, run_id=run_id)
+        return _mock_prepare_result(project_dir, run_id=run_id)
+
+    def adapter_side_effect(*args, **kwargs):
+        nonlocal active, max_active
+        with lock:
+            active += 1
+            max_active = max(max_active, active)
+        time.sleep(0.05)
+        with lock:
+            active -= 1
+        # Create waveform artifacts so the fix-run waveform gate passes.
+        tb = kwargs.get("testbench_id") or "cg_nf"
+        corner = kwargs.get("corner_id") or "tt"
+        metrics_dir = (
+            project_dir / "runs" / "real" / kwargs["run_id"]
+            / "testbenches" / tb / "corners" / corner / "metrics"
+        )
+        (metrics_dir / "waveforms").mkdir(parents=True, exist_ok=True)
+        (metrics_dir / "waveforms" / "nf_pnoise.csv").write_text("freq,nf\n", encoding="utf-8")
+        (metrics_dir / "waveform_export_manifest.json").write_text("{}", encoding="utf-8")
+        return _mock_adapter_result(project_dir, run_id=kwargs["run_id"])
+
+    with (
+        patch("hermes_workflow.fix_run_flow.check_requirement") as mock_check,
+        patch("hermes_workflow.fix_run_flow.prepare_from_requirement") as mock_prep,
+        patch("hermes_workflow.fix_run_flow.run_product_doctor") as mock_doctor,
+        patch("hermes_workflow.fix_run_flow.prepare_explicit_candidate_real_run") as mock_prepare,
+        patch("hermes_workflow.fix_run_flow.run_spectre_ocean_adapter") as mock_adapter,
+    ):
+        mock_check.return_value = _mock_intake(project_dir)
+        mock_prep.return_value = _mock_preparation(project_dir)
+        mock_doctor.return_value = MagicMock(status="pass", issues=[])
+        mock_prepare.side_effect = prepare_side_effect
+        mock_adapter.side_effect = adapter_side_effect
+
+        report = run_fix_run_project(project_dir, real=True, cadence_cshrc=None)
+
+    assert report.status == "pass"
+    assert mock_adapter.call_count == 3
+    assert max_active > 1
+    assert report.points[0].testbench_corner_count == 3
+
+
+def test_fix_run_parallel_jobs_one_keeps_child_runs_serial(tmp_path: Path) -> None:
+    from hermes_workflow.fix_run_flow import run_fix_run_project
+
+    project_dir = _create_fix_run_project(tmp_path)
+    _strip_optimizer_configs_for_fix_run(project_dir)
+    _set_spectre_parallel_jobs(project_dir, 1)
+
+    active = 0
+    max_active = 0
+    lock = threading.Lock()
+
+    def prepare_side_effect(*args, **kwargs):
+        run_id = kwargs["run_id"]
+        _write_fix_run_child_dirs(project_dir, run_id=run_id)
+        return _mock_prepare_result(project_dir, run_id=run_id)
+
+    def adapter_side_effect(*args, **kwargs):
+        nonlocal active, max_active
+        with lock:
+            active += 1
+            max_active = max(max_active, active)
+        time.sleep(0.02)
+        with lock:
+            active -= 1
+        # Create waveform artifacts so the fix-run waveform gate passes.
+        tb = kwargs.get("testbench_id") or "cg_nf"
+        corner = kwargs.get("corner_id") or "tt"
+        metrics_dir = (
+            project_dir / "runs" / "real" / kwargs["run_id"]
+            / "testbenches" / tb / "corners" / corner / "metrics"
+        )
+        (metrics_dir / "waveforms").mkdir(parents=True, exist_ok=True)
+        (metrics_dir / "waveforms" / "nf_pnoise.csv").write_text("freq,nf\n", encoding="utf-8")
+        (metrics_dir / "waveform_export_manifest.json").write_text("{}", encoding="utf-8")
+        return _mock_adapter_result(project_dir, run_id=kwargs["run_id"])
+
+    with (
+        patch("hermes_workflow.fix_run_flow.check_requirement") as mock_check,
+        patch("hermes_workflow.fix_run_flow.prepare_from_requirement") as mock_prep,
+        patch("hermes_workflow.fix_run_flow.run_product_doctor") as mock_doctor,
+        patch("hermes_workflow.fix_run_flow.prepare_explicit_candidate_real_run") as mock_prepare,
+        patch("hermes_workflow.fix_run_flow.run_spectre_ocean_adapter") as mock_adapter,
+    ):
+        mock_check.return_value = _mock_intake(project_dir)
+        mock_prep.return_value = _mock_preparation(project_dir)
+        mock_doctor.return_value = MagicMock(status="pass", issues=[])
+        mock_prepare.side_effect = prepare_side_effect
+        mock_adapter.side_effect = adapter_side_effect
+
+        report = run_fix_run_project(project_dir, real=True, cadence_cshrc=None)
+
+    assert report.status == "pass"
+    assert mock_adapter.call_count == 3
+    assert max_active == 1
+
+
+# ---------------------------------------------------------------------------
+# Failure preservation under parallelism: one failing child must not abort the
+# others and must mark the parent report failed.
+# ---------------------------------------------------------------------------
+def test_fix_run_parallel_child_failure_preserved_and_report_fails(tmp_path: Path) -> None:
+    from hermes_workflow.fix_run_flow import run_fix_run_project
+
+    project_dir = _create_fix_run_project(tmp_path)
+    _strip_optimizer_configs_for_fix_run(project_dir)
+    _set_spectre_parallel_jobs(project_dir, 2)
+
+    def prepare_side_effect(*args, **kwargs):
+        run_id = kwargs["run_id"]
+        _write_fix_run_child_dirs(project_dir, run_id=run_id)
+        return _mock_prepare_result(project_dir, run_id=run_id)
+
+    def adapter_side_effect(*args, **kwargs):
+        corner = kwargs.get("corner_id")
+        tb = kwargs.get("testbench_id") or "cg_nf"
+        if corner != "ss":
+            metrics_dir = (
+                project_dir / "runs" / "real" / kwargs["run_id"]
+                / "testbenches" / tb / "corners" / corner / "metrics"
+            )
+            (metrics_dir / "waveforms").mkdir(parents=True, exist_ok=True)
+            (metrics_dir / "waveforms" / "nf_pnoise.csv").write_text("freq,nf\n", encoding="utf-8")
+            (metrics_dir / "waveform_export_manifest.json").write_text("{}", encoding="utf-8")
+            return _mock_adapter_result(project_dir, run_id=kwargs["run_id"])
+        return MagicMock(
+            status="failed",
+            run_id=kwargs["run_id"],
+            result_manifest_path=project_dir / "runs" / "real" / kwargs["run_id"] / "result_manifest.json",
+            metric_result_manifest_path=None,
+            issues=["sim failed"],
+        )
+
+    with (
+        patch("hermes_workflow.fix_run_flow.check_requirement") as mock_check,
+        patch("hermes_workflow.fix_run_flow.prepare_from_requirement") as mock_prep,
+        patch("hermes_workflow.fix_run_flow.run_product_doctor") as mock_doctor,
+        patch("hermes_workflow.fix_run_flow.prepare_explicit_candidate_real_run") as mock_prepare,
+        patch("hermes_workflow.fix_run_flow.run_spectre_ocean_adapter") as mock_adapter,
+    ):
+        mock_check.return_value = _mock_intake(project_dir)
+        mock_prep.return_value = _mock_preparation(project_dir)
+        mock_doctor.return_value = MagicMock(status="pass", issues=[])
+        mock_prepare.side_effect = prepare_side_effect
+        mock_adapter.side_effect = adapter_side_effect
+
+        report = run_fix_run_project(project_dir, real=True, cadence_cshrc=None)
+
+    assert report.status == "fail"
+    assert report.points[0].testbench_corner_count == 3
+    assert mock_adapter.call_count == 3
+    assert any(
+        "failed" in issue.message or "sim failed" in issue.message
+        for issue in report.points[0].child_issues
+    )

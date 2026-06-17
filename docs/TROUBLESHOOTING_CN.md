@@ -72,9 +72,10 @@ getData("NF" ?result "pnoise")
 
 ## 并行数和线程数
 
-`parallel_jobs` 是候选点级别的 Spectre process 并发。`threads_per_run` 是单个
-Spectre 仿真的 `+mt` 线程数。`optimizer_cpu_threads` 限制 Python 优化器侧的 CPU
-线程。
+优化模式下，`parallel_jobs` 是候选点级别的 Spectre process 并发。fix-run 模式下，
+`parallel_jobs` 是同一个 fixed point 内 testbench/corner child 的 Spectre/OCEAN
+并发。`threads_per_run` 是单个 Spectre 仿真的 `+mt` 线程数。
+`optimizer_cpu_threads` 只限制 Python 优化器侧的 CPU 线程。
 
 这些值都来自 `opt_requirement.md`。
 

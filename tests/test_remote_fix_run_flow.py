@@ -2,11 +2,14 @@
 from __future__ import annotations
 
 import json
+import threading
+import time
 from pathlib import Path, PurePosixPath
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
+import yaml
 
 from hermes_workflow.fix_run_models import (
     FixRunReport,
@@ -49,6 +52,75 @@ def _mock_adapter_result(
         / "metric_result_manifest.json",
         issues=[],
     )
+
+
+def _write_remote_fix_run_child_dirs(
+    project_dir: Path,
+    *,
+    run_id: str = "real_001",
+    testbench_id: str = "cg_nf",
+    corner_ids: tuple[str, str, str] = ("tt", "ss", "ff"),
+) -> None:
+    for corner_id in corner_ids:
+        child_dir = (
+            project_dir
+            / "runs"
+            / "real"
+            / run_id
+            / "testbenches"
+            / testbench_id
+            / "corners"
+            / corner_id
+        )
+        child_dir.mkdir(parents=True, exist_ok=True)
+
+
+def _set_remote_spectre_parallel_jobs(project_dir: Path, parallel_jobs: int) -> None:
+    spectre_path = project_dir / "config" / "spectre.yaml"
+    payload = yaml.safe_load(spectre_path.read_text(encoding="utf-8"))
+    payload["spectre"]["parallel_jobs"] = parallel_jobs
+    spectre_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+
+def _strip_optimizer_configs_for_remote_fix_run(project_dir: Path) -> None:
+    """Make a genuine fix-run project: drop optimizer-only configs (avoids the
+    optimizer contract check batch_size <= parallel_jobs when lowering
+    parallel_jobs) and add a minimal waveform_exports.yaml so the fix-run
+    contract (at least one of metrics/waveform_exports) holds."""
+    for name in ("optimizer.yaml", "metrics.yaml"):
+        path = project_dir / "config" / name
+        if path.exists():
+            path.unlink()
+    (project_dir / "config" / "waveform_exports.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": "1.0",
+                "exports": [
+                    {
+                        "name": "nf_pnoise",
+                        "testbench": "cg_nf",
+                        "expression": 'getData("NF" ?result "pnoise")',
+                        "output_format": "csv",
+                        "nil_policy": "fail",
+                    }
+                ],
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+
+def _write_remote_waveform_artifacts(
+    project_dir: Path, run_id: str, tb: str, corner: str
+) -> None:
+    metrics_dir = (
+        project_dir / "runs" / "real" / run_id
+        / "testbenches" / tb / "corners" / corner / "metrics"
+    )
+    (metrics_dir / "waveforms").mkdir(parents=True, exist_ok=True)
+    (metrics_dir / "waveforms" / "nf_pnoise.csv").write_text("freq,nf\n", encoding="utf-8")
+    (metrics_dir / "waveform_export_manifest.json").write_text("{}", encoding="utf-8")
 
 
 # ---------------------------------------------------------------------------
@@ -557,3 +629,282 @@ def test_remote_fix_run_flow_does_not_import_optimizer_approval() -> None:
 
     assert hasattr(remote_fix_run_flow_module, "decide_fix_run_real_run")
     assert not hasattr(remote_fix_run_flow_module, "decide_first_real_run")
+
+
+# ---------------------------------------------------------------------------
+# Fix-run remote child-level parallelism (Spectre Settings.parallel_jobs)
+# ---------------------------------------------------------------------------
+def test_remote_fix_run_uses_parallel_jobs_for_child_runs(tmp_path: Path) -> None:
+    from hermes_workflow.package import create_project_from_template
+    from hermes_workflow.remote_fix_run_flow import run_remote_fix_run_project
+
+    project_dir = tmp_path / "remote_fix_run_parallel"
+    create_project_from_template(project_dir)
+    (project_dir / "netlists" / "templates").mkdir(parents=True, exist_ok=True)
+    (project_dir / "netlists" / "templates" / "template.scs").write_text(
+        "simulator lang=spectre\nparameters FN={{FN}} WN={{WN}}\ntran tran stop=10n\n",
+        encoding="utf-8",
+    )
+    (project_dir / "config" / "workflow.yaml").write_text(
+        yaml.safe_dump(
+            {"schema_version": "1.0", "mode": "fix_run", "starting_run_id": "real_001"},
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    (project_dir / "config" / "fixed_points.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": "1.0",
+                "points": [
+                    {
+                        "candidate_id": "user_point_001",
+                        "parameters": {"FN": "2", "WN": "0.3u"},
+                    }
+                ],
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    _strip_optimizer_configs_for_remote_fix_run(project_dir)
+    _set_remote_spectre_parallel_jobs(project_dir, 2)
+
+    active = 0
+    max_active = 0
+    lock = threading.Lock()
+
+    def prepare_side_effect(*args, **kwargs):
+        run_id = kwargs["run_id"]
+        _write_remote_fix_run_child_dirs(project_dir, run_id=run_id)
+        return MagicMock(run_id=run_id, run_dir=project_dir / "runs" / "real" / run_id)
+
+    def adapter_side_effect(*args, **kwargs):
+        nonlocal active, max_active
+        with lock:
+            active += 1
+            max_active = max(max_active, active)
+        time.sleep(0.05)
+        with lock:
+            active -= 1
+        tb = kwargs.get("testbench_id") or "cg_nf"
+        corner = kwargs.get("corner_id") or "tt"
+        _write_remote_waveform_artifacts(project_dir, kwargs["run_id"], tb, corner)
+        return _mock_adapter_result(project_dir, run_id=kwargs["run_id"])
+
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    mock_runner = MagicMock()
+    mock_runner.run.return_value = MagicMock(return_code=0)
+
+    with (
+        patch("hermes_workflow.remote_fix_run_flow.run_remote_doctor") as mock_doctor,
+        patch("hermes_workflow.remote_fix_run_flow.prepare_remote_project_cache") as mock_prep,
+        patch("hermes_workflow.remote_fix_run_flow.check_requirement") as mock_check,
+        patch("hermes_workflow.remote_fix_run_flow.prepare_from_requirement") as mock_prep_req,
+        patch("hermes_workflow.remote_fix_run_flow.prepare_explicit_candidate_real_run") as mock_prepare,
+        patch("hermes_workflow.remote_fix_run_flow.run_remote_spectre_ocean_adapter") as mock_adapter,
+    ):
+        mock_doctor.return_value = MagicMock(status="pass", issues=[])
+        mock_prep.return_value = _mock_preparation(project_dir)
+        mock_check.return_value = _mock_intake(project_dir)
+        mock_prep_req.return_value = MagicMock(status="pass", issues=[])
+        mock_prepare.side_effect = prepare_side_effect
+        mock_adapter.side_effect = adapter_side_effect
+
+        report = run_remote_fix_run_project(
+            ref,
+            remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
+            real=True,
+            runner=mock_runner,
+        )
+
+    assert report.status == "pass"
+    assert mock_adapter.call_count == 3
+    assert max_active > 1
+    assert report.points[0].testbench_corner_count == 3
+
+
+def test_remote_fix_run_parallel_jobs_one_keeps_child_runs_serial(
+    tmp_path: Path,
+) -> None:
+    from hermes_workflow.package import create_project_from_template
+    from hermes_workflow.remote_fix_run_flow import run_remote_fix_run_project
+
+    project_dir = tmp_path / "remote_fix_run_serial"
+    create_project_from_template(project_dir)
+    (project_dir / "netlists" / "templates").mkdir(parents=True, exist_ok=True)
+    (project_dir / "netlists" / "templates" / "template.scs").write_text(
+        "simulator lang=spectre\nparameters FN={{FN}} WN={{WN}}\ntran tran stop=10n\n",
+        encoding="utf-8",
+    )
+    (project_dir / "config" / "workflow.yaml").write_text(
+        yaml.safe_dump(
+            {"schema_version": "1.0", "mode": "fix_run", "starting_run_id": "real_001"},
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    (project_dir / "config" / "fixed_points.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": "1.0",
+                "points": [
+                    {
+                        "candidate_id": "user_point_001",
+                        "parameters": {"FN": "2", "WN": "0.3u"},
+                    }
+                ],
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    _strip_optimizer_configs_for_remote_fix_run(project_dir)
+    _set_remote_spectre_parallel_jobs(project_dir, 1)
+
+    active = 0
+    max_active = 0
+    lock = threading.Lock()
+
+    def prepare_side_effect(*args, **kwargs):
+        run_id = kwargs["run_id"]
+        _write_remote_fix_run_child_dirs(project_dir, run_id=run_id)
+        return MagicMock(run_id=run_id, run_dir=project_dir / "runs" / "real" / run_id)
+
+    def adapter_side_effect(*args, **kwargs):
+        nonlocal active, max_active
+        with lock:
+            active += 1
+            max_active = max(max_active, active)
+        time.sleep(0.02)
+        with lock:
+            active -= 1
+        tb = kwargs.get("testbench_id") or "cg_nf"
+        corner = kwargs.get("corner_id") or "tt"
+        _write_remote_waveform_artifacts(project_dir, kwargs["run_id"], tb, corner)
+        return _mock_adapter_result(project_dir, run_id=kwargs["run_id"])
+
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    mock_runner = MagicMock()
+    mock_runner.run.return_value = MagicMock(return_code=0)
+
+    with (
+        patch("hermes_workflow.remote_fix_run_flow.run_remote_doctor") as mock_doctor,
+        patch("hermes_workflow.remote_fix_run_flow.prepare_remote_project_cache") as mock_prep,
+        patch("hermes_workflow.remote_fix_run_flow.check_requirement") as mock_check,
+        patch("hermes_workflow.remote_fix_run_flow.prepare_from_requirement") as mock_prep_req,
+        patch("hermes_workflow.remote_fix_run_flow.prepare_explicit_candidate_real_run") as mock_prepare,
+        patch("hermes_workflow.remote_fix_run_flow.run_remote_spectre_ocean_adapter") as mock_adapter,
+    ):
+        mock_doctor.return_value = MagicMock(status="pass", issues=[])
+        mock_prep.return_value = _mock_preparation(project_dir)
+        mock_check.return_value = _mock_intake(project_dir)
+        mock_prep_req.return_value = MagicMock(status="pass", issues=[])
+        mock_prepare.side_effect = prepare_side_effect
+        mock_adapter.side_effect = adapter_side_effect
+
+        report = run_remote_fix_run_project(
+            ref,
+            remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
+            real=True,
+            runner=mock_runner,
+        )
+
+    assert report.status == "pass"
+    assert mock_adapter.call_count == 3
+    assert max_active == 1
+
+
+# ---------------------------------------------------------------------------
+# Failure preservation under remote parallelism
+# ---------------------------------------------------------------------------
+def test_remote_fix_run_parallel_child_failure_preserved_and_report_fails(
+    tmp_path: Path,
+) -> None:
+    from hermes_workflow.package import create_project_from_template
+    from hermes_workflow.remote_fix_run_flow import run_remote_fix_run_project
+
+    project_dir = tmp_path / "remote_fix_run_failure"
+    create_project_from_template(project_dir)
+    (project_dir / "netlists" / "templates").mkdir(parents=True, exist_ok=True)
+    (project_dir / "netlists" / "templates" / "template.scs").write_text(
+        "simulator lang=spectre\nparameters FN={{FN}} WN={{WN}}\ntran tran stop=10n\n",
+        encoding="utf-8",
+    )
+    (project_dir / "config" / "workflow.yaml").write_text(
+        yaml.safe_dump(
+            {"schema_version": "1.0", "mode": "fix_run", "starting_run_id": "real_001"},
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    (project_dir / "config" / "fixed_points.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": "1.0",
+                "points": [
+                    {
+                        "candidate_id": "user_point_001",
+                        "parameters": {"FN": "2", "WN": "0.3u"},
+                    }
+                ],
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    _strip_optimizer_configs_for_remote_fix_run(project_dir)
+    _set_remote_spectre_parallel_jobs(project_dir, 2)
+
+    def prepare_side_effect(*args, **kwargs):
+        run_id = kwargs["run_id"]
+        _write_remote_fix_run_child_dirs(project_dir, run_id=run_id)
+        return MagicMock(run_id=run_id, run_dir=project_dir / "runs" / "real" / run_id)
+
+    def adapter_side_effect(*args, **kwargs):
+        corner = kwargs.get("corner_id")
+        tb = kwargs.get("testbench_id") or "cg_nf"
+        if corner != "ss":
+            _write_remote_waveform_artifacts(project_dir, kwargs["run_id"], tb, corner)
+            return _mock_adapter_result(project_dir, run_id=kwargs["run_id"])
+        return MagicMock(
+            status="failed",
+            run_id=kwargs["run_id"],
+            result_manifest_path=project_dir / "runs" / "real" / kwargs["run_id"] / "result_manifest.json",
+            metric_result_manifest_path=None,
+            issues=["sim failed"],
+        )
+
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    mock_runner = MagicMock()
+    mock_runner.run.return_value = MagicMock(return_code=0)
+
+    with (
+        patch("hermes_workflow.remote_fix_run_flow.run_remote_doctor") as mock_doctor,
+        patch("hermes_workflow.remote_fix_run_flow.prepare_remote_project_cache") as mock_prep,
+        patch("hermes_workflow.remote_fix_run_flow.check_requirement") as mock_check,
+        patch("hermes_workflow.remote_fix_run_flow.prepare_from_requirement") as mock_prep_req,
+        patch("hermes_workflow.remote_fix_run_flow.prepare_explicit_candidate_real_run") as mock_prepare,
+        patch("hermes_workflow.remote_fix_run_flow.run_remote_spectre_ocean_adapter") as mock_adapter,
+    ):
+        mock_doctor.return_value = MagicMock(status="pass", issues=[])
+        mock_prep.return_value = _mock_preparation(project_dir)
+        mock_check.return_value = _mock_intake(project_dir)
+        mock_prep_req.return_value = MagicMock(status="pass", issues=[])
+        mock_prepare.side_effect = prepare_side_effect
+        mock_adapter.side_effect = adapter_side_effect
+
+        report = run_remote_fix_run_project(
+            ref,
+            remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
+            real=True,
+            runner=mock_runner,
+        )
+
+    assert report.status == "fail"
+    assert report.points[0].testbench_corner_count == 3
+    assert mock_adapter.call_count == 3
+    assert any(
+        "failed" in issue.message or "sim failed" in issue.message
+        for issue in report.points[0].child_issues
+    )

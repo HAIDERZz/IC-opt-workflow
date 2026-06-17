@@ -88,6 +88,12 @@ Fix-run values also stay in `opt_requirement.md`, including:
 - Spectre settings and Process Corners
 - approval checklist
 
+For fix-run, `Spectre Settings.parallel_jobs` controls how many
+testbench/corner child runs for one fixed point may run concurrently.
+`Spectre Settings.threads_per_run` remains the thread count for each Spectre
+process. Fixed points are still processed serially in this release. There is no
+CLI override for fix-run parallelism.
+
 The correct pnoise waveform expression form is:
 
 ```text

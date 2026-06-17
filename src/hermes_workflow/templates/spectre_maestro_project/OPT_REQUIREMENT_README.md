@@ -185,8 +185,10 @@ keep_failed_runs: true
 keep_successful_runs: true
 ```
 
-`threads_per_run` maps to Spectre `+mt`. `parallel_jobs` is candidate-level
-Spectre process concurrency. Keep `batch_size <= parallel_jobs`.
+`threads_per_run` maps to Spectre `+mt`. In optimize mode, `parallel_jobs` is
+candidate-level Spectre process concurrency. Keep `batch_size <= parallel_jobs`.
+In fix-run mode, `parallel_jobs` is testbench/corner child concurrency inside
+one fixed point; fixed points remain serial.
 
 `output_format` is `psfxl`.
 

@@ -138,6 +138,12 @@ variable values per section. The `temperature` field in that example is a
 generic netlist parameter override; the workflow does not special-case that
 name.
 
+In fix-run mode, Spectre `parallel_jobs` controls the maximum number of
+testbench/corner child runs for one fixed point that may run concurrently.
+`threads_per_run` remains the Spectre `+mt` thread count for each child process.
+Fixed points are processed serially in this release, and there is no CLI
+override for fix-run parallelism.
+
 ## Install
 
 From the release root:
@@ -219,6 +225,7 @@ probe status, selected candidate, and reported metrics.
 Version `0.1.8` includes:
 
 - local and remote fix-run workflow support
+- fix-run child-level parallelism through `Spectre Settings.parallel_jobs`
 - waveform CSV export manifests for fix-run child runs
 - requirement template `opt_requirement.fix_run.md`
 - requirement-driven local and remote optimization

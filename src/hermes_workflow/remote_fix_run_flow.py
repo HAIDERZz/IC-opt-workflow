@@ -8,6 +8,8 @@ fixed-point / testbench / corner, downloads results, and writes a
 from __future__ import annotations
 
 import json
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -26,12 +28,21 @@ from hermes_workflow.remote_prepare import prepare_remote_project_cache
 from hermes_workflow.remote_project import RemoteProjectRef
 from hermes_workflow.remote_ssh import RemoteSshRunner
 from hermes_workflow.requirement_intake import check_requirement, prepare_from_requirement
+from hermes_workflow.validate import assert_valid_project
 
 from hermes_workflow.execution_adapters.remote_spectre_ocean import (
     run_remote_spectre_ocean_adapter,
 )
 
 REPORT_RELATIVE = Path("reports/fix_run_report.json")
+
+
+@dataclass(frozen=True)
+class _RemoteChildAdapterOutcome:
+    testbench_id: str | None
+    corner_id: str | None
+    adapter_result: Any | None = None
+    issue: ChildRunIssue | None = None
 
 
 def _load_fixed_points(project_dir: Path) -> FixedPointsConfig:
@@ -163,6 +174,98 @@ def _has_waveform_exports(project_dir: Path) -> bool:
     return False
 
 
+def _fix_run_parallel_jobs(project_dir: Path) -> int:
+    """Resolve max concurrent remote child Spectre/OCEAN runs for one fixed
+    point from ``Spectre Settings.parallel_jobs`` (clamped to >= 1). Falls
+    back to serial (1) if the project cannot be fully validated here; the
+    project is validated earlier by the execution-package/approval gate."""
+    try:
+        bundle = assert_valid_project(project_dir)
+    except (ValueError, FileNotFoundError):
+        return 1
+    return max(1, int(bundle.spectre.spectre.parallel_jobs))
+
+
+def _run_remote_child_adapter(
+    project_dir: Path,
+    *,
+    run_id: str,
+    remote_ref: RemoteProjectRef,
+    remote_cadence_cshrc: PurePosixPath,
+    runner: Any,
+    child: dict[str, str | None],
+) -> _RemoteChildAdapterOutcome:
+    """Run the remote Spectre/OCEAN adapter for one child.
+
+    Exceptions become ``ChildRunIssue`` so one child failure cannot abort the
+    whole fixed point. Worker threads return outcomes; the main thread mutates
+    shared report lists. The shared SSH runner is effectively stateless around
+    a profile and an execute function, so concurrent worker calls are safe.
+    """
+    tb_id = child["testbench_id"]
+    corner_id = child["corner_id"]
+    try:
+        adapter_result = run_remote_spectre_ocean_adapter(
+            project_dir,
+            run_id=run_id,
+            remote_ref=remote_ref,
+            remote_cadence_cshrc=remote_cadence_cshrc,
+            runner=runner,
+            testbench_id=tb_id,
+            corner_id=corner_id,
+        )
+    except Exception as exc:  # noqa: BLE001
+        return _RemoteChildAdapterOutcome(
+            testbench_id=tb_id,
+            corner_id=corner_id,
+            issue=ChildRunIssue(
+                testbench_id=tb_id,
+                corner_id=corner_id,
+                message=f"adapter failed: {exc}",
+            ),
+        )
+    return _RemoteChildAdapterOutcome(
+        testbench_id=tb_id,
+        corner_id=corner_id,
+        adapter_result=adapter_result,
+    )
+
+
+def _run_remote_child_adapters(
+    project_dir: Path,
+    *,
+    run_id: str,
+    remote_ref: RemoteProjectRef,
+    remote_cadence_cshrc: PurePosixPath,
+    runner: Any,
+    children: list[dict[str, str | None]],
+    parallel_jobs: int,
+) -> list[_RemoteChildAdapterOutcome]:
+    """Run remote child adapters with bounded parallelism, returning outcomes
+    in deterministic child order. No partial remote report sync happens inside
+    worker threads."""
+    if not children:
+        return []
+    max_workers = min(max(1, parallel_jobs), len(children))
+    outcomes: list[_RemoteChildAdapterOutcome | None] = [None] * len(children)
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_index = {
+            executor.submit(
+                _run_remote_child_adapter,
+                project_dir,
+                run_id=run_id,
+                remote_ref=remote_ref,
+                remote_cadence_cshrc=remote_cadence_cshrc,
+                runner=runner,
+                child=child,
+            ): index
+            for index, child in enumerate(children)
+        }
+        for future in as_completed(future_to_index):
+            outcomes[future_to_index[future]] = future.result()
+    return [outcome for outcome in outcomes if outcome is not None]
+
+
 def run_remote_fix_run_project(
     remote_ref: RemoteProjectRef,
     *,
@@ -272,27 +375,34 @@ def run_remote_fix_run_project(
             if not children:
                 children = [{"testbench_id": None, "corner_id": None}]
 
-            # Run the remote Spectre/OCEAN adapter for each child
-            for child in children:
-                tb_id = child["testbench_id"]
-                corner_id = child["corner_id"]
+            # Run the remote Spectre/OCEAN adapter for each child with bounded
+            # child-level parallelism. Worker threads return outcomes; the main
+            # thread converts them into child_issues and manifest paths in
+            # deterministic child order. Remote report sync stays after all
+            # children complete (no partial sync inside workers).
+            parallel_jobs = _fix_run_parallel_jobs(project_dir)
+            child_outcomes = _run_remote_child_adapters(
+                project_dir,
+                run_id=run_id,
+                remote_ref=remote_ref,
+                remote_cadence_cshrc=remote_cadence_cshrc,
+                runner=ssh,
+                children=children,
+                parallel_jobs=parallel_jobs,
+            )
 
-                try:
-                    adapter_result = run_remote_spectre_ocean_adapter(
-                        project_dir,
-                        run_id=run_id,
-                        remote_ref=remote_ref,
-                        remote_cadence_cshrc=remote_cadence_cshrc,
-                        runner=ssh,
-                        testbench_id=tb_id,
-                        corner_id=corner_id,
-                    )
-                except Exception as exc:
+            for outcome in child_outcomes:
+                if outcome.issue is not None:
+                    child_issues.append(outcome.issue)
+                    continue
+
+                adapter_result = outcome.adapter_result
+                if adapter_result is None:
                     child_issues.append(
                         ChildRunIssue(
-                            testbench_id=tb_id,
-                            corner_id=corner_id,
-                            message=f"adapter failed: {exc}",
+                            testbench_id=outcome.testbench_id,
+                            corner_id=outcome.corner_id,
+                            message="adapter produced no result",
                         )
                     )
                     continue
@@ -301,8 +411,8 @@ def run_remote_fix_run_project(
                     adapter_detail = "; ".join(adapter_result.issues) if adapter_result.issues else adapter_result.status
                     child_issues.append(
                         ChildRunIssue(
-                            testbench_id=tb_id,
-                            corner_id=corner_id,
+                            testbench_id=outcome.testbench_id,
+                            corner_id=outcome.corner_id,
                             message=adapter_detail,
                         )
                     )

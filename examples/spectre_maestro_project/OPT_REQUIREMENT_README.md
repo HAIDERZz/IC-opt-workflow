@@ -216,15 +216,17 @@ engine: spectre_x
 preset: ax
 output_format: psfxl
 threads_per_run: 10
-parallel_jobs: 1
+parallel_jobs: 8
 timeout_s: 7200
 require_license_check: true
 keep_failed_runs: true
 keep_successful_runs: true
 ```
 
-`threads_per_run` maps to Spectre `+mt`. `parallel_jobs` is Spectre process
-concurrency for candidate or fixed-point children. `output_format` is `psfxl`.
+`threads_per_run` maps to Spectre `+mt`. In optimize mode, `parallel_jobs` is
+candidate-level Spectre process concurrency. In fix-run mode, it is
+testbench/corner child concurrency inside one fixed point; fixed points remain
+serial. `output_format` is `psfxl`.
 
 ## Optimizer Settings
 

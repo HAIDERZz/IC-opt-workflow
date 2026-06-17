@@ -54,6 +54,10 @@ examples/spectre_maestro_project/opt_requirement.fix_run.md
 Use `opt_requirement.fix_run.md` for fixed-point characterization and waveform
 CSV export. It is based on a real validated 15-corner Mixer requirement.
 
+In fix-run mode, `parallel_jobs` controls child testbench/corner concurrency
+inside one fixed point. `threads_per_run` remains per Spectre process. Multiple
+fixed points are still processed serially.
+
 ## Configure Cadence
 
 Provide a `csh`/`tcsh` setup file through one of:

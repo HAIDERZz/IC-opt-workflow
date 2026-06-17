@@ -16,6 +16,8 @@ contract.
 - Added `reports/fix_run_report.json` as the parent fix-run report.
 - Added child waveform export manifests and CSV artifact paths under each
   successful testbench/corner child run.
+- Added fix-run child-level parallelism through `Spectre Settings.parallel_jobs`.
+  `threads_per_run` remains per Spectre process, and fixed points remain serial.
 - Fix-run intentionally does not create optimizer state or optimizer decision
   reports.
 
@@ -29,6 +31,7 @@ The v0.1.8 fix-run contract was validated with:
 
 - local 15-corner fix-run workflow
 - remote 15-corner fix-run workflow
+- local and remote `parallel_jobs: 8` fix-run validation
 - TT/SS/FF model sections and five corner variable values per section
 - 15 child result manifests
 - 15 scalar metric manifests

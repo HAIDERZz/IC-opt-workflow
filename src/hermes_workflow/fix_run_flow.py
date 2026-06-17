@@ -6,7 +6,10 @@ adapter, collects results, and writes a ``reports/fix_run_report.json``.
 from __future__ import annotations
 
 import json
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import yaml
 
@@ -26,6 +29,14 @@ from hermes_workflow.requirement_intake import check_requirement, prepare_from_r
 from hermes_workflow.validate import assert_valid_project
 
 REPORT_RELATIVE = Path("reports/fix_run_report.json")
+
+
+@dataclass(frozen=True)
+class _ChildAdapterOutcome:
+    testbench_id: str | None
+    corner_id: str | None
+    adapter_result: Any | None = None
+    issue: ChildRunIssue | None = None
 
 
 def _load_fixed_points(project_dir: Path) -> FixedPointsConfig:
@@ -175,6 +186,92 @@ def _has_waveform_exports(project_dir: Path) -> bool:
     return False
 
 
+def _fix_run_parallel_jobs(project_dir: Path) -> int:
+    """Resolve the max concurrent child Spectre/OCEAN runs for one fixed point.
+
+    Reads ``Spectre Settings.parallel_jobs`` from the validated project bundle,
+    clamped to at least 1. ``threads_per_run`` is left untouched as the
+    per-Spectre-process ``+mt`` setting. Falls back to serial (1) if the
+    project cannot be fully validated at this point (the project is validated
+    earlier by the execution-package/approval gate in the real flow).
+    """
+    try:
+        bundle = assert_valid_project(project_dir)
+    except (ValueError, FileNotFoundError):
+        return 1
+    return max(1, int(bundle.spectre.spectre.parallel_jobs))
+
+
+def _run_local_child_adapter(
+    project_root: Path,
+    *,
+    run_id: str,
+    child: dict[str, str | None],
+    cadence_cshrc: Path | None,
+) -> _ChildAdapterOutcome:
+    """Run the local Spectre/OCEAN adapter for one child.
+
+    Exceptions are converted to ``ChildRunIssue`` so a single child failure
+    cannot abort the whole fixed point. Worker threads return outcomes; the
+    main thread mutates shared report lists.
+    """
+    tb_id = child["testbench_id"]
+    corner_id = child["corner_id"]
+    try:
+        adapter_result = run_spectre_ocean_adapter(
+            project_root,
+            run_id=run_id,
+            testbench_id=tb_id,
+            corner_id=corner_id,
+            cadence_cshrc=cadence_cshrc,
+        )
+    except Exception as exc:  # noqa: BLE001
+        return _ChildAdapterOutcome(
+            testbench_id=tb_id,
+            corner_id=corner_id,
+            issue=ChildRunIssue(
+                testbench_id=tb_id,
+                corner_id=corner_id,
+                message=f"adapter failed: {exc}",
+            ),
+        )
+    return _ChildAdapterOutcome(
+        testbench_id=tb_id,
+        corner_id=corner_id,
+        adapter_result=adapter_result,
+    )
+
+
+def _run_local_child_adapters(
+    project_root: Path,
+    *,
+    run_id: str,
+    children: list[dict[str, str | None]],
+    cadence_cshrc: Path | None,
+    parallel_jobs: int,
+) -> list[_ChildAdapterOutcome]:
+    """Run child adapters with bounded parallelism, returning outcomes in
+    deterministic child order."""
+    if not children:
+        return []
+    max_workers = min(max(1, parallel_jobs), len(children))
+    outcomes: list[_ChildAdapterOutcome | None] = [None] * len(children)
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_index = {
+            executor.submit(
+                _run_local_child_adapter,
+                project_root,
+                run_id=run_id,
+                child=child,
+                cadence_cshrc=cadence_cshrc,
+            ): index
+            for index, child in enumerate(children)
+        }
+        for future in as_completed(future_to_index):
+            outcomes[future_to_index[future]] = future.result()
+    return [outcome for outcome in outcomes if outcome is not None]
+
+
 def run_fix_run_project(
     project_dir: str | Path,
     *,
@@ -277,25 +374,31 @@ def run_fix_run_project(
             if not children:
                 children = [{"testbench_id": None, "corner_id": None}]
 
-            # Run the Spectre/OCEAN adapter for each child
-            for child in children:
-                tb_id = child["testbench_id"]
-                corner_id = child["corner_id"]
+            # Run the Spectre/OCEAN adapter for each child with bounded
+            # child-level parallelism. Worker threads return outcomes; the
+            # main thread converts them into child_issues and manifest paths
+            # in deterministic child order.
+            parallel_jobs = _fix_run_parallel_jobs(project_root)
+            child_outcomes = _run_local_child_adapters(
+                project_root,
+                run_id=run_id,
+                children=children,
+                cadence_cshrc=cadence_cshrc,
+                parallel_jobs=parallel_jobs,
+            )
 
-                try:
-                    adapter_result = run_spectre_ocean_adapter(
-                        project_root,
-                        run_id=run_id,
-                        testbench_id=tb_id,
-                        corner_id=corner_id,
-                        cadence_cshrc=cadence_cshrc,
-                    )
-                except Exception as exc:
+            for outcome in child_outcomes:
+                if outcome.issue is not None:
+                    child_issues.append(outcome.issue)
+                    continue
+
+                adapter_result = outcome.adapter_result
+                if adapter_result is None:
                     child_issues.append(
                         ChildRunIssue(
-                            testbench_id=tb_id,
-                            corner_id=corner_id,
-                            message=f"adapter failed: {exc}",
+                            testbench_id=outcome.testbench_id,
+                            corner_id=outcome.corner_id,
+                            message="adapter produced no result",
                         )
                     )
                     continue
@@ -303,8 +406,8 @@ def run_fix_run_project(
                 if adapter_result.status != "succeeded":
                     child_issues.append(
                         ChildRunIssue(
-                            testbench_id=tb_id,
-                            corner_id=corner_id,
+                            testbench_id=outcome.testbench_id,
+                            corner_id=outcome.corner_id,
                             message=f"adapter status: {adapter_result.status}",
                         )
                     )

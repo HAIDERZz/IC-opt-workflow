@@ -138,6 +138,11 @@ fix-run 不运行优化器，不生成 `state/optimizer_state.json`，也不生�
 示例中的 `temperature` 只是传给 netlist 的普通参数名，workflow 不会把它特殊映射成
 Spectre simulator option。
 
+fix-run 模式下，`Spectre Settings.parallel_jobs` 控制同一个 fixed point 内最多
+同时运行多少个 testbench/corner child Spectre/OCEAN 仿真；`threads_per_run` 仍然是
+每个 Spectre 进程的 `+mt` 线程数。当前 release 中多个 fixed point 仍按顺序执行，
+没有用于覆盖 fix-run 并行数的 CLI 参数。
+
 ## 多工艺角
 
 多工艺角写在 `Process Corners`：
