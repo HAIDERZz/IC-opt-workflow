@@ -151,6 +151,52 @@ class SubprocessCommandRunner:
         )
 
 
+class CshrcCommandRunner:
+    """Wrap canonical argv in a ``csh -fc 'source <cshrc>; cd <cwd>; <body>'``
+    command so local Spectre/OCEAN runs inherit the Cadence environment.
+
+    This mirrors the remote adapter's cshrc-sourcing pattern (see
+    ``remote_spectre_ocean.py``), keeping local and remote execution
+    environments consistent. The ``command_trace`` is built separately from
+    the canonical argv (via ``build_spectre_argv``/``build_ocean_argv``), so
+    no cshrc path, ``source`` text, or ``csh -fc`` wrapper leaks into traces.
+    """
+
+    def __init__(
+        self,
+        cadence_cshrc: Path,
+        *,
+        inner: CommandRunner | None = None,
+    ) -> None:
+        self._cshrc = Path(cadence_cshrc)
+        self._inner: CommandRunner = inner or SubprocessCommandRunner()
+
+    def run(
+        self,
+        argv: list[str],
+        *,
+        cwd: Path,
+        stdout_path: Path,
+        stderr_path: Path,
+        timeout_s: int,
+    ) -> CommandResult:
+        import shlex
+
+        body = " ".join(shlex.quote(a) for a in argv)
+        wrapper = (
+            f"source {shlex.quote(str(self._cshrc))}; "
+            f"cd {shlex.quote(str(cwd))}; "
+            f"{body}"
+        )
+        return self._inner.run(
+            ["csh", "-fc", wrapper],
+            cwd=cwd,
+            stdout_path=stdout_path,
+            stderr_path=stderr_path,
+            timeout_s=timeout_s,
+        )
+
+
 def run_spectre_ocean_adapter(
     project_dir: Path,
     *,
@@ -158,6 +204,7 @@ def run_spectre_ocean_adapter(
     testbench_id: str | None = None,
     corner_id: str | None = None,
     runner: CommandRunner | None = None,
+    cadence_cshrc: Path | None = None,
     allow_overwrite: bool = False,
 ) -> AdapterRunResult:
     context = load_adapter_context(
@@ -175,6 +222,8 @@ def run_spectre_ocean_adapter(
     _reject_output_file_symlinks(context)
     _assert_overwrite_policy(context, allow_overwrite=allow_overwrite)
     runner = runner or SubprocessCommandRunner()
+    if cadence_cshrc is not None:
+        runner = CshrcCommandRunner(cadence_cshrc, inner=runner)
 
     script_path = _project_relative_path(
         context.project_dir,

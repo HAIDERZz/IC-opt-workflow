@@ -1,12 +1,15 @@
 """Pydantic models for the fix-run simulation workflow."""
 from __future__ import annotations
 
+import re
 from typing import Literal
 
 from pydantic import Field, field_validator
 
-from hermes_workflow.real_run import RUN_ID_RE, SAFE_CANDIDATE_ID_RE
 from hermes_workflow.schemas import StrictModel, validate_fixed_bool, validate_name
+
+RUN_ID_RE = re.compile(r"^real_[0-9]{3}$")
+SAFE_CANDIDATE_ID_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 
 
 WorkflowMode = Literal["optimize", "fix_run"]

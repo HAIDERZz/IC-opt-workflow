@@ -6,7 +6,6 @@ from types import SimpleNamespace
 from typer.testing import CliRunner
 
 from hermes_workflow.cli import app
-from hermes_workflow.execution_agent_handoff import ExecutionAgentHandoffReport
 from hermes_workflow.optimizer_flow import OptimizerFlowServices, optimize_project
 from hermes_workflow.package import create_project_from_template
 
@@ -120,25 +119,6 @@ def _services(project_dir: Path, calls: list[str]) -> OptimizerFlowServices:
             "doctor",
             SimpleNamespace(status="pass", issues=[]),
         ),
-    )
-
-
-def _handoff_report(project_dir: Path) -> ExecutionAgentHandoffReport:
-    report_path = project_dir / "reports" / "execution_agent_handoff_report.json"
-    transcript_path = project_dir / "reports" / "execution_agent_handoff_transcript.txt"
-    return ExecutionAgentHandoffReport(
-        status="pass",
-        project_dir=str(project_dir),
-        execution_agent="claude",
-        task_path=project_dir / "execution_package" / "OPTIMIZER_EXECUTION_TASK.md",
-        manifest_path=project_dir / "execution_package" / "optimizer_execution_manifest.json",
-        command=["claude", "-p", "--dangerously-skip-permissions", "<prompt>"],
-        transcript_path=transcript_path,
-        report_path=report_path,
-        returncode=0,
-        started_at_utc="2026-06-07T00:00:00Z",
-        finished_at_utc="2026-06-07T00:00:01Z",
-        issues=[],
     )
 
 
@@ -284,57 +264,6 @@ def test_optimize_project_real_runs_closeout_without_recording_user_acceptance(
     assert report.stopped_before is None
 
 
-def test_optimize_project_claude_handoff_replaces_direct_optimizer_execution(
-    tmp_path: Path,
-) -> None:
-    project_dir = tmp_path / "project"
-    project_dir.mkdir()
-    cadence_cshrc = tmp_path / "cadence_env.csh"
-    cadence_cshrc.write_text("# test\n", encoding="utf-8")
-    calls: list[str] = []
-
-    report = optimize_project(
-        project_dir,
-        real=True,
-        dry_orchestration=False,
-        max_evals=100,
-        batch_size=10,
-        parallel_jobs=10,
-        cadence_cshrc=cadence_cshrc,
-        execution_agent="claude",
-        services=_services(project_dir, calls),
-        dispatch_execution_agent=lambda project, **kwargs: record_handoff(
-            calls, project, **kwargs
-        ),
-    )
-
-    assert calls == [
-        "doctor",
-        "check-requirement",
-        "prepare-from-requirement",
-        "validate",
-        "check-project-ready",
-        "package",
-        "prepare-netlist",
-        "dry-run",
-        "preflight-health",
-        "approve",
-        "package-optimizer-task",
-        "execution-agent-handoff",
-        "check-optimizer-run",
-        "summarize-optimizer-run",
-        "finalize-optimizer-run",
-        "visualize-optimizer-run",
-        "decide-optimizer-run",
-    ]
-    assert report.status == "pass"
-    assert report.execution_agent == "claude"
-    assert report.handoff_report_path == (
-        project_dir / "reports" / "execution_agent_handoff_report.json"
-    )
-    assert report.recommended_run_id == "real_002"
-
-
 def test_optimize_project_turbo_strategy_routes_to_native_turbo(
     monkeypatch,
     tmp_path: Path,
@@ -410,12 +339,6 @@ def test_optimize_project_turbo_strategy_routes_to_native_turbo(
     assert payload["backend"] == "native_turbo"
 
 
-def record_handoff(calls: list[str], project: Path, **kwargs) -> ExecutionAgentHandoffReport:
-    calls.append("execution-agent-handoff")
-    assert kwargs["execution_agent"] == "claude"
-    return _handoff_report(project)
-
-
 def test_optimize_cli_wires_real_dry_orchestration_options(
     tmp_path: Path,
     monkeypatch,
@@ -435,7 +358,6 @@ def test_optimize_cli_wires_real_dry_orchestration_options(
         assert kwargs["batch_size"] is None
         assert kwargs["parallel_jobs"] is None
         assert kwargs["cadence_cshrc"] == cadence_cshrc
-        assert kwargs["execution_agent"] == "direct"
         return SimpleNamespace(
             status="pass",
             report_path=project_dir / "reports" / "optimizer_flow_run_report.json",

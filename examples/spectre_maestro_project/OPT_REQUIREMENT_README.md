@@ -1,52 +1,96 @@
 # Writing `opt_requirement.md`
 
-`opt_requirement.md` is the contract for a first optimizer run. Put optimizer
-budget, batch size, Spectre parallelism, Spectre threads, optimizer CPU limit,
-algorithm choice, metric formulas, bounds, and process corners in this file.
-Do not use command-line flags to override those values for the first run.
+`opt_requirement.md` is the contract for the first real workflow run. It
+selects the mode and carries the machine-critical values for that mode. Do not
+use command-line flags to override those values for the first run.
 
-The product command-line entry kept for run extension is continuation:
-`ic-opt <project> --continue N`.
+Supported modes:
+
+- `mode: optimize`: optimizer-driven search
+- `mode: fix_run`: fixed-point Spectre/OCEAN characterization and waveform CSV
+  export
+
+The product command-line entry kept for optimizer run extension is
+continuation:
+
+```bash
+ic-opt <project> --real --continue N
+```
 
 ## Example Files
 
-This directory contains four requirement templates. They are generated from the
-same verified Mixer requirement and use the same OCEAN formulas after replacing
-private Maestro result paths with placeholders.
+This directory contains five requirement templates.
 
 | File | Use when |
 | --- | --- |
-| `opt_requirement.md` | one testbench, source point corner |
-| `opt_requirement.multi_corner.md` | one testbench, multiple process corners |
-| `opt_requirement.multi_testbench.md` | multiple testbenches, source point corner |
-| `opt_requirement.multi_tb_corner.md` | multiple testbenches, multiple process corners |
-| `opt_requirement.fix_run.md` | fixed-point simulation, no optimizer |
+| `opt_requirement.md` | one testbench optimization, source point corner |
+| `opt_requirement.multi_corner.md` | one testbench optimization, multiple process corners |
+| `opt_requirement.multi_testbench.md` | multiple testbench optimization, source point corner |
+| `opt_requirement.multi_tb_corner.md` | multiple testbench optimization, multiple process corners |
+| `opt_requirement.fix_run.md` | fixed point run across 15 process/corner-variable combinations with waveform CSV export |
 
-For a real project, copy one template to `<project>/opt_requirement.md`, then
-replace `maestro_point_root`, project metadata, variable bounds, constraints,
-and metric formulas with values from your circuit.
+The fix-run template is based on a real validated local and remote 15-corner
+Mixer requirement. For a real project, copy the relevant template to
+`<project>/opt_requirement.md`, then replace private paths and circuit-specific
+values.
 
-## Required Sections
+## Shared Sections
 
-Each required section must appear once and contain one fenced `yaml` block.
+Each section must appear once and contain one fenced `yaml` block.
+
+All real workflow requirements use:
 
 ```text
+Workflow
 Project
 Maestro Source
+Spectre Settings
+Approval Checklist
+```
+
+Optimization requirements also use:
+
+```text
 Design Variables
 Metrics
 Constraints
 Objective
-Spectre Settings
 Optimizer Settings
-Approval Checklist
 ```
 
-Multi-corner templates also include:
+Fix-run requirements also use:
+
+```text
+Fixed Points
+Waveform Exports
+```
+
+Multi-corner templates include:
 
 ```text
 Process Corners
 ```
+
+## Workflow
+
+Optimization:
+
+```yaml
+schema_version: "1.0"
+mode: optimize
+starting_run_id: real_001
+```
+
+Fix-run:
+
+```yaml
+schema_version: "1.0"
+mode: fix_run
+starting_run_id: real_001
+```
+
+If the `Workflow` section is omitted, the file is treated as an optimization
+requirement for backward compatibility.
 
 ## Maestro Source
 
@@ -62,8 +106,8 @@ test_name: Mixer_CS_CG_NF
 corner: Nominal
 ```
 
-Multi-testbench projects use `testbenches:`. Each metric then uses a
-`testbench:` routing key.
+Multi-testbench projects use `testbenches:`. Each metric or waveform export
+then uses a `testbench:` routing key.
 
 ```yaml
 testbenches:
@@ -71,7 +115,7 @@ testbenches:
     maestro_point_root: /absolute/path/to/CG_NF_Test/point_root
     virtuoso_library: Virtuoso_Bridge_test
     cell: MixerCS_PSS_CG_Noise
-    design_view: schematic
+    design_view: maestro
     maestro_view: maestro
     test_name: Mixer_CS_CG_NF
     corner: Nominal
@@ -82,8 +126,8 @@ contains `netlist/input.scs`. Do not point to `input.scs` directly.
 
 ## Process Corners
 
-Use `Process Corners` when the same candidate must be evaluated across several
-model sections or corner variables.
+Use `Process Corners` when the same candidate or fixed point must be evaluated
+across several model sections or corner variables.
 
 ```yaml
 objective_policy: worst_case
@@ -103,31 +147,10 @@ corners:
       temperature: '-40'
 ```
 
-Inside one candidate, the workflow runs each `testbench x corner` child and
-aggregates the child metric results according to the objective and constraint
-policies.
+`variables` are generic netlist parameter overrides. A variable named
+`temperature` is not special-cased by the workflow.
 
-## Design Variables
-
-Every variable is a separate YAML list item.
-
-```yaml
-- name: W
-  kind: continuous_step
-  lower: 0.6u
-  upper: 1.2u
-  step: 0.2u
-- name: F
-  kind: integer
-  lower: '20'
-  upper: '30'
-  step: '2'
-```
-
-Supported kinds are `integer` and `continuous_step`. Variable names must match
-the top-level `parameters` statement in the imported Spectre deck.
-
-## Metrics
+## Optimization Metrics
 
 `ocean_expression` is copied into the OCEAN replay script. Hermes does not
 rewrite or reinterpret Calculator/OCEAN formulas.
@@ -149,28 +172,42 @@ Multi-testbench metric:
   ocean_expression: value(getData("NF" ?result "pnoise") 3e+09)
 ```
 
-If the expression already names its result, such as
-`getData("NF" ?result "pnoise")`, do not add a separate `result:` hint.
+Optimizer metrics are scalar. Full waveform CSV export belongs in fix-run
+`Waveform Exports`.
 
-The optimizer metric path expects scalar values. Full waveform CSV export is a
-separate characterization/export workflow, not an optimizer scalar metric.
+## Fix-Run Fixed Points
 
-## Constraints And Objective
-
-Constraints reference metric names.
+`Fixed Points` lists the exact parameters to simulate:
 
 ```yaml
-- metric: NF_3G
-  op: lt
-  value: 9 dB
+schema_version: "1.0"
+points:
+  - candidate_id: user_point_001
+    parameters:
+      F: '24'
+      W: 0.8u
+      L: 30n
 ```
 
-The objective expression references metric names, not OCEAN signals.
+Each parameter name must match a design variable or a top-level Spectre
+parameter in the imported deck.
+
+## Fix-Run Waveform Exports
+
+`Waveform Exports` lists OCEAN waveform expressions to export as CSV:
 
 ```yaml
-direction: minimize
-expression: -(0.2*min(max(0,min(1,10*(ln(BW/28e9)/ln(10))/0.6)),max(0,min(1,(MAX_GAIN-5.5)/2)),max(0,min(1,(9-NF_3G)/0.7)))+0.8*(0.20*max(0,min(1,10*(ln(BW/28e9)/ln(10))/0.6))+0.30*max(0,min(1,(MAX_GAIN-5.5)/2))+0.50*max(0,min(1,(9-NF_3G)/0.7))))
+schema_version: "1.0"
+exports:
+  - name: nf_pnoise
+    testbench: cg_nf
+    expression: 'getData("NF" ?result "pnoise")'
+    output_format: csv
+    nil_policy: fail
 ```
+
+`nil_policy: fail` makes a missing waveform fail the child run instead of
+silently producing incomplete evidence.
 
 ## Spectre Settings
 
@@ -179,17 +216,17 @@ engine: spectre_x
 preset: ax
 output_format: psfxl
 threads_per_run: 10
-parallel_jobs: 10
+parallel_jobs: 8
 timeout_s: 7200
 require_license_check: true
 keep_failed_runs: true
 keep_successful_runs: true
 ```
 
-`threads_per_run` maps to Spectre `+mt`. `parallel_jobs` is candidate-level
-Spectre process concurrency. Keep `batch_size <= parallel_jobs`.
-
-`output_format` is `psfxl`.
+`threads_per_run` maps to Spectre `+mt`. In optimize mode, `parallel_jobs` is
+candidate-level Spectre process concurrency. In fix-run mode, it is
+testbench/corner child concurrency inside one fixed point; fixed points remain
+serial. `output_format` is `psfxl`.
 
 ## Optimizer Settings
 
@@ -211,11 +248,6 @@ Production strategy choices:
 - `algorithm: openbox`, `strategy: openbox_prf_eic`
 - `algorithm: turbo`, `strategy: turbo_trust_region`
 
-TuRBO is suitable when legal variable steps are fine enough that snapping a
-continuous candidate to the legal grid is a small perturbation, for example
-about `0.1u`. Avoid TuRBO for coarse finger-count-style grids or spaces that
-produce many duplicate snapped candidates.
-
 `random_baseline` is for diagnostics, not production optimization.
 
 ## Approval Checklist
@@ -229,64 +261,6 @@ spectre_resource_settings_user_approved: true
 
 All values must be `true` before real-tool execution.
 
-## Fix-Run Mode
-
-Fix-run mode runs Spectre/OCEAN simulations at user-specified design points
-without an optimizer. Use it for characterization, verification, or waveform
-export at known parameter values.
-
-Set `Workflow.mode` to `fix_run` in `opt_requirement.md`:
-
-```yaml
-## Workflow
-schema_version: "1.0"
-mode: fix_run
-starting_run_id: real_001
-```
-
-Run with the same command used for optimizer runs:
-
-```bash
-ic-opt PROJECT --real
-```
-
-The workflow detects `mode: fix_run` from the requirement file and dispatches
-the fix-run path instead of the optimizer loop.
-
-### What Comes From the Requirement File
-
-- `Design Variables` — parameter declarations (bounds and steps)
-- `Fixed Points` — one or more design points to simulate
-- `Process Corners` — corners for each point (optional)
-- `Waveform Exports` — OCEAN expressions to export as CSV
-
-### Fix-Run Output
-
-The output is a simulation archive, not an optimization report. There is no
-`optimizer.yaml`, no `optimizer_state.json`, and no
-`optimizer_decision_report.md`. Instead, inspect:
-
-```text
-runs/**/result_manifest.json
-runs/**/metric_result_manifest.json
-runs/**/waveform_export_manifest.json
-```
-
-### Required Sections for Fix-Run
-
-```text
-Workflow
-Project
-Maestro Source
-Design Variables
-Spectre Settings
-Fixed Points
-Approval Checklist
-```
-
-At least one of `Metrics` or `Waveform Exports` must be present. `Optimizer
-Settings`, `Constraints`, and `Objective` are not required in fix-run mode.
-
 ## Check The File
 
 Run:
@@ -298,5 +272,4 @@ hermes-workflow validate <project>
 hermes-workflow check-project-ready <project>
 ```
 
-For production optimizer execution, read
-`docs/OPTIMIZER_PRODUCTION_QUICKSTART.md`.
+For production execution, read `docs/OPTIMIZER_PRODUCTION_QUICKSTART.md`.

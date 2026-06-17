@@ -1,83 +1,152 @@
 # IC Auto Opt Workflow
 
-`ic-auto-opt-workflow` is a file-driven IC optimization workflow for
-Maestro-exported Spectre/OCEAN projects.
+`ic-auto-opt-workflow` is a requirement-driven workflow for real IC
+Spectre/OCEAN work. It supports two product modes:
 
-The implemented shell product command is:
+- optimization: run an optimizer over approved design variables and metrics
+- fix-run: run user-specified fixed design points and export requested
+  waveform CSV artifacts without creating optimizer state
+
+Both modes are selected in `PROJECT_DIR/opt_requirement.md`. The product CLI
+does not use a separate fix-run switch.
+
+## Product Entry
+
+Doctor check:
+
+```bash
+ic-opt /path/to/project --doctor
+```
+
+Run the workflow described by `opt_requirement.md`:
 
 ```bash
 ic-opt /path/to/project --real
 ```
 
-The runtime-native agent entrypoint, after installing the adapter for your
-agent CLI, is:
+Continue an existing optimization run:
 
-```text
-/ic-opt /path/to/project --real
+```bash
+ic-opt /path/to/project --real --continue N
 ```
 
-The project has been exercised on a real multi-testbench Mixer optimization
-flow with OpenBox, Spectre, OCEAN, and post-run visualization/reporting.
+Remote execution through an SSH profile:
 
-Important agent-integration boundary: `ic-opt` is the deterministic automation
-core. Runtime adapters make the current agent CLI act as supervisor and
-delegate real execution to that same CLI's native subagent/task mechanism.
-C-64's `--execution-agent claude` subprocess handoff remains development
-evidence, not the C-65 default product target. See
-`docs/AGENT_INTEGRATION_STATUS.md` before describing runtime support.
+```bash
+ic-opt --ssh-profile PROFILE /remote/project --doctor
+ic-opt --ssh-profile PROFILE /remote/project --real
+```
 
-For the detailed Chinese explanation of what the automation does, what evidence
-proves it, and which runtime adapters are still missing, read
-`docs/PROJECT_STATUS_AND_ARCHITECTURE_CN.md`.
+`--continue N` is only for existing optimizer runs. First-run budget, batch
+size, parallelism, Spectre thread count, optimizer CPU cap, algorithm, strategy,
+initialization, process corners, output format, retention, objective,
+constraints, fixed points, waveform exports, and metric routes all come from
+`opt_requirement.md`.
 
-## What This Project Does
+## Project Directory
 
-- Reads a strict `opt_requirement.md` from a user project directory.
-- Safely imports native Maestro/ADE point-root netlist bundles.
-- Preserves each testbench as its own Spectre/OCEAN run context.
-- Uses OpenBox or native optimizer backends to generate candidates.
-- Runs approved real Spectre/OCEAN evaluations through workflow contracts.
-- Aggregates scalar OCEAN metric results across one or more testbenches.
-- Writes optimizer acceptance, decision, visualization, and final-summary
-  reports.
+```text
+PROJECT_DIR/
+├── opt_requirement.md
+├── constraints.md
+└── context/
+```
 
-Hermes workflow tooling does not parse PSF data and does not rewrite approved
-OCEAN formulas.
+Only `opt_requirement.md` is required. Use `constraints.md` for human guidance
+and `context/` for notes, screenshots, or previous reports. Generated
+directories such as `config/`, `netlists/`, `runs/`, `reports/`, `ledger/`, and
+`state/` are created by the workflow.
 
-## Current Product Contract
+## Requirement Templates
 
-- `opt_requirement.md` is the only product entry for workload, optimizer budget
-  (`max_evaluations`), optimizer batch size, Spectre parallelism
-  (`parallel_jobs`), Spectre threads (`threads_per_run`), optimizer CPU thread
-  limit (`optimizer_cpu_threads`), optimizer strategy, initialization,
-  process-corner policy, output format, retention policy, and metric contracts.
-- The product CLI does not accept initial-run overrides for those values. Do not
-  use or document `--max-evals`, `--batch-size`, `--parallel-jobs`, `--threads`,
-  or `--strategy` on `ic-opt PROJECT --real`.
-- Product continuation keeps one CLI delta: `ic-opt PROJECT --real --continue N`
-  adds `N` more evaluations. All other values are inherited from the project
-  requirement/generated config.
-- Multi-corner optimization is configured in `opt_requirement.md` through
-  `Process Corners`. See
-  `examples/spectre_maestro_project/opt_requirement.multi_corner.md` and
-  `examples/spectre_maestro_project/opt_requirement.multi_tb_corner.md` for
-  the expected `corners`, `objective_policy`, and `constraint_policy` fields.
-- Production strategy choices are peers: `openbox_gp_eic`,
-  `openbox_prf_eic`, and `turbo_trust_region`. `openbox_auto` is the
-  default automatic mode, and `random_baseline` is diagnostic only. Use
-  `turbo_trust_region` when legal variable steps are fine enough that
-  snapping continuous TuRBO candidates is a small perturbation, for example
-  about `0.1u`; avoid it for coarse steps, finger-count-like integers, and
-  categorical choices. See `docs/OPTIMIZER_ALGORITHM_MODES.md`.
-  `RELEASE_NOTES_v0.1.7.md`.
+Start from one of these examples:
+
+```text
+examples/spectre_maestro_project/opt_requirement.md
+examples/spectre_maestro_project/opt_requirement.multi_corner.md
+examples/spectre_maestro_project/opt_requirement.multi_testbench.md
+examples/spectre_maestro_project/opt_requirement.multi_tb_corner.md
+examples/spectre_maestro_project/opt_requirement.fix_run.md
+```
+
+The fix-run template is based on the real validated 15-corner Mixer
+requirement. Replace only project-specific paths and circuit values.
+
+## Workflow Modes
+
+Optimization mode:
+
+```yaml
+Workflow:
+  mode: optimize
+```
+
+If the `Workflow` section is omitted, the requirement is treated as an
+optimization requirement for backward compatibility.
+
+Fix-run mode:
+
+```yaml
+Workflow:
+  mode: fix_run
+  starting_run_id: real_001
+```
+
+Fix-run requirements include `Fixed Points` and optional `Waveform Exports`
+sections. They do not include optimizer settings and do not create
+`state/optimizer_state.json` or `reports/optimizer_decision_report.md`.
+
+## Optimization Requirements
+
+Optimization `opt_requirement.md` files define:
+
+- Maestro/ADE point roots and testbench routes
+- OCEAN scalar metric expressions
+- design variables, legal ranges, and steps
+- objective and constraints
+- `max_evaluations` and `batch_size`
+- Spectre `parallel_jobs` and `threads_per_run`
+- `optimizer_cpu_threads`
+- `algorithm`, `strategy`, `initialization`, and `random_seed`
+- `output_format: psfxl`
+- license probe, retention, and artifact policy
+- Process Corners and multi-corner policies
+
+Production strategy choices are peers:
+
+- `algorithm: openbox`, `strategy: openbox_gp_eic`
+- `algorithm: openbox`, `strategy: openbox_prf_eic`
+- `algorithm: turbo`, `strategy: turbo_trust_region`
+
+`random_baseline` is for diagnostics. See
+`docs/OPTIMIZER_ALGORITHM_MODES.md`.
+
+## Fix-Run Requirements
+
+Fix-run `opt_requirement.md` files define:
+
+- `Workflow.mode: fix_run`
+- one or more fixed candidate points
+- Maestro/ADE point roots and testbench routes
+- Spectre settings and Process Corners
+- optional waveform CSV exports, for example
+  `getData("NF" ?result "pnoise")`
+- the same approval checklist used by real optimization runs
+
+The 15-corner fix-run example uses TT/SS/FF model sections and five corner
+variable values per section. The `temperature` field in that example is a
+generic netlist parameter override; the workflow does not special-case that
+name.
+
+In fix-run mode, Spectre `parallel_jobs` controls the maximum number of
+testbench/corner child runs for one fixed point that may run concurrently.
+`threads_per_run` remains the Spectre `+mt` thread count for each child process.
+Fixed points are processed serially in this release, and there is no CLI
+override for fix-run parallelism.
 
 ## Install
 
-Use one product-level Python environment for the repo and optimizer
-dependencies. Do not create a Python virtualenv inside each user optimization
-project.
-
-From the repository root:
+From the release root:
 
 ```bash
 python3 -m venv .venv
@@ -85,228 +154,87 @@ python3 -m venv .venv
 ./.venv/bin/python -m pip install -r requirements-product.txt
 ```
 
-Expected entrypoints:
+Check entrypoints:
 
 ```bash
 ./.venv/bin/ic-opt --help
 ./.venv/bin/hermes-workflow --help
 ```
 
-Install an agent runtime adapter once.
-
-For Claude:
-
-```bash
-./.venv/bin/hermes-workflow install-runtime-adapter claude
-```
-
-For OpenCode:
-
-```bash
-./.venv/bin/hermes-workflow install-runtime-adapter opencode
-```
-
-Then use the short agent command:
-
-```text
-/ic-opt /path/to/project --real
-```
-
-For direct shell/operator debugging, use:
-
-```bash
-ic-opt /path/to/project --real
-```
-
 ## Cadence Environment
 
-The Cadence/Spectre/OCEAN setup is user supplied. Configure it once before using
-the short product command.
-
-Recommended user-level setup:
-
-```bash
-mkdir -p ~/.ic-opt
-cp /path/to/user/cadence_env.csh ~/.ic-opt/cadence_env.csh
-```
-
-Project-local setup is also supported:
+The Cadence/Spectre/OCEAN setup is user supplied. Configure it through one of:
 
 ```text
-/path/to/project/cadence_env.csh
+--cadence-cshrc PATH
+PROJECT_DIR/cadence_env.csh
+IC_OPT_CADENCE_CSHRC
+~/.ic-opt/cadence_env.csh
 ```
 
-Discovery order for `ic-opt`:
-
-1. explicit `--cadence-cshrc PATH`;
-2. `PROJECT_DIR/cadence_env.csh`;
-3. `IC_OPT_CADENCE_CSHRC`;
-4. `~/.ic-opt/cadence_env.csh`.
-
-`ic-opt` does not infer `.bashrc`/`.zshrc` content and does not hardcode a
-Spectre version.
-
-## Remote SSH Mode
-
-Use this when your Cadence/Spectre/OCEAN environment is on a Linux EDA server,
-but you want to run `ic-opt`, OpenBox, and report viewing from your own
-workstation.
-
-First configure passwordless SSH yourself:
+Use doctor before real runs:
 
 ```bash
-ssh lab true
+ic-opt /path/to/project --doctor
 ```
 
-Then run:
+When `require_license_check: true`, doctor runs the real Spectre/license probe
+and writes `reports/license_probe_report.json`.
 
-```bash
-ic-opt --ssh-profile lab /home/user/spectre_opt_prj/Mixer_opt --doctor
-ic-opt --ssh-profile lab /home/user/spectre_opt_prj/Mixer_opt --real
-ic-opt --ssh-profile lab /home/user/spectre_opt_prj/Mixer_opt --real --continue 40
-```
+## Agent Use
 
-The project path is the Linux server path. Reports are written on the server
-under `PROJECT/reports/` and mirrored locally under `~/.ic-opt/remote_runs/`.
-
-## User Project Layout
-
-Recommended layout:
+For agent-assisted operation, give the agent:
 
 ```text
-~/spectre_opt_prj/<project_name>/
-├── opt_requirement.md
-├── constraints.md
-└── context/
+skills/ic-opt/SKILL.md
+PROJECT_DIR
 ```
 
-Only `opt_requirement.md` is required. `constraints.md` is for human guidance to
-the supervisor agent. Do not hand-build generated directories such as
-`config/`, `netlists/`, `runs/`, `reports/`, `ledger/`, or `state/`.
+The agent should use the same product CLI and inspect workflow artifacts before
+reporting success.
 
-For each testbench, first run one known-good Maestro/ADE point and put the point
-root in `opt_requirement.md`. The point root must contain:
+## Workflow Evidence
+
+Optimization evidence:
 
 ```text
-<maestro_point_root>/netlist/input.scs
-```
-
-Multi-testbench projects route each metric to a named testbench; Hermes keeps
-those native netlist bundles separate and aggregates scalar metric manifests at
-candidate level.
-
-## Run
-
-Preferred product command:
-
-```bash
-./.venv/bin/ic-opt ~/spectre_opt_prj/<project_name> --real
-```
-
-Offline gate check without launching Spectre/OCEAN/OpenBox:
-
-```bash
-./.venv/bin/ic-opt ~/spectre_opt_prj/<project_name> --real --dry-orchestration
-```
-
-The product CLI is the contract for normal users: initial real runs read workload
-and resources from `opt_requirement.md`, and continuation accepts only
-`--continue N` as a CLI delta. Low-level `hermes-workflow` commands are
-development/debugging tools for maintainers inspecting a specific pipeline stage;
-do not present them as product usage and do not use them to override the user's
-requirement contract.
-
-```bash
-./.venv/bin/hermes-workflow optimize ~/spectre_opt_prj/<project_name> --real
-```
-
-For product continuation after a completed run:
-
-```bash
-./.venv/bin/ic-opt ~/spectre_opt_prj/<project_name> --real --continue 40
-```
-
-Do not copy workload, resource, or strategy flags into product continuation
-commands. `parallel_jobs`, `batch_size`, optimizer strategy, Spectre settings,
-and retention policy come from `opt_requirement.md` / generated config.
-
-## Read Results
-
-Primary reports:
-
-```text
-reports/optimizer_flow_run_report.json
+reports/project_doctor_report.json
+reports/license_probe_report.json
+reports/optimizer_run_report.json
 reports/optimizer_decision_report.md
-reports/optimizer_insight_report.md
-reports/optimizer_final_summary.md
+runs/**/result_manifest.json
+runs/**/metric_result_manifest.json
 ```
 
-Visual artifacts are under:
+Fix-run evidence:
 
 ```text
-reports/optimizer_visuals/
-reports/openbox_advanced_visualization/
+reports/fix_run_report.json
+runs/real/real_001/testbenches/<tb>/corners/<corner>/result_manifest.json
+runs/real/real_001/testbenches/<tb>/corners/<corner>/metrics/metric_result_manifest.json
+runs/real/real_001/testbenches/<tb>/corners/<corner>/metrics/waveform_export_manifest.json
+runs/real/real_001/testbenches/<tb>/corners/<corner>/metrics/waveforms/<name>.csv
 ```
 
-The accepted candidate is a best-observed point under the evaluated samples and
-configured objective. It is not a mathematical proof of global optimum.
+Multi-testbench and multi-corner optimization runs also write parent aggregate
+manifests. Artifacts record requirement pass-through, command traces, license
+probe status, selected candidate, and reported metrics.
 
-## Proven Product Evidence
+## Current Release
 
-C-60 real product acceptance used a fresh Mixer multi-testbench project with a
-project-local `cadence_env.csh` and ran:
+Version `0.1.8` includes:
 
-```bash
-./.venv/bin/ic-opt PROJECT --real
-```
+- local and remote fix-run workflow support
+- fix-run child-level parallelism through `Spectre Settings.parallel_jobs`
+- waveform CSV export manifests for fix-run child runs
+- requirement template `opt_requirement.fix_run.md`
+- requirement-driven local and remote optimization
+- OpenBox GP+EIC, OpenBox PRF+EIC, and native TuRBO
+- multi-testbench and multi-corner support
+- psfxl-only metric flow
+- real license probe doctor gate
+- sanitized Spectre/OCEAN command trace artifacts
+- optimizer CPU thread-limit runtime audit
+- release examples and agent skill guidance synchronized with the current CLI
 
-It completed 100 real OpenBox/Spectre/OCEAN evaluations, generated OpenBox
-advanced visualization, and recommended a feasible best-observed candidate.
-
-C-64 Claude subprocess handoff acceptance used a fresh Mixer multi-testbench
-project with
-only `opt_requirement.md` and `cadence_env.csh`, then ran:
-
-```bash
-claude -p --dangerously-skip-permissions "/ic-opt PROJECT --real"
-```
-
-The historical `/ic-opt` skill appended `--execution-agent claude`; the flow wrote
-`reports/execution_agent_handoff_report.json` with `status=pass`,
-`execution_agent=claude`, `returncode=0`, completed 100 real evaluations, and
-recommended feasible `real_051`. C-65 keeps that route as acceptance evidence
-and development fallback, while product adapters target runtime-native
-same-CLI subagent delegation.
-
-## Documentation
-
-- `docs/OPTIMIZER_PRODUCTION_QUICKSTART.md`: shortest production workflow.
-- `docs/AGENT_OPTIMIZER_USAGE_MANUAL.md`: supervisor/execution-agent operating
-  manual.
-- `docs/OPTIMIZER_ALGORITHM_MODES.md`: supported optimizer strategy selection,
-  including peer production choices `openbox_gp_eic`, `openbox_prf_eic`, and
-  `turbo_trust_region`.
-- `docs/PROCESS_CORNER_OPTIMIZATION_FLOW_CN.md`: multi-corner aggregation flow
-  and what the optimizer sees.
-- `docs/AGENT_INTEGRATION_STATUS.md`: current implemented agent boundary and
-  remaining runtime-specific adapter work.
-- `docs/AGENT_USER_QUICKSTART_CN.md`: beginner-friendly Chinese guide for IC
-  users running the agent workflow.
-- `docs/PROJECT_STATUS_AND_ARCHITECTURE_CN.md`: detailed Chinese status and
-  architecture explanation with evidence references.
-- `src/hermes_workflow/templates/spectre_maestro_project/OPT_REQUIREMENT_README.md`:
-  `opt_requirement.md` format reference.
-- `docs/TOOLCHAIN_EXECUTION_REFERENCE.md`: mandatory real-tool execution
-  reference for development and debugging.
-- `docs/PRODUCT_RELEASE_CHECKLIST.md`: release sanity checklist.
-- `RELEASE_NOTES_v0.1.7.md`: current release contract and fixed bug summary.
-
-## Boundaries
-
-- Do not parse PSF in Python.
-- Do not rewrite approved OCEAN formulas.
-- Do not merge multiple testbenches into a synthetic Spectre deck.
-- Do not hand-pick optimizer points for backend acceptance.
-- Do not create per-project Python virtualenvs.
-- Do not commit raw `input.scs`, protected sidecars, PSF data, or full Cadence
-  logs.
+See `RELEASE_NOTES_v0.1.8.md`.

@@ -212,3 +212,227 @@ def test_remote_adapter_handles_missing_waveform_artifacts_gracefully(tmp_path: 
     assert result.status == "succeeded"
     # No waveform-related issues should be present
     assert not any("waveform" in issue.lower() for issue in result.issues)
+
+
+# ---------------------------------------------------------------------------
+# B-FIXRUN remote: the remote OCEAN run produces the waveform CSV, but the
+# waveform_export_manifest.json is a Python-side artifact the remote never
+# writes. The remote adapter must GENERATE it locally (reusing the local
+# helper) and upload it, so the fix-run artifact gate can find it.
+# ---------------------------------------------------------------------------
+class WaveformCsvOnlyRunner(FakeRunner):
+    """Simulates the real remote failure: OCEAN writes the waveform CSV to
+    metrics/waveforms/ remotely, but the remote never writes
+    waveform_export_manifest.json. The download of the manifest must be a
+    no-op (file not found on remote)."""
+
+    def download_tree(self, remote_path, local_path, include=None, exclude=None) -> None:
+        self.downloads.append((str(remote_path), Path(local_path)))
+        Path(local_path).mkdir(parents=True, exist_ok=True)
+        remote = str(remote_path)
+        if remote.endswith("/psf"):
+            (Path(local_path) / "spectre.out").write_text("spectre output", encoding="utf-8")
+        elif remote.endswith("/metrics/waveforms"):
+            # Remote OCEAN wrote the CSV.
+            (Path(local_path) / "nf_pnoise.csv").write_text(
+                "freq,nf\n1e6,10.5\n", encoding="utf-8"
+            )
+        elif remote.endswith("/metrics"):
+            (Path(local_path) / "ocean_scalars.tsv").write_text(
+                "metric\tvalue\tunit\tstatus\texpression_sha256\tmessage\n"
+                "rise\t1e-12\ts\tpass\t352e7b3256d5417f58d087382bd2054efbcf696d06b58fc6d39002bb09489748\t\n"
+                "fall\t1e-12\ts\tpass\t8ba00c0d961decb9275b9636f61dbbd5659b5ed066a74b0083cd0e1d6d3d5493\t\n"
+                "DC\t1e-06\tW\tpass\tcb82f3f25ee13ea3cb45f605a763ed0806ebb7f47fd27ce4a9c4a4cd902bb7c4\t\n",
+                encoding="utf-8",
+            )
+            (Path(local_path) / "ocean.stdout").write_text("ocean stdout", encoding="utf-8")
+            (Path(local_path) / "ocean.stderr").write_text("", encoding="utf-8")
+            (Path(local_path) / "ocean.log").write_text("ocean log", encoding="utf-8")
+
+    def download(self, remote_path: str, local_path: Path) -> None:
+        self.downloads.append((remote_path, local_path))
+        # Manifest does NOT exist on remote -> no-op (real failure shape).
+        name = Path(remote_path).name
+        parent = str(Path(remote_path).parent)
+        if name == "ocean.log" and parent.rstrip("/").endswith("metrics"):
+            local_path.parent.mkdir(parents=True, exist_ok=True)
+            local_path.write_text("content of ocean.log", encoding="utf-8")
+        # waveform_export_manifest.json: deliberately NOT created.
+
+
+def _add_waveform_exports(project_dir: Path) -> None:
+    """Add a waveform_exports entry to the metric extraction request and
+    refresh the manifest hash, mirroring the local adapter test helper."""
+    from hermes_workflow.metric_requests import expression_sha256
+    from tests.test_spectre_ocean_adapter import (
+        _load_json,
+        _write_json,
+        _refresh_metric_request_hash,
+    )
+
+    run_dir = project_dir / "runs" / "real" / "real_001"
+    request_path = run_dir / "metric_extraction_request.json"
+    request = _load_json(request_path)
+    expression = 'getData("NF" ?result "pnoise")'
+    request["waveform_exports"] = [
+        {
+            "name": "nf_pnoise",
+            "testbench": "cg_nf",
+            "expression": expression,
+            "expression_sha256": expression_sha256(expression),
+            "output_format": "csv",
+            "nil_policy": "fail",
+            "csv_output_file": "runs/real/real_001/metrics/waveforms/nf_pnoise.csv",
+        }
+    ]
+    _write_json(request_path, request)
+    _refresh_metric_request_hash(run_dir)
+
+
+def test_remote_adapter_generates_waveform_manifest_when_absent_on_remote(
+    tmp_path: Path,
+) -> None:
+    """Reproduces the real remote failure: remote OCEAN wrote the CSV, but the
+    remote never wrote waveform_export_manifest.json. The remote adapter must
+    GENERATE the manifest locally (reusing the local helper) so the fix-run
+    artifact gate finds it."""
+    project_dir = create_approved_real_project(tmp_path)
+    _add_waveform_exports(project_dir)
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    runner = WaveformCsvOnlyRunner()
+
+    result = run_remote_spectre_ocean_adapter(
+        project_dir,
+        run_id="real_001",
+        remote_ref=ref,
+        remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
+        runner=runner,
+    )
+
+    assert result.status == "succeeded", result.issues
+    run_dir = project_dir / "runs" / "real" / "real_001"
+    local_manifest = run_dir / "metrics" / "waveform_export_manifest.json"
+    assert local_manifest.is_file(), (
+        "remote adapter must generate waveform_export_manifest.json locally "
+        "when the remote did not produce it"
+    )
+    manifest_data = json.loads(local_manifest.read_text(encoding="utf-8"))
+    assert manifest_data["schema_version"] == "1.0"
+    assert manifest_data["workflow_mode"] == "fix_run"
+    assert manifest_data["run_id"] == "real_001"
+    assert manifest_data["exports"], "manifest must list waveform exports"
+    export = manifest_data["exports"][0]
+    assert export["name"] == "nf_pnoise"
+    assert export["expression"] == 'getData("NF" ?result "pnoise")'
+    assert export["csv_path"].endswith("waveforms/nf_pnoise.csv")
+    assert export["status"] == "pass"
+
+
+def test_remote_waveform_manifest_schema_matches_local_helper(
+    tmp_path: Path,
+) -> None:
+    """The remote-generated manifest must carry the same fields the local
+    adapter writes (CSV path, expression, name, run/corner context,
+    command_trace). Locks in local/remote schema parity."""
+    project_dir = create_approved_real_project(tmp_path)
+    _add_waveform_exports(project_dir)
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    runner = WaveformCsvOnlyRunner()
+
+    result = run_remote_spectre_ocean_adapter(
+        project_dir,
+        run_id="real_001",
+        remote_ref=ref,
+        remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
+        runner=runner,
+    )
+
+    assert result.status == "succeeded", result.issues
+    run_dir = project_dir / "runs" / "real" / "real_001"
+    manifest_data = json.loads(
+        (run_dir / "metrics" / "waveform_export_manifest.json").read_text("utf-8")
+    )
+    required_top = {
+        "schema_version",
+        "workflow_mode",
+        "run_id",
+        "candidate_id",
+        "testbench_id",
+        "corner_id",
+        "model_section",
+        "corner_variables",
+        "parameters",
+        "exports",
+        "psf_dir",
+        "ocean_log",
+        "command_trace",
+    }
+    assert required_top.issubset(manifest_data.keys()), (
+        f"manifest missing keys: {required_top - set(manifest_data.keys())}"
+    )
+    export = manifest_data["exports"][0]
+    required_export = {
+        "name",
+        "expression",
+        "expression_sha256",
+        "output_format",
+        "csv_path",
+        "status",
+        "issues",
+    }
+    assert required_export.issubset(export.keys())
+
+
+def test_remote_waveform_manifest_command_trace_does_not_leak_cshrc(
+    tmp_path: Path,
+) -> None:
+    """The manifest command_trace must be sanitized: no cshrc path, no
+    'source', no 'csh -fc' wrapper."""
+    project_dir = create_approved_real_project(tmp_path)
+    _add_waveform_exports(project_dir)
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    runner = WaveformCsvOnlyRunner()
+
+    result = run_remote_spectre_ocean_adapter(
+        project_dir,
+        run_id="real_001",
+        remote_ref=ref,
+        remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
+        runner=runner,
+    )
+
+    assert result.status == "succeeded", result.issues
+    run_dir = project_dir / "runs" / "real" / "real_001"
+    manifest_data = json.loads(
+        (run_dir / "metrics" / "waveform_export_manifest.json").read_text("utf-8")
+    )
+    trace_json = json.dumps(manifest_data.get("command_trace", {}))
+    assert "cadence_env.csh" not in trace_json
+    assert "source " not in trace_json
+    assert "csh -fc" not in trace_json
+
+
+def test_remote_adapter_uploads_generated_waveform_manifest(tmp_path: Path) -> None:
+    """The locally-generated manifest must be uploaded back to the remote so
+    the remote project tree is self-consistent."""
+    project_dir = create_approved_real_project(tmp_path)
+    _add_waveform_exports(project_dir)
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    runner = WaveformCsvOnlyRunner()
+
+    result = run_remote_spectre_ocean_adapter(
+        project_dir,
+        run_id="real_001",
+        remote_ref=ref,
+        remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
+        runner=runner,
+    )
+
+    assert result.status == "succeeded", result.issues
+    manifest_uploads = [
+        str(remote) for _local, remote in runner.uploads
+        if "waveform_export_manifest.json" in str(remote)
+    ]
+    assert manifest_uploads, (
+        "generated waveform_export_manifest.json must be uploaded to remote"
+    )

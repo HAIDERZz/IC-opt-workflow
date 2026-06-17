@@ -1,5 +1,11 @@
 # Metric Contract Notes
 
-Metric definitions live in `config/metrics.yaml`.
+Metric definitions come from the `Metrics` section of `opt_requirement.md` and
+are rendered to `config/metrics.yaml`.
 
-`maestro_formula` is preserved for traceability and review. The first MVP does not implement a generic Maestro calculator parser.
+`ocean_expression` is preserved for traceability and copied into the OCEAN
+replay script. Do not rewrite ADE/Maestro-approved formulas just to match a
+different dialect.
+
+The optimizer metric path expects scalar values. Full waveform CSV export is a
+separate characterization/export workflow.

@@ -1,31 +1,26 @@
-# Multi-Corner Optimization Requirement
+# Single-Testbench Multi-Corner Optimization Requirement
 
-Use this reference when one optimizer candidate should be evaluated across
-multiple process corners from the same Maestro/ADE testbench. Multi-corner is configured in `Process Corners` below. Inside one candidate,
-corner execution remains serial, so
-`parallel_jobs` still means candidate-level concurrency only.
-
-Monte Carlo is intentionally not part of this real-run loop. Run Monte Carlo as
-post-optimization validation after you have a best observed candidate.
+Use this template when one optimizer candidate is evaluated by one testbench
+across several process corners.
 
 ## Project
 
 ```yaml
-project_name: inverter_multi_corner_opt
-description: Optimize inverter sizing across TT/SS/FF corners
+project_name: mixer_cg_nf_corner_opt
+description: Optimize one Mixer CG/NF testbench across TT/SS/FF corners
 backend: maestro_exported_spectre_deck
 ```
 
 ## Maestro Source
 
 ```yaml
-maestro_point_root: /absolute/path/to/maestro/results/maestro/Interactive.N/1/LIB_CELL_1
+maestro_point_root: /absolute/path/to/Mixer_CS_CG_NF/point_root
 virtuoso_library: Virtuoso_Bridge_test
-cell: bridge_test_inv
-design_view: schematic
+cell: MixerCS_PSS_CG_Noise
+design_view: maestro
 maestro_view: maestro
-test_name: tran_dc_test
-corner: Nominal  # optional metadata for the source point
+test_name: Mixer_CS_CG_NF
+corner: Nominal
 ```
 
 ## Process Corners
@@ -37,85 +32,63 @@ corners:
   - id: tt
     model_section: Post_simu_top_tt
     variables:
-      temperature: "27"
+      temperature: '27'
   - id: ss
     model_section: Post_simu_top_ss
     variables:
-      temperature: "125"
+      temperature: '125'
   - id: ff
     model_section: Post_simu_top_ff
     variables:
-      temperature: "-40"
+      temperature: '-40'
 ```
 
 ## Design Variables
 
 ```yaml
-- name: FN
+- name: F
   kind: integer
-  lower: "2"
-  upper: "12"
-  step: "1"
-- name: WN
+  lower: '20'
+  upper: '30'
+  step: '2'
+- name: W
   kind: continuous_step
-  lower: "0.3u"
-  upper: "3u"
-  step: "0.2u"
-- name: FP
-  kind: integer
-  lower: "2"
-  upper: "12"
-  step: "1"
-- name: WP
+  lower: 0.6u
+  upper: 1.2u
+  step: 0.2u
+- name: L
   kind: continuous_step
-  lower: "0.3u"
-  upper: "3u"
-  step: "0.2u"
+  lower: 30n
+  upper: 40n
+  step: 10n
+- name: VB_LO
+  kind: continuous_step
+  lower: 280m
+  upper: 400m
+  step: 20m
 ```
 
 ## Metrics
 
 ```yaml
-- name: rise
-  unit: s
-  ocean_expression: riseTime(VT("/VOUT") 0 nil 0.9 nil 10 90 nil "time")
-  result: tran
-  required_signals:
-    - /VOUT
-- name: fall
-  unit: s
-  ocean_expression: fallTime(VT("/VOUT") 0.9 nil 0 nil 10 90 nil "time")
-  result: tran
-  required_signals:
-    - /VOUT
-- name: DC
-  unit: W
-  ocean_expression: VDC("/VDD") * IDC("/M0/S")
-  result: tran
-  required_signals:
-    - /VDD
-    - /M0/S
+- name: NF_3G
+  unit: dB
+  ocean_expression: 'value(getData("NF" ?result "pnoise") 3e+09)'
 ```
 
 ## Constraints
 
 ```yaml
-- metric: rise
+- metric: NF_3G
   op: lt
-  value: "80e-12 s"
-- metric: fall
-  op: lt
-  value: "80e-12 s"
-- metric: DC
-  op: lt
-  value: "4e-4 W"
+  value: 9 dB
 ```
 
 ## Objective
 
 ```yaml
 direction: minimize
-expression: "(rise + fall) * DC"
+expression: NF_3G
 ```
 
 ## Spectre Settings
@@ -125,8 +98,8 @@ engine: spectre_x
 preset: ax
 output_format: psfxl
 threads_per_run: 10
-parallel_jobs: 8
-timeout_s: 3600
+parallel_jobs: 10
+timeout_s: 7200
 require_license_check: true
 keep_failed_runs: true
 keep_successful_runs: true
@@ -136,12 +109,12 @@ keep_successful_runs: true
 
 ```yaml
 algorithm: openbox
-strategy: openbox_gp_eic
+strategy: openbox_prf_eic
 initialization: sobol
-max_evaluations: 100
+max_evaluations: 30
 batch_size: 10
 random_seed: 20260528
-optimizer_cpu_threads: 4
+optimizer_cpu_threads: 32
 failure_penalty: 1000000.0
 deduplicate_candidates: true
 ```

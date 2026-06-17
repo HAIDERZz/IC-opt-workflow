@@ -312,3 +312,116 @@ def test_spectre_config_accepts_psfxl_for_ocean_backend() -> None:
     )
 
     assert config.spectre.output_format == "psfxl"
+
+
+def _make_fix_run_project(tmp_path: Path) -> Path:
+    """Copy the optimizer fixture and convert it into fix-run shape:
+    delete optimizer-only configs, add workflow.yaml + fixed_points.yaml +
+    waveform_exports.yaml."""
+    project_dir = copy_fixture_project(tmp_path)
+    (project_dir / "config" / "optimizer.yaml").unlink()
+    (project_dir / "config" / "metrics.yaml").unlink()
+    (project_dir / "config" / "workflow.yaml").write_text(
+        "schema_version: '1.0'\nmode: fix_run\nstarting_run_id: real_001\n",
+        encoding="utf-8",
+    )
+    variables_path = project_dir / "config" / "variables.yaml"
+    variables = read_yaml(variables_path)
+    parameters = {var["name"]: str(var["lower"]) for var in variables["variables"]}
+    fixed_points_payload = {
+        "schema_version": "1.0",
+        "points": [
+            {"candidate_id": "user_point_001", "parameters": parameters},
+        ],
+    }
+    write_yaml(project_dir / "config" / "fixed_points.yaml", fixed_points_payload)
+    waveform_payload = {
+        "schema_version": "1.0",
+        "exports": [
+            {
+                "name": "nf_pnoise",
+                "testbench": "cg_nf",
+                "expression": 'getData("NF" ?result "pnoise")',
+                "output_format": "csv",
+                "nil_policy": "fail",
+            },
+        ],
+    }
+    write_yaml(project_dir / "config" / "waveform_exports.yaml", waveform_payload)
+    return project_dir
+
+
+def test_validate_optimizer_project_still_requires_metrics_yaml(tmp_path: Path) -> None:
+    """Optimizer mode (no workflow.yaml) must keep treating metrics.yaml as
+    required. Removing it must produce a validation issue. Locks in the
+    B-FIXRUN-03 regression direction."""
+    project_dir = copy_fixture_project(tmp_path)
+    (project_dir / "config" / "metrics.yaml").unlink()
+
+    report = validate_project_files(project_dir)
+
+    assert report.ok is False
+    assert any(
+        "metrics.yaml" in issue.file and "missing" in issue.message
+        for issue in report.issues
+    )
+
+
+def test_validate_optimizer_project_still_requires_optimizer_yaml(
+    tmp_path: Path,
+) -> None:
+    """Optimizer mode (no workflow.yaml) must keep treating optimizer.yaml
+    as required."""
+    project_dir = copy_fixture_project(tmp_path)
+    (project_dir / "config" / "optimizer.yaml").unlink()
+
+    report = validate_project_files(project_dir)
+
+    assert report.ok is False
+    assert any(
+        "optimizer.yaml" in issue.file and "missing" in issue.message
+        for issue in report.issues
+    )
+
+
+def test_validate_fix_run_project_accepts_no_optimizer_or_metrics_yaml(
+    tmp_path: Path,
+) -> None:
+    """Fix-run mode (workflow.yaml mode=fix_run) is allowed to omit
+    optimizer.yaml and metrics.yaml as long as fixed_points.yaml exists
+    and at least one of metrics.yaml/waveform_exports.yaml exists."""
+    project_dir = _make_fix_run_project(tmp_path)
+
+    report = validate_project_files(project_dir)
+
+    assert report.ok is True, report.format()
+
+
+def test_validate_fix_run_project_requires_metrics_or_waveform_exports(
+    tmp_path: Path,
+) -> None:
+    """Fix-run mode must still require at least one of metrics.yaml or
+    waveform_exports.yaml. Removing both must fail validation."""
+    project_dir = _make_fix_run_project(tmp_path)
+    (project_dir / "config" / "waveform_exports.yaml").unlink()
+
+    report = validate_project_files(project_dir)
+
+    assert report.ok is False
+    issue_text = report.format()
+    assert (
+        "metrics.yaml" in issue_text or "waveform_exports.yaml" in issue_text
+    )
+
+
+def test_validate_fix_run_project_accepts_metrics_only(tmp_path: Path) -> None:
+    """Fix-run with metrics.yaml but no waveform_exports.yaml is OK."""
+    project_dir = _make_fix_run_project(tmp_path)
+    (project_dir / "config" / "waveform_exports.yaml").unlink()
+    # Restore metrics.yaml from the optimizer fixture
+    optimizer_fixture = FIXTURE_PROJECT / "config" / "metrics.yaml"
+    shutil.copy2(optimizer_fixture, project_dir / "config" / "metrics.yaml")
+
+    report = validate_project_files(project_dir)
+
+    assert report.ok is True, report.format()

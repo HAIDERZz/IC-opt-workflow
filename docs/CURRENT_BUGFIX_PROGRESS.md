@@ -21,6 +21,58 @@ Last updated: 2026-06-16
   artifact inspection prove requirement variables propagated through generated
   config, backend execution, process/state files, reports, and manifests.
 
+## 2026-06-17 Dev Package Release-Line Cleanup
+
+Status: completed in the development package.
+
+Purpose:
+
+- Bring the dev package back in line with the published v0.1.8 release direction.
+- Use the v0.1.8 release package as the source of truth for release-facing docs,
+  examples, templates, product code, and tests.
+- Remove obsolete runtime-native Claude/OpenCode adapter assets, packaged
+  `src/hermes_workflow/agent_skills`, and execution-agent handoff code from the
+  dev mainline. The current agent contract remains the root
+  `skills/ic-opt/SKILL.md`.
+- Keep dev-only historical planning records under `docs/superpowers/`; those are
+  not release-package contents.
+
+Actions:
+
+- Synced v0.1.8 release-facing README, release notes, user docs, agent docs,
+  examples, templates, requirements files, and core product/test files back into
+  the dev package.
+- Added `RELEASE_NOTES_v0.1.8.md` to dev.
+- Updated `.gitignore` for Python caches and local tooling state, then removed
+  generated `__pycache__` and `.serena` directories from the working tree.
+- Removed tracked obsolete runtime/agent files:
+  `agent_runtime/`, `claude_skills/`, `src/hermes_workflow/agent_runtime.py`,
+  `src/hermes_workflow/agent_skills/`,
+  `src/hermes_workflow/execution_agent_handoff.py`,
+  `tests/test_agent_runtime.py`, `tests/test_agent_skill.py`, and
+  `tests/test_execution_agent_handoff.py`.
+- Removed the positive `--execution-agent` product CLI path and kept only
+  negative tests that assert the old flag is rejected.
+
+Fresh verification:
+
+- Focused:
+  `rtk proxy ./.venv/bin/python -m pytest tests/test_product_cli.py tests/test_cli.py tests/test_optimizer_flow.py tests/test_fix_run_flow.py tests/test_remote_fix_run_flow.py tests/test_validate.py tests/test_package.py -q`
+  -> `143 passed, 13 warnings`.
+- Full:
+  `rtk proxy ./.venv/bin/python -m pytest -q`
+  -> `1191 passed, 13 warnings`.
+- Ruff:
+  `rtk proxy ./.venv/bin/python -m ruff check src tests`
+  -> `All checks passed!`.
+- Whitespace:
+  `rtk git diff --check`
+  -> clean.
+- Dev/release tracked-file comparison:
+  release files are all present in dev; only intentional content deltas are
+  `.gitignore`, `src/hermes_workflow/product_cli.py`, and
+  `tests/test_product_cli.py`.
+
 ## 2026-06-16 Release v0.1.7 Agent/Skill Cleanup
 
 Current release-package direction:

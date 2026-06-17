@@ -1937,3 +1937,144 @@ def test_no_waveform_export_manifest_without_waveform_exports(tmp_path: Path) ->
         / "waveform_export_manifest.json"
     )
     assert not manifest_path.exists()
+
+
+class _RecordingInnerRunner:
+    """Records every argv it receives and returns success with no artifacts."""
+
+    def __init__(self) -> None:
+        self.recorded: list[list[str]] = []
+
+    def run(
+        self,
+        argv: list[str],
+        *,
+        cwd: Path,
+        stdout_path: Path,
+        stderr_path: Path,
+        timeout_s: int,
+    ) -> CommandResult:
+        self.recorded.append(list(argv))
+        stdout_path.write_text("recording runner stdout\n", encoding="utf-8")
+        stderr_path.write_text("", encoding="utf-8")
+        return CommandResult(
+            return_code=0,
+            started_at_utc="2026-06-17T00:00:00Z",
+            completed_at_utc="2026-06-17T00:00:01Z",
+        )
+
+
+def test_cshrc_command_runner_wraps_argv_with_source_and_cd(tmp_path: Path) -> None:
+    """CshrcCommandRunner must wrap the canonical argv in a csh -fc command
+    that sources the cshrc and cds into the working directory, mirroring the
+    remote adapter pattern. Locks in B-FIXRUN-01."""
+    from hermes_workflow.execution_adapters.spectre_ocean import CshrcCommandRunner
+
+    cshrc = tmp_path / "cadence_env.csh"
+    cshrc.write_text("# fake cshrc\n", encoding="utf-8")
+    inner = _RecordingInnerRunner()
+    runner = CshrcCommandRunner(cshrc, inner=inner)
+
+    cwd = tmp_path / "netlist"
+    cwd.mkdir()
+    stdout = tmp_path / "out.log"
+    stderr = tmp_path / "err.log"
+    runner.run(
+        ["spectre", "-64", "input.scs", "+preset=ax"],
+        cwd=cwd,
+        stdout_path=stdout,
+        stderr_path=stderr,
+        timeout_s=3600,
+    )
+
+    assert len(inner.recorded) == 1
+    wrapped = inner.recorded[0]
+    assert wrapped[0] == "csh"
+    assert wrapped[1] == "-fc"
+    wrapper_body = wrapped[2]
+    assert "source" in wrapper_body
+    assert str(cshrc) in wrapper_body
+    assert "cd" in wrapper_body
+    assert str(cwd) in wrapper_body
+    # The canonical spectre body is preserved inside the wrapper.
+    assert "spectre" in wrapper_body
+    assert "input.scs" in wrapper_body
+
+
+def test_run_spectre_ocean_adapter_uses_cshrc_runner_when_cadence_cshrc_given(
+    tmp_path: Path,
+) -> None:
+    """When cadence_cshrc is passed, the local adapter must execute spectre
+    inside a cshrc-sourced shell (not a bare subprocess). The inner runner
+    receives a csh -fc wrapped command. Locks in B-FIXRUN-01."""
+    from hermes_workflow.execution_adapters.spectre_ocean import (
+        run_spectre_ocean_adapter,
+    )
+
+    project_dir = _create_ready_real_run_project(tmp_path)
+    cshrc = tmp_path / "cadence_env.csh"
+    cshrc.write_text("# fake cshrc\n", encoding="utf-8")
+    inner = _RecordingInnerRunner()
+
+    try:
+        run_spectre_ocean_adapter(project_dir, cadence_cshrc=cshrc, runner=inner)
+    except Exception:
+        # The recording runner does not create spectre/ocean artifacts, so the
+        # adapter may raise downstream. We only care that the FIRST recorded
+        # command was csh-wrapped.
+        pass
+
+    assert inner.recorded, "adapter did not invoke the runner"
+    first = inner.recorded[0]
+    assert first[0] == "csh"
+    assert first[1] == "-fc"
+    assert "source" in first[2]
+    assert str(cshrc) in first[2]
+
+
+def test_run_spectre_ocean_adapter_command_trace_does_not_leak_cshrc(
+    tmp_path: Path,
+) -> None:
+    """Even when cadence_cshrc is used, command_trace must contain the
+    sanitized canonical argv only — no cshrc path, no 'source', no csh wrapper.
+    Locks in B-FIXRUN-01 sanitization."""
+    from hermes_workflow.execution_adapters.spectre_ocean import (
+        run_spectre_ocean_adapter,
+    )
+
+    project_dir = _create_ready_real_run_project(tmp_path)
+    cshrc = tmp_path / "cadence_env.csh"
+    cshrc.write_text("# fake cshrc\n", encoding="utf-8")
+
+    class _ArtifactCreatingInner(_RecordingInnerRunner):
+        def run(self, argv, *, cwd, stdout_path, stderr_path, timeout_s):
+            self.recorded.append(list(argv))
+            stdout_path.write_text("ok\n", encoding="utf-8")
+            stderr_path.write_text("", encoding="utf-8")
+            # Create minimal spectre artifacts so the adapter proceeds.
+            psf_dir = project_dir / "runs" / "real" / "real_001" / "psf"
+            psf_dir.mkdir(parents=True, exist_ok=True)
+            (psf_dir / "spectre.out").write_text("fake\n", encoding="utf-8")
+            return CommandResult(
+                return_code=0,
+                started_at_utc="2026-06-17T00:00:00Z",
+                completed_at_utc="2026-06-17T00:00:01Z",
+            )
+
+    try:
+        run_spectre_ocean_adapter(
+            project_dir, cadence_cshrc=cshrc, runner=_ArtifactCreatingInner()
+        )
+    except Exception:
+        pass
+
+    result_manifest = _load_json(
+        project_dir / "runs" / "real" / "real_001" / "result_manifest.json"
+    )
+    trace = result_manifest.get("command_trace", {})
+    trace_json = json.dumps(trace)
+    assert str(cshrc) not in trace_json
+    assert "source" not in trace_json
+    assert "csh -fc" not in trace_json
+    # Canonical argv preserved.
+    assert trace["spectre"]["argv"][0] == "spectre"

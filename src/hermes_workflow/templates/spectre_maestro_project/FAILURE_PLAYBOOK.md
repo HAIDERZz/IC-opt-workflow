@@ -1,3 +1,3 @@
 # Failure Playbook
 
-Use this file for project-specific recovery notes after Claude writes an escalation report.
+Use this file for project-specific recovery notes after a real run, doctor check, or optimizer workflow reports an actionable failure.

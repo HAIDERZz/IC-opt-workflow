@@ -60,7 +60,7 @@ def _write_project(
             "run Spectre",
             "run OCEAN",
             "run SSH",
-            "run Claude CLI",
+            "run external agent CLI",
             "run virtuoso-bridge-lite",
             "use network",
             "run subprocess-backed C-7 adapter",

@@ -21,7 +21,7 @@ def test_optimizer_task_package_does_not_label_parallel_jobs_as_spectre_setting(
 
     package = build_optimizer_execution_task_package(
         project_dir,
-        cadence_cshrc=Path("/home/zzchen/cadence_ic231_env.csh"),
+        cadence_cshrc=Path("/opt/ic-opt/cadence_env.csh"),
         created_at_utc="2026-06-04T00:00:00Z",
     )
 
@@ -58,7 +58,7 @@ def test_build_optimizer_execution_task_package_writes_task_and_manifest(
 
     package = build_optimizer_execution_task_package(
         project_dir,
-        cadence_cshrc=Path("/home/zzchen/cadence_ic231_env.csh"),
+        cadence_cshrc=Path("/opt/ic-opt/cadence_env.csh"),
         created_at_utc="2026-06-04T00:00:00Z",
     )
 
@@ -85,14 +85,14 @@ def test_build_optimizer_execution_task_package_writes_task_and_manifest(
     assert manifest_payload["created_at_utc"] == "2026-06-04T00:00:00Z"
     assert manifest_payload["max_evals"] == 100
     assert manifest_payload["parallel"] is True
-    assert manifest_payload["cadence_cshrc"] == "/home/zzchen/cadence_ic231_env.csh"
+    assert manifest_payload["cadence_cshrc"] == "/opt/ic-opt/cadence_env.csh"
     assert manifest_payload["command"] == [
         "hermes-workflow",
         "run-native-turbo",
         str(project_dir),
         "--parallel",
         "--cadence-cshrc",
-        "/home/zzchen/cadence_ic231_env.csh",
+        "/opt/ic-opt/cadence_env.csh",
     ]
     assert manifest_payload["spectre_settings"]["threads_per_run"] == 10
     assert "parallel_jobs" not in manifest_payload["spectre_settings"]
@@ -120,7 +120,7 @@ def test_build_optimizer_execution_task_package_writes_openbox_backend(
 
     package = build_optimizer_execution_task_package(
         project_dir,
-        cadence_cshrc=Path("/home/zzchen/cadence_ic231_env.csh"),
+        cadence_cshrc=Path("/opt/ic-opt/cadence_env.csh"),
         optimizer_backend="openbox",
         created_at_utc="2026-06-04T00:00:00Z",
     )
@@ -151,7 +151,7 @@ def test_build_optimizer_execution_task_package_writes_openbox_backend(
         "run-openbox-real",
         str(project_dir),
         "--cadence-cshrc",
-        "/home/zzchen/cadence_ic231_env.csh",
+        "/opt/ic-opt/cadence_env.csh",
     ]
     required_artifacts = manifest_payload["required_returned_artifacts"]
     assert "reports/optimizer_run_report.json" in required_artifacts
@@ -176,7 +176,7 @@ def test_build_optimizer_execution_task_package_uses_config_turbo_strategy_backe
 
     package = build_optimizer_execution_task_package(
         project_dir,
-        cadence_cshrc=Path("/home/zzchen/cadence_ic231_env.csh"),
+        cadence_cshrc=Path("/opt/ic-opt/cadence_env.csh"),
         optimizer_backend="openbox",
         created_at_utc="2026-06-04T00:00:00Z",
     )
@@ -207,7 +207,7 @@ def test_build_optimizer_execution_task_package_uses_config_openbox_strategy(
 
     package = build_optimizer_execution_task_package(
         project_dir,
-        cadence_cshrc=Path("/home/zzchen/cadence_ic231_env.csh"),
+        cadence_cshrc=Path("/opt/ic-opt/cadence_env.csh"),
         optimizer_backend="native_turbo",
         created_at_utc="2026-06-04T00:00:00Z",
     )
@@ -229,7 +229,7 @@ def test_build_optimizer_execution_task_package_writes_openbox_continuation(
 
     package = build_optimizer_execution_task_package(
         project_dir,
-        cadence_cshrc=Path("/home/zzchen/cadence_ic231_env.csh"),
+        cadence_cshrc=Path("/opt/ic-opt/cadence_env.csh"),
         optimizer_backend="openbox",
         continuation=True,
         created_at_utc="2026-06-05T00:00:00Z",
@@ -260,14 +260,14 @@ def test_build_optimizer_execution_task_package_writes_openbox_continuation(
         "--openbox-venv",
         "/tmp/ic_auto_opt_openbox_spike/.venv",
         "--cadence-cshrc",
-        "/home/zzchen/cadence_ic231_env.csh",
+        "/opt/ic-opt/cadence_env.csh",
     ]
     assert manifest_payload["command"] == [
         "hermes-workflow",
         "continue-openbox-real",
         str(project_dir),
         "--cadence-cshrc",
-        "/home/zzchen/cadence_ic231_env.csh",
+        "/opt/ic-opt/cadence_env.csh",
     ]
     assert "--parallel-jobs" not in manifest_payload["command"]
     assert [
@@ -295,7 +295,7 @@ def test_package_optimizer_task_cli_writes_task_and_manifest(tmp_path: Path) -> 
                 "package-optimizer-task",
                 str(project_dir),
                 "--cadence-cshrc",
-                "/home/zzchen/cadence_ic231_env.csh",
+                "/opt/ic-opt/cadence_env.csh",
             "--parallel",
         ],
     )
@@ -319,7 +319,7 @@ def test_package_optimizer_task_cli_writes_openbox_manifest(tmp_path: Path) -> N
             "package-optimizer-task",
             str(project_dir),
             "--cadence-cshrc",
-            "/home/zzchen/cadence_ic231_env.csh",
+            "/opt/ic-opt/cadence_env.csh",
             "--backend",
             "openbox",
             "--strategy",
@@ -355,7 +355,7 @@ def test_package_optimizer_task_cli_writes_openbox_continuation_manifest(
             "openbox",
             "--continuation",
             "--cadence-cshrc",
-            "/home/zzchen/cadence_ic231_env.csh",
+            "/opt/ic-opt/cadence_env.csh",
         ],
     )
 
@@ -400,7 +400,7 @@ def test_optimizer_execution_task_keeps_forbidden_actions_in_forbidden_section(
 
     package = build_optimizer_execution_task_package(
         project_dir,
-        cadence_cshrc=Path("/home/zzchen/cadence_ic231_env.csh"),
+        cadence_cshrc=Path("/opt/ic-opt/cadence_env.csh"),
     )
 
     task_text = package.task_path.read_text(encoding="utf-8")
@@ -410,7 +410,6 @@ def test_optimizer_execution_task_keeps_forbidden_actions_in_forbidden_section(
     )[0]
     forbidden_actions = task_text.split("## Forbidden Actions", 1)[1]
 
-    assert "Claude Code" not in task_text
     assert "hand-pick" not in required_behavior
     assert "parse PSF" not in required_behavior
     assert "rewrite OCEAN" not in required_behavior
@@ -427,7 +426,7 @@ def test_optimizer_execution_task_keeps_openbox_fallback_in_required_behavior(
 
     package = build_optimizer_execution_task_package(
         project_dir,
-        cadence_cshrc=Path("/home/zzchen/cadence_ic231_env.csh"),
+        cadence_cshrc=Path("/opt/ic-opt/cadence_env.csh"),
         optimizer_backend="openbox",
     )
 
@@ -449,7 +448,7 @@ def test_build_openbox_task_package_includes_optimizer_strategy(
 
     package = build_optimizer_execution_task_package(
         project_dir,
-        cadence_cshrc=Path("/home/zzchen/cadence_ic231_env.csh"),
+        cadence_cshrc=Path("/opt/ic-opt/cadence_env.csh"),
         optimizer_backend="openbox",
         strategy="openbox_prf_eic",
         created_at_utc="2026-06-04T00:00:00Z",

@@ -35,7 +35,11 @@ def build_metric_extraction_request(
         )
 
     metrics = []
-    selected_metrics = metrics_subset if metrics_subset is not None else bundle.metrics.metrics
+    selected_metrics = (
+        metrics_subset
+        if metrics_subset is not None
+        else (bundle.metrics.metrics if bundle.metrics is not None else [])
+    )
     for metric in selected_metrics:
         if metric.ocean is None:
             raise ValueError(f"metric {metric.name} is missing ocean formula")

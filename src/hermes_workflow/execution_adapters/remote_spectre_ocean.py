@@ -16,7 +16,9 @@ from hermes_workflow.execution_adapters.spectre_ocean import (
     WAVEFORM_EXPORT_MANIFEST_NAME,
     AdapterRunResult,
     _build_command_trace,
+    _build_waveform_export_results,
     _project_relative_path,
+    _write_waveform_export_manifest,
     build_ocean_argv,
     build_spectre_argv,
     load_adapter_context,
@@ -297,8 +299,27 @@ def run_remote_spectre_ocean_adapter(
         prefix="metric result manifest",
     )
 
-    # Upload waveform export manifest if it was downloaded locally.
+    # Waveform export manifest: the remote OCEAN replay never writes this
+    # Python-side artifact. If waveform exports are configured and the
+    # manifest was not produced on (or downloaded from) the remote, generate
+    # it locally by reusing the same helper the local adapter uses, so the
+    # manifest schema cannot drift between local and remote. The CSV files
+    # were already downloaded into metrics/waveforms/.
     local_waveform_manifest = context.metrics_dir / WAVEFORM_EXPORT_MANIFEST_NAME
+    if (
+        context.request.waveform_exports
+        and not local_waveform_manifest.is_file()
+    ):
+        ocean_failed = ocean_result.return_code != 0
+        waveform_results = _build_waveform_export_results(
+            context, ocean_failed=ocean_failed,
+        )
+        _write_waveform_export_manifest(
+            context, waveform_results, command_trace=full_trace,
+        )
+
+    # Upload the waveform export manifest (downloaded or locally generated)
+    # back to the remote so the remote project tree is self-consistent.
     if local_waveform_manifest.is_file():
         _safe_upload(
             runner,

@@ -200,11 +200,10 @@ def optimize_remote_project(
     max_evals=max_evals,
     batch_size=batch_size,
     parallel_jobs=parallel_jobs,
-    strategy=strategy,
-    cadence_cshrc=Path("remote-cadence-env.csh"),
-        execution_agent="direct",
-        services=services,
-    )
+            strategy=strategy,
+            cadence_cshrc=Path("remote-cadence-env.csh"),
+            services=services,
+        )
     _sync_cache_reports_to_remote(ref, prepared.cache_dir, ssh)
     return report
 
@@ -549,7 +548,6 @@ def _flow_report(
         max_evals=max_evals,
         batch_size=batch_size,
         parallel_jobs=parallel_jobs,
-        execution_agent="direct",
         steps=list(steps),
         user_decision_required=user_decision_required,
         recommended_run_id=recommended_run_id,

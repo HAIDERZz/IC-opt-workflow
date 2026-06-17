@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ic-auto-opt-workflow"
-version = "0.1.7"
+version = "0.1.8"
 description = "Hermes file-contract workflow for IC auto optimization"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -45,7 +45,6 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 hermes_workflow = [
-    "agent_skills/ic-opt/SKILL.md",
     "templates/spectre_maestro_project/*.md",
     "templates/spectre_maestro_project/config/*.yaml",
     "templates/spectre_maestro_project/**/.gitkeep",

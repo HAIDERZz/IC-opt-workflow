@@ -1,18 +1,18 @@
 # Product-level optimizer environment.
 #
-# Usage from the ic-auto-opt-workflow repository root:
+# Install from the release root:
 #   python3 -m venv .venv
-#   source .venv/bin/activate
-#   python -m pip install --upgrade pip setuptools wheel
-#   python -m pip install -r requirements-product.txt
+#   ./.venv/bin/python -m pip install --upgrade pip setuptools wheel
+#   ./.venv/bin/python -m pip install -r requirements-product.txt
 #
-# User Spectre optimization projects stay data-only. Do not create a Python venv
-# inside each user project directory.
+# User Spectre optimization project directories stay data-only. Do not create a
+# Python virtualenv inside a user optimization project.
 
 -e .
 -e vendor/open-box
 -e vendor/TuRBO
 -r vendor/open-box/requirements/main.txt
+
 matplotlib>=3.7
 scipy>=1.10
 threadpoolctl>=3.1

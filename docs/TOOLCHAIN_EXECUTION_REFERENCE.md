@@ -1,7 +1,8 @@
 # Toolchain Execution Reference
 
 Use this before running Virtuoso, Spectre, OCEAN, OpenBox, native TuRBO,
-license probes, or optimizer commands from the release package.
+license probes, optimizer commands, or fix-run commands from the release
+package.
 
 ## Product Commands
 
@@ -15,10 +16,10 @@ ic-opt --ssh-profile PROFILE PROJECT_DIR --real
 ic-opt --ssh-profile PROFILE PROJECT_DIR --real --continue N
 ```
 
-`opt_requirement.md` supplies initial-run budget, batch size, Spectre
-parallelism, Spectre thread count, optimizer CPU cap, algorithm, strategy,
-initialization, process corners, output format, metric formulas, objective, and
-constraints.
+`opt_requirement.md` supplies workflow mode, initial-run budget, batch size,
+Spectre parallelism, Spectre thread count, optimizer CPU cap, algorithm,
+strategy, initialization, process corners, output format, metric formulas,
+objective, constraints, fixed points, and waveform exports.
 
 ## Product Environment
 
@@ -60,10 +61,12 @@ reports/project_doctor_report.json
 reports/license_probe_report.json
 reports/optimizer_run_report.json
 reports/optimizer_decision_report.md
+reports/fix_run_report.json
 state/optimizer_state.json
 ledger/experiment_ledger.jsonl
 runs/**/result_manifest.json
 runs/**/metric_result_manifest.json
+runs/**/waveform_export_manifest.json
 ```
 
 For multi-corner projects, inspect parent aggregate manifests and confirm each
@@ -76,47 +79,6 @@ or secrets.
 For CPU-limit audit, confirm optimizer reports include `runtime_thread_limits`
 with requested and effective thread evidence.
 
-## Fix-Run Workflow
-
-Fix-run mode runs Spectre/OCEAN at user-specified design points without an
-optimizer loop. The command is the same as the optimizer entry:
-
-```bash
-ic-opt PROJECT_DIR --real
-```
-
-The workflow inspects `Workflow.mode` in `opt_requirement.md`. When the mode
-is `fix_run`, it dispatches the fix-run path instead of the optimizer loop.
-
-### Requirement Sections
-
-Fix-run requires these sections in `opt_requirement.md`:
-
-```text
-Workflow (mode: fix_run)
-Project
-Maestro Source
-Design Variables
-Spectre Settings
-Fixed Points
-Approval Checklist
-```
-
-At least one of `Metrics` or `Waveform Exports` must be present. `Optimizer
-Settings`, `Constraints`, and `Objective` are not required.
-
-### Fix-Run Evidence
-
-After a fix-run, inspect:
-
-```text
-runs/**/result_manifest.json
-runs/**/metric_result_manifest.json
-runs/**/waveform_export_manifest.json
-```
-
-Do not expect `optimizer.yaml`, `optimizer_state.json`, or
-`optimizer_decision_report.md` in fix-run output.
-
-For multi-corner fix-run, confirm each fixed point is evaluated at every
-declared process corner and that per-corner manifests appear.
+For fix-run, confirm `reports/fix_run_report.json` reports
+`workflow_mode: fix_run`, expected child counts, waveform CSV paths when
+requested, and no optimizer state or optimizer decision report.

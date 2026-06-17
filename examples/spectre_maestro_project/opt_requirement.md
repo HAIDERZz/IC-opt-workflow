@@ -1,93 +1,74 @@
-# Optimization Requirement
+# Single-Testbench Single-Corner Optimization Requirement
+
+Use this template when one optimizer candidate is evaluated by one Maestro/ADE
+testbench at the source point corner.
 
 ## Project
 
 ```yaml
-project_name: bridge_test_inv
-description: Optimize inverter sizing from an existing Maestro testbench
+project_name: mixer_cg_nf_opt
+description: Optimize one Mixer CG/NF testbench from one Maestro/ADE point
 backend: maestro_exported_spectre_deck
 ```
 
 ## Maestro Source
 
 ```yaml
-maestro_point_root: /absolute/path/to/maestro/results/maestro/Interactive.N/1/LIB_CELL_1
+maestro_point_root: /absolute/path/to/Mixer_CS_CG_NF/point_root
 virtuoso_library: Virtuoso_Bridge_test
-cell: bridge_test_inv
-design_view: schematic
+cell: MixerCS_PSS_CG_Noise
+design_view: maestro
 maestro_view: maestro
-test_name: tran_dc_test  # optional metadata
-corner: Nominal          # optional metadata
+test_name: Mixer_CS_CG_NF
+corner: Nominal
 ```
 
 ## Design Variables
 
 ```yaml
-- name: FN
+- name: F
   kind: integer
-  lower: "2"
-  upper: "12"
-  step: "1"
-- name: WN
+  lower: '20'
+  upper: '30'
+  step: '2'
+- name: W
   kind: continuous_step
-  lower: "0.3u"
-  upper: "3u"
-  step: "0.2u"
-- name: FP
-  kind: integer
-  lower: "2"
-  upper: "12"
-  step: "1"
-- name: WP
+  lower: 0.6u
+  upper: 1.2u
+  step: 0.2u
+- name: L
   kind: continuous_step
-  lower: "0.3u"
-  upper: "3u"
-  step: "0.2u"
+  lower: 30n
+  upper: 40n
+  step: 10n
+- name: VB_LO
+  kind: continuous_step
+  lower: 280m
+  upper: 400m
+  step: 20m
 ```
 
 ## Metrics
 
 ```yaml
-- name: rise
-  unit: s
-  ocean_expression: riseTime(VT("/VOUT") 0 nil 0.9 nil 10 90 nil "time")
-  result: tran           # optional selectResult hint
-  required_signals:
-    - /VOUT              # optional diagnostic hint
-- name: fall
-  unit: s
-  ocean_expression: fallTime(VT("/VOUT") 0.9 nil 0 nil 10 90 nil "time")
-  result: tran           # optional selectResult hint
-  required_signals:
-    - /VOUT              # optional diagnostic hint
-- name: DC
-  unit: W
-  ocean_expression: VDC("/VDD") * IDC("/M0/S")
-  result: tran           # optional selectResult hint
-  required_signals:
-    - /VDD               # optional diagnostic hint
-    - /M0/S              # optional diagnostic hint
+- name: NF_3G
+  unit: dB
+  ocean_expression: 'value(getData("NF" ?result "pnoise") 3e+09)'
 ```
 
 ## Constraints
 
 ```yaml
-- metric: rise
+- metric: NF_3G
   op: lt
-  value: "80e-12 s"
-- metric: fall
-  op: lt
-  value: "80e-12 s"
-- metric: DC
-  op: lt
-  value: "4e-4 W"
+  value: 9 dB
 ```
 
 ## Objective
 
 ```yaml
 direction: minimize
-expression: "(rise + fall) * DC"
+expression: NF_3G
 ```
 
 ## Spectre Settings
@@ -98,7 +79,7 @@ preset: ax
 output_format: psfxl
 threads_per_run: 10
 parallel_jobs: 10
-timeout_s: 3600
+timeout_s: 7200
 require_license_check: true
 keep_failed_runs: true
 keep_successful_runs: true
@@ -108,10 +89,12 @@ keep_successful_runs: true
 
 ```yaml
 algorithm: openbox
+strategy: openbox_prf_eic
 initialization: sobol
-max_evaluations: 100
+max_evaluations: 30
 batch_size: 10
 random_seed: 20260528
+optimizer_cpu_threads: 32
 failure_penalty: 1000000.0
 deduplicate_candidates: true
 ```

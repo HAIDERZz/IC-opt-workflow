@@ -978,6 +978,11 @@ def _write_real_run_package(
             candidate_id=candidate_id,
             prepared_input_scs=rendered_relative,
             prepared_input_sha256=sha256_file(rendered_path),
+            waveform_exports=(
+                bundle.waveform_exports.exports
+                if bundle.waveform_exports is not None
+                else None
+            ),
         )
         metric_request_path.write_text(
             json.dumps(metric_request_payload, indent=2, sort_keys=True) + "\n",
@@ -1103,18 +1108,44 @@ def _write_single_testbench_package(
         else:
             template_relative = f"netlists/testbenches/{testbench_id}/templates/template.scs"
         exported_input_relative = f"netlists/testbenches/{testbench_id}/exported/input.scs"
-        metrics_subset = [
-            metric for metric in bundle.metrics.metrics if metric.testbench == testbench_id
-        ]
+        metrics_subset = (
+            [
+                metric
+                for metric in bundle.metrics.metrics
+                if metric.testbench == testbench_id
+            ]
+            if bundle.metrics is not None
+            else []
+        )
+        waveform_exports_subset = (
+            [
+                export
+                for export in bundle.waveform_exports.exports
+                if export.testbench == testbench_id
+            ]
+            if bundle.waveform_exports is not None
+            else None
+        )
     else:
         if corner_id is not None:
             template_relative = f"netlists/corners/{corner_id}/template.scs"
         else:
             template_relative = bundle.project_config.netlist.template_scs
         exported_input_relative = bundle.project_config.netlist.exported_input_scs
-        metrics_subset = [
-            metric for metric in bundle.metrics.metrics if metric.testbench is None
-        ]
+        metrics_subset = (
+            [
+                metric
+                for metric in bundle.metrics.metrics
+                if metric.testbench is None
+            ]
+            if bundle.metrics is not None
+            else []
+        )
+        waveform_exports_subset = (
+            bundle.waveform_exports.exports
+            if bundle.waveform_exports is not None
+            else None
+        )
     rendered_relative = f"{child_prefix}/{SPECTRE_NETLIST_DIR}/input.scs"
     metric_request_relative = f"{child_prefix}/metric_extraction_request.json"
 
@@ -1148,6 +1179,7 @@ def _write_single_testbench_package(
         prepared_input_sha256=sha256_file(rendered_path),
         run_prefix=child_prefix,
         metrics_subset=metrics_subset,
+        waveform_exports=waveform_exports_subset,
     )
     metric_request_path.write_text(
         json.dumps(metric_request_payload, indent=2, sort_keys=True) + "\n",

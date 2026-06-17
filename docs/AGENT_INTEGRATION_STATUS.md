@@ -2,81 +2,48 @@
 
 Date: 2026-06-16
 
-## Product Model
-
-The product model is:
+The maintained agent entry is:
 
 ```text
-User -> current agent CLI supervisor -> same-runtime execution subagent
+skills/ic-opt/SKILL.md
 ```
 
-The shell product entrypoint is:
+Agent-assisted operation uses the same product CLI as a human operator.
 
 ```bash
+ic-opt PROJECT_DIR --doctor
 ic-opt PROJECT_DIR --real
-```
-
-The runtime-native agent entrypoint, after installing the adapter, is:
-
-```text
-/ic-opt PROJECT_DIR --real
-```
-
-Continuation keeps one CLI budget delta:
-
-```bash
 ic-opt PROJECT_DIR --real --continue N
 ```
 
-Initial-run workload, resource, optimizer, Spectre, metric, retention, and
-process-corner values must come from `opt_requirement.md` and generated config.
-Do not add product CLI overrides for those values.
-
-## Runtime Adapter Assets
-
-Claude adapter source:
-
-```text
-claude_skills/ic-opt/
-```
-
-OpenCode adapter source:
-
-```text
-agent_runtime/opencode/command/ic-opt.md
-agent_runtime/opencode/agents/ic-opt-execution.md
-```
-
-Installer/check commands:
+Remote execution uses:
 
 ```bash
-./.venv/bin/hermes-workflow install-runtime-adapter claude
-./.venv/bin/hermes-workflow install-runtime-adapter opencode
-./.venv/bin/hermes-workflow runtime-adapter-status
+ic-opt --ssh-profile PROFILE PROJECT_DIR --doctor
+ic-opt --ssh-profile PROFILE PROJECT_DIR --real
 ```
 
-- Product `ic-opt PROJECT_DIR --real` flow.
-- Local and remote doctor gates, including real license probe when required.
-- Peer production strategy routing for `openbox_gp_eic`,
-  `openbox_prf_eic`, and `turbo_trust_region`; `openbox_auto` is the
-  default automatic mode and `random_baseline` is diagnostic only.
-- Multi-testbench and multi-corner candidate evaluation.
-- Requirement-driven initialization pass-through for OpenBox and native TuRBO.
-- Sanitized Spectre/OCEAN command trace in child and aggregate manifests.
-- CPU thread-limit runtime audit in optimizer reports.
-- Optimizer decision, insight, visualization, and final-summary reports.
+## Current Capability
 
-## Evidence Boundary
+- local and remote real optimization through `ic-opt`
+- local and remote fix-run through `Workflow.mode: fix_run`
+- local and remote doctor gates with license probe support
+- requirement-driven budget, batch size, parallel jobs, Spectre threads,
+  optimizer CPU cap, algorithm, strategy, initialization, output format,
+  retention, fixed points, waveform exports, testbench routes, and
+  process-corner settings
+- continuation through `--continue N`
+- OpenBox GP+EIC, OpenBox PRF+EIC, and native TuRBO
+- multi-testbench and multi-corner candidate evaluation
+- fix-run waveform CSV export manifests and `reports/fix_run_report.json`
+- sanitized Spectre/OCEAN `command_trace` in child and aggregate manifests
+- optimizer CPU thread-limit audit in optimizer reports
 
-Older C-60/C-64/C-66 evidence may mention product commands with workload or
-resource flags. Those commands are historical evidence only. The current product
-contract is requirement-driven first run plus `--continue N` for continuation.
-
-Current release evidence and bug-fix summary are in:
+## Related Docs
 
 ```text
-RELEASE_NOTES_v0.1.7.md
-docs/CURRENT_BUGFIX_PROGRESS.md
+docs/AGENT_OPTIMIZER_USAGE_MANUAL.md
+docs/TOOLCHAIN_EXECUTION_REFERENCE.md
 docs/OPTIMIZER_ALGORITHM_MODES.md
 docs/PROCESS_CORNER_OPTIMIZATION_FLOW_CN.md
 ```

@@ -212,9 +212,12 @@ def render_config_payloads(sections: dict[str, Any], *, workflow_mode: str = "op
     }
 
     if workflow_mode == "fix_run":
-        # fix_run: render fixed_points.yaml, waveform_exports.yaml (if present),
-        # metrics.yaml (if Metrics present), process_corners.yaml
-        # Do NOT render optimizer.yaml
+        # fix_run: render workflow.yaml, fixed_points.yaml,
+        # waveform_exports.yaml (if present), metrics.yaml (if Metrics
+        # present), process_corners.yaml. Do NOT render optimizer.yaml.
+        workflow = _dict_section(sections, "Workflow")
+        payloads["workflow.yaml"] = workflow
+
         fixed_points = _dict_section(sections, "Fixed Points")
         payloads["fixed_points.yaml"] = fixed_points
 

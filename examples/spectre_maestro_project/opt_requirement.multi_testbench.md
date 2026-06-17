@@ -1,16 +1,13 @@
-# Multi-Testbench Optimization Requirement
+# Multi-Testbench Single-Corner Optimization Requirement
 
-Use this reference when one optimizer candidate needs metrics from more than
-one Maestro/ADE testbench. Each `maestro_point_root` must point to a
-single-point Maestro/ADE result directory that contains `netlist/input.scs`.
-The same evaluation model also supports a single testbench; use this file only
-when one candidate needs metrics from multiple Maestro/ADE setups.
+Use this template when each optimizer candidate must be evaluated by more than
+one Maestro/ADE testbench at each testbench source point corner.
 
 ## Project
 
 ```yaml
 project_name: mixer_multi_tb_opt
-description: Optimize one Mixer candidate across CG/NF/BW, IIP3, and P1dB testbenches
+description: Optimize one Mixer candidate across CG/NF and gain testbenches
 backend: maestro_exported_spectre_deck
 ```
 
@@ -19,30 +16,20 @@ backend: maestro_exported_spectre_deck
 ```yaml
 testbenches:
   - id: cg_nf
-    maestro_point_root: /absolute/path/to/CG_NF_Test/point_root
-    virtuoso_library: MixerLib
-    cell: Mixer
-    design_view: schematic
+    maestro_point_root: /absolute/path/to/Mixer_CS_CG_NF/point_root
+    virtuoso_library: Virtuoso_Bridge_test
+    cell: MixerCS_PSS_CG_Noise
+    design_view: maestro
     maestro_view: maestro
-    test_name: CG_NF_Test
+    test_name: Mixer_CS_CG_NF
     corner: Nominal
-
-  - id: iip3
-    maestro_point_root: /absolute/path/to/IIP3_Test/point_root
-    virtuoso_library: MixerLib
-    cell: Mixer
-    design_view: schematic
+  - id: gain
+    maestro_point_root: /absolute/path/to/Mixer_CS_GAIN/point_root
+    virtuoso_library: Virtuoso_Bridge_test
+    cell: MixerCS_PSS_Gain
+    design_view: maestro
     maestro_view: maestro
-    test_name: IIP3_Test
-    corner: Nominal
-
-  - id: p1db
-    maestro_point_root: /absolute/path/to/P1dB_Test/point_root
-    virtuoso_library: MixerLib
-    cell: Mixer
-    design_view: schematic
-    maestro_view: maestro
-    test_name: P1dB_Test
+    test_name: Mixer_CS_GAIN
     corner: Nominal
 ```
 
@@ -51,80 +38,55 @@ testbenches:
 ```yaml
 - name: F
   kind: integer
-  lower: "14"
-  upper: "30"
-  step: "2"
+  lower: '20'
+  upper: '30'
+  step: '2'
 - name: W
   kind: continuous_step
-  lower: "0.4u"
-  upper: "2u"
-  step: "0.2u"
+  lower: 0.6u
+  upper: 1.2u
+  step: 0.2u
 - name: L
   kind: continuous_step
-  lower: "30n"
-  upper: "50n"
-  step: "10n"
+  lower: 30n
+  upper: 40n
+  step: 10n
 - name: VB_LO
   kind: continuous_step
-  lower: "150m"
-  upper: "350m"
-  step: "20m"
+  lower: 280m
+  upper: 400m
+  step: 20m
 ```
 
 ## Metrics
 
 ```yaml
-- name: BW
-  unit: Hz
-  testbench: cg_nf
-  ocean_expression: bandwidth(db(((vh('pac "/IF_P" '-1) - vh('pac "/IF_N" '-1)) / (vh('pac "/RF_P" '(0)) - vh('pac "/RF_N" '(0))))) 3 "low")
-
-- name: MAX_GAIN
-  unit: dB
-  testbench: cg_nf
-  ocean_expression: ymax(ymax(db(((vh('pac "/IF_P" '-1) - vh('pac "/IF_N" '-1)) / (vh('pac "/RF_P" '(0)) - vh('pac "/RF_N" '(0)))))))
-
 - name: NF_3G
   unit: dB
   testbench: cg_nf
-  ocean_expression: value(getData("NF" ?result "pnoise") 3e+09)
-
-- name: IIP3
-  unit: dBm
-  testbench: iip3
-  ocean_expression: rapidIIPN("pac_ip3")
-
-- name: P1DB
-  unit: dBm
-  testbench: p1db
-  ocean_expression: compressionVRI((v("/IF_P" ?result "pss_fd") - v("/IF_N" ?result "pss_fd")) '1 ?rport resultParam("PORT2:r" ?result "pss_fd") ?gcomp 1)
+  ocean_expression: 'value(getData("NF" ?result "pnoise") 3e+09)'
+- name: MAX_GAIN
+  unit: dB
+  testbench: gain
+  ocean_expression: 'ymax(getData("gain" ?result "pac"))'
 ```
 
 ## Constraints
 
 ```yaml
-- metric: BW
-  op: gt
-  value: "19e9 Hz"
-- metric: MAX_GAIN
-  op: gt
-  value: "4 dB"
 - metric: NF_3G
   op: lt
-  value: "12 dB"
-- metric: IIP3
+  value: 9 dB
+- metric: MAX_GAIN
   op: gt
-  value: "0 dBm"
-- metric: P1DB
-  op: gt
-  value: "-2 dBm"
+  value: 5 dB
 ```
 
 ## Objective
 
 ```yaml
 direction: minimize
-expression: "NF_3G * 1e9 / (BW*MAX_GAIN*IIP3*P1DB) "
+expression: NF_3G - 0.1 * MAX_GAIN
 ```
 
 ## Spectre Settings
@@ -134,8 +96,8 @@ engine: spectre_x
 preset: ax
 output_format: psfxl
 threads_per_run: 10
-parallel_jobs: 12
-timeout_s: 3600
+parallel_jobs: 10
+timeout_s: 7200
 require_license_check: true
 keep_failed_runs: true
 keep_successful_runs: true
@@ -145,11 +107,12 @@ keep_successful_runs: true
 
 ```yaml
 algorithm: openbox
+strategy: openbox_prf_eic
 initialization: sobol
-max_evaluations: 100
+max_evaluations: 30
 batch_size: 10
 random_seed: 20260528
-optimizer_cpu_threads: 4
+optimizer_cpu_threads: 32
 failure_penalty: 1000000.0
 deduplicate_candidates: true
 ```

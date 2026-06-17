@@ -17,9 +17,16 @@ TEMPLATE_PATH = ("templates", "spectre_maestro_project")
 CONFIG_FILE_NAMES = [
     "project_config.yaml",
     "variables.yaml",
-    "metrics.yaml",
     "spectre.yaml",
+]
+OPTIONAL_CONFIG_FILE_NAMES = [
+    "metrics.yaml",
     "optimizer.yaml",
+    "testbenches.yaml",
+    "process_corners.yaml",
+    "waveform_exports.yaml",
+    "fixed_points.yaml",
+    "workflow.yaml",
 ]
 
 
@@ -81,14 +88,23 @@ def _render_execution_task(bundle: ContractBundle, manifest_payload: dict) -> st
     variable_names = ", ".join(
         f"`{variable.name}`" for variable in bundle.variables.variables
     )
-    metric_lines = "\n".join(
-        f"- `{metric.name}` [{metric.unit}]: `{metric.maestro_formula}`"
-        for metric in bundle.metrics.metrics
-    )
-    constraint_lines = "\n".join(
-        f"- `{constraint.metric}` {constraint.op.value} `{constraint.value}`"
-        for constraint in bundle.metrics.constraints
-    )
+    if bundle.metrics is not None:
+        metric_lines = "\n".join(
+            f"- `{metric.name}` [{metric.unit}]: `{metric.maestro_formula}`"
+            for metric in bundle.metrics.metrics
+        )
+        constraint_lines = "\n".join(
+            f"- `{constraint.metric}` {constraint.op.value} `{constraint.value}`"
+            for constraint in bundle.metrics.constraints
+        )
+        objective_lines = (
+            f"- Direction: `{bundle.metrics.objective.direction.value}`\n"
+            f"- Expression: `{bundle.metrics.objective.expression}`"
+        )
+    else:
+        metric_lines = "- No scalar metrics configured for this fix-run package."
+        constraint_lines = "- No scalar constraints configured for this fix-run package."
+        objective_lines = "- No optimizer objective configured for this fix-run package."
     hash_lines = "\n".join(
         f"- `{path}`: `{digest}`"
         for path, digest in sorted(manifest_payload["immutable_config_files"].items())
@@ -126,8 +142,7 @@ Hermes may template only these variables in `netlists/templates/template.scs`: {
 
 ## Objective
 
-- Direction: `{bundle.metrics.objective.direction.value}`
-- Expression: `{bundle.metrics.objective.expression}`
+{objective_lines}
 
 ## Spectre Policy
 
@@ -213,7 +228,15 @@ def _build_package_contents(
     config_destination.mkdir(parents=True, exist_ok=True)
 
     immutable_hashes: dict[str, str] = {}
-    for file_name in CONFIG_FILE_NAMES:
+    config_file_names = [
+        *CONFIG_FILE_NAMES,
+        *[
+            file_name
+            for file_name in OPTIONAL_CONFIG_FILE_NAMES
+            if (project_dir / "config" / file_name).exists()
+        ],
+    ]
+    for file_name in config_file_names:
         source = project_dir / "config" / file_name
         destination = config_destination / file_name
         shutil.copy2(source, destination)

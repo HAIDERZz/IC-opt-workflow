@@ -2,79 +2,77 @@
 
 Date: 2026-06-16
 
-## Current Product Contract
+## Product Contract
 
-- Initial real optimization reads machine-critical settings only from
-  `opt_requirement.md` / generated config: `max_evaluations`, `batch_size`,
-  `parallel_jobs`, `threads_per_run`, `optimizer_cpu_threads`, optimizer
-  strategy, initialization, process corners, output format, retention policy,
-  metric formulas, and constraints.
-- Product CLI continuation keeps one budget delta:
-  `ic-opt PROJECT --real --continue N`.
-- Do not pass initial-run workload/resource/optimizer overrides such as
-  `--max-evals`, `--batch-size`, `--parallel-jobs`, `--threads`, or
-  `--strategy` to `ic-opt PROJECT --real`.
+`opt_requirement.md` is the source for first-run optimizer and simulator
+settings:
 
-## Capabilities
+- budget and batch size
+- candidate parallelism
+- Spectre thread count
+- optimizer CPU cap
+- algorithm, strategy, initialization, and random seed
+- output format
+- process corners
+- metric formulas
+- objective and constraints
+- retention policy
 
-- Multi-corner real optimization is configured in `opt_requirement.md` under
-  `Process Corners`, using `corners`, `objective_policy`, and
-  `constraint_policy`.
-- Release examples include:
-  - `examples/spectre_maestro_project/opt_requirement.multi_corner.md`
-  - `examples/spectre_maestro_project/opt_requirement.multi_tb_corner.md`
-- Supported production strategy choices are peers:
-  - `algorithm: openbox`, `strategy: openbox_gp_eic`
-  - `algorithm: openbox`, `strategy: openbox_prf_eic`
-  - `algorithm: turbo`, `strategy: turbo_trust_region`
-- `openbox_auto` is the default automatic OpenBox mode when the user has not
-  selected a strategy. `random_baseline` is diagnostic only.
-- Use `turbo_trust_region` when legal variable steps are fine enough that
-  snapping continuous TuRBO candidates is a small perturbation, for example
-  about `0.1u`; avoid it for coarse steps, finger-count-like integers, and
-  categorical choices.
-- `docs/OPTIMIZER_ALGORITHM_MODES.md` explains strategy selection.
-- `docs/PROCESS_CORNER_OPTIMIZATION_FLOW_CN.md` explains multi-corner
-  aggregation and what the optimizer sees.
+The product CLI keeps one value-changing continuation entry for existing runs:
 
-## Fixed Bugs And Contract Hardening
+```bash
+ic-opt PROJECT_DIR --real --continue N
+```
 
-- B-01: removed product CLI strategy override from the initial-run contract.
-- B-03/B-04: remote timeout and parent aggregate simulator metadata are carried
-  from requirement/config into real artifacts.
-- B-05: `require_license_check` now runs real local/remote license probes and
-  fails closed when required.
-- B-07: optimizer `initialization` now passes through to OpenBox and native
-  TuRBO, including seeded Sobol behavior.
-- B-08: `output_format` contract is fail-closed to `psfxl`; `psfascii` is not
-  accepted by product requirement intake.
-- B-10: local/remote Spectre/OCEAN manifests include sanitized command traces.
-- Parent aggregate traceability: multi-testbench/multi-corner parent manifests
-  include child command-trace references.
-- B-11: optimizer CPU thread-limit runtime audit records requested/effective
-  threads, threadpool/Torch state, and local/remote transport mode.
+Use `--ssh-profile PROFILE` to select a remote execution profile. Use
+`--cadence-cshrc PATH` only when the project does not already provide the
+Cadence setup file.
 
-## Dependencies
+## Optimizer Modes
 
-- `vendor/open-box`
-- `vendor/TuRBO`
-- TuRBO/Sobol/runtime-audit dependencies in product requirements:
-  `scipy`, `threadpoolctl`, `torch`, and `gpytorch`.
+Production strategy choices:
 
-## Validation Summary
+- `algorithm: openbox`, `strategy: openbox_gp_eic`
+- `algorithm: openbox`, `strategy: openbox_prf_eic`
+- `algorithm: turbo`, `strategy: turbo_trust_region`
 
-- Dev full pytest: `1075 passed, 13 warnings`.
-- Dev ruff: `All checks passed!`.
-- Release package pytest: `1075 passed, 13 warnings`.
-- Release package ruff: `All checks passed!`.
-- Dev/release `src/hermes_workflow` and `tests` are synced, excluding cache and
-  local state directories.
+TuRBO fits spaces where legal variable steps are fine enough that snapping a
+continuous candidate to the legal grid is a small perturbation, for example
+about `0.1u`. Use `openbox_prf_eic` for coarse integer grids or duplicate-heavy
+snapped spaces.
+
+`random_baseline` is for diagnostics.
+
+## Fixes And Evidence Added
+
+- B-01: product CLI keeps first-run settings in `opt_requirement.md`; only
+  continuation count is accepted from CLI.
+- B-03/B-04: remote timeout and parent aggregate metadata were verified in the
+  development workflow.
+- B-05: `require_license_check` now runs real local/remote Spectre/license
+  probes through doctor.
+- B-07: Sobol initialization is seed-controlled, and OpenBox/native TuRBO
+  workflows use requirement initialization.
+- B-08: metric flow is psfxl-only and fails closed for unsupported output.
+- B-10: Spectre/OCEAN result manifests include sanitized command traces.
+- B-11: optimizer CPU thread-limit runtime audit is recorded.
+- Parent aggregate manifests include child trace references for multi-testbench
+  and multi-corner runs.
+
+## Release Checks
+
+- Full test suite passed in the development package before release packaging.
+- Ruff passed.
+- `git diff --check` passed.
+- Release examples were regenerated from a verified Mixer requirement and
+  checked with current requirement intake. Placeholder path failures are
+  expected until users replace `maestro_point_root`.
 
 ## Boundaries
 
-- Cadence Virtuoso, Spectre, OCEAN, PDK files, and simulator licenses are not
-  included.
-- Users must provide valid Maestro/ADE point roots and a working Cadence setup
-  file such as `cadence_env.csh`.
-- The optimizer reports the best observed feasible point under the configured
-  objective/policy. It does not claim a mathematical global optimum.
+Cadence Virtuoso, Spectre, OCEAN, PDK files, simulator licenses, and user
+Maestro/ADE result directories are not included. Users must provide valid
+Maestro/ADE point roots and a working Cadence setup file.
+
+Optimizer reports identify the best observed feasible candidate. They do not
+claim a mathematical global optimum.

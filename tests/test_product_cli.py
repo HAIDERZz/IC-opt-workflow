@@ -53,7 +53,6 @@ def test_ic_opt_invokes_optimizer_flow(monkeypatch, tmp_path: Path) -> None:
             "parallel_jobs": None,
             "cadence_cshrc": cadence_cshrc,
             "strategy": None,
-            "execution_agent": "direct",
         }
     ]
     assert "optimizer flow completed" in result.output
@@ -206,7 +205,6 @@ def test_ic_opt_explicit_cadence_env_overrides_project_file(
 
     assert result.exit_code == 0, result.output
     assert calls[0]["cadence_cshrc"] == explicit_cadence_cshrc
-    assert calls[0]["execution_agent"] == "direct"
 
 
 def test_ic_opt_uses_cadence_env_variable(monkeypatch, tmp_path: Path) -> None:
@@ -240,40 +238,29 @@ def test_ic_opt_uses_cadence_env_variable(monkeypatch, tmp_path: Path) -> None:
 
     assert result.exit_code == 0, result.output
     assert calls[0]["cadence_cshrc"] == cadence_cshrc
-    assert calls[0]["execution_agent"] == "direct"
 
 
-def test_ic_opt_wires_claude_execution_agent(monkeypatch, tmp_path: Path) -> None:
+def test_ic_opt_rejects_legacy_execution_agent_flag(monkeypatch, tmp_path: Path) -> None:
     project_dir = tmp_path / "project"
     project_dir.mkdir()
     cadence_cshrc = project_dir / "cadence_env.csh"
     cadence_cshrc.write_text("# test\n", encoding="utf-8")
-    calls: list[dict[str, object]] = []
 
-    def fake_optimize_project(project: Path, **kwargs: object) -> SimpleNamespace:
-        calls.append({"project": project, **kwargs})
-        report_path = project / "reports" / "optimizer_flow_run_report.json"
-        report_path.parent.mkdir(parents=True)
-        report_path.write_text("{}\n", encoding="utf-8")
-        return SimpleNamespace(
-            status="pass",
-            report_path=report_path,
-            stopped_before=None,
-            recommended_run_id="real_001",
-            user_decision_required=True,
-            issues=[],
-        )
-
-    monkeypatch.setattr(product_cli, "optimize_project", fake_optimize_project)
+    monkeypatch.setattr(
+        product_cli,
+        "optimize_project",
+        lambda *a, **kw: pytest.fail(
+            "optimize_project must not be called when --execution-agent is passed"
+        ),
+    )
 
     result = runner.invoke(
         product_cli.app,
         [str(project_dir), "--real", "--execution-agent", "claude"],
     )
 
-    assert result.exit_code == 0, result.output
-    assert calls[0]["execution_agent"] == "claude"
-    assert "recommended: real_001" in result.output
+    assert result.exit_code != 0
+    assert "--execution-agent" in result.output
 
 
 def test_ic_opt_reports_missing_cadence_env(monkeypatch, tmp_path: Path) -> None:
@@ -604,3 +591,46 @@ def test_ic_opt_real_dispatches_to_optimizer_when_workflow_absent(
     assert result.exit_code == 0, result.output
     assert "optimizer flow completed" in result.output
     assert len(optimize_calls) == 1
+
+
+def test_ic_opt_fix_run_exits_nonzero_when_report_fails(monkeypatch, tmp_path: Path) -> None:
+    """B-FIXRUN-02: when the fix-run report status is 'fail' (e.g. all child
+    adapters failed), the CLI must NOT print 'fix-run flow completed' and must
+    exit non-zero. Locks in the false-pass CLI bug."""
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    (project_dir / "opt_requirement.md").write_text("# requirement\n", encoding="utf-8")
+    cadence_cshrc = project_dir / "cadence_env.csh"
+    cadence_cshrc.write_text("# test\n", encoding="utf-8")
+
+    def fake_run_fix_run_project(project: Path, **kwargs: object) -> SimpleNamespace:
+        return SimpleNamespace(
+            status="fail",
+            schema_version="1.0",
+            workflow_mode="fix_run",
+            points=[
+                SimpleNamespace(
+                    candidate_id="user_point_001",
+                    run_id="real_001",
+                    child_issues=[SimpleNamespace(testbench_id="cg_nf", corner_id="tt_27", message="adapter failed: spectre not found")],
+                )
+            ],
+            optimizer_state_created=False,
+            optimizer_decision_report_created=False,
+        )
+
+    monkeypatch.setattr(product_cli, "run_fix_run_project", fake_run_fix_run_project)
+    monkeypatch.setattr(
+        product_cli,
+        "check_requirement",
+        lambda *a, **kw: SimpleNamespace(workflow_mode="fix_run", status="pass"),
+    )
+
+    result = runner.invoke(
+        product_cli.app,
+        [str(project_dir), "--real", "--cadence-cshrc", str(cadence_cshrc)],
+    )
+
+    assert result.exit_code != 0, result.output
+    assert "fix-run flow completed" not in result.output
+    assert "fix-run flow failed" in result.output

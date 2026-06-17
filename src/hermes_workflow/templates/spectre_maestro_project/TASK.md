@@ -1,5 +1,5 @@
 # Optimization Task
 
-This project is driven by the structured files under `config/`.
+This project is driven by `opt_requirement.md` and the generated files under `config/`.
 
-Hermes owns the config files and approval gate. Claude Code owns netlist export, variable templating, project-local metric code, dry run, and real optimization only after Hermes approval.
+Keep first-run optimizer settings in `opt_requirement.md`. Use the CLI only for workflow actions such as doctor checks, real runs, and approved continuation.

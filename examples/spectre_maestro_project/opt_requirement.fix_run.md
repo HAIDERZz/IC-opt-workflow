@@ -1,8 +1,9 @@
-# Fix-Run Simulation Requirement
+# Fix-Run 15-Corner Waveform CSV Requirement
 
-Run Spectre/OCEAN simulations at user-specified design points and export
-waveform data. This mode does not run an optimizer. All variables, fixed
-points, process corners, and waveform expressions come from this file.
+This template follows the structure used in the verified local and remote
+15-corner fix-run workflow. It runs one user-specified design point across
+three model sections and five corner variable values per section, then exports
+the requested OCEAN waveform to CSV. It does not run an optimizer.
 
 ## Workflow
 
@@ -15,21 +16,23 @@ starting_run_id: real_001
 ## Project
 
 ```yaml
-project_name: mixer_fix_run_example
-description: Fix-run example — simulate fixed Mixer points and export pnoise waveforms
+project_name: mixer_fix_run_15corner
+description: Fixed Mixer point across 15 process/corner-variable combinations with NF waveform CSV export
 backend: maestro_exported_spectre_deck
 ```
 
 ## Maestro Source
 
 ```yaml
-maestro_point_root: /path/to/maestro/CG_NF_Test/point_root
-virtuoso_library: Example_Library
-cell: MixerCS_PSS_CG_Noise
-design_view: schematic
-maestro_view: maestro
-test_name: Mixer_CS_CG_NF
-corner: tt
+testbenches:
+  - id: cg_nf
+    maestro_point_root: /absolute/path/to/Mixer_CS_CG_NF/point_root
+    virtuoso_library: Virtuoso_Bridge_test
+    cell: MixerCS_PSS_CG_Noise
+    design_view: maestro
+    maestro_view: maestro
+    test_name: Mixer_CS_CG_NF
+    corner: Nominal
 ```
 
 ## Design Variables
@@ -55,6 +58,26 @@ corner: tt
   lower: 280m
   upper: 400m
   step: 20m
+- name: FCS
+  kind: integer
+  lower: '40'
+  upper: '56'
+  step: '2'
+- name: WCS
+  kind: continuous_step
+  lower: 0.6u
+  upper: 1.2u
+  step: 0.2u
+- name: LCS
+  kind: continuous_step
+  lower: 30n
+  upper: 50n
+  step: 10n
+- name: VB_RF
+  kind: continuous_step
+  lower: 300m
+  upper: 440m
+  step: 20m
 ```
 
 ## Spectre Settings
@@ -63,11 +86,11 @@ corner: tt
 engine: spectre_x
 preset: ax
 output_format: psfxl
-threads_per_run: 4
-parallel_jobs: 1
-timeout_s: 3600
+threads_per_run: 10
+parallel_jobs: 8
+timeout_s: 7200
 require_license_check: true
-keep_failed_runs: false
+keep_failed_runs: true
 keep_successful_runs: true
 ```
 
@@ -77,31 +100,86 @@ keep_successful_runs: true
 objective_policy: worst_case
 constraint_policy: all_corners
 corners:
-  - id: tt
+  - id: tt_m25
+    model_section: Post_simu_top_tt
+    variables:
+      temperature: '-25'
+  - id: tt_0
+    model_section: Post_simu_top_tt
+    variables:
+      temperature: '0'
+  - id: tt_27
     model_section: Post_simu_top_tt
     variables:
       temperature: '27'
-  - id: ss
+  - id: tt_85
+    model_section: Post_simu_top_tt
+    variables:
+      temperature: '85'
+  - id: tt_125
+    model_section: Post_simu_top_tt
+    variables:
+      temperature: '125'
+  - id: ss_m25
+    model_section: Post_simu_top_ss
+    variables:
+      temperature: '-25'
+  - id: ss_0
+    model_section: Post_simu_top_ss
+    variables:
+      temperature: '0'
+  - id: ss_27
+    model_section: Post_simu_top_ss
+    variables:
+      temperature: '27'
+  - id: ss_85
+    model_section: Post_simu_top_ss
+    variables:
+      temperature: '85'
+  - id: ss_125
     model_section: Post_simu_top_ss
     variables:
       temperature: '125'
-  - id: ff
+  - id: ff_m25
     model_section: Post_simu_top_ff
     variables:
-      temperature: '-40'
+      temperature: '-25'
+  - id: ff_0
+    model_section: Post_simu_top_ff
+    variables:
+      temperature: '0'
+  - id: ff_27
+    model_section: Post_simu_top_ff
+    variables:
+      temperature: '27'
+  - id: ff_85
+    model_section: Post_simu_top_ff
+    variables:
+      temperature: '85'
+  - id: ff_125
+    model_section: Post_simu_top_ff
+    variables:
+      temperature: '125'
 ```
+
+`variables` are generic netlist parameter overrides. This example uses a
+parameter named `temperature`; the workflow does not special-case that name.
 
 ## Fixed Points
 
 ```yaml
 schema_version: "1.0"
 points:
-  - candidate_id: nominal_point
+  - candidate_id: user_point_001
     parameters:
       F: '24'
       W: 0.8u
       L: 30n
       VB_LO: 340m
+      FCS: '48'
+      WCS: 0.8u
+      LCS: 40n
+      VB_RF: 360m
 ```
 
 ## Waveform Exports
@@ -110,7 +188,7 @@ points:
 schema_version: "1.0"
 exports:
   - name: nf_pnoise
-    testbench: Mixer_CS_CG_NF
+    testbench: cg_nf
     expression: 'getData("NF" ?result "pnoise")'
     output_format: csv
     nil_policy: fail
