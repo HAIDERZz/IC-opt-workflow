@@ -69,6 +69,27 @@ There is no separate fix-run command-line switch. The mode comes from
 - Updated release checklist, publishing guide, toolchain reference,
   troubleshooting, terminology, handoff, and production quickstart docs.
 
+## Release Hardening
+
+- Corrected the documented doctor report path to
+  `reports/ic_opt_doctor_report.json`.
+- Removed the stale `--execution-agent` product CLI option and kept the
+  operator/agent terminology in docs aligned with the CLI.
+- Synchronized the public example requirements with the packaged template
+  requirements.
+- Added packaged template resource files that are required by clean GitHub
+  checkouts and installed packages.
+- Updated doctor readiness output for optimize and fix-run parallelism
+  semantics.
+- Replaced the fake OpenBox evaluator's circuit-specific metric assumptions
+  with a metric-generic evaluator driven by the declared metrics config.
+- Added generic project fixture coverage so tests can prove arbitrary metric
+  names without turning the release Mixer template into a product-wide
+  assumption.
+
+The remaining broad test-fixture migration away from the packaged release
+template is tracked as a post-v0.1.8 follow-up in the release checklist.
+
 ## Carried Forward Capabilities
 
 - Requirement-driven first-run settings.
