@@ -3,11 +3,12 @@ from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
 from typer.testing import CliRunner
 
 from hermes_workflow.cli import app
 from hermes_workflow.optimizer_flow import OptimizerFlowServices, optimize_project
-from hermes_workflow.package import create_project_from_template
+from tests.project_factory import create_generic_project
 
 runner = CliRunner()
 
@@ -122,6 +123,37 @@ def _services(project_dir: Path, calls: list[str]) -> OptimizerFlowServices:
     )
 
 
+@pytest.mark.parametrize("max_evals", [0, -1])
+def test_optimize_project_rejects_non_positive_max_evals_before_doctor(
+    tmp_path: Path,
+    max_evals: int,
+) -> None:
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    cadence_cshrc = tmp_path / "cadence_env.csh"
+    cadence_cshrc.write_text("# test\n", encoding="utf-8")
+    calls: list[str] = []
+
+    with pytest.raises(ValueError, match="max_evals must be >= 1"):
+        optimize_project(
+            project_dir,
+            real=True,
+            max_evals=max_evals,
+            cadence_cshrc=cadence_cshrc,
+            services=_services(project_dir, calls),
+        )
+
+    assert calls == []
+    payload = json.loads(
+        (project_dir / "reports" / "optimizer_flow_run_report.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert payload["status"] == "fail"
+    assert payload["issues"] == ["max_evals must be >= 1"]
+    assert payload["steps"] == []
+
+
 def test_optimize_project_dry_orchestration_stops_before_real_optimizer(
     tmp_path: Path,
 ) -> None:
@@ -194,8 +226,7 @@ def test_optimize_project_dry_orchestration_reports_turbo_strategy_backend(
 def test_optimize_project_dry_orchestration_uses_config_turbo_strategy_backend(
     tmp_path: Path,
 ) -> None:
-    project_dir = tmp_path / "project"
-    create_project_from_template(project_dir)
+    project_dir = create_generic_project(tmp_path)
     _set_optimizer_strategy(project_dir, "turbo_trust_region")
     cadence_cshrc = tmp_path / "cadence_env.csh"
     cadence_cshrc.write_text("# cadence", encoding="utf-8")

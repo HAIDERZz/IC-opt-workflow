@@ -367,15 +367,15 @@ def _validate_options(
     *,
     real: bool,
     cadence_cshrc: Path | None,
-    max_evals: int,
+    max_evals: int | None,
     backend: str,
 ) -> None:
     if not real:
         raise ValueError("optimize requires --real; fake optimize is not supported")
     if backend not in {"openbox", "native_turbo"}:
         raise ValueError("optimize backend must be openbox or native_turbo")
-        if max_evals is not None and max_evals < 1:
-            raise ValueError("max_evals must be >= 1")
+    if max_evals is not None and max_evals < 1:
+        raise ValueError("max_evals must be >= 1")
     if cadence_cshrc is None:
         raise ValueError("--cadence-cshrc is required")
 

@@ -12,7 +12,12 @@ def write_json(path: Path, payload: dict) -> None:
     )
 
 
-def write_pass_reports(project_dir: Path) -> None:
+def write_pass_reports(
+    project_dir: Path,
+    *,
+    variable_names: tuple[str, ...] = ("FN", "WN", "FP", "WP"),
+) -> None:
+    approved_variables = {name: True for name in variable_names}
     write_json(
         project_dir / "reports" / "netlist_preparation_report.json",
         {
@@ -20,12 +25,7 @@ def write_pass_reports(project_dir: Path) -> None:
             "status": "pass",
             "exported_input_scs": "netlists/exported/input.scs",
             "template_scs": "netlists/templates/template.scs",
-            "approved_variables_template_status": {
-                "FN": True,
-                "WN": True,
-                "FP": True,
-                "WP": True,
-            },
+            "approved_variables_template_status": approved_variables,
             "analysis_statements": ["tran", "dc"],
             "forbidden_setup_changes_detected": False,
             "issues": [],
