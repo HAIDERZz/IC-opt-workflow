@@ -20,7 +20,6 @@ from hermes_workflow.metric_requests import expression_sha256
 from hermes_workflow.metric_results import check_metric_results
 from hermes_workflow.package import (
     build_execution_package,
-    create_project_from_template,
     sha256_file,
 )
 from hermes_workflow.netlists import prepare_netlist
@@ -29,13 +28,43 @@ from hermes_workflow.reports import MetricResultCheckStatus, RealRunCheckStatus
 from hermes_workflow.requirement_intake import prepare_from_requirement
 from hermes_workflow.result_handoff import check_real_run
 from tests.report_helpers import write_pass_reports
+from tests.helpers.project_factory import build_project
 from tests.test_requirement_intake import _copy_multi_testbench_requirement_project
 
 
-TEMPLATE_TEXT = """simulator lang=spectre
-parameters FN={{FN}} WN={{WN}} FP={{FP}} WP={{WP}}
-tran tran stop=10n
-"""
+def _template_text_for_variables(variable_names: list[str]) -> str:
+    """Build a netlist template whose placeholders match the project variables.
+
+    The adapter test must not hardcode one circuit's variable names; placeholders
+    are derived from the project's declared variables so the rendered candidate
+    deck is always consistent regardless of which template the project uses.
+    """
+    placeholders = " ".join(name + "={{" + name + "}}" for name in variable_names)
+    return (
+        "simulator lang=spectre\n"
+        f"parameters {placeholders}\n"
+        "tran tran stop=10n\n"
+    )
+
+
+# Generic adapter-test metric carrying an ocean ``result`` hint so the ocean
+# replay script exercises ``selectResult``. The adapter test suite must not
+# depend on the packaged release template's metric.
+_ADAPTER_EXPRESSION = 'value(getData("gain" ?result "tran") 1)'
+_ADAPTER_TEST_METRIC = {
+    "name": "gain",
+    "unit": "dB",
+    "maestro_formula": _ADAPTER_EXPRESSION,
+    "ocean": {
+        "expression": _ADAPTER_EXPRESSION,
+        "result": "tran",
+        "expression_source": "user_approved",
+        "source_reference": "adapter-test:gain",
+        "expected_value_type": "real_scalar",
+        "nil_policy": "fail",
+        "non_finite_policy": "fail",
+    },
+}
 
 
 def _write_json(path: Path, payload: dict) -> None:
@@ -50,8 +79,11 @@ def _load_json(path: Path) -> dict:
 
 
 def _create_ready_real_run_project(tmp_path: Path) -> Path:
-    project_dir = tmp_path / "bridge_test_inv"
-    create_project_from_template(project_dir)
+    project_dir = build_project(
+        tmp_path / "bridge_test_inv",
+        metrics=[_ADAPTER_TEST_METRIC],
+        objective={"direction": "minimize", "expression": "gain"},
+    )
     build_execution_package(project_dir, created_at_utc="2026-06-02T00:00:00Z")
     write_pass_reports(project_dir)
     instruction = decide_first_real_run(
@@ -59,11 +91,17 @@ def _create_ready_real_run_project(tmp_path: Path) -> Path:
         created_at_utc="2026-06-02T00:10:00Z",
     )
     assert instruction["decision"] == "approve_first_real_run"
-    template_path = project_dir / "netlists" / "templates" / "template.scs"
-    template_path.parent.mkdir(parents=True, exist_ok=True)
-    template_path.write_text(TEMPLATE_TEXT, encoding="utf-8")
     prepare_real_run(project_dir, created_at_utc="2026-06-02T00:20:00Z")
     return project_dir
+
+
+def _project_variable_names(project_dir: Path) -> list[str]:
+    import yaml
+
+    payload = yaml.safe_load(
+        (project_dir / "config" / "variables.yaml").read_text(encoding="utf-8")
+    )
+    return [variable["name"] for variable in payload["variables"]]
 
 
 def _create_ready_multi_testbench_project(tmp_path: Path) -> Path:

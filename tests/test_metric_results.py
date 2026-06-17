@@ -31,7 +31,7 @@ from tests.report_helpers import write_pass_reports
 
 
 TEMPLATE_TEXT = """simulator lang=spectre
-parameters FN={{FN}} WN={{WN}} FP={{FP}} WP={{WP}}
+parameters F={{F}} W={{W}} L={{L}} VB_LO={{VB_LO}}
 tran tran stop=10n
 """
 
@@ -141,7 +141,7 @@ def _default_metric_entries(project_dir: Path) -> list[dict]:
             "value": 1.25,
             "value_text": "1.25",
             "unit": request_metric["unit"],
-            "result": request_metric["result"],
+            "result": request_metric.get("result"),
             "expression": request_metric["expression"],
             "expression_sha256": request_metric["expression_sha256"],
             "expression_source": request_metric["expression_source"],
@@ -269,7 +269,7 @@ def test_check_metric_results_accepts_valid_manifest(tmp_path: Path) -> None:
     assert report.checks.artifact_paths_ok is True
     assert report.issues == []
     assert persisted["status"] == "pass"
-    assert persisted["metrics"]["rise"]["status"] == "succeeded"
+    assert persisted["metrics"]["NF_3G"]["status"] == "succeeded"
 
 
 @pytest.mark.parametrize(
@@ -305,53 +305,53 @@ def test_check_metric_results_accepts_valid_manifest(tmp_path: Path) -> None:
             lambda payload: payload["metrics"][0].update(
                 {"expression": 'value(VT("/OTHER") 1n)'}
             ),
-            "metric rise expression does not match request",
+            "metric NF_3G expression does not match request",
         ),
         (
             lambda payload: payload["metrics"][0].update({"expression_sha256": "wrong"}),
-            "metric rise expression hash does not match request",
+            "metric NF_3G expression hash does not match request",
         ),
         (
             lambda payload: payload["metrics"][0].update({"unit": "ps"}),
-            "metric rise unit does not match request",
+            "metric NF_3G unit does not match request",
         ),
         (
             lambda payload: payload["metrics"][0].update({"result": "dc"}),
-            "metric rise result selector does not match request",
+            "metric NF_3G result selector does not match request",
         ),
         (
             lambda payload: payload["metrics"][0].update(
                 {"expression_source": "agent_discovered"}
             ),
-            "metric rise expression source does not match request",
+            "metric NF_3G expression source does not match request",
         ),
         (
             lambda payload: payload["metrics"][0].update({"status": "failed"}),
-            "metric rise did not succeed",
+            "metric NF_3G did not succeed",
         ),
         (
             lambda payload: payload["metrics"][0].update(
                 {"value": math.nan, "value_text": "NaN"}
             ),
-            "metric rise value is not finite",
+            "metric NF_3G value is not finite",
         ),
         (
             lambda payload: payload["metrics"][0].update(
                 {"value": None, "value_text": "nil"}
             ),
-            "metric rise value is not finite",
+            "metric NF_3G value is not finite",
         ),
         (
             lambda payload: payload["metrics"][0].update(
                 {"value": 1.0, "value_text": ""}
             ),
-            "metric rise value_text is not a finite scalar",
+            "metric NF_3G value_text is not a finite scalar",
         ),
         (
             lambda payload: payload["metrics"][0].update(
                 {"value": 1.0, "value_text": "srrWave:0x123"}
             ),
-            "metric rise value_text looks like a waveform object",
+            "metric NF_3G value_text looks like a waveform object",
         ),
         (
             lambda payload: payload.update({"psf_dir": "../psf"}),
@@ -399,7 +399,7 @@ def test_check_metric_results_rejects_missing_metric(tmp_path: Path) -> None:
     report = check_metric_results(project_dir)
 
     assert report.status == MetricResultCheckStatus.FAIL
-    assert "requested metric is missing from metric results: rise" in report.issues
+    assert "requested metric is missing from metric results: NF_3G" in report.issues
 
 
 def test_check_metric_results_rejects_extra_metric(tmp_path: Path) -> None:
@@ -440,7 +440,7 @@ def test_check_metric_results_rejects_duplicate_metric(tmp_path: Path) -> None:
     report = check_metric_results(project_dir)
 
     assert report.status == MetricResultCheckStatus.FAIL
-    assert "duplicate metric in metric results: rise" in report.issues
+    assert "duplicate metric in metric results: NF_3G" in report.issues
 
 
 def test_check_metric_results_rejects_non_succeeded_handoff(tmp_path: Path) -> None:
@@ -626,7 +626,7 @@ def test_check_metric_results_rejects_missing_metric_request(tmp_path: Path) -> 
     ("mutator", "expected_issue"),
     [
         (
-            lambda payload: payload.update({"metrics": {"rise": {}}}),
+            lambda payload: payload.update({"metrics": {"NF_3G": {}}}),
             "metric extraction request is invalid",
         ),
         (
@@ -814,8 +814,8 @@ def test_check_metric_results_rejects_invalid_formula_hash_even_when_manifests_a
     report = check_metric_results(project_dir)
 
     assert report.status == MetricResultCheckStatus.FAIL
-    assert "metric rise request expression hash is invalid" in report.issues
-    assert "metric rise expression hash is invalid" in report.issues
+    assert "metric NF_3G request expression hash is invalid" in report.issues
+    assert "metric NF_3G expression hash is invalid" in report.issues
 
 
 def test_check_metric_results_rejects_current_prepared_input_hash_drift(
@@ -836,8 +836,8 @@ def test_check_metric_results_rejects_current_prepared_input_hash_drift(
 @pytest.mark.parametrize(
     ("value", "expected_issue"),
     [
-        ("1.25", "metric rise value is not a JSON number"),
-        (True, "metric rise value is not a JSON number"),
+        ("1.25", "metric NF_3G value is not a JSON number"),
+        (True, "metric NF_3G value is not a JSON number"),
     ],
 )
 def test_check_metric_results_rejects_non_numeric_json_metric_value(
@@ -915,7 +915,7 @@ def test_metric_extraction_request_with_empty_waveform_exports_is_valid():
         },
         "metrics": [
             {
-                "name": "rise",
+                "name": "NF_3G",
                 "unit": "s",
                 "required_signals": [],
                 "expression": 'value(VT("/net1") 1n)',
@@ -957,7 +957,7 @@ def test_metric_extraction_request_with_populated_waveform_exports_validates():
         },
         "metrics": [
             {
-                "name": "rise",
+                "name": "NF_3G",
                 "unit": "s",
                 "required_signals": [],
                 "expression": 'value(VT("/net1") 1n)',
@@ -1027,7 +1027,7 @@ def test_check_metric_results_validates_waveform_export_manifest_if_present(
         "corner_id": "",
         "model_section": "",
         "corner_variables": {},
-        "parameters": {"FN": "1e-6", "WN": "2e-6"},
+        "parameters": {"F": "24", "W": "0.8u"},
         "exports": [
             {
                 "name": "nf_pnoise",

@@ -354,10 +354,10 @@ class TestGenerateCandidates:
         candidates = generate_candidates(bundle, n_candidates=6, seed=20260528)
         assert len(candidates) == 6
         for candidate in candidates:
-            assert "FN" in candidate
-            assert "WN" in candidate
-            assert "FP" in candidate
-            assert "WP" in candidate
+            assert "F" in candidate
+            assert "W" in candidate
+            assert "L" in candidate
+            assert "VB_LO" in candidate
 
     def test_generate_candidates_sobol_reproducible(self, tmp_path: Path) -> None:
         project_dir = tmp_path / "bridge_test_inv"
@@ -397,10 +397,9 @@ class TestGenerateCandidates:
         create_project_from_template(project_dir)
         bundle = assert_valid_project(project_dir)
         candidates = generate_candidates(bundle, n_candidates=20, seed=42)
-        integer_grid = {str(v) for v in generate_integer_grid(2, 12, 1)}
+        integer_grid = {str(v) for v in generate_integer_grid(20, 30, 2)}
         for candidate in candidates:
-            assert candidate["FN"] in integer_grid
-            assert candidate["FP"] in integer_grid
+            assert candidate["F"] in integer_grid
 
     def test_deduplication_removes_duplicates(self) -> None:
         candidates = [
@@ -483,7 +482,7 @@ class TestComputeMockMetrics:
         project_dir = tmp_path / "bridge_test_inv"
         create_project_from_template(project_dir)
         bundle = assert_valid_project(project_dir)
-        params = {"FN": "4", "WN": "1.0 um", "FP": "4", "WP": "1.0 um"}
+        params = {"F": "26", "W": "1.2u", "L": "40n", "VB_LO": "300m"}
         a = compute_mock_metrics(bundle.metrics, bundle.variables, params)
         b = compute_mock_metrics(bundle.metrics, bundle.variables, params)
         assert a == b
@@ -492,8 +491,8 @@ class TestComputeMockMetrics:
         project_dir = tmp_path / "bridge_test_inv"
         create_project_from_template(project_dir)
         bundle = assert_valid_project(project_dir)
-        params_a = {"FN": "4", "WN": "1.0 um", "FP": "4", "WP": "1.0 um"}
-        params_b = {"FN": "8", "WN": "2.0 um", "FP": "8", "WP": "2.0 um"}
+        params_a = {"F": "24", "W": "1.0u", "L": "40n", "VB_LO": "300m"}
+        params_b = {"F": "30", "W": "1.8u", "L": "50n", "VB_LO": "360m"}
         a = compute_mock_metrics(bundle.metrics, bundle.variables, params_a)
         b = compute_mock_metrics(bundle.metrics, bundle.variables, params_b)
         assert a != b
@@ -502,7 +501,7 @@ class TestComputeMockMetrics:
         project_dir = tmp_path / "bridge_test_inv"
         create_project_from_template(project_dir)
         bundle = assert_valid_project(project_dir)
-        params = {"FN": "4", "WN": "1.0 um", "FP": "4", "WP": "1.0 um"}
+        params = {"F": "26", "W": "1.2u", "L": "40n", "VB_LO": "300m"}
         result = compute_mock_metrics(bundle.metrics, bundle.variables, params)
         for metric in bundle.metrics.metrics:
             assert metric.name in result
@@ -511,7 +510,7 @@ class TestComputeMockMetrics:
         project_dir = tmp_path / "bridge_test_inv"
         create_project_from_template(project_dir)
         bundle = assert_valid_project(project_dir)
-        params = {"FN": "4", "WN": "1.0 um", "FP": "4", "WP": "1.0 um"}
+        params = {"F": "26", "W": "1.2u", "L": "40n", "VB_LO": "300m"}
         result = compute_mock_metrics(bundle.metrics, bundle.variables, params)
         for name, value in result.items():
             assert value > 0, f"{name} should be positive, got {value}"
@@ -520,7 +519,7 @@ class TestComputeMockMetrics:
         project_dir = tmp_path / "bridge_test_inv"
         create_project_from_template(project_dir)
         bundle = assert_valid_project(project_dir)
-        params = {"FN": "6", "WN": "0.5 um", "FP": "6", "WP": "0.5 um"}
+        params = {"F": "26", "W": "0.8u", "L": "40n", "VB_LO": "300m"}
         result = compute_mock_metrics(bundle.metrics, bundle.variables, params)
         for name, value in result.items():
             assert isinstance(value, float)
@@ -538,9 +537,9 @@ class TestEvaluateConstraints:
         create_project_from_template(project_dir)
         bundle = assert_valid_project(project_dir)
         # Use metrics that will definitely pass the constraints
-        # rise < 80, fall < 80, DC < 400 (constraint values in metrics.yaml)
+        # NF_3G < 10 dB (constraint values in metrics.yaml)
         # Mock metrics are in range 1-100, so they should pass
-        params = {"FN": "4", "WN": "1.0 um", "FP": "4", "WP": "1.0 um"}
+        params = {"F": "26", "W": "1.2u", "L": "40n", "VB_LO": "300m"}
         metrics = compute_mock_metrics(bundle.metrics, bundle.variables, params)
         # We can't easily predict mock metric values vs thresholds,
         # so we test the infrastructure, not the pass/fail outcome.
@@ -551,7 +550,7 @@ class TestEvaluateConstraints:
         project_dir = tmp_path / "bridge_test_inv"
         create_project_from_template(project_dir)
         bundle = assert_valid_project(project_dir)
-        partial_metrics = {"rise": 50.0}
+        partial_metrics = {"gain": 50.0}
         assert evaluate_constraints(bundle.metrics, partial_metrics) is False
 
     def test_lt_constraint(self) -> None:
@@ -941,10 +940,10 @@ class TestRunMockOptimization:
         assert state.current_evaluations == 6
         assert state.max_evaluations == 6
         assert state.best_candidate_id is not None
-        assert state.project_name == "bridge_test_inv"
+        assert state.project_name == "mixer_cg_nf_opt"
 
         parsed = json.loads((project_dir / "state" / "optimizer_state.json").read_text(encoding="utf-8"))
-        assert parsed["algorithm"] == "turbo"
+        assert parsed["algorithm"] == "openbox"
         assert parsed["status"] == "completed"
 
     def test_run_mock_optimization_best_candidate_exists(self, tmp_path: Path) -> None:

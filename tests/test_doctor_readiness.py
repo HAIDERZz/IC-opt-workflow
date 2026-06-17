@@ -96,11 +96,38 @@ def test_evaluation_matrix_summary_uses_parallel_jobs() -> None:
             "Spectre Settings": {"parallel_jobs": 4},
         }
     )
+    assert summary["workflow_mode"] == "optimize"
     assert summary["candidate_parallelism"] == 4
     assert summary["testbench_count"] == 2
     assert summary["corner_count"] == 2
     assert summary["child_runs_per_candidate"] == 4
     assert summary["inside_candidate_execution"] == "serial"
+
+def test_fix_run_summary_reports_child_parallelism_inside_serial_fixed_point() -> None:
+    sections = {
+        "Workflow": {"mode": "fix_run", "starting_run_id": "real_001"},
+        "Maestro Source": {"testbenches": [{"id": "cg_nf"}]},
+        "Process Corners": {"corners": [{"id": "tt"}, {"id": "ss"}]},
+        "Spectre Settings": {"parallel_jobs": 8, "threads_per_run": 10},
+    }
+
+    summary = build_requirement_summary(sections)
+    matrix = build_evaluation_matrix_summary(sections)
+
+    assert summary["workflow_mode"] == "fix_run"
+    assert summary["child_runs_per_fixed_point"] == 2
+    assert summary["inside_fixed_point_execution"] == "parallel_child_runs"
+    assert summary["fixed_point_execution"] == "serial"
+    assert "child_runs_per_candidate" not in summary
+    assert "inside_candidate_execution" not in summary
+    assert matrix["workflow_mode"] == "fix_run"
+    assert matrix["fix_run_child_parallelism"] == 8
+    assert matrix["fixed_point_parallelism"] == 1
+    assert matrix["child_runs_per_fixed_point"] == 2
+    assert matrix["inside_fixed_point_execution"] == "parallel_child_runs"
+    assert matrix["fixed_point_execution"] == "serial"
+    assert "candidate_parallelism" not in matrix
+    assert "inside_candidate_execution" not in matrix
 
 
 def test_optimizer_summary_resolves_prf_eic_strategy() -> None:

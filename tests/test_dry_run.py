@@ -29,7 +29,7 @@ def test_run_dry_run_renders_lower_bound_candidate(tmp_path: Path) -> None:
     project_dir = _create_project_with_template(
         tmp_path,
         """simulator lang=spectre
-parameters FN={{FN}} WN={{WN}} FP={{FP}} WP={{WP}}
+parameters F={{F}} W={{W}} L={{L}} VB_LO={{VB_LO}}
 tran tran stop=10n
 """,
     )
@@ -53,10 +53,10 @@ tran tran stop=10n
     assert report.issues == []
     assert "{{" not in rendered
     assert "}}" not in rendered
-    assert "FN=2" in rendered
-    assert "WN=0.3u" in rendered
-    assert "FP=2" in rendered
-    assert "WP=0.3u" in rendered
+    assert "F=20" in rendered
+    assert "W=0.6u" in rendered
+    assert "L=30n" in rendered
+    assert "VB_LO=280m" in rendered
     assert not (project_dir / "ledger" / "experiment_ledger.jsonl").exists()
     assert not (project_dir / "state" / "optimizer_state.json").exists()
     assert not (project_dir / "state" / "best_candidate.json").exists()
@@ -78,7 +78,7 @@ def test_run_dry_run_reports_missing_approved_placeholder(tmp_path: Path) -> Non
     project_dir = _create_project_with_template(
         tmp_path,
         """simulator lang=spectre
-parameters FN={{FN}} WN={{WN}} FP={{FP}}
+parameters F={{F}} W={{W}} L={{L}}
 tran tran stop=10n
 """,
     )
@@ -86,7 +86,7 @@ tran tran stop=10n
     report = run_dry_run(project_dir)
 
     assert report.status == PassFail.FAIL
-    assert "approved variable WP placeholder is missing from template" in report.issues
+    assert "approved variable VB_LO placeholder is missing from template" in report.issues
     assert not (project_dir / "runs" / "dry_run" / "input.scs").exists()
 
 
@@ -94,7 +94,7 @@ def test_run_dry_run_reports_unexpected_placeholder(tmp_path: Path) -> None:
     project_dir = _create_project_with_template(
         tmp_path,
         """simulator lang=spectre
-parameters FN={{FN}} WN={{WN}} FP={{FP}} WP={{WP}} GAIN={{GAIN}}
+parameters F={{F}} W={{W}} L={{L}} VB_LO={{VB_LO}} GAIN={{GAIN}}
 tran tran stop=10n
 """,
     )
@@ -113,7 +113,7 @@ def test_run_dry_run_reports_unresolved_malformed_placeholder(tmp_path: Path) ->
     project_dir = _create_project_with_template(
         tmp_path,
         """simulator lang=spectre
-parameters FN={{FN}} WN={{WN}} FP={{FP}} WP={{WP}} BAD={{ GAIN }}
+parameters F={{F}} W={{W}} L={{L}} VB_LO={{VB_LO}} BAD={{ GAIN }}
 tran tran stop=10n
 """,
     )
@@ -130,7 +130,7 @@ def test_run_dry_run_removes_stale_render_on_failure(tmp_path: Path) -> None:
     project_dir = _create_project_with_template(
         tmp_path,
         """simulator lang=spectre
-parameters FN={{FN}} WN={{WN}} FP={{FP}} WP={{WP}}
+parameters F={{F}} W={{W}} L={{L}} VB_LO={{VB_LO}}
 tran tran stop=10n
 """,
     )
@@ -139,7 +139,7 @@ tran tran stop=10n
     template_path = project_dir / "netlists" / "templates" / "template.scs"
     template_path.write_text(
         """simulator lang=spectre
-parameters FN={{FN}} WN={{WN}} FP={{FP}} WP={{WP}} EXTRA={{EXTRA}}
+parameters F={{F}} W={{W}} L={{L}} VB_LO={{VB_LO}} EXTRA={{EXTRA}}
 tran tran stop=10n
 """,
         encoding="utf-8",
@@ -157,15 +157,15 @@ def test_run_dry_run_constraint_result_false_still_checks_evaluability(
     project_dir = _create_project_with_template(
         tmp_path,
         """simulator lang=spectre
-parameters FN={{FN}} WN={{WN}} FP={{FP}} WP={{WP}}
+parameters F={{F}} W={{W}} L={{L}} VB_LO={{VB_LO}}
 tran tran stop=10n
 """,
     )
     metrics_path = project_dir / "config" / "metrics.yaml"
     metrics_text = metrics_path.read_text(encoding="utf-8")
-    assert 'value: "80e-12 s"' in metrics_text
+    assert "value: 9 dB" in metrics_text
     metrics_path.write_text(
-        metrics_text.replace('value: "80e-12 s"', 'value: "0 s"', 1),
+        metrics_text.replace("value: 9 dB", "value: 0 dB", 1),
         encoding="utf-8",
     )
 
@@ -180,7 +180,7 @@ def test_run_dry_run_does_not_write_optimizer_artifacts(tmp_path: Path) -> None:
     project_dir = _create_project_with_template(
         tmp_path,
         """simulator lang=spectre
-parameters FN={{FN}} WN={{WN}} FP={{FP}} WP={{WP}}
+parameters F={{F}} W={{W}} L={{L}} VB_LO={{VB_LO}}
 tran tran stop=10n
 """,
     )
@@ -201,7 +201,7 @@ def test_run_dry_run_reports_render_write_failure(tmp_path: Path) -> None:
     project_dir = _create_project_with_template(
         tmp_path,
         """simulator lang=spectre
-parameters FN={{FN}} WN={{WN}} FP={{FP}} WP={{WP}}
+parameters F={{F}} W={{W}} L={{L}} VB_LO={{VB_LO}}
 tran tran stop=10n
 """,
     )

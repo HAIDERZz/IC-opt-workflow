@@ -22,6 +22,7 @@ from tests.report_helpers import write_pass_reports
 from tests.real_run_smoke_helpers import (
     create_approved_real_project,
 )
+from tests.helpers.project_factory import write_template_for_project
 from tests.test_requirement_intake import _copy_multi_testbench_requirement_project
 
 
@@ -112,14 +113,7 @@ def _create_ready_multi_corner_single_testbench_project(
         objective_policy=objective_policy,
         constraint_policy=constraint_policy,
     )
-    template_path = project_dir / "netlists" / "templates" / "template.scs"
-    template_path.parent.mkdir(parents=True, exist_ok=True)
-    template_path.write_text(
-        "simulator lang=spectre\n"
-        "parameters FN={{FN}} WN={{WN}} FP={{FP}} WP={{WP}}\n"
-        "tran tran stop=10n\n",
-        encoding="utf-8",
-    )
+    template_path = write_template_for_project(project_dir)
     template_text = template_path.read_text(encoding="utf-8")
     for corner_id in corner_ids:
         corner_template = (
@@ -156,6 +150,32 @@ def _prepared_testbench_child_dir(
     return child_dir
 
 
+def _ocean_scalars_from_local_request(
+    metrics_local_dir: Path,
+    *,
+    fail_index: int | None = None,
+) -> str:
+    """Build ocean_scalars.tsv from the project's metric extraction request.
+
+    The fake remote runner must not hardcode one circuit's metrics; it derives
+    the scalar rows (names, units, expression hashes) from the metric request
+    that the real-run pipeline wrote next to the metrics directory. When
+    ``fail_index`` is given, that metric row is emitted with status=fail.
+    """
+    request_path = Path(metrics_local_dir).parent / "metric_extraction_request.json"
+    request = json.loads(request_path.read_text(encoding="utf-8"))
+    lines = ["metric\tvalue\tunit\tstatus\texpression_sha256\tmessage\n"]
+    for index, metric in enumerate(request["metrics"]):
+        failed = fail_index is not None and index == fail_index
+        value = "" if failed else f"{index + 1}.0"
+        status = "fail" if failed else "pass"
+        lines.append(
+            f"{metric['name']}\t{value}\t{metric['unit']}\t{status}\t"
+            f"{metric['expression_sha256']}\t\n"
+        )
+    return "".join(lines)
+
+
 class FakeRunner:
     def __init__(self) -> None:
         self.commands: list[str] = []
@@ -174,10 +194,7 @@ class FakeRunner:
             (Path(local_path) / "spectre.out").write_text("spectre output", encoding="utf-8")
         elif remote.endswith("/metrics"):
             (Path(local_path) / "ocean_scalars.tsv").write_text(
-                "metric\tvalue\tunit\tstatus\texpression_sha256\tmessage\n"
-                "rise\t1e-12\ts\tpass\t352e7b3256d5417f58d087382bd2054efbcf696d06b58fc6d39002bb09489748\t\n"
-                "fall\t1e-12\ts\tpass\t8ba00c0d961decb9275b9636f61dbbd5659b5ed066a74b0083cd0e1d6d3d5493\t\n"
-                "DC\t1e-06\tW\tpass\tcb82f3f25ee13ea3cb45f605a763ed0806ebb7f47fd27ce4a9c4a4cd902bb7c4\t\n",
+                _ocean_scalars_from_local_request(Path(local_path)),
                 encoding="utf-8",
             )
             (Path(local_path) / "ocean.stdout").write_text("ocean stdout output", encoding="utf-8")
@@ -1192,10 +1209,7 @@ class MetricFailFakeRunner(FakeRunner):
             (Path(local_path) / "spectre.out").write_text("spectre output", encoding="utf-8")
         elif remote.endswith("/metrics"):
             (Path(local_path) / "ocean_scalars.tsv").write_text(
-                "metric\tvalue\tunit\tstatus\texpression_sha256\tmessage\n"
-                "rise\t1e-12\ts\tpass\t352e7b3256d5417f58d087382bd2054efbcf696d06b58fc6d39002bb09489748\t\n"
-                "fall\t\ts\tfail\t8ba00c0d961decb9275b9636f61dbbd5659b5ed066a74b0083cd0e1d6d3d5493\t\n"
-                "DC\t1e-06\tW\tpass\tcb82f3f25ee13ea3cb45f605a763ed0806ebb7f47fd27ce4a9c4a4cd902bb7c4\t\n",
+                _ocean_scalars_from_local_request(Path(local_path), fail_index=0),
                 encoding="utf-8",
             )
             (Path(local_path) / "ocean.stdout").write_text("ocean stdout output", encoding="utf-8")
@@ -1237,15 +1251,23 @@ def test_remote_adapter_propagates_metric_failure(tmp_path: Path) -> None:
     assert metric_manifest["status"] == "failed", (
         "metric_result_manifest must report failed when a metric row has status=fail"
     )
-    fall_metric = next(m for m in metric_manifest["metrics"] if m["name"] == "fall")
-    assert fall_metric["status"] == "failed", (
+    # The first declared metric is the one MetricFailFakeRunner marks failed;
+    # derive its name from the project's metric request rather than hardcoding.
+    request = json.loads(
+        (run_dir / "metric_extraction_request.json").read_text(encoding="utf-8")
+    )
+    failed_metric_name = request["metrics"][0]["name"]
+    failed_metric = next(
+        m for m in metric_manifest["metrics"] if m["name"] == failed_metric_name
+    )
+    assert failed_metric["status"] == "failed", (
         "individual metric with status=fail in TSV must be marked failed in manifest"
     )
 
     assert result.status == "failed", (
         "adapter result must be failed when a metric row has status=fail"
     )
-    assert any("fall" in issue for issue in result.issues), (
+    assert any(failed_metric_name in issue for issue in result.issues), (
         "adapter issues must mention the failing metric name"
     )
 

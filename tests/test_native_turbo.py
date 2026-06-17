@@ -147,7 +147,7 @@ def _create_ready_multi_corner_single_testbench_project(
     template_path.parent.mkdir(parents=True, exist_ok=True)
     template_path.write_text(
         "simulator lang=spectre\n"
-        "parameters FN={{FN}} WN={{WN}} FP={{FP}} WP={{WP}}\n"
+        "parameters F={{F}} W={{W}} L={{L}} VB_LO={{VB_LO}}\n"
         "tran tran stop=10n\n",
         encoding="utf-8",
     )
@@ -340,10 +340,10 @@ def test_load_native_turbo_contract_reads_existing_project(tmp_path: Path) -> No
     contract = load_native_turbo_contract(project_dir)
 
     assert [variable.name for variable in contract.variables.variables] == [
-        "FN",
-        "WN",
-        "FP",
-        "WP",
+        "F",
+        "W",
+        "L",
+        "VB_LO",
     ]
     assert contract.optimizer.optimizer.failure_penalty > 0
     assert contract.metrics.objective.expression
@@ -628,9 +628,9 @@ def test_run_native_turbo_optimization_writes_compact_trace_files(tmp_path: Path
     create_project_from_template(project_dir)
 
     def evaluator(parameters: dict[str, str]) -> NativeTurboObservation:
-        assert set(parameters) == {"FN", "WN", "FP", "WP"}
+        assert set(parameters) == {"F", "W", "L", "VB_LO"}
         return NativeTurboObservation(
-            metrics={"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-6},
+            metrics={"NF_3G": 6.0},
         )
 
     result = run_native_turbo_optimization(
@@ -666,7 +666,7 @@ def test_run_batch_native_turbo_optimization_uses_optimizer_batch_size(
     def batch_evaluator(candidates) -> list[NativeTurboObservation]:
         return [
             NativeTurboObservation(
-                metrics={"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-6},
+                metrics={"NF_3G": 6.0},
             )
             for _candidate in candidates
         ]
@@ -699,7 +699,7 @@ def test_run_batch_native_turbo_optimization_accepts_adapter_argument(
     def batch_evaluator(candidates) -> list[NativeTurboObservation]:
         return [
             NativeTurboObservation(
-                metrics={"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-6},
+                metrics={"NF_3G": 6.0},
             )
             for _candidate in candidates
         ]
@@ -721,12 +721,12 @@ def test_run_batch_native_turbo_optimization_accepts_adapter_argument(
         )
     )
     assert report["runtime_thread_limits"]["env_vars"] == {
-        "MKL_NUM_THREADS": "4",
-        "NUMBA_NUM_THREADS": "4",
-        "NUMEXPR_NUM_THREADS": "4",
-        "OMP_NUM_THREADS": "4",
-        "OPENBLAS_NUM_THREADS": "4",
-        "VECLIB_MAXIMUM_THREADS": "4",
+        "MKL_NUM_THREADS": "32",
+        "NUMBA_NUM_THREADS": "32",
+        "NUMEXPR_NUM_THREADS": "32",
+        "OMP_NUM_THREADS": "32",
+        "OPENBLAS_NUM_THREADS": "32",
+        "VECLIB_MAXIMUM_THREADS": "32",
     }
 
 
@@ -741,8 +741,8 @@ def test_run_batch_native_turbo_optimization_applies_optimizer_cpu_thread_limit(
     optimizer_path = project_dir / "config" / "optimizer.yaml"
     optimizer_path.write_text(
         optimizer_path.read_text(encoding="utf-8").replace(
-            "deduplicate_candidates: true",
-            "deduplicate_candidates: true\n  optimizer_cpu_threads: 3",
+            "optimizer_cpu_threads: 32",
+            "optimizer_cpu_threads: 3",
         ),
         encoding="utf-8",
     )
@@ -758,7 +758,7 @@ def test_run_batch_native_turbo_optimization_applies_optimizer_cpu_thread_limit(
     def batch_evaluator(candidates) -> list[NativeTurboObservation]:
         return [
             NativeTurboObservation(
-                metrics={"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-6},
+                metrics={"NF_3G": 6.0},
             )
             for _candidate in candidates
         ]
@@ -828,7 +828,7 @@ def test_prepare_explicit_candidate_real_run_allows_first_optimizer_candidate(
         project_dir,
         candidate_id="candidate_000001",
         source="native_turbo_optimizer",
-        parameters={"FN": "4", "WN": "0.5u", "FP": "4", "WP": "1.1u"},
+        parameters={"F": "24", "W": "0.8u", "L": "40n", "VB_LO": "320m"},
         run_id="real_001",
         created_at_utc="2026-06-04T00:00:00Z",
     )
@@ -853,20 +853,20 @@ def test_real_candidate_evaluator_runs_fake_adapter_checks_and_records(
         write_fake_metric_result_manifest(
             project,
             run_id=run_id,
-            values={"rise": 1.0, "fall": 1.0, "DC": 1.0},
+            values={"NF_3G": 6.0},
         )
 
     observation = evaluate_real_candidate(
         project_dir,
         candidate_id="candidate_000001",
-        parameters={"FN": "4", "WN": "0.5u", "FP": "4", "WP": "1.1u"},
+        parameters={"F": "24", "W": "0.8u", "L": "40n", "VB_LO": "320m"},
         run_id="real_001",
         cadence_cshrc=Path("/tmp/fake.csh"),
         adapter=adapter,
     )
 
     assert observation.status == "recorded"
-    assert observation.metrics == {"rise": 1.0, "fall": 1.0, "DC": 1.0}
+    assert observation.metrics == {"NF_3G": 6.0}
     assert observation.result_manifest == "runs/real/real_001/result_manifest.json"
     assert (project_dir / "ledger" / "experiment_ledger.jsonl").exists()
 
@@ -893,7 +893,7 @@ def test_real_batch_evaluator_caps_parallel_adapter_calls(tmp_path: Path) -> Non
         write_fake_metric_result_manifest(
             project,
             run_id=run_id,
-            values={"rise": 1.0, "fall": 1.0, "DC": 1.0},
+            values={"NF_3G": 6.0},
         )
         with lock:
             active -= 1
@@ -907,12 +907,12 @@ def test_real_batch_evaluator_caps_parallel_adapter_calls(tmp_path: Path) -> Non
             batch_slot=index,
             batch_size=4,
             selection_phase="initialization",
-            raw_x=[4.0, 0.5, 4.0, 1.1],
+            raw_x=[float(18 + 2 * index), 0.8, 40.0, 0.32],
             parameters={
-                "FN": str(3 + index),
-                "WN": "0.5u",
-                "FP": "4",
-                "WP": "1.1u",
+                "F": str(18 + 2 * index),
+                "W": "0.8u",
+                "L": "40n",
+                "VB_LO": "320m",
             },
             replacement_issues=[],
         )
@@ -1294,14 +1294,14 @@ def test_real_candidate_evaluator_classifies_written_metric_failure(
             project,
             run_id=run_id,
             metric_status="failed",
-            values={"rise": 1.0, "fall": 1.0, "DC": 1.0},
+            values={"NF_3G": 6.0},
         )
         raise RuntimeError("adapter returned failed status")
 
     observation = evaluate_real_candidate(
         project_dir,
         candidate_id="candidate_000001",
-        parameters={"FN": "4", "WN": "0.5u", "FP": "4", "WP": "1.1u"},
+        parameters={"F": "24", "W": "0.8u", "L": "40n", "VB_LO": "320m"},
         run_id="real_001",
         adapter=adapter,
     )
@@ -1309,7 +1309,7 @@ def test_real_candidate_evaluator_classifies_written_metric_failure(
     assert observation.status == "metric_check_failed"
     assert observation.metrics is None
     assert observation.issues is not None
-    assert "metric rise did not succeed" in observation.issues
+    assert "metric NF_3G did not succeed" in observation.issues
     assert "adapter returned failed status" not in observation.issues
     assert (
         load_json(project_dir / "runs" / "real" / "real_001" / "recovery_decision.json")[
@@ -1336,13 +1336,13 @@ def test_real_candidate_evaluator_classifies_failed_result_manifest_as_real_fail
         write_fake_metric_result_manifest(
             project,
             run_id=run_id,
-            values={"rise": 1.0, "fall": 1.0, "DC": 1.0},
+            values={"NF_3G": 6.0},
         )
 
     observation = evaluate_real_candidate(
         project_dir,
         candidate_id="candidate_000001",
-        parameters={"FN": "4", "WN": "0.5u", "FP": "4", "WP": "1.1u"},
+        parameters={"F": "24", "W": "0.8u", "L": "40n", "VB_LO": "320m"},
         run_id="real_001",
         adapter=adapter,
     )
@@ -1691,7 +1691,7 @@ def _create_approved_real_project_with_keep_flags(
     template_path.parent.mkdir(parents=True, exist_ok=True)
     template_path.write_text(
         "simulator lang=spectre\n"
-        "parameters FN={{FN}} WN={{WN}} FP={{FP}} WP={{WP}}\n"
+        "parameters F={{F}} W={{W}} L={{L}} VB_LO={{VB_LO}}\n"
         "tran tran stop=10n\n",
         encoding="utf-8",
     )
@@ -1714,13 +1714,13 @@ def test_native_turbo_evaluate_real_candidate_deletes_run_dir_when_keep_successf
         write_fake_metric_result_manifest(
             project,
             run_id=run_id,
-            values={"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-6},
+            values={"NF_3G": 6.0},
         )
 
     observation = evaluate_real_candidate(
         project_dir,
         candidate_id="candidate_000001",
-        parameters={"FN": "4", "WN": "0.5u", "FP": "4", "WP": "1.1u"},
+        parameters={"F": "24", "W": "0.8u", "L": "40n", "VB_LO": "320m"},
         run_id="real_001",
         adapter=adapter,
     )
@@ -1753,13 +1753,13 @@ def test_native_turbo_evaluate_real_candidate_keeps_run_dir_when_keep_successful
         write_fake_metric_result_manifest(
             project,
             run_id=run_id,
-            values={"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-6},
+            values={"NF_3G": 6.0},
         )
 
     observation = evaluate_real_candidate(
         project_dir,
         candidate_id="candidate_000001",
-        parameters={"FN": "4", "WN": "0.5u", "FP": "4", "WP": "1.1u"},
+        parameters={"F": "24", "W": "0.8u", "L": "40n", "VB_LO": "320m"},
         run_id="real_001",
         adapter=adapter,
     )
@@ -1785,20 +1785,20 @@ def test_native_turbo_evaluate_real_candidate_classifies_constraint_fail_as_succ
 
     shutil.rmtree(project_dir / "runs")
 
-    # Values violate the rise<80e-12 constraint but are valid finite scalars,
+    # Values violate the NF_3G<9 dB constraint but are valid finite scalars,
     # so record_real_result will still record (simulation_status=real_constraint_fail).
     def adapter(project: Path, *, run_id: str, cadence_cshrc: Path | None) -> None:
         write_fake_result_manifest(project, run_id=run_id)
         write_fake_metric_result_manifest(
             project,
             run_id=run_id,
-            values={"rise": 200.0e-12, "fall": 1.0e-12, "DC": 1.0e-6},
+            values={"NF_3G": 12.0},
         )
 
     observation = evaluate_real_candidate(
         project_dir,
         candidate_id="candidate_000001",
-        parameters={"FN": "4", "WN": "0.5u", "FP": "4", "WP": "1.1u"},
+        parameters={"F": "24", "W": "0.8u", "L": "40n", "VB_LO": "320m"},
         run_id="real_001",
         adapter=adapter,
     )
@@ -1831,7 +1831,7 @@ def test_native_turbo_evaluate_real_candidate_deletes_run_dir_when_keep_failed_r
         write_fake_metric_result_manifest(
             project,
             run_id=run_id,
-            values={"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-6},
+            values={"NF_3G": 6.0},
         )
 
     # Force record_real_result to report a non-pass status.
@@ -1860,7 +1860,7 @@ def test_native_turbo_evaluate_real_candidate_deletes_run_dir_when_keep_failed_r
     observation = evaluate_real_candidate(
         project_dir,
         candidate_id="candidate_000001",
-        parameters={"FN": "4", "WN": "0.5u", "FP": "4", "WP": "1.1u"},
+        parameters={"F": "24", "W": "0.8u", "L": "40n", "VB_LO": "320m"},
         run_id="real_001",
         adapter=adapter,
     )
@@ -1957,7 +1957,8 @@ def _write_seven_ledger_rows(project_dir: Path) -> None:
 def _set_optimizer_max_evaluations_for_native(project_dir: Path, value: int) -> None:
     optimizer_path = project_dir / "config" / "optimizer.yaml"
     text = optimizer_path.read_text(encoding="utf-8")
-    text = text.replace("max_evaluations: 100", f"max_evaluations: {value}")
+    assert "max_evaluations: 30" in text
+    text = text.replace("max_evaluations: 30", f"max_evaluations: {value}")
     optimizer_path.write_text(text, encoding="utf-8")
 
 
@@ -2171,18 +2172,10 @@ def test_native_turbo_report_contains_optimizer_cpu_threads(tmp_path: Path) -> N
     """native_turbo_optimizer_report.json must record optimizer_cpu_threads."""
     project_dir = tmp_path / "bridge_test_inv"
     create_project_from_template(project_dir)
-    optimizer_path = project_dir / "config" / "optimizer.yaml"
-    optimizer_path.write_text(
-        optimizer_path.read_text(encoding="utf-8").replace(
-            "deduplicate_candidates: true",
-            "deduplicate_candidates: true\n  optimizer_cpu_threads: 32",
-        ),
-        encoding="utf-8",
-    )
 
     def evaluator(parameters: dict[str, str]) -> NativeTurboObservation:
         return NativeTurboObservation(
-            metrics={"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-6},
+            metrics={"NF_3G": 6.0},
         )
 
     run_native_turbo_optimization(
@@ -2208,18 +2201,10 @@ def test_native_turbo_report_contains_runtime_thread_limits(tmp_path: Path) -> N
     with env vars and threadpoolctl state."""
     project_dir = tmp_path / "bridge_test_inv"
     create_project_from_template(project_dir)
-    optimizer_path = project_dir / "config" / "optimizer.yaml"
-    optimizer_path.write_text(
-        optimizer_path.read_text(encoding="utf-8").replace(
-            "deduplicate_candidates: true",
-            "deduplicate_candidates: true\n  optimizer_cpu_threads: 32",
-        ),
-        encoding="utf-8",
-    )
 
     def evaluator(parameters: dict[str, str]) -> NativeTurboObservation:
         return NativeTurboObservation(
-            metrics={"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-6},
+            metrics={"NF_3G": 6.0},
         )
 
     run_native_turbo_optimization(
@@ -2261,18 +2246,10 @@ def test_native_turbo_effectiveness_audit_contains_runtime_thread_limits(
     for native TuRBO runs."""
     project_dir = tmp_path / "bridge_test_inv"
     create_project_from_template(project_dir)
-    optimizer_path = project_dir / "config" / "optimizer.yaml"
-    optimizer_path.write_text(
-        optimizer_path.read_text(encoding="utf-8").replace(
-            "deduplicate_candidates: true",
-            "deduplicate_candidates: true\n  optimizer_cpu_threads: 32",
-        ),
-        encoding="utf-8",
-    )
 
     def evaluator(parameters: dict[str, str]) -> NativeTurboObservation:
         return NativeTurboObservation(
-            metrics={"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-6},
+            metrics={"NF_3G": 6.0},
         )
 
     run_native_turbo_optimization(

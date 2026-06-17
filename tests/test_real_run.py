@@ -23,7 +23,7 @@ from tests.test_spectre_ocean_adapter import _create_ready_corner_project
 
 
 TEMPLATE_TEXT = """simulator lang=spectre
-parameters FN={{FN}} WN={{WN}} FP={{FP}} WP={{WP}}
+parameters F={{F}} W={{W}} L={{L}} VB_LO={{VB_LO}}
 tran tran stop=10n
 """
 
@@ -180,7 +180,7 @@ def test_prepare_real_run_rejects_config_drift_after_approval(
     variables_path = project_dir / "config" / "variables.yaml"
     variables_path.write_text(
         variables_path.read_text(encoding="utf-8").replace(
-            'upper: "12"', 'upper: "14"', 1
+            'upper: "30"', 'upper: "32"', 1
         ),
         encoding="utf-8",
     )
@@ -283,24 +283,24 @@ def test_prepare_real_run_writes_first_real_run_package(tmp_path: Path) -> None:
     assert package.manifest_path == run_dir / "real_run_manifest.json"
     assert "{{" not in rendered
     assert "}}" not in rendered
-    assert "FN=2" in rendered
-    assert "WN=0.3u" in rendered
-    assert "FP=2" in rendered
-    assert "WP=0.3u" in rendered
+    assert "F=20" in rendered
+    assert "W=0.6u" in rendered
+    assert "L=30n" in rendered
+    assert "VB_LO=280m" in rendered
     assert candidate == {
         "schema_version": "1.0",
         "candidate_id": "real_001",
         "source": "lower_bound_first_real_run",
         "parameters": {
-            "FN": "2",
-            "WN": "0.3u",
-            "FP": "2",
-            "WP": "0.3u",
+            "F": "20",
+            "W": "0.6u",
+            "L": "30n",
+            "VB_LO": "280m",
         },
     }
     assert manifest["schema_version"] == "1.0"
     assert manifest["run_id"] == "real_001"
-    assert manifest["project_name"] == "bridge_test_inv"
+    assert manifest["project_name"] == "mixer_cg_nf_opt"
     assert manifest["created_at_utc"] == "2026-05-31T00:20:00Z"
     assert manifest["status"] == "prepared"
     assert manifest["supervisor_decision"] == "approve_first_real_run"
@@ -319,7 +319,7 @@ def test_prepare_real_run_writes_first_real_run_package(tmp_path: Path) -> None:
         "preset": "ax",
         "output_format": "psfxl",
         "threads_per_run": 10,
-        "timeout_s": 3600,
+            "timeout_s": 7200,
     }
     assert "modify_maestro_setup" in manifest["forbidden_actions"]
     assert not (project_dir / "ledger" / "experiment_ledger.jsonl").exists()
@@ -341,7 +341,7 @@ def test_prepare_real_run_omits_parallel_jobs_from_spectre_runtime_contract(
 
     assert "parallel_jobs" not in manifest["spectre"]
     assert manifest["spectre"]["threads_per_run"] == 10
-    assert manifest["spectre"]["timeout_s"] == 3600
+    assert manifest["spectre"]["timeout_s"] == 7200
 
     spectre_yaml = yaml.safe_load(
         (project_dir / "config" / "spectre.yaml").read_text(encoding="utf-8")
@@ -356,7 +356,7 @@ def test_prepare_real_run_copies_exported_netlist_sidecars(tmp_path: Path) -> No
     _write_template(project_dir)
     exported_dir = project_dir / "netlists" / "exported"
     (exported_dir / "input.scs").write_text(
-        'include "ade_e.scs"\nparameters FN=2\n',
+        'include "ade_e.scs"\nparameters F=20\n',
         encoding="utf-8",
     )
     (exported_dir / "ade_e.scs").write_text(
@@ -384,7 +384,7 @@ def test_prepare_real_run_copies_exported_netlist_sidecars(tmp_path: Path) -> No
     assert (netlist_dir / ".modelFiles").read_text(encoding="utf-8") == (
         "model file sidecar\n"
     )
-    assert "FN=2" in (netlist_dir / "input.scs").read_text(encoding="utf-8")
+    assert "F=20" in (netlist_dir / "input.scs").read_text(encoding="utf-8")
 
 
 def test_prepare_real_run_rejects_exported_netlist_sidecar_symlink(
@@ -394,7 +394,7 @@ def test_prepare_real_run_rejects_exported_netlist_sidecar_symlink(
     _approve_project(project_dir)
     _write_template(project_dir)
     exported_dir = project_dir / "netlists" / "exported"
-    (exported_dir / "input.scs").write_text("parameters FN=2\n", encoding="utf-8")
+    (exported_dir / "input.scs").write_text("parameters F=20\n", encoding="utf-8")
     target = tmp_path / "protected.scs"
     target.write_text("external sidecar\n", encoding="utf-8")
     (exported_dir / "ade_e.scs").symlink_to(target)
@@ -437,7 +437,7 @@ def test_prepare_real_run_writes_metric_extraction_request(tmp_path: Path) -> No
         "preset": "ax",
         "output_format": "psfxl",
         "threads_per_run": 10,
-        "timeout_s": 3600,
+            "timeout_s": 7200,
     }
     assert request["ocean"] == {
         "mode": "nograph_replay",
@@ -445,22 +445,18 @@ def test_prepare_real_run_writes_metric_extraction_request(tmp_path: Path) -> No
         "log_file": "runs/real/real_001/metrics/ocean.log",
         "scalar_output_file": "runs/real/real_001/metrics/ocean_scalars.tsv",
     }
-    assert request["metrics"][0]["name"] == "rise"
+    assert request["metrics"][0]["name"] == "NF_3G"
     assert request["metrics"][0]["expression"]
     assert request["metrics"][0]["expression_sha256"] == expression_sha256(
         request["metrics"][0]["expression"]
     )
     request_metrics = {metric["name"]: metric for metric in request["metrics"]}
-    assert set(request_metrics) == {"rise", "fall", "DC"}
-    assert request_metrics["rise"]["expression"] == (
-        'riseTime(VT("/VOUT") 0 nil 0.9 nil 10 90 nil "time")'
+    assert set(request_metrics) == {"NF_3G"}
+    assert request_metrics["NF_3G"]["expression"] == (
+        'value(getData("NF" ?result "pnoise") 3e+09)'
     )
-    assert request_metrics["fall"]["expression"] == (
-        'fallTime(VT("/VOUT") 0.9 nil 0 nil 10 90 nil "time")'
-    )
-    assert request_metrics["DC"]["expression"] == 'VDC("/VDD") * IDC("/M0/S")'
-    assert request_metrics["DC"]["unit"] == "W"
-    assert request_metrics["DC"]["required_signals"] == ["/VDD", "/M0/S"]
+    assert request_metrics["NF_3G"]["unit"] == "dB"
+    assert request_metrics["NF_3G"]["required_signals"] == []
     assert "rewrite_metric_formula" in request["forbidden_actions"]
     assert (
         manifest["metric_extraction_request"]
@@ -484,7 +480,7 @@ def test_metric_request_omits_parallel_jobs_from_spectre_runtime_contract(
     assert "parallel_jobs" not in request["spectre"]
     assert request["spectre"]["output_format"] == "psfxl"
     assert request["spectre"]["threads_per_run"] == 10
-    assert request["spectre"]["timeout_s"] == 3600
+    assert request["spectre"]["timeout_s"] == 7200
 
 
 def test_prepare_real_run_writes_multi_testbench_child_packages(tmp_path: Path) -> None:
@@ -538,27 +534,14 @@ def test_prepare_real_run_writes_multi_testbench_child_packages(tmp_path: Path) 
 def test_prepare_real_run_rejects_metric_without_ocean_formula(tmp_path: Path) -> None:
     project_dir = _create_project(tmp_path)
     metrics_path = project_dir / "config" / "metrics.yaml"
-    metrics_text = metrics_path.read_text(encoding="utf-8")
-    assert "source_reference: template:spectre_maestro_project:rise" in metrics_text
-    metrics_path.write_text(
-        metrics_text.replace(
-            "    ocean:\n"
-            "      expression: riseTime(VT(\"/VOUT\") 0 nil 0.9 nil 10 90 nil \"time\")\n"
-            "      result: tran\n"
-            "      expression_source: user_approved\n"
-            "      source_reference: template:spectre_maestro_project:rise\n"
-            "      expected_value_type: real_scalar\n"
-            "      nil_policy: fail\n"
-            "      non_finite_policy: fail\n",
-            "",
-            1,
-        ),
-        encoding="utf-8",
-    )
+    payload = yaml.safe_load(metrics_path.read_text(encoding="utf-8"))
+    assert payload["metrics"][0]["name"] == "NF_3G"
+    payload["metrics"][0].pop("ocean")
+    metrics_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
     _approve_project(project_dir)
     _write_template(project_dir)
 
-    with pytest.raises(ValueError, match="metric rise is missing ocean formula"):
+    with pytest.raises(ValueError, match="metric NF_3G is missing ocean formula"):
         prepare_real_run(project_dir)
 
     assert not (project_dir / "runs" / "real" / "real_001").exists()
@@ -616,10 +599,10 @@ def test_prepare_real_run_rejects_placeholder_candidate_values(
             "candidate_id": run_id,
             "source": "lower_bound_first_real_run",
             "parameters": {
-                "FN": "{{WN}}",
-                "WN": "0.3u",
-                "FP": "2",
-                "WP": "0.3u",
+                "F": "{{W}}",
+                "W": "0.6u",
+                "L": "30n",
+                "VB_LO": "280m",
             },
         }
 
@@ -627,7 +610,7 @@ def test_prepare_real_run_rejects_placeholder_candidate_values(
 
     with pytest.raises(
         ValueError,
-        match="candidate parameter values must not contain placeholders: FN",
+        match="candidate parameter values must not contain placeholders: F",
     ):
         prepare_real_run(project_dir, created_at_utc="2026-05-31T00:20:00Z")
 
@@ -666,7 +649,7 @@ def test_prepare_real_run_rejects_unexpected_template_variable(
     _write_template(
         project_dir,
         """simulator lang=spectre
-parameters FN={{FN}} WN={{WN}} FP={{FP}} WP={{WP}} EXTRA={{EXTRA}}
+parameters F={{F}} W={{W}} L={{L}} VB_LO={{VB_LO}} EXTRA={{EXTRA}}
 tran tran stop=10n
 """,
     )

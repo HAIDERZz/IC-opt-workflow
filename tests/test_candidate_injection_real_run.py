@@ -47,7 +47,7 @@ def _candidate_request(
             "candidate_id": candidate_id,
             "source": source,
             "parameters": parameters
-            or {"FN": "12", "WN": "1.3u", "FP": "2", "WP": "2.5u"},
+            or {"F": "24", "W": "0.8u", "L": "40n", "VB_LO": "320m"},
             "metadata": {"optimizer": "turbo", "evaluation_index": 9},
         },
     )
@@ -120,7 +120,7 @@ def _write_candidate_metric_result_manifest(project_dir: Path, *, run_id: str) -
     script_path = metrics_dir / "metric_probe.ocn"
     script_path.write_text("sanitized ocean script\n", encoding="utf-8")
     request_by_name = {metric["name"]: metric for metric in request["metrics"]}
-    values = {"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-6}
+    values = {"NF_3G": 6.5}
     _write_json(
         metrics_dir / "metric_result_manifest.json",
         {
@@ -147,7 +147,7 @@ def _write_candidate_metric_result_manifest(project_dir: Path, *, run_id: str) -
                     "value": value,
                     "value_text": f"{value:.12g}",
                     "unit": request_by_name[name]["unit"],
-                    "result": request_by_name[name]["result"],
+                    "result": request_by_name[name].get("result"),
                     "expression": request_by_name[name]["expression"],
                     "expression_sha256": request_by_name[name]["expression_sha256"],
                     "expression_source": request_by_name[name]["expression_source"],
@@ -184,7 +184,7 @@ def test_prepare_candidate_real_run_rejects_missing_parameter(
     _record_real_001(project_dir)
     request = _candidate_request(
         project_dir,
-        parameters={"FN": "12", "WN": "1.3u", "FP": "2"},
+        parameters={"F": "24", "W": "0.8u", "L": "40n"},
     )
 
     with pytest.raises(
@@ -202,10 +202,10 @@ def test_prepare_candidate_real_run_rejects_extra_parameter(tmp_path: Path) -> N
     request = _candidate_request(
         project_dir,
         parameters={
-            "FN": "12",
-            "WN": "1.3u",
-            "FP": "2",
-            "WP": "2.5u",
+            "F": "24",
+            "W": "0.8u",
+            "L": "40n",
+            "VB_LO": "320m",
             "EXTRA": "1",
         },
     )
@@ -231,28 +231,28 @@ def test_prepare_candidate_real_run_rejects_bad_candidate_id(
 @pytest.mark.parametrize(
     ("parameters", "message"),
     [
-        (
-            {"FN": "1.5", "WN": "1.3u", "FP": "2", "WP": "2.5u"},
-            "FN must be an integer",
-        ),
-        (
-            {"FN": "99", "WN": "1.3u", "FP": "2", "WP": "2.5u"},
-            "FN is outside approved bounds",
-        ),
-        (
-            {"FN": "12", "WN": "1.3 um", "FP": "2", "WP": "2.5u"},
-            "WN must use a Spectre-safe attached unit suffix",
-        ),
-        (
-            {"FN": "12", "WN": " 1.3u ", "FP": "2", "WP": "2.5u"},
-            "WN must use compact Spectre-safe formatting",
-        ),
-        (
-            {"FN": "12", "WN": "1.4u", "FP": "2", "WP": "2.5u"},
-            "WN is not aligned to approved step",
-        ),
-    ],
-)
+            (
+                {"F": "20.5", "W": "0.8u", "L": "40n", "VB_LO": "320m"},
+                "F must be an integer",
+            ),
+            (
+                {"F": "99", "W": "0.8u", "L": "40n", "VB_LO": "320m"},
+                "F is outside approved bounds",
+            ),
+            (
+                {"F": "24", "W": "0.8 um", "L": "40n", "VB_LO": "320m"},
+                "W must use a Spectre-safe attached unit suffix",
+            ),
+            (
+                {"F": "24", "W": " 0.8u ", "L": "40n", "VB_LO": "320m"},
+                "W must use compact Spectre-safe formatting",
+            ),
+            (
+                {"F": "24", "W": "0.7u", "L": "40n", "VB_LO": "320m"},
+                "W is not aligned to approved step",
+            ),
+        ],
+    )
 def test_prepare_candidate_real_run_rejects_invalid_values(
     tmp_path: Path,
     parameters: dict[str, str],
@@ -291,10 +291,10 @@ def test_prepare_candidate_real_run_writes_real_002_package(tmp_path: Path) -> N
     assert candidate["source"] == "explicit_candidate_request"
     assert candidate["requested_source"] == "optimizer_turbo_suggestion"
     assert candidate["parameters"] == {
-        "FN": "12",
-        "WN": "1.3u",
-        "FP": "2",
-        "WP": "2.5u",
+        "F": "24",
+        "W": "0.8u",
+        "L": "40n",
+        "VB_LO": "320m",
     }
     assert candidate["candidate_request_file"] == (
         "runs/real/real_002/candidate_request.json"
@@ -369,7 +369,7 @@ def test_prepare_candidate_real_run_rejects_duplicate_parameter_tuple_from_ledge
     _record_real_001(project_dir)
     request = _candidate_request(
         project_dir,
-        parameters={"FN": "2", "WN": "0.3u", "FP": "2", "WP": "0.3u"},
+        parameters={"F": "20", "W": "0.6u", "L": "30n", "VB_LO": "280m"},
     )
 
     with pytest.raises(ValueError, match="ledger already contains candidate parameters"):
@@ -387,7 +387,7 @@ def test_prepare_candidate_real_run_rejects_duplicate_prepared_candidate_id(
     second = _candidate_request(
         project_dir,
         candidate_id="candidate_000009",
-        parameters={"FN": "11", "WN": "1.3u", "FP": "2", "WP": "2.5u"},
+        parameters={"F": "26", "W": "1.0u", "L": "30n", "VB_LO": "360m"},
     )
 
     with pytest.raises(
@@ -429,7 +429,7 @@ def test_prepare_candidate_real_run_rejects_unresolved_distinct_prepared_run(
     second = _candidate_request(
         project_dir,
         candidate_id="candidate_000010",
-        parameters={"FN": "13", "WN": "1.3u", "FP": "2", "WP": "2.5u"},
+        parameters={"F": "28", "W": "1.0u", "L": "30n", "VB_LO": "360m"},
     )
 
     with pytest.raises(ValueError, match="unresolved real run exists"):
@@ -540,8 +540,8 @@ def test_candidate_package_accepts_fake_c7_result_and_records(
     assert [row["run_id"] for row in ledger_rows] == ["real_001", "real_002"]
     assert ledger_rows[1]["candidate_id"] == "candidate_000009"
     assert ledger_rows[1]["parameters"] == {
-        "FN": "12",
-        "WN": "1.3u",
-        "FP": "2",
-        "WP": "2.5u",
+        "F": "24",
+        "W": "0.8u",
+        "L": "40n",
+        "VB_LO": "320m",
     }

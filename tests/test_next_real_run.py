@@ -23,7 +23,7 @@ from tests.report_helpers import write_pass_reports
 
 
 TEMPLATE_TEXT = """simulator lang=spectre
-parameters FN={{FN}} WN={{WN}} FP={{FP}} WP={{WP}}
+parameters F={{F}} W={{W}} L={{L}} VB_LO={{VB_LO}}
 tran tran stop=10n
 """
 
@@ -115,7 +115,7 @@ def _write_metric_result_manifest(project_dir: Path, *, run_id: str = "real_001"
     script_path = metrics_dir / "metric_probe.ocn"
     script_path.write_text("sanitized ocean script\n", encoding="utf-8")
     request_by_name = {metric["name"]: metric for metric in request["metrics"]}
-    values = {"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-6}
+    values = {"NF_3G": 6.5}
     _write_json(
         metrics_dir / "metric_result_manifest.json",
         {
@@ -142,7 +142,7 @@ def _write_metric_result_manifest(project_dir: Path, *, run_id: str = "real_001"
                     "value": value,
                     "value_text": f"{value:.12g}",
                     "unit": request_by_name[name]["unit"],
-                    "result": request_by_name[name]["result"],
+                    "result": request_by_name[name].get("result"),
                     "expression": request_by_name[name]["expression"],
                     "expression_sha256": request_by_name[name]["expression_sha256"],
                     "expression_source": request_by_name[name]["expression_source"],
@@ -192,7 +192,7 @@ def test_prepare_next_real_run_refuses_coerced_ledger_types(
     shutil.rmtree(project_dir / "runs" / "real")
     ledger_path = project_dir / "ledger" / "experiment_ledger.jsonl"
     row = json.loads(ledger_path.read_text(encoding="utf-8"))
-    row["metrics"]["rise"] = "1.0e-12"
+    row["metrics"]["NF_3G"] = "6.5"
     row["constraints_passed"] = "true"
     row["objective"] = "2.0e-18"
     ledger_path.write_text(json.dumps(row) + "\n", encoding="utf-8")
@@ -362,10 +362,10 @@ def test_prepare_next_real_run_writes_real_002_package(tmp_path: Path) -> None:
     assert candidate["source"] == "deterministic_initialization_sequence"
     assert candidate["candidate_index"] == 1
     assert candidate["parameters"] == {
-        "FN": "11",
-        "FP": "11",
-        "WN": "0.3u",
-        "WP": "2.9u",
+        "F": "30",
+        "L": "40n",
+        "VB_LO": "280m",
+        "W": "1.2u",
     }
     assert manifest["run_id"] == "real_002"
     assert manifest["candidate_id"] == "real_002"

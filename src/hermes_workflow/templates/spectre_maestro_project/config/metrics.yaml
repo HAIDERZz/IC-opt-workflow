@@ -1,0 +1,23 @@
+schema_version: "1.0"
+
+metrics:
+  - name: NF_3G
+    unit: dB
+    maestro_formula: value(getData("NF" ?result "pnoise") 3e+09)
+    required_signals: []
+    ocean:
+      expression: value(getData("NF" ?result "pnoise") 3e+09)
+      expression_source: user_approved
+      source_reference: opt_requirement.md:NF_3G
+      expected_value_type: real_scalar
+      nil_policy: fail
+      non_finite_policy: fail
+
+constraints:
+  - metric: NF_3G
+    op: lt
+    value: 9 dB
+
+objective:
+  direction: minimize
+  expression: NF_3G

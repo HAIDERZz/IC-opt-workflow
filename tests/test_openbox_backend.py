@@ -4,6 +4,7 @@ import json
 from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
+import math
 
 import pytest
 from typer.testing import CliRunner
@@ -40,12 +41,12 @@ class FakeAdvisor:
         self.updated_observations: list[object] = []
         self._batches = [
             [
-                {"FN": 2, "WN": 0.2, "FP": 3, "WP": 0.4},
-                {"FN": 4, "WN": 1.0, "FP": 5, "WP": 1.2},
+                {"F": 22, "W": 0.8, "L": 40, "VB_LO": 300},
+                {"F": 24, "W": 1.0, "L": 30, "VB_LO": 340},
             ],
             [
-                {"FN": 6, "WN": 1.4, "FP": 7, "WP": 1.6},
-                {"FN": 8, "WN": 2.0, "FP": 9, "WP": 2.2},
+                {"F": 26, "W": 1.2, "L": 40, "VB_LO": 360},
+                {"F": 28, "W": 0.6, "L": 30, "VB_LO": 380},
             ],
         ]
 
@@ -64,6 +65,69 @@ class FakeOpenBoxVisualizer:
         self.output_dir = output_dir
         self.html_path = output_dir / "hermes_openbox_real.html"
         self.json_path = output_dir / "visualization_data_hermes_openbox_real.json"
+
+
+def _metrics_config(payload: dict):
+    from hermes_workflow.schemas import MetricsConfig
+
+    return MetricsConfig.model_validate(payload)
+
+
+def test_fake_metric_observation_is_metric_generic_and_constraint_aware() -> None:
+    """The fake evaluator must not hardcode one circuit's metrics: it must
+    emit a deterministic value for every declared metric and satisfy any
+    declared constraint by default."""
+    from hermes_workflow.openbox_backend import _fake_metric_observation
+
+    metrics_config = _metrics_config(
+        {
+            "schema_version": "1.0",
+            "metrics": [
+                {"name": "gain_db", "unit": "dB", "maestro_formula": "gain"},
+                {"name": "power_mw", "unit": "mW", "maestro_formula": "pwr"},
+                {"name": "phase_margin", "unit": "deg", "maestro_formula": "pm"},
+            ],
+            "constraints": [
+                {"metric": "gain_db", "op": "ge", "value": "10"},
+                {"metric": "power_mw", "op": "le", "value": "5"},
+            ],
+            "objective": {"direction": "maximize", "expression": "gain_db"},
+        }
+    )
+
+    observation = _fake_metric_observation({"x": "1", "y": "2"}, metrics_config)
+    metrics = observation.metrics
+
+    assert set(metrics) == {"gain_db", "power_mw", "phase_margin"}
+    assert metrics["gain_db"] >= 10.0
+    assert metrics["power_mw"] <= 5.0
+    assert all(math.isfinite(value) for value in metrics.values())
+    # Deterministic: same parameters -> identical values.
+    assert (
+        _fake_metric_observation({"x": "1", "y": "2"}, metrics_config).metrics
+        == metrics
+    )
+
+
+def test_fake_metric_observation_supports_release_template_metric() -> None:
+    """The metric-generic evaluator still serves the release template metric."""
+    from hermes_workflow.openbox_backend import _fake_metric_observation
+
+    metrics_config = _metrics_config(
+        {
+            "schema_version": "1.0",
+            "metrics": [{"name": "NF_3G", "unit": "dB", "maestro_formula": "nf"}],
+            "constraints": [{"metric": "NF_3G", "op": "lt", "value": "9 dB"}],
+            "objective": {"direction": "minimize", "expression": "NF_3G"},
+        }
+    )
+
+    metrics = _fake_metric_observation(
+        {"F": "20", "W": "0.6u"}, metrics_config
+    ).metrics
+
+    assert set(metrics) == {"NF_3G"}
+    assert metrics["NF_3G"] < 9.0
 
 
 class FakeOpenBoxHistory:
@@ -129,11 +193,11 @@ class ContinuationAdvisor:
         self.seen_prior_before_suggest = False
         self._batches = [
             [
-                {"FN": 2, "WN": 0.2, "FP": 3, "WP": 0.4},
-                {"FN": 10, "WN": 2.4, "FP": 11, "WP": 2.6},
+                {"F": 22, "W": 0.8, "L": 40, "VB_LO": 300},
+                {"F": 30, "W": 1.2, "L": 40, "VB_LO": 400},
             ],
             [
-                {"FN": 12, "WN": 2.8, "FP": 12, "WP": 2.8},
+                {"F": 28, "W": 0.6, "L": 30, "VB_LO": 380},
             ],
         ]
 
@@ -158,10 +222,10 @@ class ExhaustingContinuationAdvisor:
         self.calls += 1
         if self.calls == 1:
             return [
-                {"FN": 10, "WN": 2.4, "FP": 11, "WP": 2.6},
-                {"FN": 2, "WN": 0.2, "FP": 3, "WP": 0.4},
+                {"F": 30, "W": 1.2, "L": 40, "VB_LO": 400},
+                {"F": 22, "W": 0.8, "L": 40, "VB_LO": 300},
             ][:batch_size]
-        return [{"FN": 2, "WN": 0.2, "FP": 3, "WP": 0.4}][:batch_size]
+        return [{"F": 22, "W": 0.8, "L": 40, "VB_LO": 300}][:batch_size]
 
     def update_observations(self, observations: list[object]) -> None:
         self.updated_batches += 1
@@ -181,10 +245,10 @@ class SequentialAdvisor:
             self.index += 1
             suggestions.append(
                 {
-                    "FN": 2 + (value % 10),
-                    "WN": 0.3 + 0.2 * (value % 10),
-                    "FP": 3 + (value % 9),
-                    "WP": 0.5 + 0.2 * (value % 9),
+                    "F": 20 + 2 * (value % 6),
+                    "W": 0.6 + 0.2 * (value % 4),
+                    "L": 30 + 10 * (value % 2),
+                    "VB_LO": 280 + 20 * (value % 7),
                 }
             )
         return suggestions
@@ -224,7 +288,7 @@ def create_approved_real_project_with_optimizer_max(
     create_project_from_template(project_dir)
     optimizer_path = project_dir / "config" / "optimizer.yaml"
     optimizer_text = optimizer_path.read_text(encoding="utf-8").replace(
-        "max_evaluations: 100",
+        "max_evaluations: 30",
         f"max_evaluations: {max_evaluations}",
     )
     optimizer_path.write_text(optimizer_text, encoding="utf-8")
@@ -248,11 +312,11 @@ def test_openbox_space_uses_effective_grid_upper(tmp_path: Path) -> None:
     space = _build_openbox_space(bundle.variables, FakeSpaceModule)
     by_name = {variable.name: variable for variable in space.variables}
 
-    assert by_name["WN"].upper == 2.9
-    assert by_name["WP"].upper == 2.9
-    assert by_name["FN"].upper == 12
-    assert by_name["FP"].upper == 12
-    assert list(by_name) == ["FN", "WN", "FP", "WP"]
+    assert by_name["W"].upper == 1.2
+    assert by_name["L"].upper == 40.0
+    assert by_name["VB_LO"].upper == 400.0
+    assert by_name["F"].upper == 30
+    assert list(by_name) == ["F", "W", "L", "VB_LO"]
 
 
 def test_openbox_fake_runner_writes_backend_neutral_artifacts(
@@ -279,8 +343,8 @@ def test_openbox_fake_runner_writes_backend_neutral_artifacts(
     assert report["batch_summary"]["status_counts"]
     assert report["openbox"]["duplicate_replacements"] == 0
     assert len(rows) == 4
-    assert rows[0]["parameters"]["WN"].endswith("u")
-    assert rows[0]["parameters"]["FP"] != rows[0]["parameters"]["FN"]
+    assert rows[0]["parameters"]["W"].endswith("u")
+    assert rows[0]["parameters"]["VB_LO"].endswith("m")
     assert rows[0]["result_manifest"] is None
     assert rows[0]["metric_result_manifest"] is None
     assert rows[0]["batch_id"] == "batch_001"
@@ -296,8 +360,8 @@ def test_openbox_fake_runner_applies_optimizer_cpu_thread_limit(
     optimizer_path = project_dir / "config" / "optimizer.yaml"
     optimizer_path.write_text(
         optimizer_path.read_text(encoding="utf-8").replace(
-            "deduplicate_candidates: true",
-            "deduplicate_candidates: true\n  optimizer_cpu_threads: 3",
+            "optimizer_cpu_threads: 32",
+            "optimizer_cpu_threads: 3",
         ),
         encoding="utf-8",
     )
@@ -460,10 +524,10 @@ def test_openbox_fake_continuation_warm_starts_and_writes_cumulative_artifacts(
     assert rows[2]["run_id"] == "fake_003"
     assert rows[2]["batch_id"] == "batch_002"
     assert rows[2]["parameters"] == {
-        "FN": "10",
-        "WN": "2.3u",
-        "FP": "11",
-        "WP": "2.7u",
+        "F": "30",
+        "W": "1.2u",
+        "L": "40n",
+        "VB_LO": "400m",
     }
 
 
@@ -573,7 +637,7 @@ def test_openbox_fake_run_writes_effectiveness_audit_and_report_reference(
         0,
         0,
     ]
-    assert [batch["feasible_count"] for batch in audit["batches"]] == [1, 3]
+    assert [batch["feasible_count"] for batch in audit["batches"]] == [2, 4]
     assert [batch["replay_history_count"] for batch in audit["batches"]] == [0, 0]
 
 
@@ -624,11 +688,14 @@ def _set_optimizer_yaml_openbox_strategy(
     """
     optimizer_path = project_dir / "config" / "optimizer.yaml"
     text = optimizer_path.read_text(encoding="utf-8")
-    text = text.replace(
-        "  algorithm: turbo",
-        f"  algorithm: openbox\n  strategy: {strategy}",
-        1,
-    )
+    if "  strategy:" in text:
+        lines = [
+            f"  strategy: {strategy}" if line.startswith("  strategy:") else line
+            for line in text.splitlines()
+        ]
+        text = "\n".join(lines) + "\n"
+    else:
+        text = text.replace("  algorithm: openbox", f"  algorithm: openbox\n  strategy: {strategy}", 1)
     if nested_openbox:
         nested_lines = ["  openbox:"]
         for key, value in nested_openbox.items():
@@ -763,10 +830,10 @@ def test_openbox_fake_runner_requires_openbox_when_no_advisor_is_injected(
 
 
 def test_openbox_fake_runner_requires_all_variables(tmp_path: Path) -> None:
-    class MissingFpAdvisor:
+    class MissingLAdvisor:
         def get_suggestions(self, batch_size: int) -> list[dict[str, float]]:
             assert batch_size == 1
-            return [{"FN": 2, "WN": 0.2, "WP": 0.4}]
+            return [{"F": 20, "W": 0.6, "VB_LO": 280}]
 
         def update_observations(self, observations: list[object]) -> None:
             raise AssertionError("must fail before observation update")
@@ -776,12 +843,12 @@ def test_openbox_fake_runner_requires_all_variables(tmp_path: Path) -> None:
             create_approved_real_project(tmp_path),
             max_evals=1,
             batch_size=1,
-            advisor_factory=lambda _space, _seed: MissingFpAdvisor(),
+            advisor_factory=lambda _space, _seed: MissingLAdvisor(),
         )
     except ValueError as exc:
-        assert "missing variable FP" in str(exc)
+        assert "missing variable L" in str(exc)
     else:
-        raise AssertionError("expected missing FP to fail")
+        raise AssertionError("expected missing L to fail")
 
 
 def test_run_openbox_real_optimization_uses_existing_real_candidate_path(
@@ -858,14 +925,14 @@ def test_run_openbox_real_continuation_allows_completed_prior_state(
         max_evals=8,
         batch_size=4,
         parallel_jobs=4,
-        advisor_factory=lambda _space, _seed: SequentialAdvisor(),
+        advisor_factory=lambda _space, _seed: SequentialAdvisor(start=1),
         adapter=adapter,
     )
     state = json.loads(
         (project_dir / "state" / "optimizer_state.json").read_text(encoding="utf-8")
     )
     assert state["status"] == "completed"
-    advisor = SequentialAdvisor(start=8)
+    advisor = SequentialAdvisor(start=9)
 
     result = run_openbox_real_optimization(
         project_dir,
@@ -941,8 +1008,8 @@ def test_run_openbox_real_optimization_applies_config_strategy_preset(
     create_project_from_template(project_dir)
     optimizer_path = project_dir / "config" / "optimizer.yaml"
     optimizer_text = optimizer_path.read_text(encoding="utf-8").replace(
-        "  algorithm: turbo",
-        "  algorithm: openbox\n  strategy: openbox_gp_eic",
+        "  strategy: openbox_prf_eic",
+        "  strategy: openbox_gp_eic",
         1,
     )
     optimizer_path.write_text(optimizer_text, encoding="utf-8")
@@ -1017,13 +1084,6 @@ def test_run_openbox_fake_optimization_applies_config_strategy_preset(
     tmp_path: Path,
 ) -> None:
     project_dir = create_approved_real_project(tmp_path)
-    optimizer_path = project_dir / "config" / "optimizer.yaml"
-    optimizer_text = optimizer_path.read_text(encoding="utf-8").replace(
-        "  algorithm: turbo",
-        "  algorithm: openbox\n  strategy: openbox_prf_eic",
-        1,
-    )
-    optimizer_path.write_text(optimizer_text, encoding="utf-8")
 
     run_openbox_fake_optimization(
         project_dir,
@@ -1341,6 +1401,14 @@ def test_run_openbox_real_optimization_uses_multi_corner_aggregate_metrics(
 ) -> None:
     project_dir = _create_ready_multi_corner_multi_testbench_project(tmp_path)
 
+    class MultiTestbenchAdvisor:
+        def get_suggestions(self, batch_size: int) -> list[dict[str, float]]:
+            assert batch_size == 1
+            return [{"FN": 4, "WN": 0.5, "FP": 4, "WP": 1.1}]
+
+        def update_observations(self, observations: list[object]) -> None:
+            assert observations
+
     def adapter(project: Path, *, run_id: str, **_kwargs: object) -> object:
         assert project == project_dir
         for corner_id, gain, iip3 in (
@@ -1372,7 +1440,7 @@ def test_run_openbox_real_optimization_uses_multi_corner_aggregate_metrics(
         max_evals=1,
         batch_size=1,
         parallel_jobs=1,
-        advisor_factory=lambda _space, _seed: FakeAdvisor(),
+        advisor_factory=lambda _space, _seed: MultiTestbenchAdvisor(),
         adapter=adapter,
     )
 
@@ -1580,7 +1648,7 @@ def test_openbox_batch_evaluator_deletes_run_dir_when_keep_successful_runs_false
         write_fake_metric_result_manifest(
             project,
             run_id=run_id,
-            values={"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-6},
+            values={"NF_3G": 6.0},
         )
 
     candidate = NativeTurboBatchCandidate(
@@ -1591,8 +1659,8 @@ def test_openbox_batch_evaluator_deletes_run_dir_when_keep_successful_runs_false
         batch_slot=0,
         batch_size=1,
         selection_phase="initialization",
-        raw_x=[4.0, 0.5, 4.0, 1.1],
-        parameters={"FN": "4", "WN": "0.5u", "FP": "4", "WP": "1.1u"},
+        raw_x=[24.0, 0.8, 40.0, 320.0],
+        parameters={"F": "24", "W": "0.8u", "L": "40n", "VB_LO": "320m"},
         replacement_issues=[],
     )
 
@@ -1642,7 +1710,7 @@ def test_openbox_batch_evaluator_keeps_run_dir_when_keep_successful_runs_true(
         write_fake_metric_result_manifest(
             project,
             run_id=run_id,
-            values={"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-6},
+            values={"NF_3G": 6.0},
         )
 
     candidate = NativeTurboBatchCandidate(
@@ -1653,8 +1721,8 @@ def test_openbox_batch_evaluator_keeps_run_dir_when_keep_successful_runs_true(
         batch_slot=0,
         batch_size=1,
         selection_phase="initialization",
-        raw_x=[4.0, 0.5, 4.0, 1.1],
-        parameters={"FN": "4", "WN": "0.5u", "FP": "4", "WP": "1.1u"},
+        raw_x=[24.0, 0.8, 40.0, 320.0],
+        parameters={"F": "24", "W": "0.8u", "L": "40n", "VB_LO": "320m"},
         replacement_issues=[],
     )
 
@@ -1762,7 +1830,7 @@ def _write_seven_ledger_rows_openbox(project_dir: Path) -> None:
 def _set_optimizer_max_evals_openbox(project_dir: Path, value: int) -> None:
     optimizer_path = project_dir / "config" / "optimizer.yaml"
     text = optimizer_path.read_text(encoding="utf-8")
-    text = text.replace("max_evaluations: 100", f"max_evaluations: {value}")
+    text = text.replace("max_evaluations: 30", f"max_evaluations: {value}")
     optimizer_path.write_text(text, encoding="utf-8")
 
 
@@ -2003,14 +2071,6 @@ def test_openbox_fake_run_writes_runtime_thread_audit(tmp_path: Path) -> None:
     """OpenBox fake run must write optimizer_effectiveness_audit.json with
     runtime_thread_limits containing env vars and threadpoolctl state."""
     project_dir = create_approved_real_project(tmp_path)
-    optimizer_path = project_dir / "config" / "optimizer.yaml"
-    optimizer_path.write_text(
-        optimizer_path.read_text(encoding="utf-8").replace(
-            "deduplicate_candidates: true",
-            "deduplicate_candidates: true\n  optimizer_cpu_threads: 32",
-        ),
-        encoding="utf-8",
-    )
 
     run_openbox_fake_optimization(
         project_dir,
@@ -2051,14 +2111,6 @@ def test_openbox_fake_run_writes_runtime_thread_audit(tmp_path: Path) -> None:
 def test_openbox_report_contains_runtime_thread_limits(tmp_path: Path) -> None:
     """OpenBox optimizer_run_report.json must contain runtime_thread_limits."""
     project_dir = create_approved_real_project(tmp_path)
-    optimizer_path = project_dir / "config" / "optimizer.yaml"
-    optimizer_path.write_text(
-        optimizer_path.read_text(encoding="utf-8").replace(
-            "deduplicate_candidates: true",
-            "deduplicate_candidates: true\n  optimizer_cpu_threads: 32",
-        ),
-        encoding="utf-8",
-    )
 
     run_openbox_fake_optimization(
         project_dir,
@@ -2087,14 +2139,6 @@ def test_openbox_separate_effectiveness_audit_file_has_runtime_thread_limits(
     """A dedicated optimizer_effectiveness_audit.json file must exist and
     contain runtime_thread_limits."""
     project_dir = create_approved_real_project(tmp_path)
-    optimizer_path = project_dir / "config" / "optimizer.yaml"
-    optimizer_path.write_text(
-        optimizer_path.read_text(encoding="utf-8").replace(
-            "deduplicate_candidates: true",
-            "deduplicate_candidates: true\n  optimizer_cpu_threads: 32",
-        ),
-        encoding="utf-8",
-    )
 
     run_openbox_fake_optimization(
         project_dir,

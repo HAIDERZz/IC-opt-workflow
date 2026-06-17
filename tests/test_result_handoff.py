@@ -17,12 +17,7 @@ from hermes_workflow.reports import (
 )
 from hermes_workflow.result_handoff import check_real_run
 from tests.report_helpers import write_pass_reports
-
-
-TEMPLATE_TEXT = """simulator lang=spectre
-parameters FN={{FN}} WN={{WN}} FP={{FP}} WP={{WP}}
-tran tran stop=10n
-"""
+from tests.helpers.project_factory import write_template_for_project
 
 
 def _create_project(tmp_path: Path) -> Path:
@@ -31,9 +26,14 @@ def _create_project(tmp_path: Path) -> Path:
     return project_dir
 
 
-def _write_template(project_dir: Path, text: str = TEMPLATE_TEXT) -> None:
+def _write_template(project_dir: Path, text: str | None = None) -> None:
     template_path = project_dir / "netlists" / "templates" / "template.scs"
     template_path.parent.mkdir(parents=True, exist_ok=True)
+    if text is None:
+        # Derive placeholders from the project's declared variables so the
+        # template is consistent regardless of which project config is used.
+        write_template_for_project(project_dir)
+        return
     template_path.write_text(text, encoding="utf-8")
 
 

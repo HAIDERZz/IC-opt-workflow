@@ -1,0 +1,26 @@
+schema_version: "1.0"
+
+variables:
+  - name: F
+    kind: integer
+    lower: "20"
+    upper: "30"
+    step: "2"
+
+  - name: W
+    kind: continuous_step
+    lower: 0.6u
+    upper: 1.2u
+    step: "0.2u"
+
+  - name: L
+    kind: continuous_step
+    lower: 30n
+    upper: 40n
+    step: 10n
+
+  - name: VB_LO
+    kind: continuous_step
+    lower: 280m
+    upper: 400m
+    step: 20m

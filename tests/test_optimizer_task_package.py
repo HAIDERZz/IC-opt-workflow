@@ -71,8 +71,9 @@ def test_build_optimizer_execution_task_package_writes_task_and_manifest(
 
     assert package.task_path == task_path
     assert package.manifest_path == manifest_path
-    assert "run-native-turbo" in task_text
-    assert "--parallel" in task_text
+    assert "run-openbox-real" in task_text
+    assert "run-native-turbo" not in task_text
+    assert "--parallel" not in task_text
     assert "--max-evals" not in task_text
     assert "Command exit status alone is not acceptance evidence" in task_text
     assert "Manifest-level audit is required" in task_text
@@ -81,16 +82,17 @@ def test_build_optimizer_execution_task_package_writes_task_and_manifest(
     assert "parallel_jobs" in task_text
     assert "ledger/experiment_ledger.jsonl" in task_text
     assert manifest_payload["schema_version"] == "1.0"
-    assert manifest_payload["backend"] == "native_turbo"
+    assert manifest_payload["backend"] == "openbox"
     assert manifest_payload["created_at_utc"] == "2026-06-04T00:00:00Z"
-    assert manifest_payload["max_evals"] == 100
+    assert manifest_payload["max_evals"] == 30
     assert manifest_payload["parallel"] is True
     assert manifest_payload["cadence_cshrc"] == "/opt/ic-opt/cadence_env.csh"
     assert manifest_payload["command"] == [
         "hermes-workflow",
-        "run-native-turbo",
+        "run-openbox-real",
         str(project_dir),
-        "--parallel",
+        "--strategy",
+        "openbox_prf_eic",
         "--cadence-cshrc",
         "/opt/ic-opt/cadence_env.csh",
     ]
@@ -98,9 +100,9 @@ def test_build_optimizer_execution_task_package_writes_task_and_manifest(
     assert "parallel_jobs" not in manifest_payload["spectre_settings"]
     assert manifest_payload["scheduler"]["candidate_parallelism"] == 10
     required_artifacts = manifest_payload["required_returned_artifacts"]
-    assert "reports/native_turbo_optimizer_report.json" in required_artifacts
+    assert "reports/optimizer_run_report.json" in required_artifacts
     assert "reports/optimizer_effectiveness_audit.json" in required_artifacts
-    assert "reports/native_turbo_optimizer_evaluations.jsonl" in required_artifacts
+    assert "reports/optimizer_evaluations.jsonl" in required_artifacts
     assert "state/optimizer_state.json" in required_artifacts
     assert "ledger/experiment_ledger.jsonl" in required_artifacts
     assert "reports/optimizer_finalize_report.json" in required_artifacts
@@ -150,6 +152,8 @@ def test_build_optimizer_execution_task_package_writes_openbox_backend(
         "hermes-workflow",
         "run-openbox-real",
         str(project_dir),
+        "--strategy",
+        "openbox_prf_eic",
         "--cadence-cshrc",
         "/opt/ic-opt/cadence_env.csh",
     ]
@@ -167,10 +171,10 @@ def test_build_optimizer_execution_task_package_uses_config_turbo_strategy_backe
     project_dir = tmp_path / "bridge_test_inv"
     create_project_from_template(project_dir)
     optimizer_path = project_dir / "config" / "optimizer.yaml"
-    optimizer_text = optimizer_path.read_text(encoding="utf-8").replace(
-        "  algorithm: turbo",
-        "  algorithm: turbo\n  strategy: turbo_trust_region",
-        1,
+    optimizer_text = (
+        optimizer_path.read_text(encoding="utf-8")
+        .replace("  algorithm: openbox", "  algorithm: turbo", 1)
+        .replace("  strategy: openbox_prf_eic", "  strategy: turbo_trust_region", 1)
     )
     optimizer_path.write_text(optimizer_text, encoding="utf-8")
 
@@ -197,13 +201,6 @@ def test_build_optimizer_execution_task_package_uses_config_openbox_strategy(
 ) -> None:
     project_dir = tmp_path / "bridge_test_inv"
     create_project_from_template(project_dir)
-    optimizer_path = project_dir / "config" / "optimizer.yaml"
-    optimizer_text = optimizer_path.read_text(encoding="utf-8").replace(
-        "  algorithm: turbo",
-        "  algorithm: openbox\n  strategy: openbox_prf_eic",
-        1,
-    )
-    optimizer_path.write_text(optimizer_text, encoding="utf-8")
 
     package = build_optimizer_execution_task_package(
         project_dir,
@@ -253,7 +250,7 @@ def test_build_optimizer_execution_task_package_writes_openbox_continuation(
     assert manifest_payload["backend"] == "openbox"
     assert manifest_payload["continuation"] is True
     assert manifest_payload["additional_evals"] is None
-    assert manifest_payload["max_evals"] == 100
+    assert manifest_payload["max_evals"] == 30
     assert manifest_payload["toolchain_check_command"] == [
         "hermes-workflow",
         "check-toolchain-env",
@@ -266,6 +263,8 @@ def test_build_optimizer_execution_task_package_writes_openbox_continuation(
         "hermes-workflow",
         "continue-openbox-real",
         str(project_dir),
+        "--strategy",
+        "openbox_prf_eic",
         "--cadence-cshrc",
         "/opt/ic-opt/cadence_env.csh",
     ]

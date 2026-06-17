@@ -205,7 +205,7 @@ def _create_ready_single_testbench_corner_project(
     template_path.parent.mkdir(parents=True, exist_ok=True)
     template_path.write_text(
         "simulator lang=spectre\n"
-        "parameters FN={{FN}} WN={{WN}} FP={{FP}} WP={{WP}}\n"
+        "parameters F={{F}} W={{W}} L={{L}} VB_LO={{VB_LO}}\n"
         "tran tran stop=10n\n",
         encoding="utf-8",
     )
@@ -960,13 +960,13 @@ def test_aggregate_single_testbench_multi_corner_feasible_uses_worst_case_corner
         corner_ids=["tt", "ff", "ss"],
     )
 
-    for corner_id, gain in (("tt", 10e-12), ("ff", 4e-12), ("ss", 8e-12)):
+    for corner_id, nf in (("tt", 8.0), ("ff", 4.0), ("ss", 6.0)):
         _write_corner_child_handoff(
             project_dir,
             testbench_id=None,
             corner_id=corner_id,
-            metric_name="rise",
-            value=gain,
+            metric_name="NF_3G",
+            value=nf,
         )
 
     report = aggregate_multi_testbench_run(project_dir, run_id="real_001")
@@ -977,13 +977,11 @@ def test_aggregate_single_testbench_multi_corner_feasible_uses_worst_case_corner
     assert report.selected_corner == "tt"
     assert report.worst_corner == "tt"
     assert report.corner_objectives == pytest.approx(
-        {"tt": 3.0e-15, "ff": 2.4e-15, "ss": 2.8e-15}
+        {"tt": 8.0, "ff": 4.0, "ss": 6.0}
     )
     assert report.corner_status_counts == {"feasible": 3}
     assert {metric["name"]: metric["value"] for metric in _load_json(project_dir / "runs" / "real" / "real_001" / "metrics" / "metric_result_manifest.json")["metrics"]} == {
-        "rise": 10e-12,
-        "fall": 20e-12,
-        "DC": 1e-4,
+        "NF_3G": 8.0,
     }
 
 
@@ -999,8 +997,8 @@ def test_aggregate_single_testbench_explicit_one_corner_preserves_configured_sem
         project_dir,
         testbench_id=None,
         corner_id="ss",
-        metric_name="rise",
-        value=7e-12,
+        metric_name="NF_3G",
+        value=7.0,
     )
 
     report = aggregate_multi_testbench_run(project_dir, run_id="real_001")
@@ -1010,7 +1008,7 @@ def test_aggregate_single_testbench_explicit_one_corner_preserves_configured_sem
     assert report.objective_policy == "worst_case"
     assert report.selected_corner == "ss"
     assert report.worst_corner == "ss"
-    assert report.corner_objectives == pytest.approx({"ss": 2.7e-15})
+    assert report.corner_objectives == pytest.approx({"ss": 7.0})
     assert report.corner_status_counts == {"feasible": 1}
     assert [(child.testbench, child.corner) for child in report.child_statuses] == [
         ("default_testbench", "ss")

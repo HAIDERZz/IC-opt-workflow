@@ -1,9 +1,11 @@
 import json
+import subprocess
 from hashlib import sha256
 from importlib import resources
 from pathlib import Path
 
 import pytest
+import yaml
 
 from hermes_workflow.package import (
     CONFIG_FILE_NAMES,
@@ -11,6 +13,7 @@ from hermes_workflow.package import (
     build_execution_package,
     create_project_from_template,
 )
+from hermes_workflow.requirement_intake import parse_requirement_text, render_config_payloads
 from hermes_workflow.validate import validate_project_files
 
 
@@ -95,6 +98,77 @@ def test_project_template_is_packaged_with_hermes_workflow() -> None:
     assert template.joinpath("TASK.md").is_file()
 
 
+def test_packaged_template_resource_paths_are_not_gitignored() -> None:
+    """Template runtime resources must be eligible for release commits.
+
+    The project template intentionally contains directories named like generated
+    project artifacts (`config`, `netlists`, `reports`, and so on). Those names
+    are ignored at project roots, but the packaged template copy is source data
+    and must not be hidden by `.gitignore`.
+    """
+    repo_root = Path(__file__).resolve().parent.parent
+    if not (repo_root / ".git").exists():
+        pytest.skip("git metadata is required for release packaging checks")
+    expected_paths = [
+        "src/hermes_workflow/templates/spectre_maestro_project/config/project_config.yaml",
+        "src/hermes_workflow/templates/spectre_maestro_project/config/variables.yaml",
+        "src/hermes_workflow/templates/spectre_maestro_project/config/spectre.yaml",
+        "src/hermes_workflow/templates/spectre_maestro_project/config/metrics.yaml",
+        "src/hermes_workflow/templates/spectre_maestro_project/config/optimizer.yaml",
+        "src/hermes_workflow/templates/spectre_maestro_project/netlists/exported/.gitkeep",
+        "src/hermes_workflow/templates/spectre_maestro_project/netlists/templates/.gitkeep",
+        "src/hermes_workflow/templates/spectre_maestro_project/execution_package/.gitkeep",
+        "src/hermes_workflow/templates/spectre_maestro_project/ledger/.gitkeep",
+        "src/hermes_workflow/templates/spectre_maestro_project/reports/.gitkeep",
+        "src/hermes_workflow/templates/spectre_maestro_project/state/.gitkeep",
+    ]
+
+    result = subprocess.run(
+        ["git", "check-ignore", *expected_paths],
+        cwd=repo_root,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 1, result.stdout
+
+
+def test_packaged_template_config_matches_single_requirement_example() -> None:
+    repo_root = Path(__file__).resolve().parent.parent
+    requirement_text = (
+        repo_root / "examples" / "spectre_maestro_project" / "opt_requirement.md"
+    ).read_text(encoding="utf-8")
+    report = parse_requirement_text(
+        requirement_text,
+        constraints_text=None,
+        maestro_input_exists=lambda path: True,
+    )
+    assert report.status == "pass", report.issues
+    expected_payloads = render_config_payloads(
+        report.sections,
+        workflow_mode=report.workflow_mode,
+    )
+
+    template_config = (
+        repo_root
+        / "src"
+        / "hermes_workflow"
+        / "templates"
+        / "spectre_maestro_project"
+        / "config"
+    )
+    for file_name in [
+        "project_config.yaml",
+        "variables.yaml",
+        "spectre.yaml",
+        "metrics.yaml",
+        "optimizer.yaml",
+    ]:
+        actual = yaml.safe_load((template_config / file_name).read_text(encoding="utf-8"))
+        assert actual == expected_payloads[file_name]
+
+
 def test_build_execution_package_copies_config_and_records_hashes(tmp_path: Path) -> None:
     project_dir = tmp_path / "bridge_test_inv"
     create_project_from_template(project_dir)
@@ -109,7 +183,7 @@ def test_build_execution_package_copies_config_and_records_hashes(tmp_path: Path
 
     assert manifest.path == manifest_path
     assert manifest_payload["schema_version"] == "1.0"
-    assert manifest_payload["project_name"] == "bridge_test_inv"
+    assert manifest_payload["project_name"] == "mixer_cg_nf_opt"
     assert manifest_payload["created_at_utc"] == "2026-05-28T00:00:00Z"
     for file_name in CONFIG_FILE_NAMES:
         copied_config = project_dir / "execution_package" / "config" / file_name
@@ -154,10 +228,10 @@ def test_build_execution_package_writes_execution_task(tmp_path: Path) -> None:
     )
     assert "# Execution Agent Task" in task_text
     assert "Claude Code" not in task_text
-    assert "Project: `bridge_test_inv`" in task_text
+    assert "Project: `mixer_cg_nf_opt`" in task_text
     assert "Backend: `maestro_exported_spectre_deck`" in task_text
     assert "Spectre X preset: `ax`" in task_text
-    assert "`FN`, `WN`, `FP`, `WP`" in task_text
+    assert "`F`, `W`, `L`, `VB_LO`" in task_text
     assert (
         "Hermes may template only these variables in `netlists/templates/template.scs`"
         in task_text

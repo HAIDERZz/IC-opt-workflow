@@ -37,7 +37,7 @@ def _ten_traces_seven_recorded_three_failed() -> list[dict[str, object]]:
 def _set_optimizer_max_evaluations(project_dir: Path, max_evaluations: int) -> None:
     optimizer_path = project_dir / "config" / "optimizer.yaml"
     text = optimizer_path.read_text(encoding="utf-8")
-    text = text.replace("max_evaluations: 100", f"max_evaluations: {max_evaluations}")
+    text = text.replace("max_evaluations: 30", f"max_evaluations: {max_evaluations}")
     optimizer_path.write_text(text, encoding="utf-8")
 
 

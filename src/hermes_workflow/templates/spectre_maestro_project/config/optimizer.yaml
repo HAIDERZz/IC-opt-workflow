@@ -1,0 +1,12 @@
+schema_version: "1.0"
+
+optimizer:
+  algorithm: openbox
+  strategy: openbox_prf_eic
+  initialization: sobol
+  max_evaluations: 30
+  batch_size: 10
+  random_seed: 20260528
+  optimizer_cpu_threads: 32
+  failure_penalty: 1000000.0
+  deduplicate_candidates: true

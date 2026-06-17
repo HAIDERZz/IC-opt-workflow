@@ -34,6 +34,11 @@ Mixer requirement. For a real project, copy the relevant template to
 `<project>/opt_requirement.md`, then replace private paths and circuit-specific
 values.
 
+The same files are mirrored byte-for-byte into the packaged template directory
+under `src/hermes_workflow/templates/spectre_maestro_project/`. Treat this
+directory as the user-facing source of truth; release tests must fail if the
+packaged copies drift from these examples.
+
 ## Shared Sections
 
 Each section must appear once and contain one fenced `yaml` block.
@@ -231,8 +236,8 @@ serial. `output_format` is `psfxl`.
 ## Optimizer Settings
 
 ```yaml
-algorithm: turbo
-strategy: turbo_trust_region
+algorithm: openbox
+strategy: openbox_prf_eic
 initialization: sobol
 max_evaluations: 30
 batch_size: 10

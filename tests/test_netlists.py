@@ -34,8 +34,8 @@ def test_prepare_netlist_templates_single_line_parameter_values(tmp_path: Path) 
     project_dir = _project_with_input(
         tmp_path,
         """simulator lang=spectre
-parameters temperature=27 FN=4 FP=4 WN=0.6u WP=1.2u
-M0 (VOUT IN VSS VSS) nmos w=WN*FN l=45n
+parameters temperature=27 F=24 W=0.8u L=40n VB_LO=320m
+M0 (VOUT IN VSS VSS) nmos w=W l=L
 tran tran stop=10n
 dcOp dc oppoint=rawfile
 """,
@@ -50,17 +50,17 @@ dcOp dc oppoint=rawfile
 
     assert report.status == PassFail.PASS
     assert persisted_report == report
-    assert "FN={{FN}}" in template_text
-    assert "FP={{FP}}" in template_text
-    assert "WN={{WN}}" in template_text
-    assert "WP={{WP}}" in template_text
+    assert "F={{F}}" in template_text
+    assert "W={{W}}" in template_text
+    assert "L={{L}}" in template_text
+    assert "VB_LO={{VB_LO}}" in template_text
     assert "temperature=27" in template_text
-    assert "w=WN*FN" in template_text
+    assert "w=W l=L" in template_text
     assert report.approved_variables_template_status == {
-        "FN": True,
-        "WN": True,
-        "FP": True,
-        "WP": True,
+        "F": True,
+        "W": True,
+        "L": True,
+        "VB_LO": True,
     }
     assert report.analysis_statements == ["tran", "dcOp"]
     assert report.forbidden_setup_changes_detected is False
@@ -75,9 +75,9 @@ def test_prepare_netlist_templates_backslash_continued_parameters(
         """simulator lang=spectre
 parameters \\
     temperature=27 \\
-    L2=45n FN=4 \\
-    FP=4 WN=0.6u WP=1.2u
-I0 (VOUT IN VSS VSS) inverter w=WP*FP fingers=FN
+    F=24 W=0.8u \\
+    L=40n VB_LO=320m
+I0 (VOUT IN VSS VSS) mixer w=W l=L vb=VB_LO
 pss pss fund=1G harms=10
 pac pac maxsideband=10
 pnoise pnoise maxsideband=10
@@ -90,12 +90,11 @@ pnoise pnoise maxsideband=10
         project_dir / "netlists" / "templates" / "template.scs"
     ).read_text(encoding="utf-8")
     assert report.status == PassFail.PASS
-    assert "FN={{FN}}" in template_text
-    assert "FP={{FP}}" in template_text
-    assert "WN={{WN}}" in template_text
-    assert "WP={{WP}}" in template_text
-    assert "L2=45n" in template_text
-    assert "w=WP*FP fingers=FN" in template_text
+    assert "F={{F}}" in template_text
+    assert "W={{W}}" in template_text
+    assert "L={{L}}" in template_text
+    assert "VB_LO={{VB_LO}}" in template_text
+    assert "w=W l=L vb=VB_LO" in template_text
     assert report.analysis_statements == ["pss", "pac", "pnoise"]
 
 
@@ -103,11 +102,11 @@ def test_prepare_netlist_does_not_template_instance_parameters(tmp_path: Path) -
     project_dir = _project_with_input(
         tmp_path,
         """simulator lang=spectre
-parameters temperature=27 FN=4 FP=4 WN=0.6u WP=1.2u
+parameters temperature=27 F=24 W=0.8u L=40n VB_LO=320m
 subckt wrapped IN OUT VDD VSS
-M0 (OUT IN VSS VSS) nmos w=WN*FN l=45n
+M0 (OUT IN VSS VSS) nmos w=W l=L
 ends wrapped
-X0 (IN OUT VDD VSS) wrapped FN=99 WP=99u
+X0 (IN OUT VDD VSS) wrapped F=99 W=99u
 ac ac start=1 stop=10G
 """,
     )
@@ -118,8 +117,8 @@ ac ac start=1 stop=10G
         project_dir / "netlists" / "templates" / "template.scs"
     ).read_text(encoding="utf-8")
     assert report.status == PassFail.PASS
-    assert "parameters temperature=27 FN={{FN}} FP={{FP}} WN={{WN}} WP={{WP}}" in template_text
-    assert "X0 (IN OUT VDD VSS) wrapped FN=99 WP=99u" in template_text
+    assert "parameters temperature=27 F={{F}} W={{W}} L={{L}} VB_LO={{VB_LO}}" in template_text
+    assert "X0 (IN OUT VDD VSS) wrapped F=99 W=99u" in template_text
 
 
 def test_prepare_netlist_writes_fail_report_when_input_is_missing(
@@ -142,7 +141,7 @@ def test_prepare_netlist_writes_fail_report_when_approved_variable_is_missing(
     project_dir = _project_with_input(
         tmp_path,
         """simulator lang=spectre
-parameters temperature=27 FN=4 FP=4 WN=0.6u
+parameters temperature=27 F=24 W=0.8u L=40n
 tran tran stop=10n
 """,
     )
@@ -150,8 +149,8 @@ tran tran stop=10n
     report = prepare_netlist(project_dir)
 
     assert report.status == PassFail.FAIL
-    assert report.approved_variables_template_status["WP"] is False
-    assert "approved variable WP was not found in top-level parameters" in report.issues
+    assert report.approved_variables_template_status["VB_LO"] is False
+    assert "approved variable VB_LO was not found in top-level parameters" in report.issues
     assert not (project_dir / "netlists" / "templates" / "template.scs").exists()
 
 
@@ -161,8 +160,8 @@ def test_prepare_netlist_writes_fail_report_for_duplicate_approved_variable(
     project_dir = _project_with_input(
         tmp_path,
         """simulator lang=spectre
-parameters temperature=27 FN=4 FP=4 WN=0.6u WP=1.2u
-parameters FN=5
+parameters temperature=27 F=24 W=0.8u L=40n VB_LO=320m
+parameters F=26
 tran tran stop=10n
 """,
     )
@@ -170,7 +169,7 @@ tran tran stop=10n
     report = prepare_netlist(project_dir)
 
     assert report.status == PassFail.FAIL
-    assert "approved variable FN appears more than once in top-level parameters" in report.issues
+    assert "approved variable F appears more than once in top-level parameters" in report.issues
     assert not (project_dir / "netlists" / "templates" / "template.scs").exists()
 
 
@@ -178,7 +177,7 @@ def test_prepare_netlist_templates_values_with_whitespace_units(tmp_path: Path) 
     project_dir = _project_with_input(
         tmp_path,
         """simulator lang=spectre
-parameters temperature=27 FN=4 FP=4 WN=0.6 u WP=1.2 u
+parameters temperature=27 F=24 W=0.8 u L=40 n VB_LO=320 m
 tran tran stop=10n
 """,
     )
@@ -189,10 +188,12 @@ tran tran stop=10n
         project_dir / "netlists" / "templates" / "template.scs"
     ).read_text(encoding="utf-8")
     assert report.status == PassFail.PASS
-    assert "WN={{WN}}" in template_text
-    assert "WP={{WP}}" in template_text
-    assert "WN={{WN}} u" not in template_text
-    assert "WP={{WP}} u" not in template_text
+    assert "W={{W}}" in template_text
+    assert "L={{L}}" in template_text
+    assert "VB_LO={{VB_LO}}" in template_text
+    assert "W={{W}} u" not in template_text
+    assert "L={{L}} n" not in template_text
+    assert "VB_LO={{VB_LO}} m" not in template_text
 
 
 def test_prepare_netlist_fails_closed_for_subckt_parameter_assignments(
@@ -201,10 +202,10 @@ def test_prepare_netlist_fails_closed_for_subckt_parameter_assignments(
     project_dir = _project_with_input(
         tmp_path,
         """simulator lang=spectre
-parameters temperature=27 FP=4 WP=1.2u
+parameters temperature=27 L=40n VB_LO=320m
 subckt wrapped IN OUT VDD VSS
-parameters FN=4 WN=0.6u
-M0 (OUT IN VSS VSS) nmos w=WN*FN l=45n
+parameters F=24 W=0.8u
+M0 (OUT IN VSS VSS) nmos w=W l=L
 ends wrapped
 tran tran stop=10n
 """,
@@ -214,10 +215,10 @@ tran tran stop=10n
 
     assert report.status == PassFail.FAIL
     assert report.forbidden_setup_changes_detected is True
-    assert "approved variable FN was found outside top-level parameters" in report.issues
-    assert "approved variable WN was found outside top-level parameters" in report.issues
-    assert "approved variable FN was not found in top-level parameters" in report.issues
-    assert "approved variable WN was not found in top-level parameters" in report.issues
+    assert "approved variable F was found outside top-level parameters" in report.issues
+    assert "approved variable W was found outside top-level parameters" in report.issues
+    assert "approved variable F was not found in top-level parameters" in report.issues
+    assert "approved variable W was not found in top-level parameters" in report.issues
     assert not (project_dir / "netlists" / "templates" / "template.scs").exists()
 
 
@@ -243,20 +244,11 @@ testbenches:
     (project_dir / "config" / "testbenches.yaml").write_text(
         testbenches_yaml, encoding="utf-8"
     )
-    metrics_text = (project_dir / "config" / "metrics.yaml").read_text(encoding="utf-8")
-    metrics_text = metrics_text.replace(
-        "    maestro_formula: riseTime",
-        "    testbench: tb1\n    maestro_formula: riseTime",
-    )
-    metrics_text = metrics_text.replace(
-        "    maestro_formula: fallTime",
-        "    testbench: tb1\n    maestro_formula: fallTime",
-    )
-    metrics_text = metrics_text.replace(
-        "    maestro_formula: VDC",
-        "    testbench: tb1\n    maestro_formula: VDC",
-    )
-    (project_dir / "config" / "metrics.yaml").write_text(metrics_text, encoding="utf-8")
+    metrics_path = project_dir / "config" / "metrics.yaml"
+    metrics_payload = yaml.safe_load(metrics_path.read_text(encoding="utf-8"))
+    for metric in metrics_payload["metrics"]:
+        metric["testbench"] = "tb1"
+    metrics_path.write_text(yaml.safe_dump(metrics_payload), encoding="utf-8")
     input_path = project_dir / "netlists" / "testbenches" / "tb1" / "exported" / "input.scs"
     input_path.parent.mkdir(parents=True, exist_ok=True)
     input_path.write_text(deck_text, encoding="utf-8")
@@ -414,7 +406,7 @@ def test_prepare_netlist_generates_corner_templates_for_multi_testbench(
         tmp_path,
         """simulator lang=spectre
 include "/path/to/toplevel.scs" section=Post_simu_top_tt
-parameters temperature=27 FN=4 FP=4 WN=0.6u WP=1.2u
+parameters temperature=27 F=24 W=0.8u L=40n VB_LO=320m
 tran tran stop=10n
 """,
         corner_config,
@@ -430,8 +422,8 @@ tran tran stop=10n
     ss_text = ss_template.read_text(encoding="utf-8")
     assert 'section=Post_simu_top_ss' in ss_text
     assert 'temperature=125' in ss_text
-    assert 'FN={{FN}}' in ss_text
-    assert 'WN={{WN}}' in ss_text
+    assert 'F={{F}}' in ss_text
+    assert 'W={{W}}' in ss_text
 
 
 def test_prepare_netlist_skips_corner_templates_when_no_corners_configured(
@@ -441,7 +433,7 @@ def test_prepare_netlist_skips_corner_templates_when_no_corners_configured(
         tmp_path,
         """simulator lang=spectre
 include "/path/to/toplevel.scs" section=Post_simu_top_tt
-parameters temperature=27 FN=4 FP=4 WN=0.6u WP=1.2u
+parameters temperature=27 F=24 W=0.8u L=40n VB_LO=320m
 tran tran stop=10n
 """,
         None,

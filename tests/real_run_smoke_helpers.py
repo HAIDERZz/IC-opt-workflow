@@ -22,11 +22,14 @@ from tests.report_helpers import write_pass_reports
 
 
 TEMPLATE_TEXT = """simulator lang=spectre
-parameters FN={{FN}} WN={{WN}} FP={{FP}} WP={{WP}}
+parameters F={{F}} W={{W}} L={{L}} VB_LO={{VB_LO}}
 tran tran stop=10n
 """
 
-DEFAULT_VALUES = {"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-6}
+# Generic placeholder metric value used when a caller does not supply explicit
+# metric values; the actual metric *names* are always derived from the project's
+# metric extraction request so this helper is not coupled to one release metric.
+DEFAULT_METRIC_VALUE = 6.5
 
 
 def write_json(path: Path, payload: dict) -> None:
@@ -144,7 +147,9 @@ def write_fake_metric_result_manifest(
     script_path.write_text("sanitized ocean script\n", encoding="utf-8")
     request_by_name = {metric["name"]: metric for metric in request["metrics"]}
     selected_candidate_id = candidate_id or request["candidate_id"]
-    metric_values = values or DEFAULT_VALUES
+    metric_values = values or {
+        name: DEFAULT_METRIC_VALUE for name in request_by_name
+    }
     write_json(
         metrics_dir / "metric_result_manifest.json",
         {
@@ -175,7 +180,7 @@ def write_fake_metric_result_manifest(
                         f"{value:.12g}" if metric_status == "succeeded" else None
                     ),
                     "unit": request_by_name[name]["unit"],
-                    "result": request_by_name[name]["result"],
+                    "result": request_by_name[name].get("result"),
                     "expression": request_by_name[name]["expression"],
                     "expression_sha256": request_by_name[name]["expression_sha256"],
                     "expression_source": request_by_name[name]["expression_source"],

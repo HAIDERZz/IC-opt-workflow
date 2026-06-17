@@ -18,11 +18,19 @@ def _status(value: str) -> SimpleNamespace:
 
 def _set_optimizer_strategy(project_dir: Path, strategy: str) -> None:
     optimizer_path = project_dir / "config" / "optimizer.yaml"
-    optimizer_text = optimizer_path.read_text(encoding="utf-8").replace(
-        "  algorithm: turbo",
-        f"  algorithm: turbo\n  strategy: {strategy}",
-        1,
-    )
+    lines = []
+    strategy_written = False
+    for line in optimizer_path.read_text(encoding="utf-8").splitlines():
+        if line.startswith("  algorithm:"):
+            lines.append("  algorithm: turbo")
+        elif line.startswith("  strategy:"):
+            lines.append(f"  strategy: {strategy}")
+            strategy_written = True
+        else:
+            lines.append(line)
+    if not strategy_written:
+        lines.insert(lines.index("  algorithm: turbo") + 1, f"  strategy: {strategy}")
+    optimizer_text = "\n".join(lines) + "\n"
     optimizer_path.write_text(optimizer_text, encoding="utf-8")
 
 

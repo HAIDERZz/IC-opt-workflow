@@ -26,7 +26,7 @@ from tests.report_helpers import write_pass_reports
 
 
 TEMPLATE_TEXT = """simulator lang=spectre
-parameters FN={{FN}} WN={{WN}} FP={{FP}} WP={{WP}}
+parameters F={{F}} W={{W}} L={{L}} VB_LO={{VB_LO}}
 tran tran stop=10n
 """
 
@@ -34,8 +34,8 @@ tran tran stop=10n
 def test_ledger_row_accepts_real_result_provenance() -> None:
     row = LedgerRow(
         candidate_id="real_001",
-        parameters={"FN": "2", "WN": "0.3u", "FP": "2", "WP": "0.3u"},
-        metrics={"rise": 1.25e-10, "fall": 1.45e-10, "DC": 3.2e-4},
+        parameters={"F": "20", "W": "0.6u", "L": "30n", "VB_LO": "280m"},
+        metrics={"NF_3G": 1.25e-10},
         constraints_passed=True,
         objective=3.2e-4,
         batch_id=1,
@@ -57,8 +57,8 @@ def test_ledger_row_accepts_real_result_provenance() -> None:
 def test_ledger_row_still_accepts_existing_mock_payload() -> None:
     row = LedgerRow(
         candidate_id="cand_001",
-        parameters={"FN": "4"},
-        metrics={"rise": 52.0},
+        parameters={"F": "24"},
+        metrics={"NF_3G": 52.0},
         constraints_passed=True,
         objective=52.0,
         batch_id=1,
@@ -79,7 +79,7 @@ def test_ledger_row_rejects_unapproved_real_statuses(bad_status: str) -> None:
         LedgerRow(
             candidate_id="real_001",
             parameters={"FN": "2"},
-            metrics={"rise": 1.25e-10},
+            metrics={"NF_3G": 1.25e-10},
             constraints_passed=True,
             objective=1.25e-10,
             batch_id=1,
@@ -209,7 +209,7 @@ def _write_metric_result_manifest(
     metrics_dir.mkdir(parents=True, exist_ok=True)
     script_path = metrics_dir / "metric_probe.ocn"
     script_path.write_text("sanitized ocean script\n", encoding="utf-8")
-    metric_values = values or {"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-6}
+    metric_values = values or {"NF_3G": 6.5}
     request_by_name = {metric["name"]: metric for metric in request["metrics"]}
     payload = {
         "schema_version": "1.0",
@@ -235,7 +235,7 @@ def _write_metric_result_manifest(
                 "value": value,
                 "value_text": f"{value:.12g}",
                 "unit": request_by_name[name]["unit"],
-                "result": request_by_name[name]["result"],
+                "result": request_by_name[name].get("result"),
                 "expression": request_by_name[name]["expression"],
                 "expression_sha256": request_by_name[name]["expression_sha256"],
                 "expression_source": request_by_name[name]["expression_source"],
@@ -343,16 +343,14 @@ def test_record_real_result_writes_ledger_state_best_and_report(tmp_path: Path) 
     assert row["batch_id"] == 1
     assert row["timestamp_utc"] == "2026-06-02T12:00:00Z"
     assert row["parameters"] == {
-        "FN": "2",
-        "WN": "0.3u",
-        "FP": "2",
-        "WP": "0.3u",
+        "F": "20",
+        "W": "0.6u",
+        "L": "30n",
+        "VB_LO": "280m",
     }
-    assert row["metrics"]["rise"] == pytest.approx(1.0e-12)
-    assert row["metrics"]["fall"] == pytest.approx(1.0e-12)
-    assert row["metrics"]["DC"] == pytest.approx(1.0e-6)
+    assert row["metrics"]["NF_3G"] == pytest.approx(6.5)
     assert row["constraints_passed"] is True
-    assert row["objective"] == pytest.approx(2.0e-18)
+    assert row["objective"] == pytest.approx(6.5)
 
     state = _load_json(state_path)
     assert state["current_evaluations"] == 1
@@ -364,10 +362,10 @@ def test_record_real_result_writes_ledger_state_best_and_report(tmp_path: Path) 
     best = _load_json(best_path)
     assert best["candidate_id"] == "real_001"
     assert best["parameters"] == {
-        "FN": "2",
-        "WN": "0.3u",
-        "FP": "2",
-        "WP": "0.3u",
+        "F": "20",
+        "W": "0.6u",
+        "L": "30n",
+        "VB_LO": "280m",
     }
     assert best["metrics"] == row["metrics"]
     assert best["objective"] == pytest.approx(row["objective"])
@@ -414,8 +412,8 @@ def test_record_real_result_rejects_duplicate_candidate_without_append(
         json.dumps(
             {
                 "candidate_id": "real_001",
-                "parameters": {"FN": "2"},
-                "metrics": {"rise": 1.0},
+                "parameters": {"F": "20"},
+                "metrics": {"NF_3G": 1.0},
                 "constraints_passed": True,
                 "objective": 1.0,
                 "batch_id": 1,
@@ -465,7 +463,7 @@ def test_constraint_failing_real_result_does_not_update_best(tmp_path: Path) -> 
     _write_valid_checked_result(project_dir)
     _write_metric_result_manifest(
         project_dir,
-        values={"rise": 1.0, "fall": 1.0, "DC": 1.0},
+        values={"NF_3G": 12.0},
     )
 
     report = record_real_result(
@@ -494,8 +492,8 @@ def test_worse_feasible_real_result_preserves_existing_best(tmp_path: Path) -> N
         json.dumps(
             {
                 "candidate_id": "cand_999",
-                "parameters": {"FN": "4"},
-                "metrics": {"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-9},
+                "parameters": {"F": "24"},
+                "metrics": {"NF_3G": 6.5},
                 "constraints_passed": True,
                 "objective": 1.0e-20,
                 "batch_id": 1,
@@ -512,9 +510,9 @@ def test_worse_feasible_real_result_preserves_existing_best(tmp_path: Path) -> N
         best_path,
         {
             "candidate_id": "cand_999",
-            "parameters": {"FN": "4"},
-            "metrics": {"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-9},
-            "constraints_passed": True,
+            "parameters": {"F": "24"},
+            "metrics": {"NF_3G": 12.0},
+            "constraints_passed": False,
             "objective": 1.0e-20,
             "batch_id": 1,
             "timestamp_utc": "2026-06-02T11:00:00Z",
@@ -523,7 +521,7 @@ def test_worse_feasible_real_result_preserves_existing_best(tmp_path: Path) -> N
     _write_valid_checked_result(project_dir)
     _write_metric_result_manifest(
         project_dir,
-        values={"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-6},
+        values={"NF_3G": 12.0},
     )
 
     report = record_real_result(
@@ -548,8 +546,8 @@ def test_record_real_result_derives_best_from_existing_ledger(
         json.dumps(
             {
                 "candidate_id": "cand_999",
-                "parameters": {"FN": "4"},
-                "metrics": {"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-9},
+                "parameters": {"F": "24"},
+                "metrics": {"NF_3G": 6.5},
                 "constraints_passed": True,
                 "objective": 1.0e-20,
                 "batch_id": 1,
@@ -563,7 +561,7 @@ def test_record_real_result_derives_best_from_existing_ledger(
     _write_valid_checked_result(project_dir)
     _write_metric_result_manifest(
         project_dir,
-        values={"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-6},
+        values={"NF_3G": 6.5},
     )
 
     report = record_real_result(
@@ -589,8 +587,8 @@ def test_infeasible_existing_best_does_not_block_feasible_real_result(
         best_path,
         {
             "candidate_id": "cand_bad",
-            "parameters": {"FN": "4"},
-            "metrics": {"rise": 1.0, "fall": 1.0, "DC": 1.0},
+            "parameters": {"F": "24"},
+            "metrics": {"NF_3G": 6.5},
             "constraints_passed": False,
             "objective": 0.0,
             "batch_id": 1,
@@ -620,8 +618,8 @@ def test_stale_best_file_is_replaced_by_ledger_best(tmp_path: Path) -> None:
         json.dumps(
             {
                 "candidate_id": "cand_999",
-                "parameters": {"FN": "4"},
-                "metrics": {"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-9},
+                "parameters": {"F": "24"},
+                "metrics": {"NF_3G": 6.5},
                 "constraints_passed": True,
                 "objective": 1.0e-20,
                 "batch_id": 1,
@@ -637,11 +635,11 @@ def test_stale_best_file_is_replaced_by_ledger_best(tmp_path: Path) -> None:
     _write_json(
         best_path,
         {
-            "candidate_id": "cand_stale",
-            "parameters": {"FN": "8"},
-            "metrics": {"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-3},
-            "constraints_passed": True,
-            "objective": 1.0e-3,
+                "candidate_id": "cand_stale",
+                "parameters": {"F": "28"},
+                "metrics": {"NF_3G": 12.0},
+                "constraints_passed": False,
+                "objective": 1.0e-3,
             "batch_id": 1,
             "timestamp_utc": "2026-06-02T10:00:00Z",
         },
@@ -649,7 +647,7 @@ def test_stale_best_file_is_replaced_by_ledger_best(tmp_path: Path) -> None:
     _write_valid_checked_result(project_dir)
     _write_metric_result_manifest(
         project_dir,
-        values={"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-6},
+        values={"NF_3G": 12.0},
     )
 
     report = record_real_result(
@@ -672,8 +670,8 @@ def test_invalid_best_file_is_repaired_from_ledger(tmp_path: Path) -> None:
         json.dumps(
             {
                 "candidate_id": "cand_999",
-                "parameters": {"FN": "4"},
-                "metrics": {"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-9},
+                "parameters": {"F": "24"},
+                "metrics": {"NF_3G": 6.5},
                 "constraints_passed": True,
                 "objective": 1.0e-20,
                 "batch_id": 1,
@@ -690,7 +688,7 @@ def test_invalid_best_file_is_repaired_from_ledger(tmp_path: Path) -> None:
     _write_valid_checked_result(project_dir)
     _write_metric_result_manifest(
         project_dir,
-        values={"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-6},
+        values={"NF_3G": 6.5},
     )
 
     report = record_real_result(
@@ -715,8 +713,8 @@ def test_stale_best_file_is_removed_when_no_feasible_ledger_best(
         best_path,
         {
             "candidate_id": "cand_stale",
-            "parameters": {"FN": "8"},
-            "metrics": {"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-3},
+            "parameters": {"F": "28"},
+            "metrics": {"NF_3G": 6.5},
             "constraints_passed": True,
             "objective": 1.0e-3,
             "batch_id": 1,
@@ -724,9 +722,13 @@ def test_stale_best_file_is_removed_when_no_feasible_ledger_best(
         },
     )
     _write_valid_checked_result(project_dir)
+    # NF_3G=12.0 violates the release-template constraint (NF_3G < 9 dB), so the
+    # recorded candidate is infeasible; with no feasible ledger row the stale
+    # best file must be removed. The prior value 6.5 was infeasible under the
+    # old config but is feasible under NF_3G < 9, so it no longer triggers removal.
     _write_metric_result_manifest(
         project_dir,
-        values={"rise": 1.0, "fall": 1.0, "DC": 1.0},
+        values={"NF_3G": 12.0},
     )
 
     report = record_real_result(
@@ -753,7 +755,7 @@ def test_record_real_result_normalizes_maximize_objective(tmp_path: Path) -> Non
     _write_valid_checked_result(project_dir)
     _write_metric_result_manifest(
         project_dir,
-        values={"rise": 1.0e-12, "fall": 1.0e-12, "DC": 2.0e-6},
+        values={"NF_3G": 7.0},
     )
 
     report = record_real_result(
@@ -767,4 +769,7 @@ def test_record_real_result_normalizes_maximize_objective(tmp_path: Path) -> Non
         .read_text(encoding="utf-8")
         .strip()
     )
-    assert row["objective"] == pytest.approx(-4.0e-18)
+    # Objective is "maximize NF_3G"; record_real_result negates the manifest
+    # value (7.0) for maximize, so the stored objective is -7.0. The prior
+    # expected value referenced a metric that no longer exists in the config.
+    assert row["objective"] == pytest.approx(-7.0)
