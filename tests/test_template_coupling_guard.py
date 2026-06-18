@@ -11,7 +11,6 @@ ALLOWED_TEMPLATE_CALLERS = {
     "tests/test_mock_optimizer.py",
     "tests/test_native_turbo.py",
     "tests/test_openbox_backend.py",
-    "tests/test_real_result_record.py",
     "tests/test_remote_fix_run_flow.py",
     "tests/test_remote_optimizer_flow.py",
     "tests/test_remote_spectre_ocean.py",

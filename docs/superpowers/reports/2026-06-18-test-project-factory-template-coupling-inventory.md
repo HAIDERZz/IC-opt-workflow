@@ -3,10 +3,10 @@
 Date: 2026-06-18
 Phases: 1 (factory + guard + first wave), 2 (real-run handoff + metric-result contracts),
 3 (first real-run package + recovery), 4 (next-run cluster), 5 (netlist + dry-run preflight),
-6 (approval gate), 7 (optimizer task package), 8 (retention + progress state), 9 (fix-run flow), and 10 (multi-testbench aggregation)
+6 (approval gate), 7 (optimizer task package), 8 (retention + progress state), 9 (fix-run flow), 10 (multi-testbench aggregation), and 11 (real-result record)
 
 This inventory records the state of direct `create_project_from_template()` usage
-across `tests/` after Phases 1-10 of the Test Project Factory and Template Coupling
+across `tests/` after Phases 1-11 of the Test Project Factory and Template Coupling
 Cleanup. The generic factory (`tests/project_factory.py`) and the coupling guard
 (`tests/test_template_coupling_guard.py`) are in place. Phase 1 migrated the files
 that are genuinely decoupled from circuit-specific template contents; Phase 2
@@ -17,7 +17,8 @@ next-real-run cluster via a new shared helper module; Phase 5 migrated the netli
 and dry-run preflight tests via another small shared helper; Phase 6 migrated the
 approval gate tests; Phase 7 migrated the optimizer task package tests; Phase 8 migrated the
 run-retention and optimizer-progress-state tests; Phase 9 migrated the fix-run flow
-tests; Phase 10 migrated the multi-testbench aggregation tests. Remaining
+tests; Phase 10 migrated the multi-testbench aggregation tests; Phase 11 migrated
+the real-result-record tests. Remaining
 coupled files are explicitly deferred.
 
 ## Status summary
@@ -27,6 +28,27 @@ coupled files are explicitly deferred.
 - Coupling guard: `tests/test_template_coupling_guard.py` (fails on any
   non-allowlisted direct usage of `create_project_from_template`).
 - `create_project_from_template()` remains the product/template API and is untouched.
+
+## Phase 11 status
+
+Migrated `tests/test_real_result_record.py` away from direct
+`create_project_from_template()` usage. The file now uses
+`create_approved_generic_project()` via `_create_ready_project()`, preserving the
+helper names imported by `tests/test_cli.py`. Metric/parameter/objective assertions
+derive from generated config and candidate artifacts via local helpers
+(`_candidate_parameters`, `_metric_names`, `_metric_values`, `_objective_cost`).
+The default metric manifest values use the generic factory's two-metric contract
+(metric_gain=1.0, metric_power=1e-4). Constraint-failing tests set
+constraint_value=1.0 (above the 1e-3 threshold). Existing-best tests use explicit
+negative objective costs consistent with the generic factory's maximize direction.
+The maximize-normalization test no longer edits metrics.yaml; it asserts that the
+default maximize objective records a negative cost.
+
+All 21 tests pass with behavior assertions preserved. `_create_ready_project` and
+`_write_valid_checked_result` remain importable by `tests/test_cli.py`.
+
+`tests/test_real_result_record.py` was removed from `ALLOWED_TEMPLATE_CALLERS`
+(allowlist 10 -> 9).
 
 ## Phase 10 status
 
@@ -323,6 +345,21 @@ The allowlist must shrink monotonically; the guard prevents any new unreviewed
 direct usage from being introduced.
 
 ## Verification
+
+### Phase 11
+
+- `pytest tests/test_real_result_record.py -q` -> `21 passed`
+- `pytest tests/test_template_coupling_guard.py -q` -> `1 passed`
+- `pytest tests/test_real_result_record.py tests/test_template_coupling_guard.py -q` -> `22 passed`
+- `pytest tests/test_real_result_record.py tests/test_cli.py -q` -> `70 passed`
+- `pytest [Phase 1-11 regression group, 21 files] -q` -> `372 passed`
+- `pytest -q` -> `1194 passed`
+- `ruff check src tests` -> `All checks passed!`
+- `git diff --check` -> clean
+- `git -C ../ic-auto-opt-workflow-v0.1 status --short` -> clean (release checkout untouched)
+- grep forbidden tokens over `tests/test_real_result_record.py` -> no matches
+- grep cross-imports -> known consumers only in `tests/test_cli.py`
+- `ALLOWED_TEMPLATE_CALLERS` count: 10 -> 9.
 
 ### Phase 10
 

@@ -6,12 +6,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from hermes_workflow.approvals import decide_first_real_run
-from hermes_workflow.package import (
-    build_execution_package,
-    create_project_from_template,
-    sha256_file,
-)
+from hermes_workflow.package import sha256_file
 from hermes_workflow.real_run import prepare_real_run
 from hermes_workflow.real_result_record import record_real_result
 from hermes_workflow.reports import (
@@ -22,20 +17,14 @@ from hermes_workflow.reports import (
 )
 from hermes_workflow.result_handoff import check_real_run
 from hermes_workflow.schemas import LedgerRow
-from tests.report_helpers import write_pass_reports
-
-
-TEMPLATE_TEXT = """simulator lang=spectre
-parameters FN={{FN}} WN={{WN}} FP={{FP}} WP={{WP}}
-tran tran stop=10n
-"""
+from tests.project_factory import create_approved_generic_project
 
 
 def test_ledger_row_accepts_real_result_provenance() -> None:
     row = LedgerRow(
         candidate_id="real_001",
-        parameters={"FN": "2", "WN": "0.3u", "FP": "2", "WP": "0.3u"},
-        metrics={"rise": 1.25e-10, "fall": 1.45e-10, "DC": 3.2e-4},
+        parameters={"VAR_A": "2", "VAR_B": "0.3u"},
+        metrics={"metric_alpha": 1.25e-10, "metric_beta": 3.2e-4},
         constraints_passed=True,
         objective=3.2e-4,
         batch_id=1,
@@ -57,8 +46,8 @@ def test_ledger_row_accepts_real_result_provenance() -> None:
 def test_ledger_row_still_accepts_existing_mock_payload() -> None:
     row = LedgerRow(
         candidate_id="cand_001",
-        parameters={"FN": "4"},
-        metrics={"rise": 52.0},
+        parameters={"VAR_A": "4"},
+        metrics={"metric_alpha": 52.0},
         constraints_passed=True,
         objective=52.0,
         batch_id=1,
@@ -78,8 +67,8 @@ def test_ledger_row_rejects_unapproved_real_statuses(bad_status: str) -> None:
     with pytest.raises(ValidationError, match="simulation_status must be one of"):
         LedgerRow(
             candidate_id="real_001",
-            parameters={"FN": "2"},
-            metrics={"rise": 1.25e-10},
+            parameters={"VAR_A": "2"},
+            metrics={"metric_alpha": 1.25e-10},
             constraints_passed=True,
             objective=1.25e-10,
             batch_id=1,
@@ -127,19 +116,51 @@ def _load_json(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def _create_ready_project(tmp_path: Path) -> Path:
-    project_dir = tmp_path / "bridge_test_inv"
-    create_project_from_template(project_dir)
-    build_execution_package(project_dir, created_at_utc="2026-06-02T00:00:00Z")
-    write_pass_reports(project_dir)
-    instruction = decide_first_real_run(
-        project_dir,
-        created_at_utc="2026-06-02T00:10:00Z",
+def _candidate_parameters(project_dir: Path) -> dict[str, str]:
+    payload = _load_json(
+        project_dir / "runs" / "real" / "real_001" / "candidate.json"
     )
-    assert instruction["decision"] == "approve_first_real_run"
-    template_path = project_dir / "netlists" / "templates" / "template.scs"
-    template_path.parent.mkdir(parents=True, exist_ok=True)
-    template_path.write_text(TEMPLATE_TEXT, encoding="utf-8")
+    parameters = payload["parameters"]
+    assert isinstance(parameters, dict)
+    return {str(key): str(value) for key, value in parameters.items()}
+
+
+def _metric_names(project_dir: Path) -> tuple[str, str]:
+    request = _load_json(
+        project_dir / "runs" / "real" / "real_001" / "metric_extraction_request.json"
+    )
+    metrics = request["metrics"]
+    assert isinstance(metrics, list)
+    names = [metric["name"] for metric in metrics]
+    assert len(names) == 2
+    assert all(isinstance(name, str) for name in names)
+    return names[0], names[1]
+
+
+def _metric_values(
+    project_dir: Path,
+    *,
+    objective_value: float = 1.0,
+    constraint_value: float = 1.0e-4,
+) -> dict[str, float]:
+    objective_metric, constraint_metric = _metric_names(project_dir)
+    return {
+        objective_metric: objective_value,
+        constraint_metric: constraint_value,
+    }
+
+
+def _objective_cost(project_dir: Path, values: dict[str, float]) -> float:
+    objective_metric, constraint_metric = _metric_names(project_dir)
+    return -(values[objective_metric] - values[constraint_metric])
+
+
+def _create_ready_project(tmp_path: Path) -> Path:
+    project_dir = create_approved_generic_project(
+        tmp_path,
+        name="real_result_record_project",
+        created_at_utc="2026-06-02T00:00:00Z",
+    )
     prepare_real_run(project_dir, created_at_utc="2026-06-02T00:20:00Z")
     return project_dir
 
@@ -209,7 +230,7 @@ def _write_metric_result_manifest(
     metrics_dir.mkdir(parents=True, exist_ok=True)
     script_path = metrics_dir / "metric_probe.ocn"
     script_path.write_text("sanitized ocean script\n", encoding="utf-8")
-    metric_values = values or {"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-6}
+    metric_values = values or _metric_values(project_dir)
     request_by_name = {metric["name"]: metric for metric in request["metrics"]}
     payload = {
         "schema_version": "1.0",
@@ -303,6 +324,7 @@ def test_record_real_result_rejects_missing_metric_manifest_without_writes(
 def test_record_real_result_writes_ledger_state_best_and_report(tmp_path: Path) -> None:
     project_dir = _create_ready_project(tmp_path)
     _write_valid_checked_result(project_dir)
+    expected_values = _metric_values(project_dir)
 
     report = record_real_result(
         project_dir,
@@ -330,6 +352,7 @@ def test_record_real_result_writes_ledger_state_best_and_report(tmp_path: Path) 
     assert best_path.exists()
     assert report_path.exists()
 
+    obj_metric, con_metric = _metric_names(project_dir)
     row = json.loads(ledger_path.read_text(encoding="utf-8").strip())
     assert row["candidate_id"] == "real_001"
     assert row["run_id"] == "real_001"
@@ -342,17 +365,13 @@ def test_record_real_result_writes_ledger_state_best_and_report(tmp_path: Path) 
     assert row["simulation_status"] == "real_pass"
     assert row["batch_id"] == 1
     assert row["timestamp_utc"] == "2026-06-02T12:00:00Z"
-    assert row["parameters"] == {
-        "FN": "2",
-        "WN": "0.3u",
-        "FP": "2",
-        "WP": "0.3u",
-    }
-    assert row["metrics"]["rise"] == pytest.approx(1.0e-12)
-    assert row["metrics"]["fall"] == pytest.approx(1.0e-12)
-    assert row["metrics"]["DC"] == pytest.approx(1.0e-6)
+    assert row["parameters"] == _candidate_parameters(project_dir)
+    assert row["metrics"][obj_metric] == pytest.approx(expected_values[obj_metric])
+    assert row["metrics"][con_metric] == pytest.approx(expected_values[con_metric])
     assert row["constraints_passed"] is True
-    assert row["objective"] == pytest.approx(2.0e-18)
+    assert row["objective"] == pytest.approx(
+        _objective_cost(project_dir, expected_values)
+    )
 
     state = _load_json(state_path)
     assert state["current_evaluations"] == 1
@@ -363,12 +382,7 @@ def test_record_real_result_writes_ledger_state_best_and_report(tmp_path: Path) 
 
     best = _load_json(best_path)
     assert best["candidate_id"] == "real_001"
-    assert best["parameters"] == {
-        "FN": "2",
-        "WN": "0.3u",
-        "FP": "2",
-        "WP": "0.3u",
-    }
+    assert best["parameters"] == _candidate_parameters(project_dir)
     assert best["metrics"] == row["metrics"]
     assert best["objective"] == pytest.approx(row["objective"])
 
@@ -414,8 +428,8 @@ def test_record_real_result_rejects_duplicate_candidate_without_append(
         json.dumps(
             {
                 "candidate_id": "real_001",
-                "parameters": {"FN": "2"},
-                "metrics": {"rise": 1.0},
+                "parameters": {"VAR_A": "2"},
+                "metrics": {"metric_a": 1.0},
                 "constraints_passed": True,
                 "objective": 1.0,
                 "batch_id": 1,
@@ -465,7 +479,7 @@ def test_constraint_failing_real_result_does_not_update_best(tmp_path: Path) -> 
     _write_valid_checked_result(project_dir)
     _write_metric_result_manifest(
         project_dir,
-        values={"rise": 1.0, "fall": 1.0, "DC": 1.0},
+        values=_metric_values(project_dir, constraint_value=1.0),
     )
 
     report = record_real_result(
@@ -490,14 +504,15 @@ def test_worse_feasible_real_result_preserves_existing_best(tmp_path: Path) -> N
     project_dir = _create_ready_project(tmp_path)
     ledger_path = project_dir / "ledger" / "experiment_ledger.jsonl"
     ledger_path.parent.mkdir(parents=True, exist_ok=True)
+    existing_best_cost = -2.0
     ledger_path.write_text(
         json.dumps(
             {
                 "candidate_id": "cand_999",
-                "parameters": {"FN": "4"},
-                "metrics": {"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-9},
+                "parameters": {"VAR_A": "4"},
+                "metrics": {"metric_a": 2.0, "metric_b": 1.0e-9},
                 "constraints_passed": True,
-                "objective": 1.0e-20,
+                "objective": existing_best_cost,
                 "batch_id": 1,
                 "simulation_status": "mock_pass",
                 "timestamp_utc": "2026-06-02T11:00:00Z",
@@ -512,19 +527,15 @@ def test_worse_feasible_real_result_preserves_existing_best(tmp_path: Path) -> N
         best_path,
         {
             "candidate_id": "cand_999",
-            "parameters": {"FN": "4"},
-            "metrics": {"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-9},
+            "parameters": {"VAR_A": "4"},
+            "metrics": {"metric_a": 2.0, "metric_b": 1.0e-9},
             "constraints_passed": True,
-            "objective": 1.0e-20,
+            "objective": existing_best_cost,
             "batch_id": 1,
             "timestamp_utc": "2026-06-02T11:00:00Z",
         },
     )
     _write_valid_checked_result(project_dir)
-    _write_metric_result_manifest(
-        project_dir,
-        values={"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-6},
-    )
 
     report = record_real_result(
         project_dir,
@@ -544,14 +555,15 @@ def test_record_real_result_derives_best_from_existing_ledger(
     project_dir = _create_ready_project(tmp_path)
     ledger_path = project_dir / "ledger" / "experiment_ledger.jsonl"
     ledger_path.parent.mkdir(parents=True, exist_ok=True)
+    existing_best_cost = -2.0
     ledger_path.write_text(
         json.dumps(
             {
                 "candidate_id": "cand_999",
-                "parameters": {"FN": "4"},
-                "metrics": {"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-9},
+                "parameters": {"VAR_A": "4"},
+                "metrics": {"metric_a": 2.0, "metric_b": 1.0e-9},
                 "constraints_passed": True,
-                "objective": 1.0e-20,
+                "objective": existing_best_cost,
                 "batch_id": 1,
                 "simulation_status": "mock_pass",
                 "timestamp_utc": "2026-06-02T11:00:00Z",
@@ -561,10 +573,6 @@ def test_record_real_result_derives_best_from_existing_ledger(
         encoding="utf-8",
     )
     _write_valid_checked_result(project_dir)
-    _write_metric_result_manifest(
-        project_dir,
-        values={"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-6},
-    )
 
     report = record_real_result(
         project_dir,
@@ -589,8 +597,8 @@ def test_infeasible_existing_best_does_not_block_feasible_real_result(
         best_path,
         {
             "candidate_id": "cand_bad",
-            "parameters": {"FN": "4"},
-            "metrics": {"rise": 1.0, "fall": 1.0, "DC": 1.0},
+            "parameters": {"VAR_A": "4"},
+            "metrics": {"metric_a": 1.0, "metric_b": 1.0},
             "constraints_passed": False,
             "objective": 0.0,
             "batch_id": 1,
@@ -616,14 +624,15 @@ def test_stale_best_file_is_replaced_by_ledger_best(tmp_path: Path) -> None:
     project_dir = _create_ready_project(tmp_path)
     ledger_path = project_dir / "ledger" / "experiment_ledger.jsonl"
     ledger_path.parent.mkdir(parents=True, exist_ok=True)
+    existing_best_cost = -2.0
     ledger_path.write_text(
         json.dumps(
             {
                 "candidate_id": "cand_999",
-                "parameters": {"FN": "4"},
-                "metrics": {"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-9},
+                "parameters": {"VAR_A": "4"},
+                "metrics": {"metric_a": 2.0, "metric_b": 1.0e-9},
                 "constraints_passed": True,
-                "objective": 1.0e-20,
+                "objective": existing_best_cost,
                 "batch_id": 1,
                 "simulation_status": "mock_pass",
                 "timestamp_utc": "2026-06-02T11:00:00Z",
@@ -638,19 +647,15 @@ def test_stale_best_file_is_replaced_by_ledger_best(tmp_path: Path) -> None:
         best_path,
         {
             "candidate_id": "cand_stale",
-            "parameters": {"FN": "8"},
-            "metrics": {"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-3},
+            "parameters": {"VAR_A": "8"},
+            "metrics": {"metric_a": 0.5, "metric_b": 1.0e-3},
             "constraints_passed": True,
-            "objective": 1.0e-3,
+            "objective": -0.5,
             "batch_id": 1,
             "timestamp_utc": "2026-06-02T10:00:00Z",
         },
     )
     _write_valid_checked_result(project_dir)
-    _write_metric_result_manifest(
-        project_dir,
-        values={"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-6},
-    )
 
     report = record_real_result(
         project_dir,
@@ -668,14 +673,15 @@ def test_invalid_best_file_is_repaired_from_ledger(tmp_path: Path) -> None:
     project_dir = _create_ready_project(tmp_path)
     ledger_path = project_dir / "ledger" / "experiment_ledger.jsonl"
     ledger_path.parent.mkdir(parents=True, exist_ok=True)
+    existing_best_cost = -2.0
     ledger_path.write_text(
         json.dumps(
             {
                 "candidate_id": "cand_999",
-                "parameters": {"FN": "4"},
-                "metrics": {"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-9},
+                "parameters": {"VAR_A": "4"},
+                "metrics": {"metric_a": 2.0, "metric_b": 1.0e-9},
                 "constraints_passed": True,
-                "objective": 1.0e-20,
+                "objective": existing_best_cost,
                 "batch_id": 1,
                 "simulation_status": "mock_pass",
                 "timestamp_utc": "2026-06-02T11:00:00Z",
@@ -688,10 +694,6 @@ def test_invalid_best_file_is_repaired_from_ledger(tmp_path: Path) -> None:
     best_path.parent.mkdir(parents=True, exist_ok=True)
     best_path.write_text("{not valid json}\n", encoding="utf-8")
     _write_valid_checked_result(project_dir)
-    _write_metric_result_manifest(
-        project_dir,
-        values={"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-6},
-    )
 
     report = record_real_result(
         project_dir,
@@ -715,10 +717,10 @@ def test_stale_best_file_is_removed_when_no_feasible_ledger_best(
         best_path,
         {
             "candidate_id": "cand_stale",
-            "parameters": {"FN": "8"},
-            "metrics": {"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-3},
+            "parameters": {"VAR_A": "8"},
+            "metrics": {"metric_a": 0.5, "metric_b": 1.0e-3},
             "constraints_passed": True,
-            "objective": 1.0e-3,
+            "objective": -0.5,
             "batch_id": 1,
             "timestamp_utc": "2026-06-02T10:00:00Z",
         },
@@ -726,7 +728,7 @@ def test_stale_best_file_is_removed_when_no_feasible_ledger_best(
     _write_valid_checked_result(project_dir)
     _write_metric_result_manifest(
         project_dir,
-        values={"rise": 1.0, "fall": 1.0, "DC": 1.0},
+        values=_metric_values(project_dir, constraint_value=1.0),
     )
 
     report = record_real_result(
@@ -742,19 +744,9 @@ def test_stale_best_file_is_removed_when_no_feasible_ledger_best(
 
 def test_record_real_result_normalizes_maximize_objective(tmp_path: Path) -> None:
     project_dir = _create_ready_project(tmp_path)
-    metrics_path = project_dir / "config" / "metrics.yaml"
-    metrics_path.write_text(
-        metrics_path.read_text(encoding="utf-8").replace(
-            "direction: minimize",
-            "direction: maximize",
-        ),
-        encoding="utf-8",
-    )
     _write_valid_checked_result(project_dir)
-    _write_metric_result_manifest(
-        project_dir,
-        values={"rise": 1.0e-12, "fall": 1.0e-12, "DC": 2.0e-6},
-    )
+    values = _metric_values(project_dir, objective_value=2.0, constraint_value=1.0e-4)
+    _write_metric_result_manifest(project_dir, values=values)
 
     report = record_real_result(
         project_dir,
@@ -767,4 +759,7 @@ def test_record_real_result_normalizes_maximize_objective(tmp_path: Path) -> Non
         .read_text(encoding="utf-8")
         .strip()
     )
-    assert row["objective"] == pytest.approx(-4.0e-18)
+    assert row["objective"] == pytest.approx(
+        _objective_cost(project_dir, values)
+    )
+    assert row["objective"] < 0
