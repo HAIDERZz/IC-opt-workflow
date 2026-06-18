@@ -3,10 +3,10 @@
 Date: 2026-06-18
 Phases: 1 (factory + guard + first wave), 2 (real-run handoff + metric-result contracts),
 3 (first real-run package + recovery), 4 (next-run cluster), 5 (netlist + dry-run preflight),
-6 (approval gate), 7 (optimizer task package), and 8 (retention + progress state)
+6 (approval gate), 7 (optimizer task package), 8 (retention + progress state), and 9 (fix-run flow)
 
 This inventory records the state of direct `create_project_from_template()` usage
-across `tests/` after Phases 1-8 of the Test Project Factory and Template Coupling
+across `tests/` after Phases 1-9 of the Test Project Factory and Template Coupling
 Cleanup. The generic factory (`tests/project_factory.py`) and the coupling guard
 (`tests/test_template_coupling_guard.py`) are in place. Phase 1 migrated the files
 that are genuinely decoupled from circuit-specific template contents; Phase 2
@@ -16,7 +16,8 @@ first-real-run-package and recovery tests; Phase 4 migrated the four-file
 next-real-run cluster via a new shared helper module; Phase 5 migrated the netlist
 and dry-run preflight tests via another small shared helper; Phase 6 migrated the
 approval gate tests; Phase 7 migrated the optimizer task package tests; Phase 8 migrated the
-run-retention and optimizer-progress-state tests. Remaining
+run-retention and optimizer-progress-state tests; Phase 9 migrated the fix-run flow
+tests. Remaining
 coupled files are explicitly deferred.
 
 ## Status summary
@@ -26,6 +27,22 @@ coupled files are explicitly deferred.
 - Coupling guard: `tests/test_template_coupling_guard.py` (fails on any
   non-allowlisted direct usage of `create_project_from_template`).
 - `create_project_from_template()` remains the product/template API and is untouched.
+
+## Phase 9 status
+
+Migrated `tests/test_fix_run_flow.py` away from direct
+`create_project_from_template()` usage. The file now uses the generic factory's
+`workflow_mode="fix_run"` project via `create_generic_project(..., workflow_mode="fix_run")`
+(fixed in Phase 6). Fixed-point candidate_id and parameters are derived from
+`config/fixed_points.yaml` via local helpers (`_fixed_point_candidate_id`,
+`_fixed_point_parameters`). The two-point test appends a second point derived from
+the first point's parameter names. All 17 tests pass with behavior assertions
+unchanged (doctor calls, candidate creation, run-id allocation, adapter calls,
+report JSON, optimizer-state absence, fix-run approval, child parallelism,
+failure propagation, waveform gates, cadence_cshrc passthrough).
+
+`tests/test_fix_run_flow.py` was removed from `ALLOWED_TEMPLATE_CALLERS`
+(allowlist 12 -> 11). No external tests import from `tests.test_fix_run_flow`.
 
 ## Phase 8 status
 
@@ -255,7 +272,6 @@ generic factory.
 
 ### Approvals and packaging
 
-- tests/test_fix_run_flow.py
 - tests/test_multi_testbench_aggregation.py
 - tests/real_run_smoke_helpers.py
 
@@ -288,6 +304,20 @@ The allowlist must shrink monotonically; the guard prevents any new unreviewed
 direct usage from being introduced.
 
 ## Verification
+
+### Phase 9
+
+- `pytest tests/test_fix_run_flow.py -q` -> `17 passed`
+- `pytest tests/test_template_coupling_guard.py -q` -> `1 passed`
+- `pytest tests/test_fix_run_flow.py tests/test_template_coupling_guard.py -q` -> `18 passed`
+- `pytest tests/test_project_factory.py tests/test_template_coupling_guard.py tests/test_health.py tests/test_optimizer_flow.py tests/test_result_handoff.py tests/test_metric_results.py tests/test_real_run.py tests/test_real_run_recovery.py tests/test_next_real_run.py tests/test_candidate_injection_real_run.py tests/test_optimizer_suggestion.py tests/test_optimizer_loop.py tests/test_netlists.py tests/test_dry_run.py tests/test_approvals.py tests/test_optimizer_task_package.py tests/test_run_retention.py tests/test_optimizer_progress_state.py tests/test_fix_run_flow.py -q` -> `339 passed`
+- `pytest -q` -> `1194 passed`
+- `ruff check src tests` -> `All checks passed!`
+- `git diff --check` -> clean
+- `git -C ../ic-auto-opt-workflow-v0.1 status --short` -> clean (release checkout untouched)
+- grep `create_project_from_template|bridge_test_inv|fix_run_test_inv|FN|WN|FP|WP|TEMPLATE_TEXT|rise|fall|DC` over `tests/test_fix_run_flow.py` -> no matches
+- grep `from tests.test_fix_run_flow|tests.test_fix_run_flow` over `tests/` -> no source-level matches
+- `ALLOWED_TEMPLATE_CALLERS` count: 12 -> 11.
 
 ### Phase 8
 
