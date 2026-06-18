@@ -15,7 +15,6 @@ ALLOWED_TEMPLATE_CALLERS = {
     "tests/test_multi_testbench_aggregation.py",
     "tests/test_native_turbo.py",
     "tests/test_netlists.py",
-    "tests/test_next_real_run.py",
     "tests/test_openbox_backend.py",
     "tests/test_optimizer_progress_state.py",
     "tests/test_optimizer_task_package.py",

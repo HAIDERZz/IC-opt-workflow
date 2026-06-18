@@ -20,7 +20,10 @@ from tests.test_candidate_injection_real_run import (
     _write_candidate_metric_result_manifest,
     _write_candidate_result_manifest,
 )
-from tests.test_next_real_run import _create_ready_project, _record_real_001
+from tests.real_run_cluster_helpers import (
+    create_ready_project as _create_ready_project,
+    record_real_001 as _record_real_001,
+)
 
 
 def _load_loop_tool():

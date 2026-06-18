@@ -10,7 +10,26 @@ from typer.testing import CliRunner
 from hermes_workflow.cli import app
 from hermes_workflow.optimizer_suggestion import suggest_candidate_request
 from hermes_workflow.real_run import prepare_candidate_real_run
-from tests.test_next_real_run import _create_ready_project, _load_json, _record_real_001
+from tests.real_run_cluster_helpers import (
+    create_ready_project as _create_ready_project,
+    load_json as _load_json,
+    record_real_001 as _record_real_001,
+    valid_candidate_parameters,
+    variable_names,
+)
+
+
+def _sample_parameters(project_dir: Path, index: int) -> dict[str, str]:
+    # Eight distinct valid generic pairs. Avoid the (3, "0.3u") pair that the
+    # TuRBO monkeypatch candidate maps to, so turbo selection is not rejected as
+    # a duplicate of an existing ledger row.
+    int_values = ["1", "2", "4", "5", "1", "2", "4", "5"]
+    width_values = ["0.1u", "0.2u", "0.4u", "0.5u", "0.5u", "0.4u", "0.2u", "0.1u"]
+    return valid_candidate_parameters(
+        project_dir,
+        int_value=int_values[index],
+        width_value=width_values[index],
+    )
 
 
 def test_suggest_candidate_writes_initialization_request(tmp_path: Path) -> None:
@@ -29,7 +48,11 @@ def test_suggest_candidate_writes_initialization_request(tmp_path: Path) -> None
     assert payload["schema_version"] == "1.0"
     assert payload["candidate_id"] == "candidate_000002"
     assert payload["source"] == "optimizer_initialization_suggestion"
-    assert payload["parameters"] != {"FN": "2", "WN": "0.3u", "FP": "2", "WP": "0.3u"}
+    baseline = _load_json(
+        project_dir / "runs" / "real" / "real_001" / "candidate.json"
+    )["parameters"]
+    assert set(payload["parameters"]) == set(variable_names(project_dir))
+    assert payload["parameters"] != baseline
     assert payload["metadata"]["selection_mode"] == "initialization_fallback"
     assert payload["metadata"]["evaluation_index"] == 2
     assert payload["metadata"]["ledger_rows_seen"] == 1
@@ -119,7 +142,7 @@ def test_suggest_candidate_rejects_max_evaluations_reached(tmp_path: Path) -> No
     optimizer_path = project_dir / "config" / "optimizer.yaml"
     optimizer_path.write_text(
         optimizer_path.read_text(encoding="utf-8").replace(
-            "max_evaluations: 100",
+            "max_evaluations: 12",
             "max_evaluations: 8",
         ),
         encoding="utf-8",
@@ -130,12 +153,7 @@ def test_suggest_candidate_rejects_max_evaluations_reached(tmp_path: Path) -> No
     for index in range(8):
         row = dict(first_row)
         row["candidate_id"] = f"seed_{index + 1:03d}"
-        row["parameters"] = {
-            "FN": str(2 + index),
-            "WN": f"{0.3 + 0.2 * index:g}u",
-            "FP": str(2 + index),
-            "WP": f"{0.3 + 0.2 * index:g}u",
-        }
+        row["parameters"] = _sample_parameters(project_dir, index)
         rows.append(row)
     ledger.write_text(
         "".join(json.dumps(row, sort_keys=True) + "\n" for row in rows),
@@ -174,12 +192,7 @@ def test_suggest_candidate_uses_turbo_when_enough_finite_observations(
     for index in range(8):
         row = dict(first_row)
         row["candidate_id"] = f"seed_{index + 1:03d}"
-        row["parameters"] = {
-            "FN": str(2 + index),
-            "WN": f"{0.3 + 0.2 * index:g}u",
-            "FP": str(2 + index),
-            "WP": f"{0.3 + 0.2 * index:g}u",
-        }
+        row["parameters"] = _sample_parameters(project_dir, index)
         row["objective"] = float(100 - index)
         rows.append(row)
     ledger.write_text(
@@ -195,7 +208,7 @@ def test_suggest_candidate_uses_turbo_when_enough_finite_observations(
 
     monkeypatch.setattr(
         "hermes_workflow.optimizer_suggestion._suggest_turbo_raw_candidate",
-        lambda *args, **kwargs: [12.0, 1.3, 2.0, 2.5],
+        lambda *args, **kwargs: [3.0, 0.3],
     )
 
     result = suggest_candidate_request(
@@ -207,7 +220,7 @@ def test_suggest_candidate_uses_turbo_when_enough_finite_observations(
     payload = _load_json(result.output_path)
     assert result.selection_mode == "turbo"
     assert payload["source"] == "optimizer_turbo_suggestion"
-    assert payload["parameters"] == {"FN": "12", "WN": "1.3u", "FP": "2", "WP": "2.5u"}
+    assert payload["parameters"] == valid_candidate_parameters(project_dir)
     assert payload["metadata"]["selection_mode"] == "turbo"
     assert payload["metadata"]["finite_observations"] == 8
 

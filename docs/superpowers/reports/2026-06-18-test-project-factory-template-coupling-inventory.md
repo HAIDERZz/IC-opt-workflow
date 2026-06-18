@@ -2,18 +2,18 @@
 
 Date: 2026-06-18
 Phases: 1 (factory + guard + first wave), 2 (real-run handoff + metric-result contracts),
-and 3 (first real-run package + recovery; next-run cluster deferred)
+3 (first real-run package + recovery), and 4 (next-run cluster)
 
 This inventory records the state of direct `create_project_from_template()` usage
-across `tests/` after Phases 1-3 of the Test Project Factory and Template Coupling
+across `tests/` after Phases 1-4 of the Test Project Factory and Template Coupling
 Cleanup. The generic factory (`tests/project_factory.py`) and the coupling guard
 (`tests/test_template_coupling_guard.py`) are in place. Phase 1 migrated the files
 that are genuinely decoupled from circuit-specific template contents; Phase 2
 migrated the real-run handoff and metric-result contract tests by deriving
 incidental metric names from generated request files; Phase 3 migrated the
-first-real-run-package and recovery tests. `tests/test_next_real_run.py` and its
-three coupled consumers are deferred as a single cluster (see Phase 3 status).
-Remaining coupled files are explicitly deferred.
+first-real-run-package and recovery tests; Phase 4 migrated the four-file
+next-real-run cluster via a new shared helper module. Remaining coupled files are
+explicitly deferred.
 
 ## Status summary
 
@@ -22,6 +22,42 @@ Remaining coupled files are explicitly deferred.
 - Coupling guard: `tests/test_template_coupling_guard.py` (fails on any
   non-allowlisted direct usage of `create_project_from_template`).
 - `create_project_from_template()` remains the product/template API and is untouched.
+
+## Phase 4 status
+
+Migrated the four-file next-real-run cluster away from direct
+`create_project_from_template()` usage and old release-template assumptions,
+using a new shared test-only helper module `tests/real_run_cluster_helpers.py`
+(generic project setup via `create_approved_generic_project()`, fake
+result/metric writers that derive metric names from
+`metric_extraction_request.json`, candidate parameter builders bound to the
+generic factory's two-variable contract, and `record_real_001`).
+
+- tests/test_next_real_run.py — imports the shared helpers (aliased to the old
+  local names so call sites are unchanged), removed `TEMPLATE_TEXT` and the six
+  local helpers, and generalizes the coerced-ledger metric mutation and the
+  `real_002` candidate assertion to derive metric/variable names from generated
+  artifacts. 26 tests preserved.
+- tests/test_candidate_injection_real_run.py — imports the shared helpers;
+  `_candidate_request` defaults to `valid_candidate_parameters(project_dir)`;
+  the candidate-result/metric writers delegate to the shared writers (keeping
+  `tests/test_optimizer_loop.py`'s wrapper imports stable); the missing/extra/
+  invalid candidate cases and candidate/ledger assertions use the helper
+  builders (the 5-case invalid-values parametrize became a single loop test, so
+  the full-suite instance count drops by 4 with identical coverage). 16 tests
+  preserved.
+- tests/test_optimizer_suggestion.py — imports the shared helpers; the
+  initialization-fallback, maximum-evaluations, and TuRBO assertions derive from
+  the generic variable/metric names and a two-value TuRBO raw candidate
+  (`[3.0, 0.3]` -> `valid_candidate_parameters`). 11 tests preserved.
+- tests/test_optimizer_loop.py — imports `create_ready_project`/`record_real_001`
+  from the shared helper (still imports the result-writer wrappers from
+  `tests.test_candidate_injection_real_run`); status/run-id/candidate-id/report
+  assertions unchanged. 11 tests preserved.
+
+`tests/test_next_real_run.py` was removed from `ALLOWED_TEMPLATE_CALLERS`
+(allowlist 19 -> 18). No consumer imports from `tests.test_next_real_run` remain;
+shared cluster setup now comes from `tests.real_run_cluster_helpers`.
 
 ## Phase 3 status (partial — next-run cluster deferred)
 
@@ -49,21 +85,13 @@ Migrated away from direct `create_project_from_template()` usage:
 
 Both files were removed from `ALLOWED_TEMPLATE_CALLERS` (allowlist 21 -> 19).
 
-### Deferred: tests/test_next_real_run.py + coupled cluster (user-approved)
+### Phase 3 deferral (resolved in Phase 4)
 
-`tests/test_next_real_run.py` is the hub of a tightly-coupled 4-file cluster that
-all require the `FN/WN/FP/WP` + `rise/fall/DC` template project via shared helpers:
-`tests/test_candidate_injection_real_run.py` (injects and validates `FN/WN/FP/WP`
-candidates), `tests/test_optimizer_suggestion.py` (asserts exact `FN/WN/FP/WP`
-parameter sequences), and `tests/test_optimizer_loop.py` (imports helpers from
-both `test_next_real_run` and `test_candidate_injection_real_run`). Migrating
-`test_next_real_run.py` alone breaks all three; fixing them is a large migration
-(candidate parameters, validation messages, metric helpers), not a small
-helper-localization edit. Per the plan's stop-condition and explicit user
-approval, this cluster is deferred to a dedicated later phase. It remains in
-`ALLOWED_TEMPLATE_CALLERS`. (Localizing template helpers into the consumers was
-ruled out: it would re-introduce `create_project_from_template()` into three
-currently-clean files, violating the guard's monotonic-shrink rule.)
+The four-file next-real-run cluster — `tests/test_next_real_run.py`,
+`tests/test_candidate_injection_real_run.py`, `tests/test_optimizer_suggestion.py`,
+and `tests/test_optimizer_loop.py` — was deferred in Phase 3 because migrating the
+hub alone breaks its three consumers. Phase 4 migrated the whole cluster via the
+new `tests/real_run_cluster_helpers.py` shared helper — see Phase 4 status.
 
 ## Phase 2 status
 
@@ -134,23 +162,10 @@ Task 3 Step 5 ("do not change tests that intentionally exercise four-variable
 optimizer behavior; leave those for a later wave"), they are deferred and remain in
 the guard allowlist.
 
-- tests/test_next_real_run.py — hub of the deferred 4-file cluster (see Phase 3
-  status); asserts a deterministic optimizer-init candidate plus `rise/fall/DC`
-  metrics, and shares its template fixture helpers with
-  `tests/test_candidate_injection_real_run.py`, `tests/test_optimizer_suggestion.py`,
-  and `tests/test_optimizer_loop.py`.
 - tests/test_approvals.py (optional per plan) — 13 call sites with packaging +
   approval setup; deferred to a focused wave rather than a large edit.
 
 ## Remaining migration waves
-
-### Real-run continuation cluster (next phase — migrate as a unit)
-
-- tests/test_next_real_run.py — migrate together with its three consumers
-  (`tests/test_candidate_injection_real_run.py`,
-  `tests/test_optimizer_suggestion.py`, `tests/test_optimizer_loop.py`); they
-  share one template project fixture and inject/validate `FN/WN/FP/WP`
-  candidates, so they must move to the generic factory together.
 
 ### Approvals and packaging
 
@@ -193,6 +208,24 @@ The allowlist must shrink monotonically; the guard prevents any new unreviewed
 direct usage from being introduced.
 
 ## Verification
+
+### Phase 4
+
+- `pytest tests/test_next_real_run.py -q` -> `26 passed`
+- `pytest tests/test_candidate_injection_real_run.py -q` -> `16 passed`
+- `pytest tests/test_optimizer_suggestion.py -q` -> `11 passed`
+- `pytest tests/test_optimizer_loop.py -q` -> `11 passed`
+- `pytest tests/test_template_coupling_guard.py -q` -> `1 passed`
+- `pytest tests/test_next_real_run.py tests/test_candidate_injection_real_run.py tests/test_optimizer_suggestion.py tests/test_optimizer_loop.py -q` -> `64 passed`
+- `pytest tests/test_project_factory.py tests/test_template_coupling_guard.py tests/test_health.py tests/test_optimizer_flow.py tests/test_result_handoff.py tests/test_metric_results.py tests/test_real_run.py tests/test_real_run_recovery.py tests/test_next_real_run.py tests/test_candidate_injection_real_run.py tests/test_optimizer_suggestion.py tests/test_optimizer_loop.py -q` -> `237 passed`
+- `pytest -q` -> `1193 passed` (down 4 from 1197: the 5-case invalid-values parametrize became one loop test with identical coverage)
+- `ruff check src tests` -> `All checks passed!`
+- `git diff --check` -> clean
+- `git -C ../ic-auto-opt-workflow-v0.1 status --short` -> clean (release checkout untouched)
+- grep `create_project_from_template|bridge_test_inv|FN|WN|FP|WP|TEMPLATE_TEXT` over the four cluster files -> no matches
+- grep `"rise"|"fall"|"DC"` over the four cluster files -> no matches
+- grep `from tests.test_next_real_run` over `tests/` -> no matches
+- `ALLOWED_TEMPLATE_CALLERS` count: 19 -> 18.
 
 ### Phase 3 (partial)
 
