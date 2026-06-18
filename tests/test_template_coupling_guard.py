@@ -13,12 +13,10 @@ ALLOWED_TEMPLATE_CALLERS = {
     "tests/test_multi_testbench_aggregation.py",
     "tests/test_native_turbo.py",
     "tests/test_openbox_backend.py",
-    "tests/test_optimizer_progress_state.py",
     "tests/test_real_result_record.py",
     "tests/test_remote_fix_run_flow.py",
     "tests/test_remote_optimizer_flow.py",
     "tests/test_remote_spectre_ocean.py",
-    "tests/test_run_retention.py",
     "tests/test_spectre_ocean_adapter.py",
 }
 

@@ -3,10 +3,10 @@
 Date: 2026-06-18
 Phases: 1 (factory + guard + first wave), 2 (real-run handoff + metric-result contracts),
 3 (first real-run package + recovery), 4 (next-run cluster), 5 (netlist + dry-run preflight),
-6 (approval gate), and 7 (optimizer task package)
+6 (approval gate), 7 (optimizer task package), and 8 (retention + progress state)
 
 This inventory records the state of direct `create_project_from_template()` usage
-across `tests/` after Phases 1-7 of the Test Project Factory and Template Coupling
+across `tests/` after Phases 1-8 of the Test Project Factory and Template Coupling
 Cleanup. The generic factory (`tests/project_factory.py`) and the coupling guard
 (`tests/test_template_coupling_guard.py`) are in place. Phase 1 migrated the files
 that are genuinely decoupled from circuit-specific template contents; Phase 2
@@ -15,7 +15,8 @@ incidental metric names from generated request files; Phase 3 migrated the
 first-real-run-package and recovery tests; Phase 4 migrated the four-file
 next-real-run cluster via a new shared helper module; Phase 5 migrated the netlist
 and dry-run preflight tests via another small shared helper; Phase 6 migrated the
-approval gate tests; Phase 7 migrated the optimizer task package tests. Remaining
+approval gate tests; Phase 7 migrated the optimizer task package tests; Phase 8 migrated the
+run-retention and optimizer-progress-state tests. Remaining
 coupled files are explicitly deferred.
 
 ## Status summary
@@ -25,6 +26,22 @@ coupled files are explicitly deferred.
 - Coupling guard: `tests/test_template_coupling_guard.py` (fails on any
   non-allowlisted direct usage of `create_project_from_template`).
 - `create_project_from_template()` remains the product/template API and is untouched.
+
+## Phase 8 status
+
+Migrated `tests/test_run_retention.py` and `tests/test_optimizer_progress_state.py`
+away from direct `create_project_from_template()` usage. Both files now create
+generic projects through `tests/project_factory.py`. The retention tests use
+structured YAML mutation for spectre.yaml flags (`_set_keep_flags`), and the
+progress-state tests derive variable/metric names from generated config.
+
+Coverage preserved: run-retention keep/delete decisions, decision report fields,
+unsafe-run-id rejection, rmtree failure handling, remote/local field merging;
+optimizer progress state build (5 unit tests) and sync (2 integration tests with
+config-derived max_evaluations/batch_size and derived ledger variable/metric names).
+
+Both files were removed from `ALLOWED_TEMPLATE_CALLERS` (allowlist 14 -> 12).
+No external tests import from either file.
 
 ## Phase 7 status
 
@@ -238,10 +255,8 @@ generic factory.
 
 ### Approvals and packaging
 
-- tests/test_run_retention.py
 - tests/test_fix_run_flow.py
 - tests/test_multi_testbench_aggregation.py
-- tests/test_optimizer_progress_state.py
 - tests/real_run_smoke_helpers.py
 
 ### Optimizer backends (deepest coupling)
@@ -273,6 +288,20 @@ The allowlist must shrink monotonically; the guard prevents any new unreviewed
 direct usage from being introduced.
 
 ## Verification
+
+### Phase 8
+
+- `pytest tests/test_run_retention.py tests/test_optimizer_progress_state.py -q` -> `28 passed`
+- `pytest tests/test_template_coupling_guard.py -q` -> `1 passed`
+- `pytest tests/test_run_retention.py tests/test_optimizer_progress_state.py tests/test_template_coupling_guard.py -q` -> `29 passed`
+- `pytest tests/test_project_factory.py tests/test_template_coupling_guard.py tests/test_health.py tests/test_optimizer_flow.py tests/test_result_handoff.py tests/test_metric_results.py tests/test_real_run.py tests/test_real_run_recovery.py tests/test_next_real_run.py tests/test_candidate_injection_real_run.py tests/test_optimizer_suggestion.py tests/test_optimizer_loop.py tests/test_netlists.py tests/test_dry_run.py tests/test_approvals.py tests/test_optimizer_task_package.py tests/test_run_retention.py tests/test_optimizer_progress_state.py -q` -> `322 passed`
+- `pytest -q` -> `1194 passed`
+- `ruff check src tests` -> `All checks passed!`
+- `git diff --check` -> clean
+- `git -C ../ic-auto-opt-workflow-v0.1 status --short` -> clean (release checkout untouched)
+- grep `create_project_from_template|bridge_test_inv|FN|WN|FP|WP|rise` over the two migrated files -> no matches
+- grep cross-imports -> no source-level matches
+- `ALLOWED_TEMPLATE_CALLERS` count: 14 -> 12.
 
 ### Phase 7
 
