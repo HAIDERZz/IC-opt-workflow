@@ -20,8 +20,6 @@ ALLOWED_TEMPLATE_CALLERS = {
     "tests/test_optimizer_progress_state.py",
     "tests/test_optimizer_task_package.py",
     "tests/test_real_result_record.py",
-    "tests/test_real_run.py",
-    "tests/test_real_run_recovery.py",
     "tests/test_remote_fix_run_flow.py",
     "tests/test_remote_optimizer_flow.py",
     "tests/test_remote_spectre_ocean.py",

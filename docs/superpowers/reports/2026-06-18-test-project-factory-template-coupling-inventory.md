@@ -1,15 +1,18 @@
 # Test Project Factory Template Coupling Inventory
 
 Date: 2026-06-18
-Phases: 1 (factory + guard + first wave) and 2 (real-run handoff + metric-result contracts)
+Phases: 1 (factory + guard + first wave), 2 (real-run handoff + metric-result contracts),
+and 3 (first real-run package + recovery; next-run cluster deferred)
 
 This inventory records the state of direct `create_project_from_template()` usage
-across `tests/` after Phases 1-2 of the Test Project Factory and Template Coupling
+across `tests/` after Phases 1-3 of the Test Project Factory and Template Coupling
 Cleanup. The generic factory (`tests/project_factory.py`) and the coupling guard
 (`tests/test_template_coupling_guard.py`) are in place. Phase 1 migrated the files
 that are genuinely decoupled from circuit-specific template contents; Phase 2
 migrated the real-run handoff and metric-result contract tests by deriving
-incidental metric names from generated request files rather than hardcoding them.
+incidental metric names from generated request files; Phase 3 migrated the
+first-real-run-package and recovery tests. `tests/test_next_real_run.py` and its
+three coupled consumers are deferred as a single cluster (see Phase 3 status).
 Remaining coupled files are explicitly deferred.
 
 ## Status summary
@@ -19,6 +22,48 @@ Remaining coupled files are explicitly deferred.
 - Coupling guard: `tests/test_template_coupling_guard.py` (fails on any
   non-allowlisted direct usage of `create_project_from_template`).
 - `create_project_from_template()` remains the product/template API and is untouched.
+
+## Phase 3 status (partial — next-run cluster deferred)
+
+Migrated away from direct `create_project_from_template()` usage:
+
+- tests/test_real_run.py — now uses `create_generic_project()`; `_create_project`
+  returns the generic project, `_approve_project` writes pass reports with
+  `VAR_INT`/`VAR_WIDTH`, and `_write_template` is a no-op for the default (the
+  factory already writes the generic template) while still supporting custom
+  template text. Assertions derive from generated artifacts: candidate parameters
+  from `candidate.json`, project name from `project_dir.name`, metric names from
+  `metric_extraction_request.json` (`metric_gain`/`metric_power`), and simulator
+  settings from the generic factory's `spectre.yaml` (`threads_per_run=2`,
+  `parallel_jobs=4`). 29 tests preserved; the "rejects" failure-path tests assert
+  on the run-package dir `runs/real/real_001` (the factory pre-creates an empty
+  `runs/real/` skeleton), and the missing-template test explicitly unlinks the
+  factory-provided template.
+- tests/test_real_run_recovery.py — `_create_ready_project` now uses
+  `create_approved_generic_project()` + `prepare_real_run()`; `_write_metric_result_manifest`
+  derives metric names/values from the request; `_write_manual_retry_package` uses
+  `VAR_INT`/`VAR_WIDTH` retry parameters; the template-change test edits the
+  existing generic template in place. 42 tests preserved. Its `tests/test_cli.py`
+  consumers (name-agnostic recovery assertions) are unaffected and needed no
+  change.
+
+Both files were removed from `ALLOWED_TEMPLATE_CALLERS` (allowlist 21 -> 19).
+
+### Deferred: tests/test_next_real_run.py + coupled cluster (user-approved)
+
+`tests/test_next_real_run.py` is the hub of a tightly-coupled 4-file cluster that
+all require the `FN/WN/FP/WP` + `rise/fall/DC` template project via shared helpers:
+`tests/test_candidate_injection_real_run.py` (injects and validates `FN/WN/FP/WP`
+candidates), `tests/test_optimizer_suggestion.py` (asserts exact `FN/WN/FP/WP`
+parameter sequences), and `tests/test_optimizer_loop.py` (imports helpers from
+both `test_next_real_run` and `test_candidate_injection_real_run`). Migrating
+`test_next_real_run.py` alone breaks all three; fixing them is a large migration
+(candidate parameters, validation messages, metric helpers), not a small
+helper-localization edit. Per the plan's stop-condition and explicit user
+approval, this cluster is deferred to a dedicated later phase. It remains in
+`ALLOWED_TEMPLATE_CALLERS`. (Localizing template helpers into the consumers was
+ruled out: it would re-introduce `create_project_from_template()` into three
+currently-clean files, violating the guard's monotonic-shrink rule.)
 
 ## Phase 2 status
 
@@ -89,24 +134,23 @@ Task 3 Step 5 ("do not change tests that intentionally exercise four-variable
 optimizer behavior; leave those for a later wave"), they are deferred and remain in
 the guard allowlist.
 
-- tests/test_next_real_run.py — asserts deterministic optimizer-init candidate
-  `parameters == {"FN":"11","FP":"11","WN":"0.3u","WP":"2.9u"}` (4 variables) plus
-  the `rise/fall/DC` metric result manifest.
-- tests/test_real_run.py — asserts `manifest["project_name"] == "bridge_test_inv"`,
-  candidate `{"FN":"2","WN":"0.3u","FP":"2","WP":"0.3u"}`, rendered `"FN=2"`, and
-  `set(request_metrics) == {"rise","fall","DC"}`.
-- tests/test_real_run_recovery.py — same `FN/WN/FP/WP` template + `rise/fall/DC`
-  manifests + manual retry `parameters {"FN":...}`.
+- tests/test_next_real_run.py — hub of the deferred 4-file cluster (see Phase 3
+  status); asserts a deterministic optimizer-init candidate plus `rise/fall/DC`
+  metrics, and shares its template fixture helpers with
+  `tests/test_candidate_injection_real_run.py`, `tests/test_optimizer_suggestion.py`,
+  and `tests/test_optimizer_loop.py`.
 - tests/test_approvals.py (optional per plan) — 13 call sites with packaging +
   approval setup; deferred to a focused wave rather than a large edit.
 
 ## Remaining migration waves
 
-### Real-run and metric-handoff contracts (closest, lowest-risk next)
+### Real-run continuation cluster (next phase — migrate as a unit)
 
-- tests/test_next_real_run.py — needs candidate-value assertions generalized.
-- tests/test_real_run.py — needs project-name, candidate, and metric-name generalization.
-- tests/test_real_run_recovery.py — needs template + metric + retry-parameter generalization.
+- tests/test_next_real_run.py — migrate together with its three consumers
+  (`tests/test_candidate_injection_real_run.py`,
+  `tests/test_optimizer_suggestion.py`, `tests/test_optimizer_loop.py`); they
+  share one template project fixture and inject/validate `FN/WN/FP/WP`
+  candidates, so they must move to the generic factory together.
 
 ### Approvals and packaging
 
@@ -149,6 +193,21 @@ The allowlist must shrink monotonically; the guard prevents any new unreviewed
 direct usage from being introduced.
 
 ## Verification
+
+### Phase 3 (partial)
+
+- `pytest tests/test_real_run.py -q` -> `29 passed`
+- `pytest tests/test_real_run_recovery.py -q` -> `42 passed`
+- `pytest tests/test_next_real_run.py -q` -> deferred (unchanged; still passes as part of the cluster)
+- `pytest tests/test_cli.py tests/test_candidate_injection_real_run.py tests/test_optimizer_loop.py tests/test_optimizer_suggestion.py tests/test_template_coupling_guard.py -q` -> `92 passed`
+- `pytest tests/test_project_factory.py tests/test_template_coupling_guard.py tests/test_health.py tests/test_optimizer_flow.py tests/test_result_handoff.py tests/test_metric_results.py tests/test_real_run.py tests/test_next_real_run.py tests/test_real_run_recovery.py tests/test_cli.py tests/test_candidate_injection_real_run.py tests/test_optimizer_loop.py tests/test_optimizer_suggestion.py -q` -> `290 passed`
+- `pytest -q` -> `1197 passed`
+- `ruff check src tests` -> `All checks passed!`
+- `git diff --check` -> clean
+- `git -C ../ic-auto-opt-workflow-v0.1 status --short` -> clean (release checkout untouched)
+- grep `create_project_from_template|bridge_test_inv|FN|WN|FP|WP|TEMPLATE_TEXT` over the two migrated targets (`tests/test_real_run.py`, `tests/test_real_run_recovery.py`) -> no matches. (`tests/test_next_real_run.py` still matches — deferred by design.)
+- grep `"rise"|"fall"|"DC"` over the two migrated targets -> no matches.
+- `ALLOWED_TEMPLATE_CALLERS` count: 21 -> 19.
 
 ### Phase 2
 
