@@ -14,7 +14,6 @@ ALLOWED_TEMPLATE_CALLERS = {
     "tests/test_native_turbo.py",
     "tests/test_openbox_backend.py",
     "tests/test_optimizer_progress_state.py",
-    "tests/test_optimizer_task_package.py",
     "tests/test_real_result_record.py",
     "tests/test_remote_fix_run_flow.py",
     "tests/test_remote_optimizer_flow.py",

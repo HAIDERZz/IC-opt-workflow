@@ -3,10 +3,10 @@
 Date: 2026-06-18
 Phases: 1 (factory + guard + first wave), 2 (real-run handoff + metric-result contracts),
 3 (first real-run package + recovery), 4 (next-run cluster), 5 (netlist + dry-run preflight),
-and 6 (approval gate)
+6 (approval gate), and 7 (optimizer task package)
 
 This inventory records the state of direct `create_project_from_template()` usage
-across `tests/` after Phases 1-6 of the Test Project Factory and Template Coupling
+across `tests/` after Phases 1-7 of the Test Project Factory and Template Coupling
 Cleanup. The generic factory (`tests/project_factory.py`) and the coupling guard
 (`tests/test_template_coupling_guard.py`) are in place. Phase 1 migrated the files
 that are genuinely decoupled from circuit-specific template contents; Phase 2
@@ -15,7 +15,8 @@ incidental metric names from generated request files; Phase 3 migrated the
 first-real-run-package and recovery tests; Phase 4 migrated the four-file
 next-real-run cluster via a new shared helper module; Phase 5 migrated the netlist
 and dry-run preflight tests via another small shared helper; Phase 6 migrated the
-approval gate tests. Remaining coupled files are explicitly deferred.
+approval gate tests; Phase 7 migrated the optimizer task package tests. Remaining
+coupled files are explicitly deferred.
 
 ## Status summary
 
@@ -24,6 +25,29 @@ approval gate tests. Remaining coupled files are explicitly deferred.
 - Coupling guard: `tests/test_template_coupling_guard.py` (fails on any
   non-allowlisted direct usage of `create_project_from_template`).
 - `create_project_from_template()` remains the product/template API and is untouched.
+
+## Phase 7 status
+
+Migrated `tests/test_optimizer_task_package.py` away from direct
+`create_project_from_template()` usage. The file now creates generic projects
+through `tests/project_factory.py` with explicit optimizer package settings
+(`max_evaluations=100`, `batch_size=10`, `parallel_jobs=10`) so package behavior
+remains comparable to the previous template-backed tests without depending on the
+packaged example circuit. Strategy-routing tests mutate `config/optimizer.yaml`
+through structured YAML (`_set_optimizer_settings`) instead of old template text
+replacement, and numeric/spectre assertions derive from generated config via
+`_optimizer_settings` / `_spectre_settings`. Command and audit-command assertions
+use `str(project_dir.resolve())` / `str(CADENCE_CSHRC.resolve())`.
+
+Coverage preserved: native TuRBO package generation, OpenBox package generation,
+config-driven turbo/openbox strategy routing, OpenBox continuation, CLI package
+entrypoints (native / openbox / continuation), shell-safe absolute command paths,
+scheduler/Spectre settings separation, forbidden-action section placement, OpenBox
+fallback guidance, and explicit OpenBox strategy handling. All 13 tests preserved.
+
+`tests/test_optimizer_task_package.py` was removed from `ALLOWED_TEMPLATE_CALLERS`
+(allowlist 15 -> 14). No external tests import from
+`tests.test_optimizer_task_package`.
 
 ## Phase 6 status
 
@@ -214,7 +238,6 @@ generic factory.
 
 ### Approvals and packaging
 
-- tests/test_optimizer_task_package.py
 - tests/test_run_retention.py
 - tests/test_fix_run_flow.py
 - tests/test_multi_testbench_aggregation.py
@@ -250,6 +273,20 @@ The allowlist must shrink monotonically; the guard prevents any new unreviewed
 direct usage from being introduced.
 
 ## Verification
+
+### Phase 7
+
+- `pytest tests/test_optimizer_task_package.py -q` -> `13 passed`
+- `pytest tests/test_template_coupling_guard.py -q` -> `1 passed`
+- `pytest tests/test_optimizer_task_package.py tests/test_template_coupling_guard.py -q` -> `14 passed`
+- `pytest tests/test_project_factory.py tests/test_template_coupling_guard.py tests/test_health.py tests/test_optimizer_flow.py tests/test_result_handoff.py tests/test_metric_results.py tests/test_real_run.py tests/test_real_run_recovery.py tests/test_next_real_run.py tests/test_candidate_injection_real_run.py tests/test_optimizer_suggestion.py tests/test_optimizer_loop.py tests/test_netlists.py tests/test_dry_run.py tests/test_approvals.py tests/test_optimizer_task_package.py -q` -> `294 passed`
+- `pytest -q` -> `1194 passed`
+- `ruff check src tests` -> `All checks passed!`
+- `git diff --check` -> clean
+- `git -C ../ic-auto-opt-workflow-v0.1 status --short` -> clean (release checkout untouched)
+- grep `create_project_from_template|bridge_test_inv|FN|WN|FP|WP` over `tests/test_optimizer_task_package.py` -> no matches
+- grep `from tests.test_optimizer_task_package|tests.test_optimizer_task_package` over `tests/` -> no source-level matches
+- `ALLOWED_TEMPLATE_CALLERS` count: 15 -> 14.
 
 ### Phase 6
 
