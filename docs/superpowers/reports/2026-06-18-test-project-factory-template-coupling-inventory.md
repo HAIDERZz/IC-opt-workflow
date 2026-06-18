@@ -2,18 +2,19 @@
 
 Date: 2026-06-18
 Phases: 1 (factory + guard + first wave), 2 (real-run handoff + metric-result contracts),
-3 (first real-run package + recovery), and 4 (next-run cluster)
+3 (first real-run package + recovery), 4 (next-run cluster), and 5 (netlist + dry-run preflight)
 
 This inventory records the state of direct `create_project_from_template()` usage
-across `tests/` after Phases 1-4 of the Test Project Factory and Template Coupling
+across `tests/` after Phases 1-5 of the Test Project Factory and Template Coupling
 Cleanup. The generic factory (`tests/project_factory.py`) and the coupling guard
 (`tests/test_template_coupling_guard.py`) are in place. Phase 1 migrated the files
 that are genuinely decoupled from circuit-specific template contents; Phase 2
 migrated the real-run handoff and metric-result contract tests by deriving
 incidental metric names from generated request files; Phase 3 migrated the
 first-real-run-package and recovery tests; Phase 4 migrated the four-file
-next-real-run cluster via a new shared helper module. Remaining coupled files are
-explicitly deferred.
+next-real-run cluster via a new shared helper module; Phase 5 migrated the netlist
+and dry-run preflight tests via another small shared helper. Remaining coupled
+files are explicitly deferred.
 
 ## Status summary
 
@@ -22,6 +23,32 @@ explicitly deferred.
 - Coupling guard: `tests/test_template_coupling_guard.py` (fails on any
   non-allowlisted direct usage of `create_project_from_template`).
 - `create_project_from_template()` remains the product/template API and is untouched.
+
+## Phase 5 status
+
+Migrated the netlist and dry-run preflight tests away from direct
+`create_project_from_template()` usage, using a new shared test-only helper
+module `tests/netlist_dry_run_helpers.py` (generic project creation via
+`create_generic_project()`, approved-variable lookup from `config/variables.yaml`,
+exported-deck/template builders, and a multi-testbench metric assigner).
+
+- tests/test_netlists.py — the `prepare_netlist` tests build exported decks
+  inline using the two generic approved variables (derived from `variables.yaml`);
+  templated-token and report-status assertions derive keys from those names. The
+  multi-testbench helper now assigns all metrics to a testbench via `metrics.yaml`
+  parsing instead of text-replacing old metric formula names, and the pure
+  `render_corner_netlist_template()` tests (already using arbitrary names like
+  `F`/`W`/`temperature`) were left unchanged. The missing-input test unlinks the
+  factory-provided exported input and template. 20 tests preserved.
+- tests/test_dry_run.py — templates come from the helper's generic
+  `template_text()`/`project_with_template()`; lower-bound, missing-template,
+  missing/unexpected/malformed-placeholder, stale-render, no-optimizer-artifacts,
+  and render-write-failure coverage is preserved with derived variable names; the
+  false-but-evaluable constraint test parses `metrics.yaml` and mutates the first
+  constraint value. 9 tests preserved.
+
+Both files were removed from `ALLOWED_TEMPLATE_CALLERS` (allowlist 18 -> 16).
+No external tests import from `tests.test_netlists` or `tests.test_dry_run`.
 
 ## Phase 4 status
 
@@ -172,8 +199,6 @@ the guard allowlist.
 - tests/test_approvals.py
 - tests/test_optimizer_task_package.py
 - tests/test_run_retention.py
-- tests/test_netlists.py
-- tests/test_dry_run.py
 - tests/test_fix_run_flow.py
 - tests/test_multi_testbench_aggregation.py
 - tests/test_optimizer_progress_state.py
@@ -208,6 +233,21 @@ The allowlist must shrink monotonically; the guard prevents any new unreviewed
 direct usage from being introduced.
 
 ## Verification
+
+### Phase 5
+
+- `pytest tests/test_netlists.py -q` -> `20 passed`
+- `pytest tests/test_dry_run.py -q` -> `9 passed`
+- `pytest tests/test_template_coupling_guard.py -q` -> `1 passed`
+- `pytest tests/test_netlists.py tests/test_dry_run.py -q` -> `29 passed`
+- `pytest tests/test_project_factory.py tests/test_template_coupling_guard.py tests/test_health.py tests/test_optimizer_flow.py tests/test_result_handoff.py tests/test_metric_results.py tests/test_real_run.py tests/test_real_run_recovery.py tests/test_next_real_run.py tests/test_candidate_injection_real_run.py tests/test_optimizer_suggestion.py tests/test_optimizer_loop.py tests/test_netlists.py tests/test_dry_run.py -q` -> `266 passed`
+- `pytest -q` -> `1193 passed`
+- `ruff check src tests` -> `All checks passed!`
+- `git diff --check` -> clean
+- `git -C ../ic-auto-opt-workflow-v0.1 status --short` -> clean (release checkout untouched)
+- grep `create_project_from_template|bridge_test_inv|FN|WN|FP|WP|TEMPLATE_TEXT` over `tests/test_netlists.py tests/test_dry_run.py tests/netlist_dry_run_helpers.py` -> no matches
+- grep `from tests.test_netlists|from tests.test_dry_run` over `tests/` -> no matches
+- `ALLOWED_TEMPLATE_CALLERS` count: 18 -> 16.
 
 ### Phase 4
 

@@ -9,12 +9,10 @@ ALLOWED_TEMPLATE_CALLERS = {
     # Not yet migrated. Shrink this list in follow-up waves.
     "tests/real_run_smoke_helpers.py",
     "tests/test_approvals.py",
-    "tests/test_dry_run.py",
     "tests/test_fix_run_flow.py",
     "tests/test_mock_optimizer.py",
     "tests/test_multi_testbench_aggregation.py",
     "tests/test_native_turbo.py",
-    "tests/test_netlists.py",
     "tests/test_openbox_backend.py",
     "tests/test_optimizer_progress_state.py",
     "tests/test_optimizer_task_package.py",
