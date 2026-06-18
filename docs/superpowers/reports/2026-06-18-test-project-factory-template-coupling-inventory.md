@@ -2,10 +2,11 @@
 
 Date: 2026-06-18
 Phases: 1 (factory + guard + first wave), 2 (real-run handoff + metric-result contracts),
-3 (first real-run package + recovery), 4 (next-run cluster), and 5 (netlist + dry-run preflight)
+3 (first real-run package + recovery), 4 (next-run cluster), 5 (netlist + dry-run preflight),
+and 6 (approval gate)
 
 This inventory records the state of direct `create_project_from_template()` usage
-across `tests/` after Phases 1-5 of the Test Project Factory and Template Coupling
+across `tests/` after Phases 1-6 of the Test Project Factory and Template Coupling
 Cleanup. The generic factory (`tests/project_factory.py`) and the coupling guard
 (`tests/test_template_coupling_guard.py`) are in place. Phase 1 migrated the files
 that are genuinely decoupled from circuit-specific template contents; Phase 2
@@ -13,8 +14,8 @@ migrated the real-run handoff and metric-result contract tests by deriving
 incidental metric names from generated request files; Phase 3 migrated the
 first-real-run-package and recovery tests; Phase 4 migrated the four-file
 next-real-run cluster via a new shared helper module; Phase 5 migrated the netlist
-and dry-run preflight tests via another small shared helper. Remaining coupled
-files are explicitly deferred.
+and dry-run preflight tests via another small shared helper; Phase 6 migrated the
+approval gate tests. Remaining coupled files are explicitly deferred.
 
 ## Status summary
 
@@ -23,6 +24,38 @@ files are explicitly deferred.
 - Coupling guard: `tests/test_template_coupling_guard.py` (fails on any
   non-allowlisted direct usage of `create_project_from_template`).
 - `create_project_from_template()` remains the product/template API and is untouched.
+
+## Phase 6 status
+
+Migrated `tests/test_approvals.py` away from direct
+`create_project_from_template()` usage. Optimizer approval tests use generic
+factory projects (`create_packaged_generic_project`) plus local report helpers
+that derive approved variable names from `config/variables.yaml`; fix-run approval
+tests use the generic factory's `workflow_mode="fix_run"` project. All 14 tests
+preserve their decision/reason/action assertions unchanged.
+
+### Scope note: factory fix_run fix (user-approved)
+
+Phase 6 discovered that the generic factory's `workflow_mode="fix_run"` path was
+broken (never exercised before Phase 6): `_write_fix_run_workflow` wrote `mode`
+nested under `workflow:` and `fixed_points` inside `workflow.yaml`, but the
+production validator detects fix_run mode from a top-level `mode` key and requires
+a separate `fixed_points.yaml`. The factory's fix_run project was therefore
+rejected as an invalid optimize project. With user approval,
+`_write_fix_run_workflow` in `tests/project_factory.py` was fixed to write a
+top-level `mode: fix_run` + `starting_run_id` in `workflow.yaml` and a separate
+`fixed_points.yaml` with `points:`. This is a general factory fix (not
+approval-specific); it makes `create_generic_project(workflow_mode="fix_run")`
+valid as the Phase 6 plan intended. A regression test
+(`test_create_generic_project_fix_run_mode_is_valid`) was added to
+`tests/test_project_factory.py` to lock in the fix: it asserts the fix-run project
+validates, `workflow.yaml` carries top-level `mode: fix_run` + `starting_run_id`,
+`fixed_points.yaml` exists with `VAR_INT`/`VAR_WIDTH` parameters, and
+`optimizer.yaml` is absent (so fix-run is not mistaken for optimize).
+`tests/test_project_factory.py` now passes 4 tests.
+
+`tests/test_approvals.py` was removed from `ALLOWED_TEMPLATE_CALLERS`
+(allowlist 16 -> 15). No external tests import from `tests.test_approvals`.
 
 ## Phase 5 status
 
@@ -177,26 +210,10 @@ generic factory.
 - tests/test_package.py — template tree, packaged resources, `init` semantics.
 - tests/test_cli.py — `hermes-workflow init` product behavior.
 
-## Deferred from the proposed first wave (circuit-specific coupling)
-
-The plan proposed these as a first wave, but reading the source showed each is
-coupled to circuit-specific template contents (4 variables `FN/WN/FP/WP`, 3
-metrics `rise/fall/DC`, project name `bridge_test_inv`, and/or specific optimizer
-initialization candidate values). The generic factory deliberately produces exactly
-2 variables / 2 metrics, so it cannot serve these tests without a per-test rewrite
-of templates, fake manifests, and assertions. Per spec design principle 6 and plan
-Task 3 Step 5 ("do not change tests that intentionally exercise four-variable
-optimizer behavior; leave those for a later wave"), they are deferred and remain in
-the guard allowlist.
-
-- tests/test_approvals.py (optional per plan) — 13 call sites with packaging +
-  approval setup; deferred to a focused wave rather than a large edit.
-
 ## Remaining migration waves
 
 ### Approvals and packaging
 
-- tests/test_approvals.py
 - tests/test_optimizer_task_package.py
 - tests/test_run_retention.py
 - tests/test_fix_run_flow.py
@@ -233,6 +250,21 @@ The allowlist must shrink monotonically; the guard prevents any new unreviewed
 direct usage from being introduced.
 
 ## Verification
+
+### Phase 6
+
+- `pytest tests/test_project_factory.py -q` -> `4 passed`
+- `pytest tests/test_approvals.py -q` -> `14 passed`
+- `pytest tests/test_template_coupling_guard.py -q` -> `1 passed`
+- `pytest tests/test_approvals.py tests/test_template_coupling_guard.py -q` -> `15 passed`
+- `pytest tests/test_project_factory.py tests/test_template_coupling_guard.py tests/test_health.py tests/test_optimizer_flow.py tests/test_result_handoff.py tests/test_metric_results.py tests/test_real_run.py tests/test_real_run_recovery.py tests/test_next_real_run.py tests/test_candidate_injection_real_run.py tests/test_optimizer_suggestion.py tests/test_optimizer_loop.py tests/test_netlists.py tests/test_dry_run.py tests/test_approvals.py -q` -> `281 passed`
+- `pytest -q` -> `1194 passed`
+- `ruff check src tests` -> `All checks passed!`
+- `git diff --check` -> clean
+- `git -C ../ic-auto-opt-workflow-v0.1 status --short` -> clean (release checkout untouched)
+- grep `create_project_from_template|bridge_test_inv|FN|WN|FP|WP` over `tests/test_approvals.py` -> no matches
+- grep `from tests.test_approvals|tests.test_approvals` over `tests/` -> no source-level matches
+- `ALLOWED_TEMPLATE_CALLERS` count: 16 -> 15.
 
 ### Phase 5
 

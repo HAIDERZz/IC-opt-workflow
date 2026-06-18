@@ -322,8 +322,15 @@ def _write_fix_run_workflow(
         project_dir / "config" / "workflow.yaml",
         {
             "schema_version": "1.0",
-            "workflow": {"mode": "fix_run"},
-            "fixed_points": [
+            "mode": "fix_run",
+            "starting_run_id": "real_001",
+        },
+    )
+    write_yaml(
+        project_dir / "config" / "fixed_points.yaml",
+        {
+            "schema_version": "1.0",
+            "points": [
                 {
                     "candidate_id": "fixed_001",
                     "parameters": {int_name: "2", width_name: "0.2u"},

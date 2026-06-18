@@ -63,3 +63,26 @@ def test_create_approved_generic_project_approves_first_real_run(
         "VAR_INT": True,
         "VAR_WIDTH": True,
     }
+
+
+def test_create_generic_project_fix_run_mode_is_valid(tmp_path: Path) -> None:
+    project_dir = create_generic_project(tmp_path, workflow_mode="fix_run")
+
+    assert validate_project_files(project_dir).ok is True
+    assert_valid_project(project_dir)
+
+    workflow = yaml.safe_load(
+        (project_dir / "config" / "workflow.yaml").read_text(encoding="utf-8")
+    )
+    assert workflow["mode"] == "fix_run"
+    assert workflow["starting_run_id"] == "real_001"
+
+    fixed_points = yaml.safe_load(
+        (project_dir / "config" / "fixed_points.yaml").read_text(encoding="utf-8")
+    )
+    assert fixed_points["points"][0]["parameters"] == {
+        "VAR_INT": "2",
+        "VAR_WIDTH": "0.2u",
+    }
+
+    assert not (project_dir / "config" / "optimizer.yaml").exists()
