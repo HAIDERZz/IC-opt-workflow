@@ -3,10 +3,10 @@
 Date: 2026-06-18
 Phases: 1 (factory + guard + first wave), 2 (real-run handoff + metric-result contracts),
 3 (first real-run package + recovery), 4 (next-run cluster), 5 (netlist + dry-run preflight),
-6 (approval gate), 7 (optimizer task package), 8 (retention + progress state), and 9 (fix-run flow)
+6 (approval gate), 7 (optimizer task package), 8 (retention + progress state), 9 (fix-run flow), and 10 (multi-testbench aggregation)
 
 This inventory records the state of direct `create_project_from_template()` usage
-across `tests/` after Phases 1-9 of the Test Project Factory and Template Coupling
+across `tests/` after Phases 1-10 of the Test Project Factory and Template Coupling
 Cleanup. The generic factory (`tests/project_factory.py`) and the coupling guard
 (`tests/test_template_coupling_guard.py`) are in place. Phase 1 migrated the files
 that are genuinely decoupled from circuit-specific template contents; Phase 2
@@ -17,7 +17,7 @@ next-real-run cluster via a new shared helper module; Phase 5 migrated the netli
 and dry-run preflight tests via another small shared helper; Phase 6 migrated the
 approval gate tests; Phase 7 migrated the optimizer task package tests; Phase 8 migrated the
 run-retention and optimizer-progress-state tests; Phase 9 migrated the fix-run flow
-tests. Remaining
+tests; Phase 10 migrated the multi-testbench aggregation tests. Remaining
 coupled files are explicitly deferred.
 
 ## Status summary
@@ -27,6 +27,26 @@ coupled files are explicitly deferred.
 - Coupling guard: `tests/test_template_coupling_guard.py` (fails on any
   non-allowlisted direct usage of `create_project_from_template`).
 - `create_project_from_template()` remains the product/template API and is untouched.
+
+## Phase 10 status
+
+Migrated `tests/test_multi_testbench_aggregation.py` away from direct
+`create_project_from_template()` usage. The direct coupling was in
+`_create_ready_single_testbench_corner_project()` which now uses
+`create_generic_project()` with derived variable names for pass reports.
+Two single-testbench corner tests derive metric names from generated
+`config/metrics.yaml` and use generic objective values with the generic
+factory's "maximize" objective direction (corner_objectives stored as cost =
+negated objective). The multi-testbench requirement fixture helpers
+(`_create_ready_multi_testbench_project`,
+`_create_ready_multi_corner_multi_testbench_project`) remain requirement-driven
+and untouched — they are consumed by `tests/test_openbox_backend.py` and
+`tests/test_remote_spectre_ocean.py`.
+
+`tests/test_multi_testbench_aggregation.py` was removed from
+`ALLOWED_TEMPLATE_CALLERS` (allowlist 11 -> 10). Cross-test imports in
+`tests/test_openbox_backend.py` and `tests/test_remote_spectre_ocean.py` target
+the requirement fixture helpers, not the migrated single-testbench helper.
 
 ## Phase 9 status
 
@@ -272,7 +292,6 @@ generic factory.
 
 ### Approvals and packaging
 
-- tests/test_multi_testbench_aggregation.py
 - tests/real_run_smoke_helpers.py
 
 ### Optimizer backends (deepest coupling)
@@ -304,6 +323,21 @@ The allowlist must shrink monotonically; the guard prevents any new unreviewed
 direct usage from being introduced.
 
 ## Verification
+
+### Phase 10
+
+- `pytest tests/test_multi_testbench_aggregation.py -q` -> `12 passed`
+- `pytest tests/test_template_coupling_guard.py -q` -> `1 passed`
+- `pytest tests/test_multi_testbench_aggregation.py tests/test_template_coupling_guard.py -q` -> `13 passed`
+- `pytest tests/test_multi_testbench_aggregation.py tests/test_openbox_backend.py tests/test_remote_spectre_ocean.py -q` -> `95 passed`
+- `pytest [Phase 1-10 regression group, 20 files] -q` -> `351 passed`
+- `pytest -q` -> `1194 passed`
+- `ruff check src tests` -> `All checks passed!`
+- `git diff --check` -> clean
+- `git -C ../ic-auto-opt-workflow-v0.1 status --short` -> clean (release checkout untouched)
+- grep forbidden tokens over `tests/test_multi_testbench_aggregation.py` -> no matches
+- grep cross-imports -> known consumers only in `tests/test_openbox_backend.py` and `tests/test_remote_spectre_ocean.py` (requirement fixture helpers)
+- `ALLOWED_TEMPLATE_CALLERS` count: 11 -> 10.
 
 ### Phase 9
 
