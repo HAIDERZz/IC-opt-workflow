@@ -69,6 +69,7 @@ def test_summarize_optimizer_status_reads_closeout_reports(
         "reports/optimizer_effectiveness_audit.json"
     )
     assert summary.reports["finalize"] == "reports/optimizer_finalize_report.json"
+    assert summary.reports["insight_html"] == "reports/optimizer_insight_report.html"
 
 
 def test_optimizer_status_cli_prints_supervisor_summary(tmp_path: Path) -> None:
@@ -87,6 +88,7 @@ def test_optimizer_status_cli_prints_supervisor_summary(tmp_path: Path) -> None:
     assert "status counts:" in result.output
     assert "continuation recommended:" in result.output
     assert "reports/optimizer_finalize_report.json" in result.output
+    assert "insight_html: reports/optimizer_insight_report.html" in result.output
 
 
 def test_optimizer_status_cli_fails_closed_when_finalize_fails(tmp_path: Path) -> None:

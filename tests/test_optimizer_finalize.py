@@ -78,9 +78,11 @@ def test_finalize_optimizer_run_writes_closeout_report(
         "acceptance": "reports/optimizer_run_acceptance_report.json",
         "completion": "reports/optimizer_completion_report.json",
         "insight": "reports/optimizer_insight_report.json",
+        "insight_html": "reports/optimizer_insight_report.html",
     }
     assert (project_dir / "reports/optimizer_completion_report.json").exists()
     assert (project_dir / "reports/optimizer_insight_report.json").exists()
+    assert (project_dir / "reports/optimizer_insight_report.html").exists()
 
 
 def test_finalize_optimizer_run_fails_closed_when_acceptance_rejects(

@@ -43,7 +43,16 @@ from hermes_workflow.schemas import (
     VariableKind,
     VariablesConfig,
 )
-from hermes_workflow.validate import assert_valid_project
+from hermes_workflow.validate import ContractBundle, assert_valid_project
+from hermes_workflow.history_warm_start import (
+    HISTORY_WARM_START_AUDIT_MD_RELATIVE,
+    HISTORY_WARM_START_AUDIT_RELATIVE,
+    WarmStartAdapterResult,
+    audit_history_warm_start,
+    audit_with_openbox_application,
+    build_warm_start_openbox_adapter,
+    write_history_warm_start_reports,
+)
 
 
 OPENBOX_BACKEND = "openbox"
@@ -123,6 +132,7 @@ class OpenBoxBatchRunSettings:
     resolved_strategy: dict[str, object] = field(default_factory=dict)
     initialization: str = "sobol"
     effective_init_strategy: str = "sobol"
+    history_warm_start: dict[str, object] | None = None
 
 
 @dataclass(frozen=True)
@@ -225,6 +235,112 @@ def run_openbox_fake_optimization(
     return result
 
 
+_HISTORY_WARM_START_CONTINUATION_MESSAGE = (
+    "history warm-start cannot be combined with continuation; "
+    "use continuation for same-project budget extension, or start a new "
+    "project for history warm-start"
+)
+
+
+def _assert_warm_start_not_combined_with_continuation(
+    bundle: ContractBundle, *, continue_from_existing: bool
+) -> None:
+    if not continue_from_existing:
+        return
+    config = bundle.history_warm_start
+    if config is not None and config.history_warm_start.enabled:
+        raise ValueError(_HISTORY_WARM_START_CONTINUATION_MESSAGE)
+
+
+def _build_warm_start_adapter(
+    project_dir: Path,
+    bundle: ContractBundle,
+    *,
+    advisor_factory: AdvisorFactory | None,
+    num_constraints: int,
+    initial_trials: int | None,
+    initialization: str | None,
+    seed: int,
+) -> WarmStartAdapterResult:
+    """Resolve history warm-start into OpenBox objects for the real flow.
+
+    With an injected ``advisor_factory`` (fake/test path) the audit still runs
+    for its reports, but no real OpenBox history objects are constructed.
+    """
+    config = bundle.history_warm_start
+    if config is None or not config.history_warm_start.enabled:
+        # Disabled/no-config: do not write a warm-start report, so existing
+        # no-config project behavior is left untouched.
+        audit = audit_history_warm_start(project_dir, bundle, write_reports=False)
+        return WarmStartAdapterResult(
+            audit=audit,
+            transfer_learning_history=[],
+            initial_configurations=[],
+            accepted_observation_count=audit.accepted_observation_count,
+            applied_observation_count=0,
+            application_mode="disabled",
+            not_applied_reason=None,
+            warm_start_strategy=None,
+        )
+    if advisor_factory is not None:
+        base_audit = audit_history_warm_start(project_dir, bundle, write_reports=False)
+        strategy = config.history_warm_start.warm_start_strategy
+        accepted = base_audit.accepted_observation_count
+        if accepted == 0:
+            mode = "no_accepted_observations"
+        else:
+            mode = (
+                "transfer_learning_history"
+                if num_constraints == 0
+                else "initial_configurations_from_history"
+            )
+        applied_to_advisor = accepted > 0 and mode in (
+            "transfer_learning_history",
+            "initial_configurations_from_history",
+        )
+        final_audit = audit_with_openbox_application(
+            base_audit,
+            applied_to_advisor=applied_to_advisor,
+            application_mode=mode,
+            applied_observation_count=accepted,
+            not_applied_reason=None,
+            warm_start_strategy=strategy,
+        )
+        write_history_warm_start_reports(project_dir, final_audit)
+        return WarmStartAdapterResult(
+            audit=final_audit,
+            transfer_learning_history=[],
+            initial_configurations=[],
+            accepted_observation_count=accepted,
+            applied_observation_count=accepted,
+            application_mode=mode,
+            not_applied_reason=None,
+            warm_start_strategy=strategy,
+        )
+
+    _, Observation, History, InitialConfigProvider, sp = _load_openbox()
+    space = _build_openbox_space(bundle.variables, sp)
+
+    def config_builder(parameters: dict[str, str]) -> object:
+        return sp.Configuration(
+            space, values=_values_from_parameters(bundle.variables, parameters)
+        )
+
+    return build_warm_start_openbox_adapter(
+        project_dir,
+        bundle,
+        space=space,
+        observation_factory=Observation,
+        history_factory=History,
+        config_builder=config_builder,
+        initial_config_provider=InitialConfigProvider,
+        random_seed=seed,
+        initial_trials=initial_trials,
+        initialization=initialization,
+        num_constraints=num_constraints,
+    )
+
+
 def run_openbox_real_optimization(
     project_dir: str | Path,
     *,
@@ -245,10 +361,13 @@ def run_openbox_real_optimization(
     initial_trials: int | None = None,
 ) -> NativeTurboRunResult:
     project_root = Path(project_dir)
+    bundle = assert_valid_project(project_root)
+    _assert_warm_start_not_combined_with_continuation(
+        bundle, continue_from_existing=continue_from_existing
+    )
     _ensure_optimizer_history_for_continuation(
         project_root, continue_from_existing=continue_from_existing
     )
-    bundle = assert_valid_project(project_root)
     selected_batch_size = batch_size or bundle.optimizer.optimizer.batch_size
     selected_parallel_jobs = parallel_jobs or bundle.spectre.spectre.parallel_jobs
     if selected_batch_size < 1:
@@ -273,6 +392,15 @@ def run_openbox_real_optimization(
         continue_from_existing=continue_from_existing,
         prior_count=len(prior_traces),
         default_max_evals=bundle.optimizer.optimizer.max_evaluations,
+    )
+    warm_start_adapter = _build_warm_start_adapter(
+        project_root,
+        bundle,
+        advisor_factory=advisor_factory,
+        num_constraints=len(bundle.metrics.constraints) if bundle.metrics else 0,
+        initial_trials=initial_trials,
+        initialization=contract.optimizer.optimizer.initialization.value,
+        seed=seed,
     )
     evaluator = make_openbox_real_candidate_batch_evaluator(
         project_root,
@@ -300,6 +428,7 @@ def run_openbox_real_optimization(
         acq_type=acq_type,
         acq_optimizer_type=acq_optimizer_type,
         initial_trials=initial_trials,
+        warm_start_adapter=warm_start_adapter,
     )
 
 
@@ -360,6 +489,34 @@ def _write_openbox_effectiveness_audit(
         encoding="utf-8",
     )
     return audit_path
+
+
+def _history_warm_start_report_payload(
+    adapter: WarmStartAdapterResult | None,
+) -> dict[str, object] | None:
+    """Build the ``openbox.history_warm_start`` report payload.
+
+    Returns ``None`` when warm-start is absent or disabled so the key is omitted
+    from the optimizer report entirely.
+    """
+    if adapter is None or adapter.application_mode == "disabled":
+        return None
+    applied_to_advisor = (
+        adapter.application_mode
+        in ("transfer_learning_history", "initial_configurations_from_history")
+        and adapter.applied_observation_count > 0
+    )
+    return {
+        "enabled": True,
+        "audit": HISTORY_WARM_START_AUDIT_RELATIVE.as_posix(),
+        "audit_markdown": HISTORY_WARM_START_AUDIT_MD_RELATIVE.as_posix(),
+        "accepted_observation_count": adapter.accepted_observation_count,
+        "applied_observation_count": adapter.applied_observation_count,
+        "applied_to_advisor": applied_to_advisor,
+        "application_mode": adapter.application_mode,
+        "warm_start_strategy": adapter.warm_start_strategy,
+        "not_applied_reason": adapter.not_applied_reason,
+    }
 
 
 def write_openbox_reports(
@@ -450,6 +607,8 @@ def write_openbox_reports(
             },
         },
     }
+    if settings.history_warm_start is not None:
+        payload["openbox"]["history_warm_start"] = settings.history_warm_start
     if effectiveness_audit_relative is not None:
         payload["effectiveness_audit"] = effectiveness_audit_relative
     if runtime_thread_limits is not None:
@@ -579,15 +738,17 @@ def _create_random_baseline_advisor(
     return RandomBaselineAdvisor(variables, seed), FakeOpenBoxObservation, dict
 
 
-def _load_openbox() -> tuple[Any, Any, Any]:
+def _load_openbox() -> tuple[Any, Any, Any, Any, Any]:
     try:
         from openbox import Advisor, Observation, space as sp
+        from openbox.core.initial_config import InitialConfigProvider
+        from openbox.utils.history import History
     except ImportError as exc:
         raise RuntimeError(
             "OpenBox is not installed; install it in the active environment "
             "to run the OpenBox backend"
         ) from exc
-    return Advisor, Observation, sp
+    return Advisor, Observation, History, InitialConfigProvider, sp
 
 
 def _load_continuation_traces(
@@ -703,6 +864,7 @@ def _run_openbox_batches(
     acq_type: str | None = None,
     acq_optimizer_type: str | None = None,
     initial_trials: int | None = None,
+    warm_start_adapter: WarmStartAdapterResult | None = None,
 ) -> NativeTurboRunResult:
     contract = load_native_turbo_contract(project_dir)
     resolved_strategy = _resolve_openbox_strategy(
@@ -740,6 +902,21 @@ def _run_openbox_batches(
                 acq_type=resolved_strategy.acq_type,
                 acq_optimizer_type=resolved_strategy.acq_optimizer_type,
                 initialization=contract.optimizer.optimizer.initialization.value,
+                transfer_learning_history=(
+                    warm_start_adapter.transfer_learning_history
+                    if warm_start_adapter is not None
+                    else None
+                ),
+                initial_configurations=(
+                    warm_start_adapter.initial_configurations
+                    if warm_start_adapter is not None
+                    else None
+                ),
+                warm_start_strategy=(
+                    warm_start_adapter.warm_start_strategy
+                    if warm_start_adapter is not None
+                    else None
+                ),
             )
     traces: list[NativeTurboEvaluationTrace] = list(prior_traces or [])
     prior_count = len(traces)
@@ -783,6 +960,7 @@ def _run_openbox_batches(
         },
         initialization=contract.optimizer.optimizer.initialization.value,
         effective_init_strategy=contract.optimizer.optimizer.initialization.value,
+        history_warm_start=_history_warm_start_report_payload(warm_start_adapter),
     )
     effectiveness_audit_batches: list[dict[str, Any]] = []
     if model_replay_traces:
@@ -1264,7 +1442,7 @@ def _build_openbox_advisor(
     *,
     num_constraints: int = 0,
 ) -> object:
-    Advisor, _Observation, sp = _load_openbox()
+    Advisor, _Observation, _History, _InitialConfigProvider, sp = _load_openbox()
     space = _build_openbox_space(variables, sp)
     return Advisor(
         space,
@@ -1286,6 +1464,9 @@ def _create_advisor(
     acq_type: str | None,
     acq_optimizer_type: str | None,
     initialization: str | None = None,
+    transfer_learning_history: list[object] | None = None,
+    initial_configurations: list[object] | None = None,
+    warm_start_strategy: str | None = None,
 ) -> tuple[object, Callable[..., object], Callable[[dict[str, str]], object]]:
     if advisor_factory is not None:
         return (
@@ -1294,24 +1475,30 @@ def _create_advisor(
             lambda parameters: _values_from_parameters(variables, parameters),
         )
 
-    Advisor, Observation, sp = _load_openbox()
+    Advisor, Observation, _History, _InitialConfigProvider, sp = _load_openbox()
     space = _build_openbox_space(variables, sp)
     output_dir = project_dir / "reports" / "openbox_workdir"
     output_dir.mkdir(parents=True, exist_ok=True)
+    advisor_kwargs: dict[str, object] = {
+        "num_objectives": 1,
+        "num_constraints": num_constraints,
+        "initial_trials": initial_trials or max(2 * len(variables.variables), 1),
+        "init_strategy": initialization or "sobol",
+        "surrogate_type": surrogate_type or "auto",
+        "acq_type": acq_type or "auto",
+        "acq_optimizer_type": acq_optimizer_type or "auto",
+        "task_id": "hermes_openbox_real",
+        "output_dir": str(output_dir),
+        "random_state": seed,
+        "initial_configurations": initial_configurations or None,
+    }
+    # OpenBox only accepts direct transfer history for unconstrained
+    # single-objective problems; pass it (and the strategy) only when present.
+    if transfer_learning_history:
+        advisor_kwargs["transfer_learning_history"] = transfer_learning_history
+        advisor_kwargs["warm_start_strategy"] = warm_start_strategy or "topk"
     return (
-        Advisor(
-            space,
-            num_objectives=1,
-            num_constraints=num_constraints,
-            initial_trials=initial_trials or max(2 * len(variables.variables), 1),
-            init_strategy=initialization or "sobol",
-            surrogate_type=surrogate_type or "auto",
-            acq_type=acq_type or "auto",
-            acq_optimizer_type=acq_optimizer_type or "auto",
-            task_id="hermes_openbox_real",
-            output_dir=str(output_dir),
-            random_state=seed,
-        ),
+        Advisor(space, **advisor_kwargs),
         Observation,
         lambda parameters: sp.Configuration(
             space,

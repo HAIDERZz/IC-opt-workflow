@@ -1,22 +1,23 @@
 # Single-Testbench Single-Corner Optimization Requirement
 
-Template derived from the verified Mixer requirement. Replace only the Maestro/ADE point path and bounds that belong to your circuit. This mode evaluates one testbench at the source point corner.
+Use this template when one optimizer candidate is evaluated by one Maestro/ADE
+testbench at the source point corner.
 
 ## Project
 
 ```yaml
 project_name: mixer_cg_nf_opt
-description: Optimize one Mixer CG/NF/BW testbench from one Maestro/ADE point
+description: Optimize one Mixer CG/NF testbench from one Maestro/ADE point
 backend: maestro_exported_spectre_deck
 ```
 
 ## Maestro Source
 
 ```yaml
-maestro_point_root: /absolute/path/to/CG_NF_Test/point_root
+maestro_point_root: /absolute/path/to/Mixer_CS_CG_NF/point_root
 virtuoso_library: Virtuoso_Bridge_test
 cell: MixerCS_PSS_CG_Noise
-design_view: schematic
+design_view: maestro
 maestro_view: maestro
 test_name: Mixer_CS_CG_NF
 corner: Nominal
@@ -45,51 +46,19 @@ corner: Nominal
   lower: 280m
   upper: 400m
   step: 20m
-- name: FCS
-  kind: integer
-  lower: '40'
-  upper: '56'
-  step: '2'
-- name: WCS
-  kind: continuous_step
-  lower: 0.6u
-  upper: 1.2u
-  step: 0.2u
-- name: LCS
-  kind: continuous_step
-  lower: 30n
-  upper: 50n
-  step: 10n
-- name: VB_RF
-  kind: continuous_step
-  lower: 300m
-  upper: 440m
-  step: 20m
 ```
 
 ## Metrics
 
 ```yaml
-- name: BW
-  unit: Hz
-  ocean_expression: bandwidth(db((harmonic((v("/IF_P" ?result "pac") - v("/IF_N" ?result "pac")) '-1) / harmonic(drplPacVolGnExpDen("(v(\"/RF_P\" ?result \"pac\")-v(\"/RF_N\" ?result \"pac\"))" '(0) nil) '-1))) 3 "low")
-- name: MAX_GAIN
-  unit: dB
-  ocean_expression: ymax(db((harmonic((v("/IF_P" ?result "pac") - v("/IF_N" ?result "pac")) '-1) / harmonic(drplPacVolGnExpDen("(v(\"/RF_P\" ?result \"pac\")-v(\"/RF_N\" ?result \"pac\"))" '(0) nil) '-1))))
 - name: NF_3G
   unit: dB
-  ocean_expression: value(getData("NF" ?result "pnoise") 3e+09)
+  ocean_expression: 'value(getData("NF" ?result "pnoise") 3e+09)'
 ```
 
 ## Constraints
 
 ```yaml
-- metric: BW
-  op: gt
-  value: 28e9 Hz
-- metric: MAX_GAIN
-  op: gt
-  value: 5.5 dB
 - metric: NF_3G
   op: lt
   value: 9 dB
@@ -99,7 +68,7 @@ corner: Nominal
 
 ```yaml
 direction: minimize
-expression: -(0.2*min(max(0,min(1,10*(ln(BW/28e9)/ln(10))/0.6)),max(0,min(1,(MAX_GAIN-5.5)/2)),max(0,min(1,(9-NF_3G)/0.7)))+0.8*(0.20*max(0,min(1,10*(ln(BW/28e9)/ln(10))/0.6))+0.30*max(0,min(1,(MAX_GAIN-5.5)/2))+0.50*max(0,min(1,(9-NF_3G)/0.7))))
+expression: NF_3G
 ```
 
 ## Spectre Settings
@@ -119,8 +88,8 @@ keep_successful_runs: true
 ## Optimizer Settings
 
 ```yaml
-algorithm: turbo
-strategy: turbo_trust_region
+algorithm: openbox
+strategy: openbox_prf_eic
 initialization: sobol
 max_evaluations: 30
 batch_size: 10

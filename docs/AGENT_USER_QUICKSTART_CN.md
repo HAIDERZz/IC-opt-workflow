@@ -28,6 +28,67 @@ ic-opt --ssh-profile PROFILE PROJECT_DIR --real --continue N
 `--continue N` 是追加仿真入口。`--ssh-profile PROFILE` 只选择远端执行 profile，
 不是资源或优化器覆盖。
 
+## History Warm Start
+
+`History Warm Start` 是新建 optimize 项目时引用同一电路旧项目历史的入口，不是
+`--continue N`。`--continue N` 只给同一个项目追加预算，不重新读取用户改过的
+`opt_requirement.md`。History warm-start 不支持 fix-run，也不能和 `--continue` 一起跑。
+
+最小 section：
+
+```yaml
+enabled: true
+sources:
+  - path: /path/to/previous_same_circuit_project
+    label: round1
+max_observations: 200
+warm_start_strategy: topk
+```
+
+它会生成 `config/history_warm_start.yaml`。第一版要求新旧项目变量名完全一致，metric
+定义一致；旧点超出当前空间会记为 `out_of_current_space`。运行后必须检查
+`reports/history_warm_start_audit.json`、`reports/history_warm_start_audit.md`，以及
+`reports/optimizer_run_report.json` 里的 `openbox.history_warm_start`。有约束项目通常显示
+`initial_configurations_from_history`；无约束单目标项目才可能显示
+`transfer_learning_history`。
+
+History warm-start 的实际应用只支持 OpenBox backend。native TuRBO 不会消费这些历史
+点来影响新 candidate；如果用户希望旧项目历史真正参与下一轮建议，应选择 OpenBox。
+TuRBO 报告里 history 相关内容可能不存在，或显示为 `not_available`。
+
+## Optimizer Insight Report
+
+优化或 finalize 后，agent 应优先查看：
+
+```text
+reports/optimizer_insight_report.html
+reports/optimizer_insight_report.json
+reports/optimizer_insight_report.md
+```
+
+HTML 是给用户阅读的主报告；JSON 是机器可读合同；Markdown 是文本备份。
+HTML 适合快速定位问题，但不能替代底层事实。判断 trade-off、history 是否真正生效、
+或者下一轮变量范围时，还要查看 `reports/optimizer_insight_report.json`、
+`reports/optimizer_run_report.json`、`reports/history_warm_start_audit.json`、
+`reports/optimizer_evaluations.jsonl` / `reports/native_turbo_optimizer_evaluations.jsonl`、
+`ledger/experiment_ledger.jsonl` 和 `runs/**/metric_result_manifest.json` 中实际存在的文件。
+
+Pareto/trade-off 分析只基于已有 raw metrics 做报告层 trade-off 总结，不表示
+OpenBox 已启用 multi-objective optimizer mode，也不改变 candidate 选择或 objective。
+Space Compression Advisory 使用 OpenBox compressor dry-run，只给出人工复盘建议，
+不会自动应用到 optimizer。用户认可后，可以把建议范围写进新的
+`opt_requirement.md` 再开下一轮。
+
+如果 backend 是 native TuRBO，HTML/JSON 报告仍可保留 backend-neutral 内容，例如 best
+point、实际测量 metric、evaluation/status counts、plots、raw-metric trade-off summary，
+以及仅用于建议的 space-compression dry-run。OpenBox 专属内容不应期待存在，包括
+history warm-start application、advanced surrogate visualization、parameter importance；
+这些 section 可能缺失或显示 `not_available`。
+
+如果 objective 直接对 dB、dBm 这类带符号或对数域 metric 做乘除，尤其数值可能跨过
+0 时，排序会很难解释。workflow 会保留用户写的 objective；需要重新设计 objective
+时，应在下一版 requirement 中明确改成线性域或归一化后的表达。
+
 ## Requirement 内容
 
 - Maestro/ADE point root 和 testbench 定义
@@ -110,6 +171,14 @@ reports/ic_opt_doctor_report.json
 reports/license_probe_report.json
 reports/optimizer_run_report.json
 reports/optimizer_decision_report.md
+reports/optimizer_insight_report.html
+reports/optimizer_insight_report.json
+reports/optimizer_insight_report.md
+reports/history_warm_start_audit.json
+reports/history_warm_start_audit.md
+reports/optimizer_evaluations.jsonl
+reports/native_turbo_optimizer_evaluations.jsonl
+ledger/experiment_ledger.jsonl
 runs/**/result_manifest.json
 runs/**/metric_result_manifest.json
 ```

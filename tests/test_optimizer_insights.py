@@ -68,9 +68,15 @@ def test_generate_optimizer_insight_report_writes_json_markdown_and_pngs(
     assert report.best_observed["run_id"] == "real_006"
     assert report.report_path == project_dir / "reports/optimizer_insight_report.json"
     assert report.markdown_path == project_dir / "reports/optimizer_insight_report.md"
+    assert report.html_path == project_dir / "reports/optimizer_insight_report.html"
 
     payload = json.loads(report.report_path.read_text(encoding="utf-8"))
     assert payload["schema_version"] == "1.0"
+    assert payload["html_path"] == "reports/optimizer_insight_report.html"
+    assert payload["html_generation"] == {
+        "path": "reports/optimizer_insight_report.html",
+        "status": "generated",
+    }
     assert payload["advanced_surrogate_visualization"]["status"] == "not_generated"
     assert "FN" in payload["observed_relationships"]
     assert "objective" in payload["observed_relationships"]["FN"]
@@ -93,10 +99,156 @@ def test_generate_optimizer_insight_report_writes_json_markdown_and_pngs(
     assert "Best observed" in markdown
     assert "Observed Relationships" in markdown
     assert "all_evaluable_fom" in markdown
+    html_path = project_dir / "reports" / "optimizer_insight_report.html"
+    assert html_path.is_file()
+    html_text = html_path.read_text(encoding="utf-8")
+    assert "Optimizer Insight Report" in html_text
+    assert "Report-layer Pareto" in html_text
+    assert "Space Compression Advisory" in html_text
 
     for relative_plot in payload["plots"].values():
         plot_bytes = (project_dir / relative_plot).read_bytes()
         assert plot_bytes.startswith(b"\x89PNG\r\n\x1a\n")
+
+
+def test_optimizer_insight_report_includes_tradeoff_and_space_advisory(
+    tmp_path: Path,
+) -> None:
+    rows = [
+        _trace_row(
+            evaluation_index=1,
+            run_id="real_001",
+            status="feasible",
+            objective=1.0,
+        ),
+        _trace_row(
+            evaluation_index=2,
+            run_id="real_002",
+            status="feasible",
+            objective=2.0,
+        ),
+        _trace_row(
+            evaluation_index=3,
+            run_id="real_003",
+            status="constraint_failed",
+            objective=3.0,
+        ),
+    ]
+    rows[0]["metrics"] = {"gain": 10.0, "power": 1.0}
+    rows[1]["metrics"] = {"gain": 12.0, "power": 1.5}
+    rows[2]["metrics"] = {"gain": 9.0, "power": 1.2}
+    project_dir = _write_accepted_optimizer_project(tmp_path, rows=rows)
+    (project_dir / "config" / "metrics.yaml").write_text(
+        '''
+schema_version: "1.0"
+metrics:
+  - name: gain
+    unit: dB
+  - name: power
+    unit: W
+constraints:
+  - metric: gain
+    op: ge
+    value: "8"
+  - metric: power
+    op: le
+    value: "2"
+objective:
+  direction: minimize
+  expression: "power"
+'''.lstrip(),
+        encoding="utf-8",
+    )
+
+    report = generate_optimizer_insight_report(project_dir)
+    payload = json.loads(report.report_path.read_text(encoding="utf-8"))
+    markdown = report.markdown_path.read_text(encoding="utf-8")
+
+    assert report.pareto_tradeoff_summary["status"] == "available"
+    assert payload["pareto_tradeoff_summary"]["mode"] == (
+        "report_layer_raw_metric_tradeoff"
+    )
+    assert payload["pareto_tradeoff_summary"]["optimizer_mode_changed"] is False
+    assert payload["pareto_tradeoff_summary"]["front_count"] == 2
+    assert payload["space_compression_advisory"]["mode"] == (
+        "openbox_compressor_dry_run"
+    )
+    assert payload["space_compression_advisory"]["advisory_only"] is True
+    assert payload["space_compression_advisory"]["applied_to_optimizer"] is False
+    assert "Report-layer Pareto Trade-Off" in markdown
+    assert "Space Compression Advisory" in markdown
+    assert "optimizer mode was not changed" in markdown
+    assert "advisory only" in markdown
+
+
+def test_optimizer_insight_report_includes_trustworthy_interpretation_summaries(
+    tmp_path: Path,
+) -> None:
+    project_dir = _write_accepted_optimizer_project(tmp_path)
+
+    report = generate_optimizer_insight_report(project_dir)
+
+    payload = json.loads(report.report_path.read_text(encoding="utf-8"))
+    markdown = report.markdown_path.read_text(encoding="utf-8")
+    tradeoff_summary = payload["tradeoff_interpretation_summary"]
+    assert tradeoff_summary["status"] in {"available", "not_available"}
+    assert tradeoff_summary["confidence_boundary"] == "facts_and_rule_based_notes_only"
+    assert "front_selectivity" in tradeoff_summary
+    assert "constraint_blockers" in tradeoff_summary
+    if tradeoff_summary["status"] == "not_available":
+        assert "reason" in tradeoff_summary
+        assert tradeoff_summary["front_selectivity"]["usefulness"] == "not_available"
+    assert payload["history_reuse_summary"]["status"] in {
+        "available",
+        "not_available",
+    }
+    assert "history_warm_start" in payload
+    assert "## Trustworthy Trade-Off Summary" in markdown
+    assert "## History Reuse Summary" in markdown
+
+
+def test_optimizer_insight_report_includes_history_warm_start_summary(
+    tmp_path: Path,
+) -> None:
+    project_dir = _write_accepted_optimizer_project(tmp_path)
+    history_summary = {
+        "accepted_observation_count": 64,
+        "application_mode": "transfer_learning_history",
+        "applied_observation_count": 64,
+        "applied_to_advisor": True,
+        "audit": "reports/history_warm_start_audit.json",
+        "enabled": True,
+        "not_applied_reason": None,
+        "warm_start_strategy": "topk",
+    }
+    (project_dir / "reports" / "optimizer_run_report.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "1.0",
+                "status": "pass",
+                "openbox": {"history_warm_start": history_summary},
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    report = generate_optimizer_insight_report(project_dir)
+
+    payload = json.loads(report.report_path.read_text(encoding="utf-8"))
+    assert payload["history_warm_start"]["status"] == "available"
+    assert payload["history_warm_start"]["source"] == (
+        "reports/optimizer_run_report.json"
+    )
+    assert payload["history_warm_start"]["application_mode"] == (
+        "transfer_learning_history"
+    )
+    assert payload["history_warm_start"]["applied_to_advisor"] is True
+    html_text = report.html_path.read_text(encoding="utf-8")
+    assert "transfer_learning_history" in html_text
+    assert "accepted_observation_count" in html_text
 
 
 def test_generate_optimizer_insight_report_records_metric_relationships(
@@ -403,7 +555,9 @@ def test_visualize_optimizer_run_cli_writes_report(tmp_path: Path) -> None:
     assert result.exit_code == 0
     assert "optimizer insight report written" in result.output
     assert "reports/optimizer_insight_report.json" in result.output
+    assert "html: reports/optimizer_insight_report.html" in result.output
     assert (project_dir / "reports/optimizer_insight_report.json").exists()
+    assert (project_dir / "reports/optimizer_insight_report.html").exists()
 
 
 def test_generate_optimizer_insight_report_fails_without_traces(tmp_path: Path) -> None:
@@ -414,6 +568,8 @@ def test_generate_optimizer_insight_report_fails_without_traces(tmp_path: Path) 
 
     assert report.status == "fail"
     assert "no optimizer trace rows found" in report.issues
+    assert report.pareto_tradeoff_summary["status"] == "not_available"
+    assert report.space_compression_advisory["status"] == "not_available"
 
 
 def test_generate_optimizer_insight_report_summarizes_process_corners(

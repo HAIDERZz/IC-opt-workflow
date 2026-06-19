@@ -48,6 +48,90 @@ optimizer or resource override.
 Do not hand-pick optimizer candidate points, rewrite OCEAN formulas, parse PSF
 in Python, change the search space, or hardcode a Spectre version.
 
+## History Warm Start
+
+If `opt_requirement.md` contains `## History Warm Start`, treat it as a new
+optimize-project warm-start from previous same-circuit projects. It renders to
+`config/history_warm_start.yaml`. Do not run it with `--continue N`; continuation
+only adds budget to the same optimizer project and does not reread a changed
+requirement. Do not use it for fix-run.
+
+The first supported contract is strict: current and previous projects must have
+exactly the same variable names, no variable-name mapping, and matching required
+metric definitions. Previous objective and constraint results are not reused;
+old raw metrics are re-evaluated against the current requirement. Points outside
+the current variable space are rejected as `out_of_current_space`.
+
+History application is an OpenBox backend feature. Do not claim that native
+TuRBO consumed history warm-start data. For TuRBO, history application evidence
+may be absent or `not_available`; recommend OpenBox when previous project
+history must guide new candidate suggestions.
+
+After the run, inspect:
+
+```text
+reports/history_warm_start_audit.json
+reports/history_warm_start_audit.md
+openbox.history_warm_start in reports/optimizer_run_report.json
+```
+
+When reporting, distinguish accepted history from applied history:
+`accepted_observation_count` means the audit found compatible old rows;
+`applied_observation_count` means data actually reached OpenBox Advisor.
+Unconstrained single-objective projects may use `transfer_learning_history`.
+Constrained IC projects use `initial_configurations_from_history`. If
+`applied_to_advisor` is false, report `not_applied_reason`.
+
+## Optimizer Insight Report
+
+After optimize/finalize, inspect `reports/optimizer_insight_report.html` first
+when advising the user. The workflow also writes:
+
+```text
+reports/optimizer_insight_report.json
+reports/optimizer_insight_report.md
+reports/optimizer_insight_report.html
+```
+
+Use the HTML report for orientation, but do not base detailed engineering
+recommendations on the HTML alone. Inspect the dense artifacts before answering
+trade-off, history, or next-range questions. Some backend-specific JSONL files
+are only present for the backend that ran:
+
+```text
+reports/optimizer_insight_report.json
+reports/optimizer_run_report.json
+reports/history_warm_start_audit.json
+reports/optimizer_evaluations.jsonl
+reports/native_turbo_optimizer_evaluations.jsonl
+ledger/experiment_ledger.jsonl
+runs/**/metric_result_manifest.json
+```
+
+Treat scripted HTML notes as summaries. Verify exact counts, raw metric values,
+and parameter combinations in JSON/JSONL before making recommendations.
+
+Treat Pareto and space-compression sections as report-layer guidance only. The
+Pareto/trade-off analyzer uses existing raw metrics; it does not enable OpenBox
+multi-objective optimizer mode, change candidate selection, or rewrite the
+configured objective. The Space Compression Advisory uses an OpenBox compressor
+dry-run. Suggested ranges are advisory only and are not applied to optimizer
+execution; a user must copy reviewed ranges into a new `opt_requirement.md` for
+a later run.
+
+For native TuRBO runs, use only backend-neutral insight sections: best observed
+point, actual measured metrics, evaluation/status counts, plots, raw-metric
+trade-off summaries, and advisory space-compression dry-runs when artifacts
+exist. OpenBox-specific sections such as history warm-start application,
+advanced surrogate visualization, and parameter importance are not supported
+for TuRBO and may be missing or marked `not_available`.
+
+If an objective expression directly multiplies or divides signed/log-domain
+metrics such as dB or dBm, especially values that may cross zero, report that
+the ranking may be hard to interpret. The workflow preserves the user's
+objective; suggest linear-domain or normalized terms only as a reviewed
+next-requirement choice.
+
 ## Commands
 
 Local:
@@ -126,6 +210,14 @@ reports/ic_opt_doctor_report.json
 reports/license_probe_report.json
 reports/optimizer_run_report.json
 reports/optimizer_decision_report.md
+reports/optimizer_insight_report.json
+reports/optimizer_insight_report.md
+reports/optimizer_insight_report.html
+reports/history_warm_start_audit.json
+reports/history_warm_start_audit.md
+reports/optimizer_evaluations.jsonl
+reports/native_turbo_optimizer_evaluations.jsonl
+ledger/experiment_ledger.jsonl
 runs/**/result_manifest.json
 runs/**/metric_result_manifest.json
 ```

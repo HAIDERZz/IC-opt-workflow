@@ -354,7 +354,7 @@ Goal:
 Implementation:
 
 - Added `src/hermes_workflow/execution_agent_handoff.py`.
-- Added `legacy execution-agent direct/Claude selector` to `ic-opt` and lower-level
+- Added `execution-agent option direct|claude` to `ic-opt` and lower-level
   `hermes-workflow optimize`.
 - `direct` remains the default shell behavior.
 - In `claude` mode, `optimizer_flow` replaces only `run-openbox-real` with
@@ -363,7 +363,7 @@ Implementation:
   `finalize-optimizer-run`, `visualize-optimizer-run`, and
   `decide-optimizer-run`.
 - Updated `claude_skills/ic-opt/SKILL.md` so `/ic-opt` appends
-  `legacy execution-agent Claude handoff` unless the user already passed an execution-agent
+  `execution-agent option claude` unless the user already passed an execution-agent
   flag.
 
 Real evidence:
@@ -2932,7 +2932,7 @@ C-57 One-Command Optimizer Flow:
 C-65 Runtime-Native Agent Adapters:
 
 - Status: complete, verified-only.
-- Product correction: C-64 `legacy execution-agent Claude handoff` subprocess handoff is now classified as development/acceptance evidence, not the C-65 default product target.
+- Product correction: C-64 `execution-agent option claude` subprocess handoff is now classified as development/acceptance evidence, not the C-65 default product target.
 - Target product UX: user enters `/ic-opt PROJECT_DIR --real` in the active agent CLI; that runtime's supervisor agent prepares the Hermes package and delegates real execution to the same runtime's native subagent/task mechanism.
 - Code: added `src/hermes_workflow/agent_runtime.py`; CLI commands `hermes-workflow install-runtime-adapter` and `hermes-workflow runtime-adapter-status`.
 - Runtime assets: updated `claude_skills/ic-opt/SKILL.md`; added OpenCode assets under `agent_runtime/opencode/command/ic-opt.md` and `agent_runtime/opencode/agents/ic-opt-execution.md`.

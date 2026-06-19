@@ -91,6 +91,13 @@ Continuation:
 ./.venv/bin/ic-opt PROJECT_DIR --real --continue N
 ```
 
+Optional History Warm Start is for a new optimize project that references
+previous same-circuit project directories through `config/history_warm_start.yaml`.
+It is not a CLI flag, is not supported for fix-run, and must not be combined
+with `--continue N`. Treat `reports/history_warm_start_audit.json` and
+`openbox.history_warm_start` in `reports/optimizer_run_report.json` as the
+acceptance proof before saying previous history was applied.
+
 Remote:
 
 ```bash
@@ -108,6 +115,8 @@ reports/license_probe_report.json
 reports/optimizer_run_report.json
 reports/optimizer_decision_report.md
 reports/fix_run_report.json
+reports/history_warm_start_audit.json
+reports/history_warm_start_audit.md
 ```
 
 For real Spectre/OCEAN evidence, inspect:

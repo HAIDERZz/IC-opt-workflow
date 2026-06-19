@@ -485,3 +485,26 @@ class OptimizerState(StrictModel):
         if value not in allowed:
             raise ValueError(f"status must be one of {allowed}")
         return value
+
+
+class HistoryWarmStartSource(StrictModel):
+    path: NonEmptyStr
+    label: NonEmptyStr | None = None
+
+
+class HistoryWarmStartSettings(StrictModel):
+    enabled: StrictBool
+    sources: list[HistoryWarmStartSource] = Field(default_factory=list)
+    max_observations: StrictInt | None = Field(default=None, ge=1)
+    warm_start_strategy: Literal["topk"] = "topk"
+
+    @model_validator(mode="after")
+    def _enabled_requires_sources(self) -> "HistoryWarmStartSettings":
+        if self.enabled and not self.sources:
+            raise ValueError("history_warm_start.sources is required when enabled is true")
+        return self
+
+
+class HistoryWarmStartConfig(StrictModel):
+    schema_version: Literal["1.0"]
+    history_warm_start: HistoryWarmStartSettings

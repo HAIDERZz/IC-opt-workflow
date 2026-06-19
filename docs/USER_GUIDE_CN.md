@@ -115,6 +115,42 @@ examples/spectre_maestro_project/opt_requirement.fix_run.md
 
 `random_baseline` 用于诊断，不作为生产优化策略。
 
+## History Warm Start
+
+`History Warm Start` 用于“新建一个 optimize 项目，但参考同一电路之前跑过的优化
+历史”。典型流程是：用户看完上一轮报告后，新建项目目录，复制并修改新的
+`opt_requirement.md`，然后在新 requirement 里加入 `History Warm Start` section：
+
+```yaml
+enabled: true
+sources:
+  - path: /path/to/previous_same_circuit_project
+    label: round1
+max_observations: 200
+warm_start_strategy: topk
+```
+
+这个 section 会渲染为 `config/history_warm_start.yaml`。它和 `--continue N` 不是
+同一个用途：`--continue N` 只用于同一个项目追加优化预算，不重新读取用户改写后的
+`opt_requirement.md`。History warm-start 只支持 optimize，不支持 fix-run，也不能和
+`--continue` 一起使用。
+
+第一版规则是严格的：新旧项目变量名必须完全一致，不做变量名映射，也不接受旧项目
+多出来的变量。变量范围可以变化；旧点如果超出当前变量空间，会在 audit 里统计为
+`out_of_current_space`。系统不复用旧的 objective 或 constraint 结果，只读取旧 run 的
+raw metrics，并按当前项目的 objective 和 constraints 重新计算。当前项目需要的 metric
+定义必须和旧项目一致，否则旧历史不会进入 warm-start。
+
+有约束的 IC 优化场景使用 OpenBox 的 `initial_configurations_from_history` 路径，把
+可用历史转换为初始候选配置；无约束单目标场景才可能使用 OpenBox 原生
+`transfer_learning_history`。运行后检查
+`reports/history_warm_start_audit.json`、`reports/history_warm_start_audit.md`，以及
+`reports/optimizer_run_report.json` 里的 `openbox.history_warm_start`。
+
+History warm-start 的实际应用只支持 OpenBox backend。native TuRBO 不会把旧项目历史
+传入候选建议流程；如果需要让历史影响下一轮搜索，应使用 OpenBox。TuRBO 项目中相关
+报告内容可能不存在，或显示为 `not_available`。
+
 ## Fix-Run 模式
 
 fix-run requirement 必须写：
@@ -176,9 +212,44 @@ reports/ic_opt_doctor_report.json
 reports/license_probe_report.json
 reports/optimizer_run_report.json
 reports/optimizer_decision_report.md
+reports/optimizer_insight_report.json
+reports/optimizer_insight_report.md
+reports/optimizer_insight_report.html
+reports/history_warm_start_audit.json
+reports/history_warm_start_audit.md
+reports/optimizer_evaluations.jsonl
+reports/native_turbo_optimizer_evaluations.jsonl
+ledger/experiment_ledger.jsonl
 runs/**/result_manifest.json
 runs/**/metric_result_manifest.json
 ```
+
+`reports/optimizer_insight_report.html` 是优化结束后优先阅读的报告。
+JSON 是机器可读合同，Markdown 是文本备份。该 HTML 报告里的
+Pareto/trade-off 分析只使用本轮已有 raw metrics 做报告层 trade-off 总结；
+它不会把 OpenBox 切换成 multi-objective optimizer mode，也不会改变 candidate
+选择或改写 objective。
+
+HTML 报告用于快速阅读和定位问题；JSON/JSONL 是更底层的事实来源。如果要判断
+trade-off、history 是否有效、或者下一轮变量范围，应同时查看
+`reports/optimizer_insight_report.json`、`reports/optimizer_run_report.json`、
+`reports/history_warm_start_audit.json`、`reports/optimizer_evaluations.jsonl` /
+`reports/native_turbo_optimizer_evaluations.jsonl`、`ledger/experiment_ledger.jsonl`
+和 `runs/**/metric_result_manifest.json` 中实际存在的文件。
+
+Space Compression Advisory 使用 OpenBox compressor dry-run，在当前变量合同和已观测
+run 上生成搜索空间收窄建议。建议只用于人工复盘，不会自动应用到 optimizer 执行。
+用户确认后，可以把建议范围手动写入新的 `opt_requirement.md` 再启动下一轮优化。
+
+如果 backend 是 native TuRBO，报告仍可保留 backend-neutral 内容，例如 best point、
+实际测量 metric、evaluation/status counts、plots、raw-metric trade-off summary，
+以及仅用于建议的 space-compression dry-run。OpenBox 专属内容不应期待存在，包括
+history warm-start application、advanced surrogate visualization、parameter importance；
+这些 section 可能缺失或显示 `not_available`。
+
+如果 objective 直接对 dB、dBm 这类带符号或对数域 metric 做乘除，尤其数值可能跨过
+0 时，排序会很难解释。workflow 会保留用户写的 objective；需要调整时，建议在下一轮
+requirement 中改成线性域或归一化后的表达。
 
 fix-run 报告：
 
