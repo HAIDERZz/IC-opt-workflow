@@ -147,6 +147,10 @@ raw metrics，并按当前项目的 objective 和 constraints 重新计算。当
 `reports/history_warm_start_audit.json`、`reports/history_warm_start_audit.md`，以及
 `reports/optimizer_run_report.json` 里的 `openbox.history_warm_start`。
 
+History warm-start 的实际应用只支持 OpenBox backend。native TuRBO 不会把旧项目历史
+传入候选建议流程；如果需要让历史影响下一轮搜索，应使用 OpenBox。TuRBO 项目中相关
+报告内容可能不存在，或显示为 `not_available`。
+
 ## Fix-Run 模式
 
 fix-run requirement 必须写：
@@ -213,6 +217,9 @@ reports/optimizer_insight_report.md
 reports/optimizer_insight_report.html
 reports/history_warm_start_audit.json
 reports/history_warm_start_audit.md
+reports/optimizer_evaluations.jsonl
+reports/native_turbo_optimizer_evaluations.jsonl
+ledger/experiment_ledger.jsonl
 runs/**/result_manifest.json
 runs/**/metric_result_manifest.json
 ```
@@ -223,9 +230,26 @@ Pareto/trade-off 分析只使用本轮已有 raw metrics 做报告层 trade-off 
 它不会把 OpenBox 切换成 multi-objective optimizer mode，也不会改变 candidate
 选择或改写 objective。
 
+HTML 报告用于快速阅读和定位问题；JSON/JSONL 是更底层的事实来源。如果要判断
+trade-off、history 是否有效、或者下一轮变量范围，应同时查看
+`reports/optimizer_insight_report.json`、`reports/optimizer_run_report.json`、
+`reports/history_warm_start_audit.json`、`reports/optimizer_evaluations.jsonl` /
+`reports/native_turbo_optimizer_evaluations.jsonl`、`ledger/experiment_ledger.jsonl`
+和 `runs/**/metric_result_manifest.json` 中实际存在的文件。
+
 Space Compression Advisory 使用 OpenBox compressor dry-run，在当前变量合同和已观测
 run 上生成搜索空间收窄建议。建议只用于人工复盘，不会自动应用到 optimizer 执行。
 用户确认后，可以把建议范围手动写入新的 `opt_requirement.md` 再启动下一轮优化。
+
+如果 backend 是 native TuRBO，报告仍可保留 backend-neutral 内容，例如 best point、
+实际测量 metric、evaluation/status counts、plots、raw-metric trade-off summary，
+以及仅用于建议的 space-compression dry-run。OpenBox 专属内容不应期待存在，包括
+history warm-start application、advanced surrogate visualization、parameter importance；
+这些 section 可能缺失或显示 `not_available`。
+
+如果 objective 直接对 dB、dBm 这类带符号或对数域 metric 做乘除，尤其数值可能跨过
+0 时，排序会很难解释。workflow 会保留用户写的 objective；需要调整时，建议在下一轮
+requirement 中改成线性域或归一化后的表达。
 
 fix-run 报告：
 

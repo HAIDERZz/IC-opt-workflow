@@ -60,8 +60,10 @@ warm_start_strategy: topk
 
 The section renders to `config/history_warm_start.yaml`. History warm-start is
 optimize-only, cannot be combined with `--continue`, and is not supported for
-fix-run. Current and previous projects must use the exact same variable names;
-old objective and constraint values are not reused. Inspect
+fix-run. History application is supported by the OpenBox backend. Native TuRBO
+does not consume history warm-start data; use OpenBox when previous run history
+must affect candidate suggestions. Current and previous projects must use the
+exact same variable names; old objective and constraint values are not reused. Inspect
 `reports/history_warm_start_audit.json`,
 `reports/history_warm_start_audit.md`, and `openbox.history_warm_start` in
 `reports/optimizer_run_report.json` before saying the history was applied.
@@ -79,6 +81,13 @@ reports/optimizer_insight_report.html
 
 The HTML file is the first reader-facing report to inspect. The JSON file is
 the machine-readable contract, and the Markdown file is a text fallback.
+Use the HTML report for orientation, not as the only evidence for engineering
+recommendations. For trade-off, history, or next-range decisions, inspect the
+dense artifacts that exist for the run: `reports/optimizer_insight_report.json`,
+`reports/optimizer_run_report.json`, `reports/history_warm_start_audit.json`,
+`reports/optimizer_evaluations.jsonl`,
+`reports/native_turbo_optimizer_evaluations.jsonl`, `ledger/experiment_ledger.jsonl`,
+and the `runs/**/metric_result_manifest.json` files.
 
 The report-layer Pareto/trade-off analyzer uses existing raw metrics from the
 optimizer run. It does not enable OpenBox multi-objective optimizer mode, does
@@ -88,6 +97,19 @@ The Space Compression Advisory uses an OpenBox compressor dry-run on the
 current variable contract and observed rows. Suggestions are advisory only:
 they are not applied to optimizer execution. A user may copy reviewed suggested
 ranges into a new `opt_requirement.md` for a later run.
+
+For native TuRBO runs, the report keeps backend-neutral sections such as
+best observed point, actual measured metrics, evaluation counts, plots, raw
+metric trade-off summaries, and advisory space-compression dry-runs when the
+required artifacts exist. OpenBox-specific sections are not available for TuRBO:
+history warm-start application, advanced surrogate visualization, and parameter
+importance may be absent or marked `not_available`.
+
+If an objective expression directly multiplies or divides signed or log-domain
+metrics such as dB or dBm, especially values that may cross zero, the ranking can
+be hard to interpret. The workflow preserves the user-provided objective; choose
+objective formulas deliberately and consider linear-domain or normalized terms
+when needed.
 
 ## Project Directory
 
@@ -253,6 +275,9 @@ reports/optimizer_insight_report.md
 reports/optimizer_insight_report.html
 reports/history_warm_start_audit.json
 reports/history_warm_start_audit.md
+reports/optimizer_evaluations.jsonl
+reports/native_turbo_optimizer_evaluations.jsonl
+ledger/experiment_ledger.jsonl
 runs/**/result_manifest.json
 runs/**/metric_result_manifest.json
 ```

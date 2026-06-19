@@ -181,6 +181,76 @@ objective:
     assert "advisory only" in markdown
 
 
+def test_optimizer_insight_report_includes_trustworthy_interpretation_summaries(
+    tmp_path: Path,
+) -> None:
+    project_dir = _write_accepted_optimizer_project(tmp_path)
+
+    report = generate_optimizer_insight_report(project_dir)
+
+    payload = json.loads(report.report_path.read_text(encoding="utf-8"))
+    markdown = report.markdown_path.read_text(encoding="utf-8")
+    tradeoff_summary = payload["tradeoff_interpretation_summary"]
+    assert tradeoff_summary["status"] in {"available", "not_available"}
+    assert tradeoff_summary["confidence_boundary"] == "facts_and_rule_based_notes_only"
+    assert "front_selectivity" in tradeoff_summary
+    assert "constraint_blockers" in tradeoff_summary
+    if tradeoff_summary["status"] == "not_available":
+        assert "reason" in tradeoff_summary
+        assert tradeoff_summary["front_selectivity"]["usefulness"] == "not_available"
+    assert payload["history_reuse_summary"]["status"] in {
+        "available",
+        "not_available",
+    }
+    assert "history_warm_start" in payload
+    assert "## Trustworthy Trade-Off Summary" in markdown
+    assert "## History Reuse Summary" in markdown
+
+
+def test_optimizer_insight_report_includes_history_warm_start_summary(
+    tmp_path: Path,
+) -> None:
+    project_dir = _write_accepted_optimizer_project(tmp_path)
+    history_summary = {
+        "accepted_observation_count": 64,
+        "application_mode": "transfer_learning_history",
+        "applied_observation_count": 64,
+        "applied_to_advisor": True,
+        "audit": "reports/history_warm_start_audit.json",
+        "enabled": True,
+        "not_applied_reason": None,
+        "warm_start_strategy": "topk",
+    }
+    (project_dir / "reports" / "optimizer_run_report.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "1.0",
+                "status": "pass",
+                "openbox": {"history_warm_start": history_summary},
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    report = generate_optimizer_insight_report(project_dir)
+
+    payload = json.loads(report.report_path.read_text(encoding="utf-8"))
+    assert payload["history_warm_start"]["status"] == "available"
+    assert payload["history_warm_start"]["source"] == (
+        "reports/optimizer_run_report.json"
+    )
+    assert payload["history_warm_start"]["application_mode"] == (
+        "transfer_learning_history"
+    )
+    assert payload["history_warm_start"]["applied_to_advisor"] is True
+    html_text = report.html_path.read_text(encoding="utf-8")
+    assert "transfer_learning_history" in html_text
+    assert "accepted_observation_count" in html_text
+
+
 def test_generate_optimizer_insight_report_records_metric_relationships(
     tmp_path: Path,
 ) -> None:

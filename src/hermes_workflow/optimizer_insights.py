@@ -25,6 +25,10 @@ import yaml
 
 from hermes_workflow.optimizer_artifacts import load_optimizer_artifacts
 from hermes_workflow.optimizer_html_report import render_optimizer_insight_html
+from hermes_workflow.optimizer_report_interpretation import (
+    build_history_reuse_summary,
+    build_tradeoff_interpretation_summary,
+)
 from hermes_workflow.optimizer_space_advisory import build_space_compression_advisory
 from hermes_workflow.optimizer_tradeoffs import build_pareto_tradeoff_summary
 from hermes_workflow.validate import evaluate_objective
@@ -34,6 +38,8 @@ REPORT_RELATIVE = Path("reports/optimizer_insight_report.json")
 MARKDOWN_RELATIVE = Path("reports/optimizer_insight_report.md")
 HTML_RELATIVE = Path("reports/optimizer_insight_report.html")
 EFFECTIVENESS_AUDIT_RELATIVE = Path("reports/optimizer_effectiveness_audit.json")
+OPTIMIZER_RUN_REPORT_RELATIVE = Path("reports/optimizer_run_report.json")
+HISTORY_WARM_START_AUDIT_RELATIVE = Path("reports/history_warm_start_audit.json")
 VISUALS_DIR_RELATIVE = Path("reports/optimizer_visuals")
 ALL_EVALUABLE_FOM_RELATIVE = VISUALS_DIR_RELATIVE / "all_evaluable_fom.png"
 BOTTLENECK_WEIGHTED_SCORE_RELATIVE = (
@@ -74,6 +80,9 @@ class OptimizerInsightReport:
     process_corner_summary: dict[str, Any]
     pareto_tradeoff_summary: dict[str, Any]
     space_compression_advisory: dict[str, Any]
+    history_warm_start: dict[str, Any]
+    tradeoff_interpretation_summary: dict[str, Any]
+    history_reuse_summary: dict[str, Any]
     optimizer_effectiveness_audit: dict[str, Any]
     issues: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
@@ -137,6 +146,17 @@ def generate_optimizer_insight_report(project_dir: str | Path) -> OptimizerInsig
     process_corner_summary = _process_corner_summary(project_root, traces, best_observed)
     pareto_tradeoff = build_pareto_tradeoff_summary(traces, metric_contract)
     space_advisory = _space_compression_advisory(project_root, traces)
+    history_warm_start = _load_history_warm_start_summary(project_root)
+    tradeoff_interpretation = build_tradeoff_interpretation_summary(
+        traces=traces,
+        metric_contract=metric_contract,
+        pareto_summary=pareto_tradeoff,
+    )
+    history_reuse = build_history_reuse_summary(
+        project_root,
+        traces,
+        history_warm_start,
+    )
     effectiveness_audit = _load_optimizer_effectiveness_audit(project_root)
 
     report = OptimizerInsightReport(
@@ -157,6 +177,9 @@ def generate_optimizer_insight_report(project_dir: str | Path) -> OptimizerInsig
         process_corner_summary=process_corner_summary,
         pareto_tradeoff_summary=pareto_tradeoff,
         space_compression_advisory=space_advisory,
+        history_warm_start=history_warm_start,
+        tradeoff_interpretation_summary=tradeoff_interpretation,
+        history_reuse_summary=history_reuse,
         optimizer_effectiveness_audit=effectiveness_audit,
         issues=issues,
         warnings=warnings,
@@ -186,6 +209,29 @@ def _space_compression_advisory(
             "applied_to_optimizer": False,
             "reason": f"space compression advisory unavailable: {exc}",
         }
+
+
+def _load_history_warm_start_summary(project_root: Path) -> dict[str, Any]:
+    optimizer_run_report = _load_json(project_root / OPTIMIZER_RUN_REPORT_RELATIVE)
+    openbox_payload = _dict_value(optimizer_run_report.get("openbox"))
+    runtime_summary = _dict_value(openbox_payload.get("history_warm_start"))
+    if runtime_summary:
+        summary = dict(runtime_summary)
+        summary.setdefault("status", "available")
+        summary["source"] = OPTIMIZER_RUN_REPORT_RELATIVE.as_posix()
+        return summary
+
+    audit_payload = _load_json(project_root / HISTORY_WARM_START_AUDIT_RELATIVE)
+    if audit_payload:
+        summary = dict(audit_payload)
+        summary.setdefault("status", "available")
+        summary["source"] = HISTORY_WARM_START_AUDIT_RELATIVE.as_posix()
+        return summary
+
+    return {
+        "status": "not_available",
+        "reason": "history warm-start artifact is missing",
+    }
 
 
 def _load_optimizer_effectiveness_audit(project_root: Path) -> dict[str, Any]:
@@ -1834,6 +1880,55 @@ def _optimizer_effectiveness_markdown(report: OptimizerInsightReport) -> list[st
     return lines
 
 
+def _trustworthy_tradeoff_markdown(report: OptimizerInsightReport) -> list[str]:
+    summary = report.tradeoff_interpretation_summary
+    front = _dict_value(summary.get("front_selectivity"), default={})
+    lines = [
+        "",
+        "## Trustworthy Trade-Off Summary",
+        "",
+        "- Evidence boundary: scripted facts and conservative rule-based notes only.",
+        f"- Front selectivity: `{front.get('front_count')}` / `{front.get('eligible_count')}` (ratio `{front.get('ratio')}`)",
+        f"- Usefulness: `{front.get('usefulness')}`",
+    ]
+    if message := front.get("message"):
+        lines.append(f"- Note: {message}")
+    blockers = summary.get("constraint_blockers")
+    if isinstance(blockers, list) and blockers:
+        for blocker in blockers[:5]:
+            if isinstance(blocker, dict):
+                lines.append(
+                    f"- Constraint blocker: {blocker.get('metric')} failed {blocker.get('failed_count')} rows"
+                )
+    return lines
+
+
+def _history_reuse_markdown(report: OptimizerInsightReport) -> list[str]:
+    summary = report.history_reuse_summary
+    lines = [
+        "",
+        "## History Reuse Summary",
+        "",
+        "- Evidence boundary: exact parameter matches only; not proof of optimizer improvement.",
+        f"- Status: `{summary.get('status')}`",
+    ]
+    if summary.get("status") == "available":
+        lines.extend(
+            [
+                f"- Application mode: `{summary.get('application_mode') or 'n/a'}`",
+                f"- Accepted/applied/rejected: `{summary.get('accepted_observation_count')}` / `{summary.get('applied_observation_count')}` / `{summary.get('rejected_observation_count')}`",
+                f"- Repeated current points: `{summary.get('repeated_current_point_count')}`",
+                f"- Repeated status counts: `{json.dumps(summary.get('repeated_current_status_counts', {}), sort_keys=True)}`",
+                f"- Best candidate reused history: `{str(bool(summary.get('best_candidate_reused_history'))).lower()}`",
+            ]
+        )
+        if interpretation := summary.get("interpretation"):
+            lines.append(f"- Interpretation: {interpretation}")
+    elif reason := summary.get("reason"):
+        lines.append(f"- Reason: {reason}")
+    return lines
+
+
 def _pareto_tradeoff_markdown(report: OptimizerInsightReport) -> list[str]:
     summary = report.pareto_tradeoff_summary
     lines = [
@@ -2076,6 +2171,8 @@ def _markdown_report(report: OptimizerInsightReport) -> str:
             lines.append(f"- {constraint_name}: {top}")
     else:
         lines.append(f"- Status: `{report.openbox_parameter_importance.get('status')}`")
+    lines.extend(_trustworthy_tradeoff_markdown(report))
+    lines.extend(_history_reuse_markdown(report))
     lines.extend(_pareto_tradeoff_markdown(report))
     lines.extend(_space_compression_markdown(report))
     lines.extend(
