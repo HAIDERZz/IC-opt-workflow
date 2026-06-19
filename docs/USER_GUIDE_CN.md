@@ -208,11 +208,24 @@ reports/ic_opt_doctor_report.json
 reports/license_probe_report.json
 reports/optimizer_run_report.json
 reports/optimizer_decision_report.md
+reports/optimizer_insight_report.json
+reports/optimizer_insight_report.md
+reports/optimizer_insight_report.html
 reports/history_warm_start_audit.json
 reports/history_warm_start_audit.md
 runs/**/result_manifest.json
 runs/**/metric_result_manifest.json
 ```
+
+`reports/optimizer_insight_report.html` 是优化结束后优先阅读的报告。
+JSON 是机器可读合同，Markdown 是文本备份。该 HTML 报告里的
+Pareto/trade-off 分析只使用本轮已有 raw metrics 做报告层 trade-off 总结；
+它不会把 OpenBox 切换成 multi-objective optimizer mode，也不会改变 candidate
+选择或改写 objective。
+
+Space Compression Advisory 使用 OpenBox compressor dry-run，在当前变量合同和已观测
+run 上生成搜索空间收窄建议。建议只用于人工复盘，不会自动应用到 optimizer 执行。
+用户确认后，可以把建议范围手动写入新的 `opt_requirement.md` 再启动下一轮优化。
 
 fix-run 报告：
 

@@ -52,6 +52,23 @@ warm_start_strategy: topk
 `initial_configurations_from_history`；无约束单目标项目才可能显示
 `transfer_learning_history`。
 
+## Optimizer Insight Report
+
+优化或 finalize 后，agent 应优先查看：
+
+```text
+reports/optimizer_insight_report.html
+reports/optimizer_insight_report.json
+reports/optimizer_insight_report.md
+```
+
+HTML 是给用户阅读的主报告；JSON 是机器可读合同；Markdown 是文本备份。
+Pareto/trade-off 分析只基于已有 raw metrics 做报告层 trade-off 总结，不表示
+OpenBox 已启用 multi-objective optimizer mode，也不改变 candidate 选择或 objective。
+Space Compression Advisory 使用 OpenBox compressor dry-run，只给出人工复盘建议，
+不会自动应用到 optimizer。用户认可后，可以把建议范围写进新的
+`opt_requirement.md` 再开下一轮。
+
 ## Requirement 内容
 
 - Maestro/ADE point root 和 testbench 定义
@@ -134,6 +151,9 @@ reports/ic_opt_doctor_report.json
 reports/license_probe_report.json
 reports/optimizer_run_report.json
 reports/optimizer_decision_report.md
+reports/optimizer_insight_report.html
+reports/optimizer_insight_report.json
+reports/optimizer_insight_report.md
 reports/history_warm_start_audit.json
 reports/history_warm_start_audit.md
 runs/**/result_manifest.json

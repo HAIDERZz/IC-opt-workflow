@@ -91,6 +91,27 @@ Do not say history was applied just because the config exists. Check
 projects may use `transfer_learning_history`; constrained IC projects use
 `initial_configurations_from_history`.
 
+## Optimizer Insight Report
+
+After optimize/finalize, inspect `reports/optimizer_insight_report.html` first
+when advising the user. The workflow also writes:
+
+```text
+reports/optimizer_insight_report.json
+reports/optimizer_insight_report.md
+reports/optimizer_insight_report.html
+```
+
+Treat Pareto and space-compression sections as report-layer guidance only.
+The Pareto/trade-off analyzer uses existing raw metrics; it does not enable
+OpenBox multi-objective optimizer mode, does not change candidate selection,
+and does not rewrite the configured objective.
+
+The Space Compression Advisory uses an OpenBox compressor dry-run. Suggested
+ranges are advisory only and are not applied to optimizer execution. If the user
+accepts a suggestion, they must copy the reviewed range into a new
+`opt_requirement.md` for a later run.
+
 ## Product Commands
 
 Local:
@@ -185,6 +206,9 @@ reports/ic_opt_doctor_report.json
 reports/license_probe_report.json
 reports/optimizer_run_report.json
 reports/optimizer_decision_report.md
+reports/optimizer_insight_report.json
+reports/optimizer_insight_report.md
+reports/optimizer_insight_report.html
 reports/history_warm_start_audit.json
 reports/history_warm_start_audit.md
 runs/**/result_manifest.json

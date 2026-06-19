@@ -66,6 +66,29 @@ old objective and constraint values are not reused. Inspect
 `reports/history_warm_start_audit.md`, and `openbox.history_warm_start` in
 `reports/optimizer_run_report.json` before saying the history was applied.
 
+### Optimizer Insight Report
+
+Successful optimization flows run `visualize-optimizer-run` after optimizer
+finalization and write:
+
+```text
+reports/optimizer_insight_report.json
+reports/optimizer_insight_report.md
+reports/optimizer_insight_report.html
+```
+
+The HTML file is the first reader-facing report to inspect. The JSON file is
+the machine-readable contract, and the Markdown file is a text fallback.
+
+The report-layer Pareto/trade-off analyzer uses existing raw metrics from the
+optimizer run. It does not enable OpenBox multi-objective optimizer mode, does
+not change candidate selection, and does not rewrite the configured objective.
+
+The Space Compression Advisory uses an OpenBox compressor dry-run on the
+current variable contract and observed rows. Suggestions are advisory only:
+they are not applied to optimizer execution. A user may copy reviewed suggested
+ranges into a new `opt_requirement.md` for a later run.
+
 ## Project Directory
 
 ```text
@@ -225,6 +248,9 @@ reports/ic_opt_doctor_report.json
 reports/license_probe_report.json
 reports/optimizer_run_report.json
 reports/optimizer_decision_report.md
+reports/optimizer_insight_report.json
+reports/optimizer_insight_report.md
+reports/optimizer_insight_report.html
 reports/history_warm_start_audit.json
 reports/history_warm_start_audit.md
 runs/**/result_manifest.json

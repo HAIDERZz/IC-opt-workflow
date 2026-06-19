@@ -77,6 +77,25 @@ Unconstrained single-objective projects may use `transfer_learning_history`.
 Constrained IC projects use `initial_configurations_from_history`. If
 `applied_to_advisor` is false, report `not_applied_reason`.
 
+## Optimizer Insight Report
+
+After optimize/finalize, inspect `reports/optimizer_insight_report.html` first
+when advising the user. The workflow also writes:
+
+```text
+reports/optimizer_insight_report.json
+reports/optimizer_insight_report.md
+reports/optimizer_insight_report.html
+```
+
+Treat Pareto and space-compression sections as report-layer guidance only. The
+Pareto/trade-off analyzer uses existing raw metrics; it does not enable OpenBox
+multi-objective optimizer mode, change candidate selection, or rewrite the
+configured objective. The Space Compression Advisory uses an OpenBox compressor
+dry-run. Suggested ranges are advisory only and are not applied to optimizer
+execution; a user must copy reviewed ranges into a new `opt_requirement.md` for
+a later run.
+
 ## Commands
 
 Local:
@@ -155,6 +174,9 @@ reports/ic_opt_doctor_report.json
 reports/license_probe_report.json
 reports/optimizer_run_report.json
 reports/optimizer_decision_report.md
+reports/optimizer_insight_report.json
+reports/optimizer_insight_report.md
+reports/optimizer_insight_report.html
 reports/history_warm_start_audit.json
 reports/history_warm_start_audit.md
 runs/**/result_manifest.json
