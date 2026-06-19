@@ -53,6 +53,8 @@ examples/spectre_maestro_project/opt_requirement.multi_testbench.md
 examples/spectre_maestro_project/opt_requirement.multi_corner.md
 examples/spectre_maestro_project/opt_requirement.multi_tb_corner.md
 examples/spectre_maestro_project/opt_requirement.fix_run.md
+examples/spectre_maestro_project/OPT_REQUIREMENT_README.md
+src/hermes_workflow/templates/spectre_maestro_project/OPT_REQUIREMENT_README.md
 src/hermes_workflow/templates/spectre_maestro_project/opt_requirement.fix_run.md
 ```
 
@@ -95,6 +97,15 @@ Before publishing:
   test cache files, and raw tool evidence from the release package
 - check that README, release notes, user guides, agent docs, skills, and
   examples describe the same CLI contract
+- run `tests/test_history_warm_start_docs.py`
+- compare `examples/spectre_maestro_project/OPT_REQUIREMENT_README.md` and
+  `src/hermes_workflow/templates/spectre_maestro_project/OPT_REQUIREMENT_README.md`
+- verify history warm-start docs use the real `History Warm Start`
+  requirement section, `history_warm_start` config name,
+  `reports/history_warm_start_audit.json`, and
+  `openbox.history_warm_start`
+- verify history warm-start docs do not advertise a fake
+  `--history-warm-start` CLI flag
 - check markdown code fences
 - check user-facing docs do not advertise stale CLI controls
 - keep `RELEASE_NOTES_v0.1.8.md` as the release summary

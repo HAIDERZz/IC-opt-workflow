@@ -43,6 +43,29 @@ initialization, process corners, output format, retention, objective,
 constraints, fixed points, waveform exports, and metric routes all come from
 `opt_requirement.md`.
 
+### History Warm Start
+
+Use `History Warm Start` when a new optimize project should learn from previous
+same-circuit runs. This is different from `--continue N`: continuation only adds
+budget to the same project and does not reread a changed `opt_requirement.md`.
+
+```yaml
+enabled: true
+sources:
+  - path: /path/to/previous_same_circuit_project
+    label: round1
+max_observations: 200
+warm_start_strategy: topk
+```
+
+The section renders to `config/history_warm_start.yaml`. History warm-start is
+optimize-only, cannot be combined with `--continue`, and is not supported for
+fix-run. Current and previous projects must use the exact same variable names;
+old objective and constraint values are not reused. Inspect
+`reports/history_warm_start_audit.json`,
+`reports/history_warm_start_audit.md`, and `openbox.history_warm_start` in
+`reports/optimizer_run_report.json` before saying the history was applied.
+
 ## Project Directory
 
 ```text
@@ -198,10 +221,12 @@ reporting success.
 Optimization evidence:
 
 ```text
-reports/project_doctor_report.json
+reports/ic_opt_doctor_report.json
 reports/license_probe_report.json
 reports/optimizer_run_report.json
 reports/optimizer_decision_report.md
+reports/history_warm_start_audit.json
+reports/history_warm_start_audit.md
 runs/**/result_manifest.json
 runs/**/metric_result_manifest.json
 ```

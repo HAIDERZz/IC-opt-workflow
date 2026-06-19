@@ -48,6 +48,35 @@ optimizer or resource override.
 Do not hand-pick optimizer candidate points, rewrite OCEAN formulas, parse PSF
 in Python, change the search space, or hardcode a Spectre version.
 
+## History Warm Start
+
+If `opt_requirement.md` contains `## History Warm Start`, treat it as a new
+optimize-project warm-start from previous same-circuit projects. It renders to
+`config/history_warm_start.yaml`. Do not run it with `--continue N`; continuation
+only adds budget to the same optimizer project and does not reread a changed
+requirement. Do not use it for fix-run.
+
+The first supported contract is strict: current and previous projects must have
+exactly the same variable names, no variable-name mapping, and matching required
+metric definitions. Previous objective and constraint results are not reused;
+old raw metrics are re-evaluated against the current requirement. Points outside
+the current variable space are rejected as `out_of_current_space`.
+
+After the run, inspect:
+
+```text
+reports/history_warm_start_audit.json
+reports/history_warm_start_audit.md
+openbox.history_warm_start in reports/optimizer_run_report.json
+```
+
+When reporting, distinguish accepted history from applied history:
+`accepted_observation_count` means the audit found compatible old rows;
+`applied_observation_count` means data actually reached OpenBox Advisor.
+Unconstrained single-objective projects may use `transfer_learning_history`.
+Constrained IC projects use `initial_configurations_from_history`. If
+`applied_to_advisor` is false, report `not_applied_reason`.
+
 ## Commands
 
 Local:
@@ -122,10 +151,12 @@ Do not treat successful command exit as full workflow acceptance.
 For optimization workflows, inspect:
 
 ```text
-reports/project_doctor_report.json
+reports/ic_opt_doctor_report.json
 reports/license_probe_report.json
 reports/optimizer_run_report.json
 reports/optimizer_decision_report.md
+reports/history_warm_start_audit.json
+reports/history_warm_start_audit.md
 runs/**/result_manifest.json
 runs/**/metric_result_manifest.json
 ```

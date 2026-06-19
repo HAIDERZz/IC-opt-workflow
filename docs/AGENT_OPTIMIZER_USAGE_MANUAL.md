@@ -63,6 +63,34 @@ ic-opt PROJECT_DIR --real --continue N
 
 All other values stay inherited from `opt_requirement.md` and generated config.
 
+## History Warm Start
+
+If `opt_requirement.md` contains `## History Warm Start`, treat it as a new
+optimize-project warm-start from previous same-circuit projects. It renders to
+`config/history_warm_start.yaml`. Do not recommend it for fix-run, and do not
+combine it with `--continue N`; continuation only extends an existing optimizer
+project and does not reread a changed requirement.
+
+The first release of history warm-start is strict: current and previous projects
+must have exactly the same variable names, no variable-name mapping, and matching
+required metric definitions. Old objective and constraint values are not reused;
+old raw metrics are re-evaluated with the current requirement. Old points outside
+the current variable space are rejected as `out_of_current_space`.
+
+After a run, inspect:
+
+```text
+reports/history_warm_start_audit.json
+reports/history_warm_start_audit.md
+openbox.history_warm_start in reports/optimizer_run_report.json
+```
+
+Do not say history was applied just because the config exists. Check
+`accepted_observation_count`, `applied_observation_count`, `applied_to_advisor`,
+`application_mode`, and `not_applied_reason`. Unconstrained single-objective
+projects may use `transfer_learning_history`; constrained IC projects use
+`initial_configurations_from_history`.
+
 ## Product Commands
 
 Local:
@@ -153,10 +181,12 @@ Confirm:
 For optimizer workflows, inspect:
 
 ```text
-reports/project_doctor_report.json
+reports/ic_opt_doctor_report.json
 reports/license_probe_report.json
 reports/optimizer_run_report.json
 reports/optimizer_decision_report.md
+reports/history_warm_start_audit.json
+reports/history_warm_start_audit.md
 runs/**/result_manifest.json
 runs/**/metric_result_manifest.json
 ```

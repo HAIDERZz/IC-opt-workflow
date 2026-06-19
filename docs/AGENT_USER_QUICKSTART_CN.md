@@ -28,6 +28,30 @@ ic-opt --ssh-profile PROFILE PROJECT_DIR --real --continue N
 `--continue N` 是追加仿真入口。`--ssh-profile PROFILE` 只选择远端执行 profile，
 不是资源或优化器覆盖。
 
+## History Warm Start
+
+`History Warm Start` 是新建 optimize 项目时引用同一电路旧项目历史的入口，不是
+`--continue N`。`--continue N` 只给同一个项目追加预算，不重新读取用户改过的
+`opt_requirement.md`。History warm-start 不支持 fix-run，也不能和 `--continue` 一起跑。
+
+最小 section：
+
+```yaml
+enabled: true
+sources:
+  - path: /path/to/previous_same_circuit_project
+    label: round1
+max_observations: 200
+warm_start_strategy: topk
+```
+
+它会生成 `config/history_warm_start.yaml`。第一版要求新旧项目变量名完全一致，metric
+定义一致；旧点超出当前空间会记为 `out_of_current_space`。运行后必须检查
+`reports/history_warm_start_audit.json`、`reports/history_warm_start_audit.md`，以及
+`reports/optimizer_run_report.json` 里的 `openbox.history_warm_start`。有约束项目通常显示
+`initial_configurations_from_history`；无约束单目标项目才可能显示
+`transfer_learning_history`。
+
 ## Requirement 内容
 
 - Maestro/ADE point root 和 testbench 定义
@@ -106,10 +130,12 @@ getData("NF" ?result "pnoise")
 不要只看退出码。真实 workflow 验收至少看：
 
 ```text
-reports/project_doctor_report.json
+reports/ic_opt_doctor_report.json
 reports/license_probe_report.json
 reports/optimizer_run_report.json
 reports/optimizer_decision_report.md
+reports/history_warm_start_audit.json
+reports/history_warm_start_audit.md
 runs/**/result_manifest.json
 runs/**/metric_result_manifest.json
 ```

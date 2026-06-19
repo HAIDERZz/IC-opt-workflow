@@ -115,6 +115,38 @@ examples/spectre_maestro_project/opt_requirement.fix_run.md
 
 `random_baseline` 用于诊断，不作为生产优化策略。
 
+## History Warm Start
+
+`History Warm Start` 用于“新建一个 optimize 项目，但参考同一电路之前跑过的优化
+历史”。典型流程是：用户看完上一轮报告后，新建项目目录，复制并修改新的
+`opt_requirement.md`，然后在新 requirement 里加入 `History Warm Start` section：
+
+```yaml
+enabled: true
+sources:
+  - path: /path/to/previous_same_circuit_project
+    label: round1
+max_observations: 200
+warm_start_strategy: topk
+```
+
+这个 section 会渲染为 `config/history_warm_start.yaml`。它和 `--continue N` 不是
+同一个用途：`--continue N` 只用于同一个项目追加优化预算，不重新读取用户改写后的
+`opt_requirement.md`。History warm-start 只支持 optimize，不支持 fix-run，也不能和
+`--continue` 一起使用。
+
+第一版规则是严格的：新旧项目变量名必须完全一致，不做变量名映射，也不接受旧项目
+多出来的变量。变量范围可以变化；旧点如果超出当前变量空间，会在 audit 里统计为
+`out_of_current_space`。系统不复用旧的 objective 或 constraint 结果，只读取旧 run 的
+raw metrics，并按当前项目的 objective 和 constraints 重新计算。当前项目需要的 metric
+定义必须和旧项目一致，否则旧历史不会进入 warm-start。
+
+有约束的 IC 优化场景使用 OpenBox 的 `initial_configurations_from_history` 路径，把
+可用历史转换为初始候选配置；无约束单目标场景才可能使用 OpenBox 原生
+`transfer_learning_history`。运行后检查
+`reports/history_warm_start_audit.json`、`reports/history_warm_start_audit.md`，以及
+`reports/optimizer_run_report.json` 里的 `openbox.history_warm_start`。
+
 ## Fix-Run 模式
 
 fix-run requirement 必须写：
@@ -172,10 +204,12 @@ corners:
 优化报告：
 
 ```text
-reports/project_doctor_report.json
+reports/ic_opt_doctor_report.json
 reports/license_probe_report.json
 reports/optimizer_run_report.json
 reports/optimizer_decision_report.md
+reports/history_warm_start_audit.json
+reports/history_warm_start_audit.md
 runs/**/result_manifest.json
 runs/**/metric_result_manifest.json
 ```

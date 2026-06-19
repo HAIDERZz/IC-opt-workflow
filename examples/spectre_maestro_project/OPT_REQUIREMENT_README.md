@@ -250,6 +250,40 @@ Production strategy choices:
 
 `random_baseline` is for diagnostics, not production optimization.
 
+## History Warm Start
+
+`History Warm Start` is an optional optimize-mode section for a new project that
+references previous same-circuit project directories. It is different from
+`--continue N`: continuation extends the same optimizer project and does not
+reread a changed `opt_requirement.md`. It is not supported for fix-run.
+
+Docs-only section example:
+
+```yaml
+enabled: true
+sources:
+  - path: /path/to/previous_same_circuit_project
+    label: round1
+max_observations: 200
+warm_start_strategy: topk
+```
+
+The section renders to `config/history_warm_start.yaml`. The first supported
+contract requires exactly matching variable names and matching required metric
+definitions between current and previous projects. Old objective and constraint
+values are not reused; old raw metrics are re-evaluated with the current
+requirement. Points outside the current variable space are rejected as
+`out_of_current_space`.
+
+After a run, inspect `reports/history_warm_start_audit.json`,
+`reports/history_warm_start_audit.md`, and `openbox.history_warm_start` in
+`reports/optimizer_run_report.json`. Constrained IC projects use
+`initial_configurations_from_history`; unconstrained single-objective projects
+may use `transfer_learning_history`.
+
+This optional snippet is not inserted into the verified `opt_requirement*.md`
+files in this directory.
+
 ## Approval Checklist
 
 ```yaml
