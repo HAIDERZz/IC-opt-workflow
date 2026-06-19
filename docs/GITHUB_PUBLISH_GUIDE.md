@@ -25,7 +25,7 @@ skills/
 vendor/
 tests/
 tools/
-RELEASE_NOTES_v0.1.8.md
+RELEASE_NOTES_v0.1.9.md
 LICENSE
 ```
 
@@ -67,10 +67,10 @@ python3 -m venv .venv
 git diff --check -- . ':!vendor' ':!.serena'
 ```
 
-Run at least the focused fix-run tests before publishing v0.1.8:
+Run at least the focused release-contract tests before publishing v0.1.9:
 
 ```bash
-./.venv/bin/python -m pytest tests/test_fix_run_docs.py tests/test_requirement_intake_fix_run.py tests/test_fix_run_flow.py tests/test_remote_fix_run_flow.py tests/test_remote_spectre_ocean_waveform.py -q
+./.venv/bin/python -m pytest tests/test_fix_run_docs.py tests/test_history_warm_start_docs.py tests/test_requirement_intake.py tests/test_fix_run_flow.py tests/test_remote_fix_run_flow.py tests/test_optimizer_insights.py tests/test_optimizer_html_report.py -q
 ```
 
 Use the site's Python 3.11+ command if `python3` is older than 3.11.
@@ -92,10 +92,10 @@ From the package root:
 ```bash
 git status --short
 git add .
-git commit -m "release: v0.1.8"
+git commit -m "release: v0.1.9"
 git push origin main
-git tag v0.1.8
-git push origin v0.1.8
+git tag v0.1.9
+git push origin v0.1.9
 ```
 
-Use `RELEASE_NOTES_v0.1.8.md` for GitHub release notes.
+Use `RELEASE_NOTES_v0.1.9.md` for GitHub release notes.

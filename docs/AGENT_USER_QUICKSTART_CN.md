@@ -141,6 +141,12 @@ examples/spectre_maestro_project/opt_requirement.multi_tb_corner.md
 agent 需要报告 objective policy、constraint policy、被选中的 run、各 corner
 聚合结果，以及 worst-case 或 all-corners 约束判断。
 
+multi-testbench 示例必须保留真实跑通过的 Mixer 路由结构：
+`opt_requirement.multi_testbench.md` 和 `opt_requirement.multi_tb_corner.md`
+中，CG/NF/BW、IIP3、P1dB 指标分别路由到对应 testbench。history 场景使用
+`examples/spectre_maestro_project/opt_requirement.history_warm_start.md`，这是
+第二轮同电路 history 验证 requirement 的脱敏版本。
+
 ## Fix-Run
 
 fix-run 使用同一个产品命令：

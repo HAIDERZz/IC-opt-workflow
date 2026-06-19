@@ -7,7 +7,7 @@ single-point Maestro/ADE result directory that contains `netlist/input.scs`.
 ## Project
 
 ```yaml
-project_name: insight_local_mt80_multi_tb
+project_name: insight_local_mt40_history_multi_tb
 description: Optimize one Mixer candidate across CG/NF/BW, IIP3, and P1dB testbenches
 backend: maestro_exported_spectre_deck
 ```
@@ -49,7 +49,7 @@ testbenches:
 ```yaml
 - name: F
   kind: integer
-  lower: "14"
+  lower: "16"
   upper: "30"
   step: "2"
 - name: W
@@ -144,12 +144,23 @@ keep_successful_runs: true
 ```yaml
 algorithm: openbox
 initialization: sobol
-max_evaluations: 80
+max_evaluations: 40
 batch_size: 10
 random_seed: 20260528
 optimizer_cpu_threads: 4
 failure_penalty: 1000000.0
 deduplicate_candidates: true
+```
+
+## History Warm Start
+
+```yaml
+enabled: true
+sources:
+  - path: /absolute/path/to/previous_same_circuit_project
+    label: local_round1_mt80
+max_observations: 80
+warm_start_strategy: topk
 ```
 
 ## Approval Checklist
