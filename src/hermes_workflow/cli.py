@@ -771,6 +771,7 @@ def visualize_optimizer_run_command(
         typer.echo("optimizer insight report written")
         typer.echo("report: reports/optimizer_insight_report.json")
         typer.echo("markdown: reports/optimizer_insight_report.md")
+        typer.echo("html: reports/optimizer_insight_report.html")
         for plot_name, plot_path in sorted(report.plots.items()):
             typer.echo(f"{plot_name}: {plot_path}")
         return

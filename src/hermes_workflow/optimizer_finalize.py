@@ -14,6 +14,7 @@ REPORT_RELATIVE = Path("reports/optimizer_finalize_report.json")
 ACCEPTANCE_RELATIVE = Path("reports/optimizer_run_acceptance_report.json")
 COMPLETION_RELATIVE = Path("reports/optimizer_completion_report.json")
 INSIGHT_RELATIVE = Path("reports/optimizer_insight_report.json")
+INSIGHT_HTML_RELATIVE = Path("reports/optimizer_insight_report.html")
 
 
 @dataclass(frozen=True)
@@ -126,6 +127,7 @@ def _report_paths(*, include_completion: bool, include_insight: bool) -> dict[st
         reports["completion"] = COMPLETION_RELATIVE.as_posix()
     if include_insight:
         reports["insight"] = INSIGHT_RELATIVE.as_posix()
+        reports["insight_html"] = INSIGHT_HTML_RELATIVE.as_posix()
     return reports
 
 

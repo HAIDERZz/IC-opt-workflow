@@ -485,7 +485,9 @@ def test_visualize_optimizer_run_cli_writes_report(tmp_path: Path) -> None:
     assert result.exit_code == 0
     assert "optimizer insight report written" in result.output
     assert "reports/optimizer_insight_report.json" in result.output
+    assert "html: reports/optimizer_insight_report.html" in result.output
     assert (project_dir / "reports/optimizer_insight_report.json").exists()
+    assert (project_dir / "reports/optimizer_insight_report.html").exists()
 
 
 def test_generate_optimizer_insight_report_fails_without_traces(tmp_path: Path) -> None:
