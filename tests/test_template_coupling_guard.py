@@ -3,14 +3,15 @@ from __future__ import annotations
 from pathlib import Path
 
 
-ALLOWED_TEMPLATE_CALLERS = {
-    # Product/template behavior.
+# Only tests that intentionally exercise the product/template API
+# (create_project_from_template) itself. All other test files must use
+# tests/project_factory.py or existing generic helpers instead.
+INTENTIONAL_TEMPLATE_API_CALLERS = {
     "tests/test_package.py",
-    # Intentionally template-based: create_project_from_template is the product/template API.
 }
 
 
-def test_create_project_from_template_usage_is_explicitly_allowlisted() -> None:
+def test_create_project_from_template_usage_is_limited_to_product_template_api_tests() -> None:
     root = Path(__file__).resolve().parents[1]
     offenders: list[str] = []
     for path in sorted((root / "tests").glob("*.py")):
@@ -18,7 +19,7 @@ def test_create_project_from_template_usage_is_explicitly_allowlisted() -> None:
         if relative == "tests/test_template_coupling_guard.py":
             continue
         text = path.read_text(encoding="utf-8")
-        if "create_project_from_template" in text and relative not in ALLOWED_TEMPLATE_CALLERS:
+        if "create_project_from_template" in text and relative not in INTENTIONAL_TEMPLATE_API_CALLERS:
             offenders.append(relative)
 
     assert offenders == []

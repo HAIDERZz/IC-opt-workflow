@@ -348,26 +348,18 @@ generic factory.
 - tests/test_package.py — template tree, packaged resources, `init` semantics.
 - tests/test_cli.py — `hermes-workflow init` product behavior.
 
-## Remaining migration waves
+## Final guard state
 
-### Remote and adapter flows
+All non-product test files have been migrated away from direct
+`create_project_from_template()` usage. Only `tests/test_package.py` remains
+because it tests the product/template API itself (template tree creation,
+packaged resources, `hermes-workflow init` semantics). New tests should use
+`tests/project_factory.py` or existing generic helpers.
 
-All remote and adapter flow tests have been migrated. No remaining files in this
-category.
-
-## How to continue
-
-1. Pick one file from a wave above.
-2. Replace its `create_project_from_template(...)` usage with the appropriate
-   factory helper (`create_generic_project` / `create_packaged_generic_project` /
-   `create_approved_generic_project`), updating any circuit-specific template
-   overlays, fake manifests, and name-based assertions.
-3. Remove the file from `ALLOWED_TEMPLATE_CALLERS`.
-4. Run `tests/test_template_coupling_guard.py`, the file's tests, and the full
-   suite before the next file.
-
-The allowlist must shrink monotonically; the guard prevents any new unreviewed
-direct usage from being introduced.
+The coupling guard (`tests/test_template_coupling_guard.py`) enforces this
+contract: `INTENTIONAL_TEMPLATE_API_CALLERS = {"tests/test_package.py"}`.
+Any new test file that directly contains `create_project_from_template` will
+fail the guard unless explicitly added to this set.
 
 ## Verification
 
