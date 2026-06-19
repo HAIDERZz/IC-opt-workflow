@@ -16,12 +16,14 @@ from hermes_workflow.multi_testbench_aggregation import aggregate_multi_testbenc
 from hermes_workflow.openbox_backend import (
     OPENBOX_ADVANCED_VISUALIZATION_MANIFEST_RELATIVE,
     OPENBOX_EFFECTIVENESS_AUDIT_RELATIVE,
+    _build_openbox_advisor,
     _build_openbox_space,
     _create_advisor,
     run_openbox_fake_optimization,
     run_openbox_real_optimization,
 )
 from hermes_workflow.optimizer_artifacts import EVALUATIONS_RELATIVE, REPORT_RELATIVE
+from hermes_workflow.history_warm_start import HISTORY_WARM_START_AUDIT_RELATIVE
 from hermes_workflow.package import build_execution_package
 from hermes_workflow.real_run import prepare_real_run
 from hermes_workflow.validate import assert_valid_project
@@ -1244,7 +1246,7 @@ def test_create_advisor_passes_initial_trials_into_openbox_advisor(
     monkeypatch.setattr(
         module,
         "_load_openbox",
-        lambda: (CapturingAdvisor, object, FakeSpaceModule),
+        lambda: (CapturingAdvisor, object, object, object, FakeSpaceModule),
     )
 
     _create_advisor(
@@ -2116,7 +2118,7 @@ def test_openbox_create_advisor_uses_requirement_initialization(
 
     monkeypatch.setattr(
         "hermes_workflow.openbox_backend._load_openbox",
-        lambda: (_CapturingAdvisor, _Observation, fake_sp),
+        lambda: (_CapturingAdvisor, _Observation, object, object, fake_sp),
     )
 
     _create_advisor(
@@ -2247,3 +2249,246 @@ def test_openbox_separate_effectiveness_audit_file_has_runtime_thread_limits(
     assert audit_path.exists(), "optimizer_effectiveness_audit.json must exist"
     audit = json.loads(audit_path.read_text(encoding="utf-8"))
     assert "runtime_thread_limits" in audit
+
+
+# ---------------------------------------------------------------------------
+# Task 4: history warm-start OpenBox adapter
+# ---------------------------------------------------------------------------
+
+
+_MIXED_MODE_MESSAGE = (
+    "history warm-start cannot be combined with continuation; "
+    "use continuation for same-project budget extension, or start a new "
+    "project for history warm-start"
+)
+
+
+def _write_warm_start_config(
+    project_dir: Path, *, enabled: bool, sources: list[dict[str, object]]
+) -> None:
+    _write_yaml(
+        project_dir / "config" / "history_warm_start.yaml",
+        {
+            "schema_version": "1.0",
+            "history_warm_start": {
+                "enabled": enabled,
+                "sources": sources,
+                "warm_start_strategy": "topk",
+            },
+        },
+    )
+
+
+def _fake_manifest_adapter() -> tuple[list[str], object]:
+    runs: list[str] = []
+
+    def adapter(project_dir: Path, *, run_id: str, cadence_cshrc: Path | None) -> None:
+        runs.append(run_id)
+        from tests.real_run_smoke_helpers import (
+            write_fake_metric_result_manifest,
+            write_fake_result_manifest,
+        )
+
+        write_fake_result_manifest(project_dir, run_id=run_id)
+        write_fake_metric_result_manifest(project_dir, run_id=run_id)
+
+    return runs, adapter
+
+
+def test_load_openbox_returns_five_tuple(monkeypatch) -> None:
+    import hermes_workflow.openbox_backend as module
+
+    monkeypatch.setattr(
+        module,
+        "_load_openbox",
+        lambda: ("Advisor", "Observation", "History", "InitialConfigProvider", "sp"),
+    )
+    assert len(module._load_openbox()) == 5
+
+
+def test_build_openbox_advisor_accepts_five_tuple_loader(
+    tmp_path: Path, monkeypatch
+) -> None:
+    import hermes_workflow.openbox_backend as module
+
+    project_dir = create_approved_real_project(tmp_path)
+    contract = module.load_native_turbo_contract(project_dir)
+    captured: dict[str, object] = {}
+
+    class CapturingAdvisor:
+        def __init__(self, _space: object, **kwargs: object) -> None:
+            captured.update(kwargs)
+
+    monkeypatch.setattr(
+        module,
+        "_load_openbox",
+        lambda: (CapturingAdvisor, object, object, object, FakeSpaceModule),
+    )
+
+    _build_openbox_advisor(contract.variables, seed=19, num_constraints=1)
+
+    assert captured["num_constraints"] == 1
+    assert captured["random_state"] == 19
+
+
+def test_create_advisor_passes_transfer_history_when_unconstrained(
+    tmp_path: Path, monkeypatch
+) -> None:
+    import hermes_workflow.openbox_backend as module
+
+    project_dir = create_approved_real_project(tmp_path)
+    contract = module.load_native_turbo_contract(project_dir)
+    captured: dict[str, object] = {}
+
+    class CapturingAdvisor:
+        def __init__(self, _space: object, **kwargs: object) -> None:
+            captured.update(kwargs)
+
+    monkeypatch.setattr(
+        module,
+        "_load_openbox",
+        lambda: (CapturingAdvisor, object, object, object, FakeSpaceModule),
+    )
+    fake_history = object()
+
+    _create_advisor(
+        project_dir,
+        contract.variables,
+        11,
+        advisor_factory=None,
+        num_constraints=0,
+        initial_trials=3,
+        surrogate_type="gp",
+        acq_type="eic",
+        acq_optimizer_type="random_scipy",
+        transfer_learning_history=[fake_history],
+        warm_start_strategy="topk",
+    )
+
+    assert captured["num_constraints"] == 0
+    assert captured["transfer_learning_history"] == [fake_history]
+    assert captured["warm_start_strategy"] == "topk"
+
+
+def test_create_advisor_passes_initial_configurations_without_transfer_history(
+    tmp_path: Path, monkeypatch
+) -> None:
+    import hermes_workflow.openbox_backend as module
+
+    project_dir = create_approved_real_project(tmp_path)
+    contract = module.load_native_turbo_contract(project_dir)
+    captured: dict[str, object] = {}
+
+    class CapturingAdvisor:
+        def __init__(self, _space: object, **kwargs: object) -> None:
+            captured.update(kwargs)
+
+    monkeypatch.setattr(
+        module,
+        "_load_openbox",
+        lambda: (CapturingAdvisor, object, object, object, FakeSpaceModule),
+    )
+    fake_configuration = object()
+
+    _create_advisor(
+        project_dir,
+        contract.variables,
+        11,
+        advisor_factory=None,
+        num_constraints=1,
+        initial_trials=3,
+        surrogate_type="gp",
+        acq_type="eic",
+        acq_optimizer_type="random_scipy",
+        transfer_learning_history=[],
+        initial_configurations=[fake_configuration],
+        warm_start_strategy="topk",
+    )
+
+    assert captured["num_constraints"] == 1
+    assert "transfer_learning_history" not in captured
+    assert "warm_start_strategy" not in captured
+    assert captured["initial_configurations"] == [fake_configuration]
+
+
+def test_run_openbox_real_rejects_warm_start_combined_with_continuation(
+    tmp_path: Path,
+) -> None:
+    project_dir = create_generic_project(tmp_path, name="current_project")
+    _write_warm_start_config(
+        project_dir,
+        enabled=True,
+        sources=[{"path": str(tmp_path / "previous_project"), "label": "round1"}],
+    )
+
+    with pytest.raises(ValueError, match=_MIXED_MODE_MESSAGE):
+        run_openbox_real_optimization(project_dir, continue_from_existing=True)
+
+
+def test_run_openbox_real_warm_start_runs_audit_without_real_openbox(
+    tmp_path: Path, monkeypatch
+) -> None:
+    import hermes_workflow.openbox_backend as module
+
+    # advisor_factory path must not load real OpenBox at all.
+    monkeypatch.setattr(
+        module,
+        "_load_openbox",
+        lambda: (_ for _ in ()).throw(AssertionError("real OpenBox must not load")),
+    )
+    project_dir = create_approved_real_project(tmp_path)
+    _write_warm_start_config(
+        project_dir,
+        enabled=True,
+        sources=[{"path": str(tmp_path / "missing_source"), "label": "round1"}],
+    )
+    _runs, adapter = _fake_manifest_adapter()
+
+    result = run_openbox_real_optimization(
+        project_dir,
+        max_evals=1,
+        batch_size=1,
+        parallel_jobs=1,
+        advisor_factory=lambda _space, _seed: FakeAdvisor(project_dir),
+        adapter=adapter,
+    )
+
+    assert result.evaluation_count == 1
+    assert (project_dir / HISTORY_WARM_START_AUDIT_RELATIVE).exists()
+
+
+def test_run_openbox_real_no_config_and_disabled_warm_start_preserve_behavior(
+    tmp_path: Path,
+) -> None:
+    _runs, adapter = _fake_manifest_adapter()
+
+    # No warm-start config: existing behavior, no warm-start audit artifact.
+    project_dir = create_approved_real_project(tmp_path)
+    result = run_openbox_real_optimization(
+        project_dir,
+        max_evals=1,
+        batch_size=1,
+        parallel_jobs=1,
+        advisor_factory=lambda _space, _seed: FakeAdvisor(project_dir),
+        adapter=adapter,
+    )
+    assert result.evaluation_count == 1
+    assert not (project_dir / HISTORY_WARM_START_AUDIT_RELATIVE).exists()
+
+    # enabled: false: same as no-config (no warm-start audit artifact).
+    disabled_dir = create_approved_real_project(tmp_path / "disabled_case")
+    _write_warm_start_config(
+        disabled_dir,
+        enabled=False,
+        sources=[{"path": str(tmp_path / "previous_project"), "label": "round1"}],
+    )
+    disabled_result = run_openbox_real_optimization(
+        disabled_dir,
+        max_evals=1,
+        batch_size=1,
+        parallel_jobs=1,
+        advisor_factory=lambda _space, _seed: FakeAdvisor(disabled_dir),
+        adapter=adapter,
+    )
+    assert disabled_result.evaluation_count == 1
+    assert not (disabled_dir / HISTORY_WARM_START_AUDIT_RELATIVE).exists()

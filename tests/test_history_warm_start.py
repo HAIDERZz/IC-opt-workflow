@@ -9,6 +9,7 @@ from hermes_workflow.history_warm_start import (
     HISTORY_WARM_START_AUDIT_MD_RELATIVE,
     HISTORY_WARM_START_AUDIT_RELATIVE,
     audit_history_warm_start,
+    build_warm_start_openbox_adapter,
 )
 from hermes_workflow.optimizer_artifacts import EVALUATIONS_RELATIVE
 from hermes_workflow.validate import assert_valid_project
@@ -633,3 +634,183 @@ def test_reports_contain_expected_status_counts_issues(tmp_path: Path) -> None:
     assert "Status: completed" in markdown
     assert "Accepted observations: 2" in markdown
     assert "Rejected observations: 0" in markdown
+
+
+# ---------------------------------------------------------------------------
+# Task 4: OpenBox adapter (fake OpenBox classes; no real OpenBox import)
+# ---------------------------------------------------------------------------
+
+
+class _FakeOBConfiguration:
+    def __init__(self, values: dict[str, str]) -> None:
+        self.values = values
+
+
+class _FakeOBObservation:
+    def __init__(
+        self,
+        *,
+        config: _FakeOBConfiguration,
+        objectives: list[float],
+        constraints: list[float],
+        extra_info: dict[str, object],
+    ) -> None:
+        self.config = config
+        self.objectives = objectives
+        self.constraints = constraints
+        self.extra_info = extra_info
+
+
+class _FakeOBHistory:
+    def __init__(
+        self, *, config_space: object, num_constraints: int, reject: bool = False
+    ) -> None:
+        self.config_space = config_space
+        self.num_constraints = num_constraints
+        self.reject = reject
+        self.observations: list[_FakeOBObservation] = []
+
+    def update_observation(self, observation: _FakeOBObservation) -> None:
+        if self.reject:
+            raise ValueError("OpenBox rejected this observation")
+        self.observations.append(observation)
+
+
+class _FakeOBInitialConfigProvider:
+    def __init__(
+        self,
+        *,
+        config_space: object,
+        init_num: int,
+        init_strategy: str,
+        transfer_learning_history: list[_FakeOBHistory],
+        warm_start_strategy: str,
+        rng: object,
+    ) -> None:
+        self.config_queue = [
+            observation
+            for history in transfer_learning_history
+            for observation in history.observations
+        ]
+        # All extracted configs are tagged as warm-start so the builder's
+        # source filter keeps them (mirrors the real provider's warm_start tag).
+        self.config_sources = ["warm_start"] * len(self.config_queue)
+
+
+def _run_builder(
+    tmp_path: Path,
+    rows: list[str],
+    *,
+    history_factory: object,
+    num_sources: int = 1,
+    num_constraints: int = 0,
+    enabled: bool = True,
+) -> object:
+    sources: list[dict[str, object]] = []
+    for index in range(num_sources):
+        source = _matching_source(
+            tmp_path, rows, name=f"source_{index}"
+        )
+        sources.append({"path": str(source), "label": f"round{index}"})
+    project_dir, bundle = _current_project_with_warm_start(
+        tmp_path, sources=sources, enabled=enabled
+    )
+    return build_warm_start_openbox_adapter(
+        project_dir,
+        bundle,
+        space="config-space",
+        observation_factory=_FakeOBObservation,
+        history_factory=history_factory,
+        config_builder=lambda parameters: _FakeOBConfiguration(parameters),
+        initial_config_provider=_FakeOBInitialConfigProvider,
+        random_seed=7,
+        initial_trials=None,
+        initialization="sobol",
+        num_constraints=num_constraints,
+    )
+
+
+def test_build_adapter_creates_one_history_per_source(tmp_path: Path) -> None:
+    adapter = _run_builder(
+        tmp_path,
+        [_row(evaluation_index=1)],
+        history_factory=_FakeOBHistory,
+        num_sources=2,
+        num_constraints=0,
+    )
+
+    assert adapter.application_mode == "transfer_learning_history"
+    assert len(adapter.transfer_learning_history) == 2
+    # One history per source, each carrying its single accepted observation.
+    for history in adapter.transfer_learning_history:
+        assert len(history.observations) == 1
+
+
+def test_build_adapter_observation_payload(tmp_path: Path) -> None:
+    adapter = _run_builder(
+        tmp_path,
+        [_row(objective=99999.0, evaluation_index=1)],
+        history_factory=_FakeOBHistory,
+        num_constraints=0,
+    )
+
+    observation = adapter.transfer_learning_history[0].observations[0]
+    assert observation.objectives == [pytest.approx(-0.9995)]
+    assert observation.constraints == [pytest.approx(-0.0005)]
+    assert observation.config.values == {"VAR_INT": "2", "VAR_WIDTH": "0.3u"}
+    assert observation.extra_info["history_warm_start"] is True
+    assert observation.extra_info["source_label"] == "round0"
+    assert observation.extra_info["source_evaluation_index"] == 1
+    assert observation.extra_info["source_run_id"] == "real_001"
+    assert observation.extra_info["status"] == "feasible"
+
+
+def test_build_adapter_no_accepted_observations(tmp_path: Path) -> None:
+    # Old status outside the completed set -> row rejected, zero accepted.
+    adapter = _run_builder(
+        tmp_path,
+        [_row(status="metric_failed")],
+        history_factory=_FakeOBHistory,
+        num_constraints=0,
+    )
+
+    assert adapter.application_mode == "no_accepted_observations"
+    assert adapter.transfer_learning_history == []
+    assert adapter.accepted_observation_count == 0
+
+
+def test_build_adapter_constrained_extracts_initial_configurations(
+    tmp_path: Path,
+) -> None:
+    # Constrained problem: OpenBox cannot take transfer history directly, so the
+    # adapter extracts warm-start initial configurations from the histories.
+    adapter = _run_builder(
+        tmp_path,
+        [_row(evaluation_index=1), _row(evaluation_index=2)],
+        history_factory=_FakeOBHistory,
+        num_constraints=1,
+    )
+
+    assert adapter.application_mode == "initial_configurations_from_history"
+    assert adapter.transfer_learning_history == []
+    # Only warm-start-extracted configurations are passed (not OpenBox fallback).
+    assert len(adapter.initial_configurations) == 2
+
+
+def test_build_adapter_openbox_rejection_is_non_fatal(tmp_path: Path) -> None:
+    def rejecting_factory(*, config_space, num_constraints):  # type: ignore[no-untyped-def]
+        return _FakeOBHistory(
+            config_space=config_space, num_constraints=num_constraints, reject=True
+        )
+
+    adapter = _run_builder(
+        tmp_path,
+        [_row(evaluation_index=1), _row(evaluation_index=2)],
+        history_factory=rejecting_factory,
+        num_constraints=0,
+    )
+
+    assert adapter.application_mode == "not_applied"
+    assert adapter.not_applied_reason == "history_object_rejected_by_openbox"
+    assert adapter.transfer_learning_history == []
+    assert adapter.applied_observation_count == 0
