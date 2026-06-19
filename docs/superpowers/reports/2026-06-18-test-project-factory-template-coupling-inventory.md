@@ -19,7 +19,7 @@ approval gate tests; Phase 7 migrated the optimizer task package tests; Phase 8 
 run-retention and optimizer-progress-state tests; Phase 9 migrated the fix-run flow
 tests; Phase 10 migrated the multi-testbench aggregation tests; Phase 11 migrated
 the real-result-record tests; Phase 12 migrated the real-run smoke helpers and
-adapted their consumer cluster. Remaining
+adapted their consumer cluster; Phase 13 migrated the mock optimizer tests. Remaining
 coupled files are explicitly deferred.
 
 ## Status summary
@@ -349,9 +349,8 @@ generic factory.
 
 ### Optimizer backends (deepest coupling)
 
-- tests/test_openbox_backend.py
 - tests/test_native_turbo.py
-- tests/test_mock_optimizer.py
+- tests/test_openbox_backend.py
 
 ### Remote and adapter flows
 
@@ -376,6 +375,19 @@ The allowlist must shrink monotonically; the guard prevents any new unreviewed
 direct usage from being introduced.
 
 ## Verification
+
+### Phase 13
+
+- `pytest tests/test_mock_optimizer.py -q` -> `83 passed`
+- `pytest tests/test_template_coupling_guard.py -q` -> `1 passed`
+- `pytest tests/test_mock_optimizer.py tests/test_template_coupling_guard.py -q` -> `84 passed`
+- `pytest -q` -> `1194 passed`
+- `ruff check src tests` -> `All checks passed!`
+- `git diff --check` -> clean
+- `git -C ../ic-auto-opt-workflow-v0.1 status --short` -> clean (release checkout untouched)
+- grep forbidden tokens over `tests/test_mock_optimizer.py` -> no matches
+- grep cross-imports -> no source-level matches
+- `ALLOWED_TEMPLATE_CALLERS` count: 8 -> 7.
 
 ### Phase 12
 
