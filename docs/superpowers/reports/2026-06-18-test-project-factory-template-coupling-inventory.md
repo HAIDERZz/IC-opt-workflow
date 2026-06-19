@@ -20,8 +20,8 @@ run-retention and optimizer-progress-state tests; Phase 9 migrated the fix-run f
 tests; Phase 10 migrated the multi-testbench aggregation tests; Phase 11 migrated
 the real-result-record tests; Phase 12 migrated the real-run smoke helpers and
 adapted their consumer cluster; Phase 13 migrated the mock optimizer tests; R1
-migrated the native TuRBO tests; R2 migrated the OpenBox backend tests; R3 migrated the remote fix-run flow tests; R4 migrated the remote optimizer flow tests.
-Remaining
+migrated the native TuRBO tests; R2 migrated the OpenBox backend tests; R3 migrated the remote fix-run flow tests; R4 migrated the remote optimizer flow tests; R5 migrated the Spectre/OCEAN adapter
+tests. Remaining
 coupled files are explicitly deferred.
 
 ## Status summary
@@ -352,7 +352,6 @@ generic factory.
 ### Remote and adapter flows
 
 - tests/test_remote_spectre_ocean.py
-- tests/test_spectre_ocean_adapter.py
 
 ## How to continue
 
@@ -369,6 +368,20 @@ The allowlist must shrink monotonically; the guard prevents any new unreviewed
 direct usage from being introduced.
 
 ## Verification
+
+### R5 Spectre/OCEAN Adapter
+
+- `pytest tests/test_spectre_ocean_adapter.py -q` -> `87 passed, 13 warnings`
+- `pytest tests/test_template_coupling_guard.py -q` -> `1 passed`
+- `pytest tests/test_spectre_ocean_adapter.py tests/test_template_coupling_guard.py -q` -> `88 passed, 13 warnings`
+- `pytest tests/test_spectre_ocean_adapter.py tests/test_real_run.py tests/test_remote_spectre_ocean.py tests/test_remote_spectre_ocean_waveform.py -q` -> `161 passed, 13 warnings`
+- `pytest -q` -> `1194 passed, 13 warnings`
+- `ruff check src tests` -> `All checks passed!`
+- `git diff --check` -> clean
+- `git -C ../ic-auto-opt-workflow-v0.1 status --short` -> clean (release checkout untouched)
+- grep forbidden tokens over `tests/test_spectre_ocean_adapter.py` -> no matches
+- grep cross-imports -> known consumers only in test_real_run.py, test_remote_spectre_ocean.py, test_remote_spectre_ocean_waveform.py
+- `ALLOWED_TEMPLATE_CALLERS` count: 3 -> 2.
 
 ### R4 Remote Optimizer Flow
 

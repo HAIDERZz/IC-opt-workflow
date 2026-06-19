@@ -8,7 +8,6 @@ ALLOWED_TEMPLATE_CALLERS = {
     "tests/test_package.py",
     # Not yet migrated. Shrink this list in follow-up waves.
     "tests/test_remote_spectre_ocean.py",
-    "tests/test_spectre_ocean_adapter.py",
 }
 
 
