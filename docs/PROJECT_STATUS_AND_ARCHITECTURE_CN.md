@@ -16,7 +16,7 @@ script。[E1][E3]
 当前 C-65 产品目标已经修正为 runtime-native：用户在哪个 agent CLI 里输入
 `/ic-opt PROJECT_DIR --real`，哪个 CLI 的当前会话就是 supervisor agent，
 并使用同一个 CLI 的原生 subagent/task 机制执行真实优化任务。Claude 和
-OpenCode 的入口资产已经加入仓库；C-64 的 `--execution-agent claude`
+OpenCode 的入口资产已经加入仓库；C-64 的 `execution-agent option claude`
 subprocess 方式保留为开发/验收证据，不再被描述为默认产品形态。[E2][E20]
 
 当前 `ic-opt` shell 命令默认是 direct 自动化路径，会在同一个 Python 流程
@@ -277,7 +277,7 @@ artifact 验收、可视化和 decision report。[E3][E4][E9]
 ```
 
 Claude 会触发该 skill，并由 skill 调用 shell 自动化核心；默认情况下它会
-追加 `--execution-agent claude`，在 `package-optimizer-task` 后派发独立
+追加 `execution-agent option claude`，在 `package-optimizer-task` 后派发独立
 Claude CLI execution-agent process。[E19][E20]
 
 如果最终产品要满足“The less user needs to talk to agent, the better”，那么

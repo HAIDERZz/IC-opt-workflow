@@ -29,7 +29,7 @@ parse PSF in Python, change the search space, or invent fix-run fixed points.
 Do not accept a real run from prose. Inspect:
 
 ```text
-reports/project_doctor_report.json
+reports/ic_opt_doctor_report.json
 reports/license_probe_report.json
 reports/optimizer_run_report.json
 reports/optimizer_decision_report.md

@@ -97,7 +97,7 @@ requirement for backward compatibility.
 Single-testbench projects use a top-level Maestro source:
 
 ```yaml
-maestro_point_root: /absolute/path/to/CG_NF_Test/point_root
+maestro_point_root: /absolute/path/to/Mixer_CS_CG_NF/point_root
 virtuoso_library: Virtuoso_Bridge_test
 cell: MixerCS_PSS_CG_Noise
 design_view: schematic
@@ -112,7 +112,7 @@ then uses a `testbench:` routing key.
 ```yaml
 testbenches:
   - id: cg_nf
-    maestro_point_root: /absolute/path/to/CG_NF_Test/point_root
+    maestro_point_root: /absolute/path/to/Mixer_CS_CG_NF/point_root
     virtuoso_library: Virtuoso_Bridge_test
     cell: MixerCS_PSS_CG_Noise
     design_view: maestro
@@ -231,8 +231,8 @@ serial. `output_format` is `psfxl`.
 ## Optimizer Settings
 
 ```yaml
-algorithm: turbo
-strategy: turbo_trust_region
+algorithm: openbox
+strategy: openbox_prf_eic
 initialization: sobol
 max_evaluations: 30
 batch_size: 10

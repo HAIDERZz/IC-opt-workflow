@@ -46,7 +46,7 @@ launches real workflow steps, and writes reports.
 Workflow acceptance comes from files:
 
 ```text
-reports/project_doctor_report.json
+reports/ic_opt_doctor_report.json
 reports/license_probe_report.json
 reports/optimizer_run_report.json
 reports/optimizer_decision_report.md

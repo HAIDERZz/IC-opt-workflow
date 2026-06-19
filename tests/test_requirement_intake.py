@@ -406,7 +406,8 @@ turbo:
 def test_optimizer_requirement_template_uses_explicit_strategy() -> None:
     text = TEMPLATE_OPT_REQUIREMENT.read_text(encoding="utf-8")
 
-    assert "strategy: turbo_trust_region" in text
+    assert "algorithm: openbox" in text
+    assert "strategy: openbox_prf_eic" in text
 
 
 def test_optimizer_requirement_template_includes_multi_corner_variants() -> None:
@@ -420,9 +421,9 @@ def test_optimizer_requirement_template_includes_multi_corner_variants() -> None
 
     assert "## Process Corners" in multi_corner
     assert "objective_policy: worst_case" in multi_corner
-    assert "strategy: turbo_trust_region" in multi_corner
+    assert "strategy: openbox_prf_eic" in multi_corner
     assert "## Process Corners" in multi_tb_corner
-    assert "strategy: turbo_trust_region" in multi_tb_corner
+    assert "strategy: openbox_prf_eic" in multi_tb_corner
 
 
 def test_optimizer_requirement_template_intake_accepts_placeholder_replacement(
@@ -430,7 +431,7 @@ def test_optimizer_requirement_template_intake_accepts_placeholder_replacement(
 ) -> None:
     project_dir = _copy_requirement_project(tmp_path)
     text = TEMPLATE_OPT_REQUIREMENT.read_text(encoding="utf-8").replace(
-        "/absolute/path/to/CG_NF_Test/point_root",
+        "/absolute/path/to/Mixer_CS_CG_NF/point_root",
         VALID_MAESTRO_POINT.as_posix(),
     )
     (project_dir / "opt_requirement.md").write_text(text, encoding="utf-8")

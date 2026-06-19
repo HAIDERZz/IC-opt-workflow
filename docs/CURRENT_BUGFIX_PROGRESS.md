@@ -51,7 +51,7 @@ Actions:
   `src/hermes_workflow/execution_agent_handoff.py`,
   `tests/test_agent_runtime.py`, `tests/test_agent_skill.py`, and
   `tests/test_execution_agent_handoff.py`.
-- Removed the positive `--execution-agent` product CLI path and kept only
+- Removed the positive `execution-agent option` product CLI path and kept only
   negative tests that assert the old flag is rejected.
 
 Fresh verification:
@@ -89,7 +89,7 @@ Verification in `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow-v
 - `PYTHONPATH=src ../ic-auto-opt-workflow/.venv/bin/python -m ruff check src tests` passed.
 - `git diff --check -- . ':!vendor' ':!.serena'` passed.
 - Grep for `Claude|claude|OpenCode|opencode|agent_runtime|agent_skills|claude_skills|install-runtime-adapter|runtime-adapter|agent-skill-path|execution_agent_handoff` returned no release-package matches outside `vendor/.git`.
-- Grep for `--execution-agent|execution_agent|execution-agent` returns only negative tests that assert the old option is rejected.
+- Grep for `execution-agent option|execution_agent|execution-agent` returns only negative tests that assert the old option is rejected.
 
 ## Code-Level Accepted In Dev
 

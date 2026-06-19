@@ -232,11 +232,11 @@ C-64 is an observable Claude execution-agent handoff checkpoint.
 Implemented today:
 
 - Added `src/hermes_workflow/execution_agent_handoff.py`.
-- Added `--execution-agent direct|claude` to `ic-opt` and lower-level
+- Added `execution-agent option direct|claude` to `ic-opt` and lower-level
   `hermes-workflow optimize`.
 - Kept shell `ic-opt` default behavior as `direct`.
 - Updated `claude_skills/ic-opt/SKILL.md` so Claude `/ic-opt` appends
-  `--execution-agent claude` by default.
+  `execution-agent option claude` by default.
 - Added `docs/CLAUDE_EXECUTION_AGENT_HANDOFF_2026-06-07.md`.
 - Added C-64 design spec and implementation plan.
 
@@ -260,7 +260,7 @@ Implemented:
   ic-opt PROJECT_DIR --real
   Claude CLI /ic-opt PROJECT_DIR --real after installing claude_skills/ic-opt
   Claude CLI observable supervisor -> independent execution-agent handoff
-  hermes-workflow optimize PROJECT_DIR --real --execution-agent direct|claude
+  hermes-workflow optimize PROJECT_DIR --real execution-agent option direct|claude
   file contracts, task package, real optimizer reports
 
 Not implemented:
@@ -2133,6 +2133,6 @@ C-65 Runtime-Native Agent Adapters:
 - Added `agent_runtime` installer/status support and runtime assets for Claude and OpenCode.
 - Claude adapter smoke: `/ic-opt` entered the new skill; clean Mixer dry-orchestration project passed all 10 supervisor gate steps and stopped before `run-openbox-real` with `execution_agent=direct`.
 - OpenCode adapter smoke: `ic-opt-execution` appears as a subagent; `/ic-opt` command entered the new command; clean Mixer dry-orchestration project passed and did not dispatch real execution.
-- User-facing docs now point IC users to `docs/AGENT_USER_QUICKSTART_CN.md` and clarify that C-64 `--execution-agent claude` is development/acceptance evidence, not the default product route.
+- User-facing docs now point IC users to `docs/AGENT_USER_QUICKSTART_CN.md` and clarify that C-64 `execution-agent option claude` is development/acceptance evidence, not the default product route.
 - Verification: `tests/test_agent_runtime.py tests/test_product_cli.py` passed (`14 passed`), targeted ruff passed, runtime adapter install/status checks passed, and Claude/OpenCode dry runtime smoke checks passed.
 - current_scope: C-65 Runtime-native agent adapters complete.

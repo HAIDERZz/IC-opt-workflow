@@ -9,7 +9,7 @@ Validate the first observable two-agent product-shaped route:
 ```text
 User short command
 -> Claude CLI supervisor `/ic-opt` skill
--> repo `ic-opt --execution-agent claude`
+-> repo `ic-opt execution-agent option claude`
 -> independent Claude CLI execution-agent process
 -> real OpenBox/Spectre/OCEAN optimizer run
 -> supervisor-side closeout and decision report
@@ -44,7 +44,7 @@ The user-facing command was:
 claude -p --dangerously-skip-permissions "/ic-opt /tmp/ic_auto_opt_c64_handoff_zX9JrO/Mixer_opt_muti_tb --real"
 ```
 
-The Claude `/ic-opt` skill appended `--execution-agent claude`, so the shell
+The Claude `/ic-opt` skill appended `execution-agent option claude`, so the shell
 automation core dispatched an independent Claude CLI execution-agent process at
 the `package-optimizer-task` boundary.
 
