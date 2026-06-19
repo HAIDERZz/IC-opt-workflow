@@ -25,6 +25,57 @@ from tests.real_run_smoke_helpers import (
 from tests.test_requirement_intake import _copy_multi_testbench_requirement_project
 
 
+def _metric_names(project_dir: Path) -> list[str]:
+    request = json.loads(
+        (project_dir / "runs" / "real" / "real_001" / "metric_extraction_request.json")
+        .read_text(encoding="utf-8")
+    )
+    return [metric["name"] for metric in request["metrics"]]
+
+
+def _request_for_metrics_dir(metrics_dir: Path) -> dict | None:
+    """Resolve the metric_extraction_request.json for a downloaded metrics dir.
+
+    The metrics dir lives at <project_dir>/runs/real/<run_id>/metrics (single
+    testbench) or under a testbenches/<id>[/corners/<id>] subtree (multi
+    testbench).  Walk parents to find the runs/real/<run_id> directory that
+    contains the metric_extraction_request.json.
+    """
+    run_dir = metrics_dir.parent
+    direct = run_dir / "metric_extraction_request.json"
+    if direct.is_file():
+        return json.loads(direct.read_text(encoding="utf-8"))
+    for ancestor in metrics_dir.parents:
+        if ancestor.name == "runs":
+            continue
+        candidate = ancestor / "metric_extraction_request.json"
+        if candidate.is_file():
+            return json.loads(candidate.read_text(encoding="utf-8"))
+    return None
+
+
+def _ocean_scalars_tsv(request: dict | None) -> str:
+    """Build an ocean_scalars.tsv body from a metric request.
+
+    When no request is available, falls back to legacy rise/fall/DC rows so
+    that projects created via create_project_from_template (bridge_test_inv)
+    keep working unchanged.
+    """
+    header = "metric\tvalue\tunit\tstatus\texpression_sha256\tmessage\n"
+    if not request:
+        return (
+            header
+            + "rise\t1e-12\ts\tpass\t352e7b3256d5417f58d087382bd2054efbcf696d06b58fc6d39002bb09489748\t\n"
+            + "fall\t1e-12\ts\tpass\t8ba00c0d961decb9275b9636f61dbbd5659b5ed066a74b0083cd0e1d6d3d5493\t\n"
+            + "DC\t1e-06\tW\tpass\tcb82f3f25ee13ea3cb45f605a763ed0806ebb7f47fd27ce4a9c4a4cd902bb7c4\t\n"
+        )
+    rows = "".join(
+        f"{metric['name']}\t1e-12\t{metric['unit']}\tpass\t{metric['expression_sha256']}\t\n"
+        for metric in request["metrics"]
+    )
+    return header + rows
+
+
 def _inject_three_corner_section(project_dir: Path) -> None:
     requirement_path = project_dir / "opt_requirement.md"
     text = requirement_path.read_text(encoding="utf-8")
@@ -174,10 +225,7 @@ class FakeRunner:
             (Path(local_path) / "spectre.out").write_text("spectre output", encoding="utf-8")
         elif remote.endswith("/metrics"):
             (Path(local_path) / "ocean_scalars.tsv").write_text(
-                "metric\tvalue\tunit\tstatus\texpression_sha256\tmessage\n"
-                "rise\t1e-12\ts\tpass\t352e7b3256d5417f58d087382bd2054efbcf696d06b58fc6d39002bb09489748\t\n"
-                "fall\t1e-12\ts\tpass\t8ba00c0d961decb9275b9636f61dbbd5659b5ed066a74b0083cd0e1d6d3d5493\t\n"
-                "DC\t1e-06\tW\tpass\tcb82f3f25ee13ea3cb45f605a763ed0806ebb7f47fd27ce4a9c4a4cd902bb7c4\t\n",
+                _ocean_scalars_tsv(_request_for_metrics_dir(Path(local_path))),
                 encoding="utf-8",
             )
             (Path(local_path) / "ocean.stdout").write_text("ocean stdout output", encoding="utf-8")
@@ -1141,10 +1189,7 @@ class NoPsfFakeRunner(FakeRunner):
             pass
         elif remote.endswith("/metrics"):
             (Path(local_path) / "ocean_scalars.tsv").write_text(
-                "metric\tvalue\tunit\tstatus\texpression_sha256\tmessage\n"
-                "rise\t1e-12\ts\tpass\t352e7b3256d5417f58d087382bd2054efbcf696d06b58fc6d39002bb09489748\t\n"
-                "fall\t1e-12\ts\tpass\t8ba00c0d961decb9275b9636f61dbbd5659b5ed066a74b0083cd0e1d6d3d5493\t\n"
-                "DC\t1e-06\tW\tpass\tcb82f3f25ee13ea3cb45f605a763ed0806ebb7f47fd27ce4a9c4a4cd902bb7c4\t\n",
+                _ocean_scalars_tsv(_request_for_metrics_dir(Path(local_path))),
                 encoding="utf-8",
             )
             (Path(local_path) / "ocean.stdout").write_text("ocean stdout output", encoding="utf-8")
@@ -1182,7 +1227,12 @@ def test_remote_adapter_fails_when_psf_artifacts_missing(tmp_path: Path) -> None
 
 
 class MetricFailFakeRunner(FakeRunner):
-    """FakeRunner that writes ocean_scalars.tsv with a metric row marked fail."""
+    """FakeRunner that writes ocean_scalars.tsv with a metric row marked fail.
+
+    The last metric from the project's metric_extraction_request.json is the
+    one marked fail (matching the legacy "fall" semantics).  Falls back to the
+    legacy rise/fall/DC rows when no request is resolvable.
+    """
 
     def download_tree(self, remote_path, local_path, include=None, exclude=None) -> None:
         self.downloads.append((str(remote_path), Path(local_path)))
@@ -1191,13 +1241,25 @@ class MetricFailFakeRunner(FakeRunner):
         if remote.endswith("/psf"):
             (Path(local_path) / "spectre.out").write_text("spectre output", encoding="utf-8")
         elif remote.endswith("/metrics"):
-            (Path(local_path) / "ocean_scalars.tsv").write_text(
-                "metric\tvalue\tunit\tstatus\texpression_sha256\tmessage\n"
-                "rise\t1e-12\ts\tpass\t352e7b3256d5417f58d087382bd2054efbcf696d06b58fc6d39002bb09489748\t\n"
-                "fall\t\ts\tfail\t8ba00c0d961decb9275b9636f61dbbd5659b5ed066a74b0083cd0e1d6d3d5493\t\n"
-                "DC\t1e-06\tW\tpass\tcb82f3f25ee13ea3cb45f605a763ed0806ebb7f47fd27ce4a9c4a4cd902bb7c4\t\n",
-                encoding="utf-8",
-            )
+            request = _request_for_metrics_dir(Path(local_path))
+            if request is not None:
+                metrics = request["metrics"]
+                failing = metrics[-1]["name"]
+                rows = "".join(
+                    f"{metric['name']}\t\t{metric['unit']}\t"
+                    f"{'fail' if metric['name'] == failing else 'pass'}\t"
+                    f"{metric['expression_sha256']}\t\n"
+                    for metric in metrics
+                )
+                tsv = "metric\tvalue\tunit\tstatus\texpression_sha256\tmessage\n" + rows
+            else:
+                tsv = (
+                    "metric\tvalue\tunit\tstatus\texpression_sha256\tmessage\n"
+                    "rise\t1e-12\ts\tpass\t352e7b3256d5417f58d087382bd2054efbcf696d06b58fc6d39002bb09489748\t\n"
+                    "fall\t\ts\tfail\t8ba00c0d961decb9275b9636f61dbbd5659b5ed066a74b0083cd0e1d6d3d5493\t\n"
+                    "DC\t1e-06\tW\tpass\tcb82f3f25ee13ea3cb45f605a763ed0806ebb7f47fd27ce4a9c4a4cd902bb7c4\t\n"
+                )
+            (Path(local_path) / "ocean_scalars.tsv").write_text(tsv, encoding="utf-8")
             (Path(local_path) / "ocean.stdout").write_text("ocean stdout output", encoding="utf-8")
             (Path(local_path) / "ocean.stderr").write_text("", encoding="utf-8")
             (Path(local_path) / "ocean.log").write_text("ocean log output", encoding="utf-8")
@@ -1237,7 +1299,8 @@ def test_remote_adapter_propagates_metric_failure(tmp_path: Path) -> None:
     assert metric_manifest["status"] == "failed", (
         "metric_result_manifest must report failed when a metric row has status=fail"
     )
-    fall_metric = next(m for m in metric_manifest["metrics"] if m["name"] == "fall")
+    failing_name = _metric_names(project_dir)[-1]
+    fall_metric = next(m for m in metric_manifest["metrics"] if m["name"] == failing_name)
     assert fall_metric["status"] == "failed", (
         "individual metric with status=fail in TSV must be marked failed in manifest"
     )
@@ -1245,7 +1308,7 @@ def test_remote_adapter_propagates_metric_failure(tmp_path: Path) -> None:
     assert result.status == "failed", (
         "adapter result must be failed when a metric row has status=fail"
     )
-    assert any("fall" in issue for issue in result.issues), (
+    assert any(failing_name in issue for issue in result.issues), (
         "adapter issues must mention the failing metric name"
     )
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from contextlib import contextmanager
+from decimal import Decimal
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -24,8 +25,10 @@ from hermes_workflow.package import build_execution_package, create_project_from
 from hermes_workflow.real_run import prepare_real_run
 from hermes_workflow.validate import assert_valid_project
 from tests.real_run_smoke_helpers import (
-    TEMPLATE_TEXT,
+    advisor_batches,
     create_approved_real_project,
+    default_metric_values,
+    variable_names,
 )
 from tests.report_helpers import write_pass_reports
 from tests.test_multi_testbench_aggregation import (
@@ -33,21 +36,38 @@ from tests.test_multi_testbench_aggregation import (
     _write_corner_child_handoff,
 )
 
+# Local template used by the create_project_from_template-based helpers that
+# still build a bridge_test_inv project (FN/WN/FP/WP). These tests are not
+# migrated to the generic factory.
+_TEMPLATE_TEXT = """simulator lang=spectre
+parameters FN={{FN}} WN={{WN}} FP={{FP}} WP={{WP}}
+tran tran stop=10n
+"""
+
 
 class FakeAdvisor:
-    def __init__(self) -> None:
+    def __init__(self, project_dir: Path) -> None:
         self.updated_batches = 0
         self.updated_observations: list[object] = []
-        self._batches = [
-            [
-                {"FN": 2, "WN": 0.2, "FP": 3, "WP": 0.4},
-                {"FN": 4, "WN": 1.0, "FP": 5, "WP": 1.2},
-            ],
-            [
-                {"FN": 6, "WN": 1.4, "FP": 7, "WP": 1.6},
-                {"FN": 8, "WN": 2.0, "FP": 9, "WP": 2.2},
-            ],
-        ]
+        grid = _project_variable_grid(project_dir)
+        # For generic 2-variable projects use the shared advisor_batches
+        # contract so these tests stay aligned with the other migrated suites.
+        # Projects with a different variable count (the 4-variable FN/WN/FP/WP
+        # template and multi-corner projects) keep the original hardcoded
+        # batches so those tests' values stay byte-identical to before.
+        if len(grid) == 2:
+            self._batches = advisor_batches(project_dir)
+        else:
+            self._batches = [
+                [
+                    {"FN": 2, "WN": 0.2, "FP": 3, "WP": 0.4},
+                    {"FN": 4, "WN": 1.0, "FP": 5, "WP": 1.2},
+                ],
+                [
+                    {"FN": 6, "WN": 1.4, "FP": 7, "WP": 1.6},
+                    {"FN": 8, "WN": 2.0, "FP": 9, "WP": 2.2},
+                ],
+            ]
 
     def get_suggestions(self, batch_size: int) -> list[dict[str, float]]:
         batch = self._batches.pop(0)
@@ -114,8 +134,10 @@ class FakeOpenBoxHistory:
 
 
 class VisualizingAdvisor(FakeAdvisor):
-    def __init__(self, *, fail: bool = False, partial: bool = False) -> None:
-        super().__init__()
+    def __init__(
+        self, project_dir: Path, *, fail: bool = False, partial: bool = False
+    ) -> None:
+        super().__init__(project_dir)
         self.history = FakeOpenBoxHistory(fail=fail, partial=partial)
 
     def get_history(self) -> FakeOpenBoxHistory:
@@ -123,18 +145,19 @@ class VisualizingAdvisor(FakeAdvisor):
 
 
 class ContinuationAdvisor:
-    def __init__(self) -> None:
+    def __init__(self, project_dir: Path) -> None:
         self.updated_batches = 0
         self.updated_observations: list[object] = []
         self.seen_prior_before_suggest = False
+        baseline = advisor_batches(project_dir)
+        first_prior = baseline[0][0]
+        unique_a = baseline[1][0]
+        unique_b = baseline[1][1]
+        # First suggestion repeats a prior candidate (drives one duplicate
+        # replacement); the rest are fresh unique candidates.
         self._batches = [
-            [
-                {"FN": 2, "WN": 0.2, "FP": 3, "WP": 0.4},
-                {"FN": 10, "WN": 2.4, "FP": 11, "WP": 2.6},
-            ],
-            [
-                {"FN": 12, "WN": 2.8, "FP": 12, "WP": 2.8},
-            ],
+            [first_prior, unique_a],
+            [unique_b],
         ]
 
     def get_suggestions(self, batch_size: int) -> list[dict[str, float]]:
@@ -149,19 +172,20 @@ class ContinuationAdvisor:
 
 
 class ExhaustingContinuationAdvisor:
-    def __init__(self) -> None:
+    def __init__(self, project_dir: Path) -> None:
         self.updated_batches = 0
         self.updated_observations: list[object] = []
         self.calls = 0
+        self._project_dir = project_dir
 
     def get_suggestions(self, batch_size: int) -> list[dict[str, float]]:
         self.calls += 1
+        baseline = advisor_batches(self._project_dir)
+        first_prior = baseline[0][0]
+        unique = baseline[1][0]
         if self.calls == 1:
-            return [
-                {"FN": 10, "WN": 2.4, "FP": 11, "WP": 2.6},
-                {"FN": 2, "WN": 0.2, "FP": 3, "WP": 0.4},
-            ][:batch_size]
-        return [{"FN": 2, "WN": 0.2, "FP": 3, "WP": 0.4}][:batch_size]
+            return [first_prior, unique][:batch_size]
+        return [first_prior][:batch_size]
 
     def update_observations(self, observations: list[object]) -> None:
         self.updated_batches += 1
@@ -170,28 +194,63 @@ class ExhaustingContinuationAdvisor:
 
 
 class SequentialAdvisor:
-    def __init__(self, *, start: int = 0) -> None:
+    def __init__(self, project_dir: Path, *, start: int = 0) -> None:
         self.index = start
         self.updated_observations: list[object] = []
+        self._grid = _project_variable_grid(project_dir)
 
     def get_suggestions(self, batch_size: int) -> list[dict[str, float]]:
         suggestions: list[dict[str, float]] = []
-        for _slot in range(batch_size):
-            value = self.index
-            self.index += 1
-            suggestions.append(
-                {
-                    "FN": 2 + (value % 10),
-                    "WN": 0.3 + 0.2 * (value % 10),
-                    "FP": 3 + (value % 9),
-                    "WP": 0.5 + 0.2 * (value % 9),
-                }
-            )
+        for slot in range(batch_size):
+            value = self.index + slot
+            suggestion: dict[str, float] = {}
+            for offset, spec in enumerate(self._grid):
+                grid = spec["grid"]
+                pick = grid[(value + offset) % len(grid)]
+                suggestion[spec["name"]] = pick
+            suggestions.append(suggestion)
+        self.index += batch_size
         return suggestions
 
     def update_observations(self, observations: list[object]) -> None:
         self.updated_observations.extend(observations)
         assert observations
+
+
+def _project_variable_grid(project_dir: Path) -> list[dict[str, object]]:
+    """Return each variable's name and the list of raw float values on its
+    configured grid (lower, lower+step, ..., upper). Used to fabricate unique,
+    in-range advisor suggestions keyed by the project's actual variable names,
+    regardless of whether the project is the generic (VAR_INT/VAR_WIDTH) or the
+    template (FN/WN/FP/WP) variant.
+    """
+    import yaml
+
+    from hermes_workflow.openbox_backend import _parse_decimal_unit
+
+    payload = yaml.safe_load(
+        (project_dir / "config" / "variables.yaml").read_text(encoding="utf-8")
+    )
+    grid: list[dict[str, object]] = []
+    for variable in payload["variables"]:
+        name = variable["name"]
+        kind = variable["kind"]
+        if kind == "integer":
+            lower = int(variable["lower"])
+            upper = int(variable["upper"])
+            step = int(variable["step"])
+            values = [float(value) for value in range(lower, upper + 1, step)]
+        else:
+            lower, _unit = _parse_decimal_unit(variable["lower"])
+            upper, _ = _parse_decimal_unit(variable["upper"])
+            step, _ = _parse_decimal_unit(variable["step"])
+            max_offset = int((upper - lower) / step)
+            values = [
+                float(lower + Decimal(offset) * step)
+                for offset in range(max_offset + 1)
+            ]
+        grid.append({"name": name, "grid": values})
+    return grid
 
 
 class FakeVariable:
@@ -237,7 +296,7 @@ def create_approved_real_project_with_optimizer_max(
     assert instruction["decision"] == "approve_first_real_run"
     template_path = project_dir / "netlists" / "templates" / "template.scs"
     template_path.parent.mkdir(parents=True, exist_ok=True)
-    template_path.write_text(TEMPLATE_TEXT, encoding="utf-8")
+    template_path.write_text(_TEMPLATE_TEXT, encoding="utf-8")
     prepare_real_run(project_dir, created_at_utc="2026-06-03T00:20:00Z")
     return project_dir
 
@@ -248,11 +307,9 @@ def test_openbox_space_uses_effective_grid_upper(tmp_path: Path) -> None:
     space = _build_openbox_space(bundle.variables, FakeSpaceModule)
     by_name = {variable.name: variable for variable in space.variables}
 
-    assert by_name["WN"].upper == 2.9
-    assert by_name["WP"].upper == 2.9
-    assert by_name["FN"].upper == 12
-    assert by_name["FP"].upper == 12
-    assert list(by_name) == ["FN", "WN", "FP", "WP"]
+    assert by_name["VAR_INT"].upper == 5
+    assert by_name["VAR_WIDTH"].upper == 0.5
+    assert list(by_name) == ["VAR_INT", "VAR_WIDTH"]
 
 
 def test_openbox_fake_runner_writes_backend_neutral_artifacts(
@@ -263,7 +320,7 @@ def test_openbox_fake_runner_writes_backend_neutral_artifacts(
         project_dir,
         max_evals=4,
         batch_size=2,
-        advisor_factory=lambda _space, _seed: FakeAdvisor(),
+        advisor_factory=lambda _space, _seed: FakeAdvisor(project_dir),
     )
 
     report = json.loads((project_dir / REPORT_RELATIVE).read_text())
@@ -279,8 +336,9 @@ def test_openbox_fake_runner_writes_backend_neutral_artifacts(
     assert report["batch_summary"]["status_counts"]
     assert report["openbox"]["duplicate_replacements"] == 0
     assert len(rows) == 4
-    assert rows[0]["parameters"]["WN"].endswith("u")
-    assert rows[0]["parameters"]["FP"] != rows[0]["parameters"]["FN"]
+    assert rows[0]["parameters"]["VAR_WIDTH"].endswith("u")
+    assert "VAR_INT" in rows[0]["parameters"]
+    assert rows[0]["parameters"] != rows[1]["parameters"]
     assert rows[0]["result_manifest"] is None
     assert rows[0]["metric_result_manifest"] is None
     assert rows[0]["batch_id"] == "batch_001"
@@ -314,7 +372,7 @@ def test_openbox_fake_runner_applies_optimizer_cpu_thread_limit(
         project_dir,
         max_evals=2,
         batch_size=2,
-        advisor_factory=lambda _space, _seed: FakeAdvisor(),
+        advisor_factory=lambda _space, _seed: FakeAdvisor(project_dir),
     )
 
     assert calls
@@ -326,7 +384,7 @@ def test_openbox_runner_writes_advanced_visualization_artifact(
     tmp_path: Path,
 ) -> None:
     project_dir = create_approved_real_project(tmp_path)
-    advisor = VisualizingAdvisor()
+    advisor = VisualizingAdvisor(project_dir)
 
     run_openbox_fake_optimization(
         project_dir,
@@ -365,7 +423,7 @@ def test_openbox_runner_records_advanced_visualization_dependency_failure(
     tmp_path: Path,
 ) -> None:
     project_dir = create_approved_real_project(tmp_path)
-    advisor = VisualizingAdvisor(fail=True)
+    advisor = VisualizingAdvisor(project_dir, fail=True)
 
     result = run_openbox_fake_optimization(
         project_dir,
@@ -393,7 +451,7 @@ def test_openbox_runner_records_partial_advanced_visualization(
     tmp_path: Path,
 ) -> None:
     project_dir = create_approved_real_project(tmp_path)
-    advisor = VisualizingAdvisor(partial=True)
+    advisor = VisualizingAdvisor(project_dir, partial=True)
 
     run_openbox_fake_optimization(
         project_dir,
@@ -421,9 +479,9 @@ def test_openbox_fake_continuation_warm_starts_and_writes_cumulative_artifacts(
         project_dir,
         max_evals=2,
         batch_size=2,
-        advisor_factory=lambda _space, _seed: FakeAdvisor(),
+        advisor_factory=lambda _space, _seed: FakeAdvisor(project_dir),
     )
-    advisor = ContinuationAdvisor()
+    advisor = ContinuationAdvisor(project_dir)
 
     result = run_openbox_fake_optimization(
         project_dir,
@@ -460,10 +518,8 @@ def test_openbox_fake_continuation_warm_starts_and_writes_cumulative_artifacts(
     assert rows[2]["run_id"] == "fake_003"
     assert rows[2]["batch_id"] == "batch_002"
     assert rows[2]["parameters"] == {
-        "FN": "10",
-        "WN": "2.3u",
-        "FP": "11",
-        "WP": "2.7u",
+        "VAR_INT": "3",
+        "VAR_WIDTH": "0.3u",
     }
 
 
@@ -475,9 +531,9 @@ def test_openbox_fake_continuation_stops_after_partial_unique_batch(
         project_dir,
         max_evals=2,
         batch_size=2,
-        advisor_factory=lambda _space, _seed: FakeAdvisor(),
+        advisor_factory=lambda _space, _seed: FakeAdvisor(project_dir),
     )
-    advisor = ExhaustingContinuationAdvisor()
+    advisor = ExhaustingContinuationAdvisor(project_dir)
 
     result = run_openbox_fake_optimization(
         project_dir,
@@ -507,14 +563,20 @@ def test_openbox_fake_continuation_stops_after_partial_unique_batch(
 def test_openbox_fake_continuation_caps_model_replay_observations(
     tmp_path: Path,
 ) -> None:
-    project_dir = create_approved_real_project(tmp_path)
+    # This exercise needs a variable grid large enough for 45 unique candidates
+    # so that the model-replay cap (40) is exercised; the generic 2-variable
+    # project's grid is too small, so it uses the template-backed project.
+    project_dir = create_approved_real_project_with_optimizer_max(
+        tmp_path,
+        max_evaluations=45,
+    )
     run_openbox_fake_optimization(
         project_dir,
         max_evals=45,
         batch_size=5,
-        advisor_factory=lambda _space, _seed: SequentialAdvisor(),
+        advisor_factory=lambda _space, _seed: SequentialAdvisor(project_dir),
     )
-    advisor = SequentialAdvisor(start=45)
+    advisor = SequentialAdvisor(project_dir, start=45)
 
     result = run_openbox_fake_optimization(
         project_dir,
@@ -533,15 +595,24 @@ def test_openbox_fake_continuation_caps_model_replay_observations(
 
 def test_openbox_fake_run_writes_effectiveness_audit_and_report_reference(
     tmp_path: Path,
+    monkeypatch,
 ) -> None:
     project_dir = create_approved_real_project(tmp_path)
+
+    import hermes_workflow.openbox_backend as _ob
+    _values = default_metric_values(project_dir)
+
+    def _generic(_parameters: dict[str, str]) -> object:
+        return type("_FakeObs", (), {"metrics": dict(_values), "issues": []})()
+
+    monkeypatch.setattr(_ob, "_fake_inverter_metrics", _generic)
 
     run_openbox_fake_optimization(
         project_dir,
         max_evals=4,
         batch_size=2,
         initial_trials=2,
-        advisor_factory=lambda _space, _seed: FakeAdvisor(),
+        advisor_factory=lambda _space, _seed: FakeAdvisor(project_dir),
     )
 
     report = json.loads((project_dir / REPORT_RELATIVE).read_text())
@@ -573,7 +644,7 @@ def test_openbox_fake_run_writes_effectiveness_audit_and_report_reference(
         0,
         0,
     ]
-    assert [batch["feasible_count"] for batch in audit["batches"]] == [1, 3]
+    assert [batch["feasible_count"] for batch in audit["batches"]] == [2, 4]
     assert [batch["replay_history_count"] for batch in audit["batches"]] == [0, 0]
 
 
@@ -585,9 +656,9 @@ def test_openbox_fake_continuation_writes_effectiveness_audit_with_replay_count(
         project_dir,
         max_evals=2,
         batch_size=2,
-        advisor_factory=lambda _space, _seed: FakeAdvisor(),
+        advisor_factory=lambda _space, _seed: FakeAdvisor(project_dir),
     )
-    advisor = ContinuationAdvisor()
+    advisor = ContinuationAdvisor(project_dir)
 
     run_openbox_fake_optimization(
         project_dir,
@@ -649,14 +720,14 @@ def test_openbox_fake_continuation_resolves_requirement_strategy_openbox_gp_eic(
         project_dir,
         max_evals=2,
         batch_size=2,
-        advisor_factory=lambda _space, _seed: FakeAdvisor(),
+        advisor_factory=lambda _space, _seed: FakeAdvisor(project_dir),
     )
     run_openbox_fake_optimization(
         project_dir,
         additional_evals=2,
         batch_size=2,
         continue_from_existing=True,
-        advisor_factory=lambda _space, _seed: ContinuationAdvisor(),
+        advisor_factory=lambda _space, _seed: ContinuationAdvisor(project_dir),
     )
     report = json.loads((project_dir / REPORT_RELATIVE).read_text(encoding="utf-8"))
     assert report["openbox"]["requested_strategy"] == "openbox_gp_eic"
@@ -683,14 +754,14 @@ def test_openbox_fake_continuation_resolves_requirement_strategy_openbox_prf_eic
         project_dir,
         max_evals=2,
         batch_size=2,
-        advisor_factory=lambda _space, _seed: FakeAdvisor(),
+        advisor_factory=lambda _space, _seed: FakeAdvisor(project_dir),
     )
     run_openbox_fake_optimization(
         project_dir,
         additional_evals=2,
         batch_size=2,
         continue_from_existing=True,
-        advisor_factory=lambda _space, _seed: ContinuationAdvisor(),
+        advisor_factory=lambda _space, _seed: ContinuationAdvisor(project_dir),
     )
     report = json.loads((project_dir / REPORT_RELATIVE).read_text(encoding="utf-8"))
     assert report["openbox"]["requested_strategy"] == "openbox_prf_eic"
@@ -721,14 +792,14 @@ def test_openbox_fake_continuation_preserves_nested_openbox_settings(
         project_dir,
         max_evals=2,
         batch_size=2,
-        advisor_factory=lambda _space, _seed: FakeAdvisor(),
+        advisor_factory=lambda _space, _seed: FakeAdvisor(project_dir),
     )
     run_openbox_fake_optimization(
         project_dir,
         additional_evals=2,
         batch_size=2,
         continue_from_existing=True,
-        advisor_factory=lambda _space, _seed: ContinuationAdvisor(),
+        advisor_factory=lambda _space, _seed: ContinuationAdvisor(project_dir),
     )
     report = json.loads((project_dir / REPORT_RELATIVE).read_text(encoding="utf-8"))
     resolved = report["openbox"]["resolved_strategy"]
@@ -763,25 +834,28 @@ def test_openbox_fake_runner_requires_openbox_when_no_advisor_is_injected(
 
 
 def test_openbox_fake_runner_requires_all_variables(tmp_path: Path) -> None:
-    class MissingFpAdvisor:
+    project_dir = create_approved_real_project(tmp_path)
+    int_name, width_name = variable_names(project_dir)
+
+    class MissingWidthAdvisor:
         def get_suggestions(self, batch_size: int) -> list[dict[str, float]]:
             assert batch_size == 1
-            return [{"FN": 2, "WN": 0.2, "WP": 0.4}]
+            return [{int_name: 2}]
 
         def update_observations(self, observations: list[object]) -> None:
             raise AssertionError("must fail before observation update")
 
     try:
         run_openbox_fake_optimization(
-            create_approved_real_project(tmp_path),
+            project_dir,
             max_evals=1,
             batch_size=1,
-            advisor_factory=lambda _space, _seed: MissingFpAdvisor(),
+            advisor_factory=lambda _space, _seed: MissingWidthAdvisor(),
         )
     except ValueError as exc:
-        assert "missing variable FP" in str(exc)
+        assert f"missing variable {width_name}" in str(exc)
     else:
-        raise AssertionError("expected missing FP to fail")
+        raise AssertionError(f"expected missing {width_name} to fail")
 
 
 def test_run_openbox_real_optimization_uses_existing_real_candidate_path(
@@ -810,7 +884,7 @@ def test_run_openbox_real_optimization_uses_existing_real_candidate_path(
         max_evals=2,
         batch_size=2,
         parallel_jobs=2,
-        advisor_factory=lambda _space, _seed: FakeAdvisor(),
+        advisor_factory=lambda _space, _seed: FakeAdvisor(project_dir),
         adapter=adapter,
     )
 
@@ -829,7 +903,7 @@ def test_run_openbox_real_optimization_uses_existing_real_candidate_path(
     assert report["execution_mode"] == "real"
     assert report["openbox"]["parallel_jobs"] == 2
     assert rows[0]["parallel_jobs"] == 2
-    assert rows[0]["threads_per_run"] == 10
+    assert rows[0]["threads_per_run"] == 2
     assert rows[0]["result_manifest"]
     assert rows[0]["metric_result_manifest"]
     assert first_candidate["requested_source"] == "openbox_optimizer"
@@ -858,14 +932,14 @@ def test_run_openbox_real_continuation_allows_completed_prior_state(
         max_evals=8,
         batch_size=4,
         parallel_jobs=4,
-        advisor_factory=lambda _space, _seed: SequentialAdvisor(),
+        advisor_factory=lambda _space, _seed: SequentialAdvisor(project_dir),
         adapter=adapter,
     )
     state = json.loads(
         (project_dir / "state" / "optimizer_state.json").read_text(encoding="utf-8")
     )
     assert state["status"] == "completed"
-    advisor = SequentialAdvisor(start=8)
+    advisor = SequentialAdvisor(project_dir, start=8)
 
     result = run_openbox_real_optimization(
         project_dir,
@@ -914,7 +988,7 @@ def test_run_openbox_real_optimization_applies_strategy_preset(
         max_evals=2,
         batch_size=2,
         parallel_jobs=1,
-        advisor_factory=lambda _space, _seed: FakeAdvisor(),
+        advisor_factory=lambda _space, _seed: FakeAdvisor(project_dir),
         strategy="openbox_gp_eic",
         adapter=adapter,
     )
@@ -925,7 +999,7 @@ def test_run_openbox_real_optimization_applies_strategy_preset(
         "surrogate_type": "gp",
         "acq_type": "eic",
         "acq_optimizer_type": "random_scipy",
-        "initial_trials": 8,
+        "initial_trials": 4,
     }
 
 
@@ -955,7 +1029,7 @@ def test_run_openbox_real_optimization_applies_config_strategy_preset(
     assert instruction["decision"] == "approve_first_real_run"
     template_path = project_dir / "netlists" / "templates" / "template.scs"
     template_path.parent.mkdir(parents=True, exist_ok=True)
-    template_path.write_text(TEMPLATE_TEXT, encoding="utf-8")
+    template_path.write_text(_TEMPLATE_TEXT, encoding="utf-8")
     prepare_real_run(project_dir, created_at_utc="2026-06-03T00:20:00Z")
 
     def adapter(
@@ -973,7 +1047,7 @@ def test_run_openbox_real_optimization_applies_config_strategy_preset(
         max_evals=2,
         batch_size=2,
         parallel_jobs=1,
-        advisor_factory=lambda _space, _seed: FakeAdvisor(),
+        advisor_factory=lambda _space, _seed: FakeAdvisor(project_dir),
         adapter=adapter,
     )
 
@@ -996,7 +1070,7 @@ def test_run_openbox_fake_optimization_prefers_explicit_overrides_over_strategy_
         project_dir,
         max_evals=2,
         batch_size=2,
-        advisor_factory=lambda _space, _seed: FakeAdvisor(),
+        advisor_factory=lambda _space, _seed: FakeAdvisor(project_dir),
         strategy="openbox_gp_eic",
         surrogate_type="prf",
         acq_optimizer_type="local_random",
@@ -1029,7 +1103,7 @@ def test_run_openbox_fake_optimization_applies_config_strategy_preset(
         project_dir,
         max_evals=2,
         batch_size=2,
-        advisor_factory=lambda _space, _seed: FakeAdvisor(),
+        advisor_factory=lambda _space, _seed: FakeAdvisor(project_dir),
     )
 
     report = json.loads((project_dir / REPORT_RELATIVE).read_text(encoding="utf-8"))
@@ -1044,7 +1118,7 @@ def test_run_openbox_fake_optimization_applies_config_strategy_preset(
         "surrogate_type": "prf",
         "acq_type": "eic",
         "acq_optimizer_type": "local_random",
-        "initial_trials": 8,
+        "initial_trials": 4,
     }
 
 
@@ -1372,7 +1446,7 @@ def test_run_openbox_real_optimization_uses_multi_corner_aggregate_metrics(
         max_evals=1,
         batch_size=1,
         parallel_jobs=1,
-        advisor_factory=lambda _space, _seed: FakeAdvisor(),
+        advisor_factory=lambda _space, _seed: FakeAdvisor(project_dir),
         adapter=adapter,
     )
 
@@ -1403,26 +1477,28 @@ def _set_config_parallelism(
 ) -> None:
     """Update batch_size in optimizer.yaml and parallel_jobs in spectre.yaml.
 
-    Templates ship with batch_size=10 and parallel_jobs=10, so we replace those
-    exact lines. Also strip any prepared/request `parallel_jobs` from the spectre
-    block of `runs/real/real_001/real_run_manifest.json` and
+    Sets the values via YAML (rather than line replacement) so this works
+    regardless of the project factory's default parallelism values. Also strip
+    any prepared/request `parallel_jobs` from the spectre block of
+    `runs/real/real_001/real_run_manifest.json` and
     `metric_extraction_request.json` so the test reaches the scheduler value via
     config (`bundle.spectre.spectre.parallel_jobs`), not via runtime metadata.
     """
+    import yaml
 
     optimizer_path = project_dir / "config" / "optimizer.yaml"
-    optimizer_text = optimizer_path.read_text(encoding="utf-8").replace(
-        "batch_size: 10",
-        f"batch_size: {batch_size}",
+    optimizer_payload = yaml.safe_load(optimizer_path.read_text(encoding="utf-8"))
+    optimizer_payload["optimizer"]["batch_size"] = batch_size
+    optimizer_path.write_text(
+        yaml.safe_dump(optimizer_payload, sort_keys=False), encoding="utf-8"
     )
-    optimizer_path.write_text(optimizer_text, encoding="utf-8")
 
     spectre_path = project_dir / "config" / "spectre.yaml"
-    spectre_text = spectre_path.read_text(encoding="utf-8").replace(
-        "parallel_jobs: 10",
-        f"parallel_jobs: {parallel_jobs}",
+    spectre_payload = yaml.safe_load(spectre_path.read_text(encoding="utf-8"))
+    spectre_payload["spectre"]["parallel_jobs"] = parallel_jobs
+    spectre_path.write_text(
+        yaml.safe_dump(spectre_payload, sort_keys=False), encoding="utf-8"
     )
-    spectre_path.write_text(spectre_text, encoding="utf-8")
 
     # Tasks 1-2 already strip parallel_jobs from prepared/request spectre
     # contracts, but assert the runtime files do NOT contain it so this test
@@ -1498,7 +1574,7 @@ def test_openbox_real_uses_requirement_parallel_jobs_for_candidate_workers(
             run_openbox_real_optimization(
                 project_dir,
                 max_evals=1,
-                advisor_factory=lambda _space, _seed: FakeAdvisor(),
+                advisor_factory=lambda _space, _seed: FakeAdvisor(project_dir),
             )
 
         assert captured["max_workers"] == expected, (
@@ -1550,7 +1626,7 @@ def _create_approved_real_project_with_keep_flags(
     assert instruction["decision"] == "approve_first_real_run"
     template_path = project_dir / "netlists" / "templates" / "template.scs"
     template_path.parent.mkdir(parents=True, exist_ok=True)
-    template_path.write_text(TEMPLATE_TEXT, encoding="utf-8")
+    template_path.write_text(_TEMPLATE_TEXT, encoding="utf-8")
     prepare_real_run(project_dir, created_at_utc="2026-06-03T00:20:00Z")
     return project_dir
 
@@ -1760,10 +1836,14 @@ def _write_seven_ledger_rows_openbox(project_dir: Path) -> None:
 
 
 def _set_optimizer_max_evals_openbox(project_dir: Path, value: int) -> None:
+    import yaml
+
     optimizer_path = project_dir / "config" / "optimizer.yaml"
-    text = optimizer_path.read_text(encoding="utf-8")
-    text = text.replace("max_evaluations: 100", f"max_evaluations: {value}")
-    optimizer_path.write_text(text, encoding="utf-8")
+    payload = yaml.safe_load(optimizer_path.read_text(encoding="utf-8"))
+    payload["optimizer"]["max_evaluations"] = value
+    optimizer_path.write_text(
+        yaml.safe_dump(payload, sort_keys=False), encoding="utf-8"
+    )
 
 
 def test_write_openbox_reports_syncs_optimizer_progress_state(tmp_path: Path) -> None:
@@ -1855,7 +1935,7 @@ def test_openbox_fake_non_continuation_does_not_set_continuation_audit_fields(
         project_dir,
         max_evals=2,
         batch_size=2,
-        advisor_factory=lambda _space, _seed: FakeAdvisor(),
+        advisor_factory=lambda _space, _seed: FakeAdvisor(project_dir),
     )
     report = json.loads((project_dir / REPORT_RELATIVE).read_text())
     cont = report["openbox"]["continuation"]
@@ -1866,11 +1946,19 @@ def test_openbox_fake_non_continuation_does_not_set_continuation_audit_fields(
 
 def test_openbox_continuation_does_not_modify_opt_requirement_md(tmp_path: Path) -> None:
     project_dir = create_approved_real_project(tmp_path)
+    # The generic project factory does not ship an opt_requirement.md, so seed a
+    # minimal one to establish the precondition this test guards (the file must
+    # exist and remain byte-identical across a continuation run).
+    requirement_path = project_dir / "opt_requirement.md"
+    requirement_path.write_text(
+        "# opt requirement\n\nGeneric placeholder requirement.\n",
+        encoding="utf-8",
+    )
     run_openbox_fake_optimization(
         project_dir,
         max_evals=2,
         batch_size=2,
-        advisor_factory=lambda _space, _seed: FakeAdvisor(),
+        advisor_factory=lambda _space, _seed: FakeAdvisor(project_dir),
     )
     requirement_path = project_dir / "opt_requirement.md"
     assert requirement_path.is_file(), "test prerequisite: opt_requirement.md must exist"
@@ -1880,7 +1968,7 @@ def test_openbox_continuation_does_not_modify_opt_requirement_md(tmp_path: Path)
         additional_evals=2,
         batch_size=2,
         continue_from_existing=True,
-        advisor_factory=lambda _space, _seed: ContinuationAdvisor(),
+        advisor_factory=lambda _space, _seed: ContinuationAdvisor(project_dir),
     )
     after = requirement_path.read_bytes()
     assert before == after
@@ -1980,7 +2068,7 @@ def test_openbox_report_records_initialization(tmp_path: Path) -> None:
         project_dir,
         max_evals=2,
         batch_size=2,
-        advisor_factory=lambda _space, _seed: FakeAdvisor(),
+        advisor_factory=lambda _space, _seed: FakeAdvisor(project_dir),
     )
     report = json.loads((project_dir / REPORT_RELATIVE).read_text(encoding="utf-8"))
     assert report["openbox"]["initialization"] == "latin_hypercube"
@@ -2016,7 +2104,7 @@ def test_openbox_fake_run_writes_runtime_thread_audit(tmp_path: Path) -> None:
         project_dir,
         max_evals=2,
         batch_size=2,
-        advisor_factory=lambda _space, _seed: FakeAdvisor(),
+        advisor_factory=lambda _space, _seed: FakeAdvisor(project_dir),
     )
 
     # The effectiveness audit must contain runtime_thread_limits
@@ -2064,7 +2152,7 @@ def test_openbox_report_contains_runtime_thread_limits(tmp_path: Path) -> None:
         project_dir,
         max_evals=2,
         batch_size=2,
-        advisor_factory=lambda _space, _seed: FakeAdvisor(),
+        advisor_factory=lambda _space, _seed: FakeAdvisor(project_dir),
     )
 
     report = json.loads((project_dir / REPORT_RELATIVE).read_text(encoding="utf-8"))
@@ -2100,7 +2188,7 @@ def test_openbox_separate_effectiveness_audit_file_has_runtime_thread_limits(
         project_dir,
         max_evals=2,
         batch_size=2,
-        advisor_factory=lambda _space, _seed: FakeAdvisor(),
+        advisor_factory=lambda _space, _seed: FakeAdvisor(project_dir),
     )
 
     audit_path = project_dir / "reports" / "optimizer_effectiveness_audit.json"

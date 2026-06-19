@@ -15,6 +15,8 @@ from hermes_workflow.remote_project import RemoteProjectRef
 # Import shared test helpers from the existing test_remote_spectre_ocean module
 from tests.test_remote_spectre_ocean import (
     FakeRunner,
+    _ocean_scalars_tsv,
+    _request_for_metrics_dir,
     create_approved_real_project,
 )
 from hermes_workflow.execution_adapters.remote_spectre_ocean import (
@@ -50,10 +52,7 @@ class WaveformFakeRunner(FakeRunner):
         elif remote.endswith("/metrics"):
             # Standard metrics
             (Path(local_path) / "ocean_scalars.tsv").write_text(
-                "metric\tvalue\tunit\tstatus\texpression_sha256\tmessage\n"
-                "rise\t1e-12\ts\tpass\t352e7b3256d5417f58d087382bd2054efbcf696d06b58fc6d39002bb09489748\t\n"
-                "fall\t1e-12\ts\tpass\t8ba00c0d961decb9275b9636f61dbbd5659b5ed066a74b0083cd0e1d6d3d5493\t\n"
-                "DC\t1e-06\tW\tpass\tcb82f3f25ee13ea3cb45f605a763ed0806ebb7f47fd27ce4a9c4a4cd902bb7c4\t\n",
+                _ocean_scalars_tsv(_request_for_metrics_dir(Path(local_path))),
                 encoding="utf-8",
             )
             (Path(local_path) / "ocean.stdout").write_text("ocean stdout output", encoding="utf-8")
@@ -239,10 +238,7 @@ class WaveformCsvOnlyRunner(FakeRunner):
             )
         elif remote.endswith("/metrics"):
             (Path(local_path) / "ocean_scalars.tsv").write_text(
-                "metric\tvalue\tunit\tstatus\texpression_sha256\tmessage\n"
-                "rise\t1e-12\ts\tpass\t352e7b3256d5417f58d087382bd2054efbcf696d06b58fc6d39002bb09489748\t\n"
-                "fall\t1e-12\ts\tpass\t8ba00c0d961decb9275b9636f61dbbd5659b5ed066a74b0083cd0e1d6d3d5493\t\n"
-                "DC\t1e-06\tW\tpass\tcb82f3f25ee13ea3cb45f605a763ed0806ebb7f47fd27ce4a9c4a4cd902bb7c4\t\n",
+                _ocean_scalars_tsv(_request_for_metrics_dir(Path(local_path))),
                 encoding="utf-8",
             )
             (Path(local_path) / "ocean.stdout").write_text("ocean stdout", encoding="utf-8")

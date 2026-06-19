@@ -6,7 +6,7 @@ from typer.testing import CliRunner
 
 from hermes_workflow.cli import app
 from hermes_workflow.optimizer_completion import summarize_optimizer_run
-from tests.real_run_smoke_helpers import create_approved_real_project
+from tests.real_run_smoke_helpers import advisor_batches, create_approved_real_project
 
 
 def _write_json(path: Path, payload: dict) -> None:
@@ -202,17 +202,8 @@ def _write_accepted_optimizer_project(
 
 
 class FakeAdvisorForCompletion:
-    def __init__(self) -> None:
-        self._batches = [
-            [
-                {"FN": 2, "WN": 0.2, "FP": 3, "WP": 0.4},
-                {"FN": 4, "WN": 1.0, "FP": 5, "WP": 1.2},
-            ],
-            [
-                {"FN": 6, "WN": 1.4, "FP": 7, "WP": 1.6},
-                {"FN": 8, "WN": 2.0, "FP": 9, "WP": 2.2},
-            ],
-        ]
+    def __init__(self, project_dir: Path) -> None:
+        self._batches = advisor_batches(project_dir)
 
     def get_suggestions(self, batch_size: int) -> list[dict[str, float]]:
         return self._batches.pop(0)[:batch_size]
@@ -232,7 +223,7 @@ def test_summarize_optimizer_run_reads_backend_neutral_report(
         project_dir,
         max_evals=4,
         batch_size=2,
-        advisor_factory=lambda _space, _seed: FakeAdvisorForCompletion(),
+        advisor_factory=lambda _space, _seed: FakeAdvisorForCompletion(project_dir),
     )
     check_optimizer_run(project_dir)
 

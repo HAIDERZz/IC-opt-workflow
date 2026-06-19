@@ -3,10 +3,10 @@
 Date: 2026-06-18
 Phases: 1 (factory + guard + first wave), 2 (real-run handoff + metric-result contracts),
 3 (first real-run package + recovery), 4 (next-run cluster), 5 (netlist + dry-run preflight),
-6 (approval gate), 7 (optimizer task package), 8 (retention + progress state), 9 (fix-run flow), 10 (multi-testbench aggregation), and 11 (real-result record)
+6 (approval gate), 7 (optimizer task package), 8 (retention + progress state), 9 (fix-run flow), 10 (multi-testbench aggregation), 11 (real-result record), and 12 (real-run smoke helpers)
 
 This inventory records the state of direct `create_project_from_template()` usage
-across `tests/` after Phases 1-11 of the Test Project Factory and Template Coupling
+across `tests/` after Phases 1-12 of the Test Project Factory and Template Coupling
 Cleanup. The generic factory (`tests/project_factory.py`) and the coupling guard
 (`tests/test_template_coupling_guard.py`) are in place. Phase 1 migrated the files
 that are genuinely decoupled from circuit-specific template contents; Phase 2
@@ -18,7 +18,8 @@ and dry-run preflight tests via another small shared helper; Phase 6 migrated th
 approval gate tests; Phase 7 migrated the optimizer task package tests; Phase 8 migrated the
 run-retention and optimizer-progress-state tests; Phase 9 migrated the fix-run flow
 tests; Phase 10 migrated the multi-testbench aggregation tests; Phase 11 migrated
-the real-result-record tests. Remaining
+the real-result-record tests; Phase 12 migrated the real-run smoke helpers and
+adapted their consumer cluster. Remaining
 coupled files are explicitly deferred.
 
 ## Status summary
@@ -28,6 +29,40 @@ coupled files are explicitly deferred.
 - Coupling guard: `tests/test_template_coupling_guard.py` (fails on any
   non-allowlisted direct usage of `create_project_from_template`).
 - `create_project_from_template()` remains the product/template API and is untouched.
+
+## Phase 12 status
+
+Migrated `tests/real_run_smoke_helpers.py` away from direct
+`create_project_from_template()` usage. The helper now uses
+`create_approved_generic_project()` with `max_evaluations=12`. Added
+`variable_names`, `metric_names_for_run`, `default_metric_values`,
+`advisor_suggestion`, and `advisor_batches` helpers so consumers derive variable
+and metric names from the generated project. `write_fake_metric_result_manifest`
+defaults to `default_metric_values(project_dir)` instead of hardcoded
+rise/fall/DC. `TEMPLATE_TEXT` and `DEFAULT_VALUES` removed.
+
+Consumer files adapted (all in allowed scope):
+- tests/test_optimizer_acceptance.py, test_optimizer_completion.py,
+  test_optimizer_finalize.py, test_optimizer_status.py — FakeAdvisor classes
+  now take `project_dir` and use `advisor_batches(project_dir)`; tests that call
+  `run_openbox_fake_optimization` monkeypatch `_fake_inverter_metrics` to emit
+  generic project metric names.
+- tests/test_openbox_backend.py — added local `_TEMPLATE_TEXT` for direct-template
+  tests (not migrated); FakeAdvisor classes use `advisor_batches`; YAML-based
+  config mutation helpers replace string replacement.
+- tests/test_native_turbo.py — tests using `create_approved_real_project` remove
+  explicit `values={"rise":...}` dicts and use default derived values.
+- tests/test_remote_spectre_ocean.py — fake runner TSV data now derives metric
+  names from the project's request.
+
+`tests/real_run_smoke_helpers.py` was removed from `ALLOWED_TEMPLATE_CALLERS`
+(allowlist 9 -> 8).
+
+Known remaining issue: `tests/test_remote_spectre_ocean_waveform.py` (outside
+allowed scope) has 6 failures because its FakeRunner writes hardcoded
+rise/fall/DC TSV data. The fix is the same `_metric_names` + `_ocean_scalars_tsv`
+pattern applied to `test_remote_spectre_ocean.py`, but the file is outside the
+Phase 12 allowed scope. The consumer group (8 allowed files) passes 166/166.
 
 ## Phase 11 status
 
@@ -312,10 +347,6 @@ generic factory.
 
 ## Remaining migration waves
 
-### Approvals and packaging
-
-- tests/real_run_smoke_helpers.py
-
 ### Optimizer backends (deepest coupling)
 
 - tests/test_openbox_backend.py
@@ -345,6 +376,32 @@ The allowlist must shrink monotonically; the guard prevents any new unreviewed
 direct usage from being introduced.
 
 ## Verification
+
+### Phase 12
+
+- `pytest tests/test_local_real_run_smoke.py -q` -> `4 passed`
+- `pytest [consumer group: 8 files] -q` -> `166 passed, 13 warnings`
+- `pytest tests/test_template_coupling_guard.py -q` -> `1 passed`
+- `pytest -q` -> `1188 passed, 6 failed` (6 failures in tests/test_remote_spectre_ocean_waveform.py, outside allowed scope — same rise/fall/DC TSV coupling)
+- `ruff check src tests` -> `All checks passed!`
+- `git diff --check` -> clean
+- `git -C ../ic-auto-opt-workflow-v0.1 status --short` -> clean (release checkout untouched)
+- grep forbidden tokens over `tests/real_run_smoke_helpers.py` -> no matches
+- grep cross-imports -> all consumers import from `tests.real_run_smoke_helpers` (expected)
+- `ALLOWED_TEMPLATE_CALLERS` count: 9 -> 8.
+
+### Phase 12b: remote waveform metric names (scope extension)
+
+Fixed 6 full-suite failures in `tests/test_remote_spectre_ocean_waveform.py`
+(sibling of `tests/test_remote_spectre_ocean.py`, outside Phase 12's allowed
+scope). The waveform test's `WaveformFakeRunner.download_tree()` and
+`WaveformCsvOnlyRunner.download_tree()` wrote hardcoded rise/fall/DC rows to
+`ocean_scalars.tsv`. Extended the sibling import to include
+`_ocean_scalars_tsv` and `_request_for_metrics_dir` from
+`tests.test_remote_spectre_ocean`, and replaced both hardcoded TSV writes with
+`_ocean_scalars_tsv(_request_for_metrics_dir(Path(local_path)))`. Waveform CSV,
+waveform manifest, ocean stdout/stderr/log behavior unchanged. Full suite now
+passes 1194/1194.
 
 ### Phase 11
 

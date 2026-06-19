@@ -3,13 +3,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from hermes_workflow.approvals import decide_first_real_run
+import yaml
+
 from hermes_workflow.metric_results import check_metric_results
-from hermes_workflow.package import (
-    build_execution_package,
-    create_project_from_template,
-    sha256_file,
-)
+from hermes_workflow.package import sha256_file
 from hermes_workflow.real_result_record import record_real_result
 from hermes_workflow.real_run import prepare_real_run
 from hermes_workflow.reports import (
@@ -18,15 +15,7 @@ from hermes_workflow.reports import (
     RealResultRecordReport,
 )
 from hermes_workflow.result_handoff import check_real_run
-from tests.report_helpers import write_pass_reports
-
-
-TEMPLATE_TEXT = """simulator lang=spectre
-parameters FN={{FN}} WN={{WN}} FP={{FP}} WP={{WP}}
-tran tran stop=10n
-"""
-
-DEFAULT_VALUES = {"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-6}
+from tests.project_factory import create_approved_generic_project
 
 
 def write_json(path: Path, payload: dict) -> None:
@@ -41,19 +30,67 @@ def load_json(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def create_approved_real_project(tmp_path: Path) -> Path:
-    project_dir = tmp_path / "bridge_test_inv"
-    create_project_from_template(project_dir)
-    build_execution_package(project_dir, created_at_utc="2026-06-03T00:00:00Z")
-    write_pass_reports(project_dir)
-    instruction = decide_first_real_run(
-        project_dir,
-        created_at_utc="2026-06-03T00:10:00Z",
+def variable_names(project_dir: Path) -> tuple[str, str]:
+    payload = yaml.safe_load(
+        (project_dir / "config" / "variables.yaml").read_text(encoding="utf-8")
     )
-    assert instruction["decision"] == "approve_first_real_run"
-    template_path = project_dir / "netlists" / "templates" / "template.scs"
-    template_path.parent.mkdir(parents=True, exist_ok=True)
-    template_path.write_text(TEMPLATE_TEXT, encoding="utf-8")
+    variables = payload["variables"]
+    names = [variable["name"] for variable in variables]
+    assert len(names) == 2
+    return names[0], names[1]
+
+
+def metric_names_for_run(project_dir: Path, run_id: str = "real_001") -> tuple[str, str]:
+    request = load_json(
+        project_dir / "runs" / "real" / run_id / "metric_extraction_request.json"
+    )
+    names = [metric["name"] for metric in request["metrics"]]
+    assert len(names) == 2
+    return names[0], names[1]
+
+
+def default_metric_values(
+    project_dir: Path,
+    *,
+    run_id: str = "real_001",
+) -> dict[str, float]:
+    objective_metric, constraint_metric = metric_names_for_run(project_dir, run_id)
+    return {
+        objective_metric: 10.0,
+        constraint_metric: 1.0e-6,
+    }
+
+
+def advisor_suggestion(
+    project_dir: Path,
+    *,
+    int_value: float,
+    width_value: float,
+) -> dict[str, float]:
+    int_name, width_name = variable_names(project_dir)
+    return {int_name: int_value, width_name: width_value}
+
+
+def advisor_batches(project_dir: Path) -> list[list[dict[str, float]]]:
+    return [
+        [
+            advisor_suggestion(project_dir, int_value=2, width_value=0.2),
+            advisor_suggestion(project_dir, int_value=4, width_value=0.4),
+        ],
+        [
+            advisor_suggestion(project_dir, int_value=3, width_value=0.3),
+            advisor_suggestion(project_dir, int_value=5, width_value=0.5),
+        ],
+    ]
+
+
+def create_approved_real_project(tmp_path: Path) -> Path:
+    project_dir = create_approved_generic_project(
+        tmp_path,
+        name="real_run_smoke_project",
+        created_at_utc="2026-06-03T00:00:00Z",
+        max_evaluations=12,
+    )
     prepare_real_run(project_dir, created_at_utc="2026-06-03T00:20:00Z")
     return project_dir
 
@@ -144,7 +181,7 @@ def write_fake_metric_result_manifest(
     script_path.write_text("sanitized ocean script\n", encoding="utf-8")
     request_by_name = {metric["name"]: metric for metric in request["metrics"]}
     selected_candidate_id = candidate_id or request["candidate_id"]
-    metric_values = values or DEFAULT_VALUES
+    metric_values = values or default_metric_values(project_dir, run_id=run_id)
     write_json(
         metrics_dir / "metric_result_manifest.json",
         {

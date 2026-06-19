@@ -828,7 +828,7 @@ def test_prepare_explicit_candidate_real_run_allows_first_optimizer_candidate(
         project_dir,
         candidate_id="candidate_000001",
         source="native_turbo_optimizer",
-        parameters={"FN": "4", "WN": "0.5u", "FP": "4", "WP": "1.1u"},
+        parameters={"VAR_INT": "3", "VAR_WIDTH": "0.3u"},
         run_id="real_001",
         created_at_utc="2026-06-04T00:00:00Z",
     )
@@ -853,20 +853,19 @@ def test_real_candidate_evaluator_runs_fake_adapter_checks_and_records(
         write_fake_metric_result_manifest(
             project,
             run_id=run_id,
-            values={"rise": 1.0, "fall": 1.0, "DC": 1.0},
         )
 
     observation = evaluate_real_candidate(
         project_dir,
         candidate_id="candidate_000001",
-        parameters={"FN": "4", "WN": "0.5u", "FP": "4", "WP": "1.1u"},
+        parameters={"VAR_INT": "3", "VAR_WIDTH": "0.3u"},
         run_id="real_001",
         cadence_cshrc=Path("/tmp/fake.csh"),
         adapter=adapter,
     )
 
     assert observation.status == "recorded"
-    assert observation.metrics == {"rise": 1.0, "fall": 1.0, "DC": 1.0}
+    assert set(observation.metrics) == {"metric_gain", "metric_power"}
     assert observation.result_manifest == "runs/real/real_001/result_manifest.json"
     assert (project_dir / "ledger" / "experiment_ledger.jsonl").exists()
 
@@ -893,11 +892,11 @@ def test_real_batch_evaluator_caps_parallel_adapter_calls(tmp_path: Path) -> Non
         write_fake_metric_result_manifest(
             project,
             run_id=run_id,
-            values={"rise": 1.0, "fall": 1.0, "DC": 1.0},
         )
         with lock:
             active -= 1
 
+    width_values = ["0.1u", "0.2u", "0.3u", "0.4u"]
     candidates = [
         NativeTurboBatchCandidate(
             evaluation_index=index,
@@ -909,10 +908,8 @@ def test_real_batch_evaluator_caps_parallel_adapter_calls(tmp_path: Path) -> Non
             selection_phase="initialization",
             raw_x=[4.0, 0.5, 4.0, 1.1],
             parameters={
-                "FN": str(3 + index),
-                "WN": "0.5u",
-                "FP": "4",
-                "WP": "1.1u",
+                "VAR_INT": str(index),
+                "VAR_WIDTH": width_values[index - 1],
             },
             replacement_issues=[],
         )
@@ -1294,14 +1291,13 @@ def test_real_candidate_evaluator_classifies_written_metric_failure(
             project,
             run_id=run_id,
             metric_status="failed",
-            values={"rise": 1.0, "fall": 1.0, "DC": 1.0},
         )
         raise RuntimeError("adapter returned failed status")
 
     observation = evaluate_real_candidate(
         project_dir,
         candidate_id="candidate_000001",
-        parameters={"FN": "4", "WN": "0.5u", "FP": "4", "WP": "1.1u"},
+        parameters={"VAR_INT": "3", "VAR_WIDTH": "0.3u"},
         run_id="real_001",
         adapter=adapter,
     )
@@ -1309,7 +1305,7 @@ def test_real_candidate_evaluator_classifies_written_metric_failure(
     assert observation.status == "metric_check_failed"
     assert observation.metrics is None
     assert observation.issues is not None
-    assert "metric rise did not succeed" in observation.issues
+    assert "metric metric_gain did not succeed" in observation.issues
     assert "adapter returned failed status" not in observation.issues
     assert (
         load_json(project_dir / "runs" / "real" / "real_001" / "recovery_decision.json")[
@@ -1336,13 +1332,12 @@ def test_real_candidate_evaluator_classifies_failed_result_manifest_as_real_fail
         write_fake_metric_result_manifest(
             project,
             run_id=run_id,
-            values={"rise": 1.0, "fall": 1.0, "DC": 1.0},
         )
 
     observation = evaluate_real_candidate(
         project_dir,
         candidate_id="candidate_000001",
-        parameters={"FN": "4", "WN": "0.5u", "FP": "4", "WP": "1.1u"},
+        parameters={"VAR_INT": "3", "VAR_WIDTH": "0.3u"},
         run_id="real_001",
         adapter=adapter,
     )
