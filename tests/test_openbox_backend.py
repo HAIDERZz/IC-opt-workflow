@@ -7,6 +7,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+import yaml
 from typer.testing import CliRunner
 
 from hermes_workflow.approvals import decide_first_real_run
@@ -21,11 +22,11 @@ from hermes_workflow.openbox_backend import (
     run_openbox_real_optimization,
 )
 from hermes_workflow.optimizer_artifacts import EVALUATIONS_RELATIVE, REPORT_RELATIVE
-from hermes_workflow.package import build_execution_package, create_project_from_template
+from hermes_workflow.package import build_execution_package
 from hermes_workflow.real_run import prepare_real_run
 from hermes_workflow.validate import assert_valid_project
+from tests.project_factory import create_generic_project
 from tests.real_run_smoke_helpers import (
-    advisor_batches,
     create_approved_real_project,
     default_metric_values,
     variable_names,
@@ -36,13 +37,115 @@ from tests.test_multi_testbench_aggregation import (
     _write_corner_child_handoff,
 )
 
-# Local template used by the create_project_from_template-based helpers that
-# still build a bridge_test_inv project (FN/WN/FP/WP). These tests are not
-# migrated to the generic factory.
-_TEMPLATE_TEXT = """simulator lang=spectre
-parameters FN={{FN}} WN={{WN}} FP={{FP}} WP={{WP}}
-tran tran stop=10n
-"""
+
+# ---------------------------------------------------------------------------
+# Local helpers (structured YAML mutation; no template tokens)
+# ---------------------------------------------------------------------------
+
+
+def _read_yaml(path: Path) -> dict:
+    return yaml.safe_load(path.read_text(encoding="utf-8"))
+
+
+def _write_yaml(path: Path, payload: dict) -> None:
+    path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+
+def _set_optimizer_value(project_dir: Path, key: str, value) -> None:
+    """Structured YAML mutation of a single ``optimizer.<key>`` value."""
+    path = project_dir / "config" / "optimizer.yaml"
+    payload = _read_yaml(path)
+    payload["optimizer"][key] = value
+    _write_yaml(path, payload)
+
+
+def _set_spectre_value(project_dir: Path, key: str, value) -> None:
+    """Structured YAML mutation of a single ``spectre.<key>`` value."""
+    path = project_dir / "config" / "spectre.yaml"
+    payload = _read_yaml(path)
+    payload["spectre"][key] = value
+    _write_yaml(path, payload)
+
+
+def _metric_names_from_config(project_dir: Path) -> list[str]:
+    payload = _read_yaml(project_dir / "config" / "metrics.yaml")
+    return [metric["name"] for metric in payload["metrics"]]
+
+
+def _passing_metric_values_from_config(project_dir: Path) -> dict[str, float]:
+    names = _metric_names_from_config(project_dir)
+    # Two metrics: objective metric and constraint metric. The passing values
+    # satisfy the objective/constraint contract (constraint metric well below
+    # its ``lt`` threshold).
+    return {names[0]: 1.0, names[1]: 1.0e-4}
+
+
+def _constraint_failing_metric_values_from_config(project_dir: Path) -> dict[str, float]:
+    names = _metric_names_from_config(project_dir)
+    # Objective metric nominal; constraint metric above its ``lt`` threshold.
+    return {names[0]: 1.0, names[1]: 1.0}
+
+
+def _create_openbox_project(
+    tmp_path: Path,
+    *,
+    name: str = "openbox_project",
+    mutate_config=None,
+    prepare: bool = True,
+    **kwargs,
+) -> Path:
+    """Create a generic project, optionally mutate config, then
+    package + approve + (optionally) prepare.
+
+    Extra kwargs are forwarded to :func:`create_generic_project`
+    (``max_evaluations``, ``batch_size``, ``parallel_jobs``).
+
+    ``mutate_config``, if given, is called with the project dir after the
+    generic project is created but BEFORE packaging, so config edits are
+    captured in the approved config hashes (post-package edits would trip the
+    immutable-config-drift guard).
+    """
+    project_dir = create_generic_project(tmp_path, name=name, **kwargs)
+    if mutate_config is not None:
+        mutate_config(project_dir)
+    build_execution_package(project_dir, created_at_utc="2026-06-03T00:00:00Z")
+    write_pass_reports(project_dir, variable_names=_project_variable_names(project_dir))
+    instruction = decide_first_real_run(
+        project_dir,
+        created_at_utc="2026-06-03T00:10:00Z",
+    )
+    assert instruction["decision"] == "approve_first_real_run"
+    if prepare:
+        prepare_real_run(project_dir, created_at_utc="2026-06-03T00:20:00Z")
+    return project_dir
+
+
+def _project_variable_names(project_dir: Path) -> tuple[str, ...]:
+    payload = _read_yaml(project_dir / "config" / "variables.yaml")
+    return tuple(variable["name"] for variable in payload["variables"])
+
+
+def _suggestion_from_grid(
+    project_dir: Path, int_value: float, width_value: float
+) -> dict[str, float]:
+    int_name, width_name = _project_variable_names(project_dir)
+    return {int_name: int_value, width_name: width_value}
+
+
+def _advisor_batches_for_project(project_dir: Path) -> list[list[dict[str, float]]]:
+    """Two batches of two suggestions each, keyed by the project's variable
+    names. Mirrors :func:`advisor_batches` but kept local so this module has a
+    self-contained, config-derived contract."""
+    return [
+        [
+            _suggestion_from_grid(project_dir, 2, 0.2),
+            _suggestion_from_grid(project_dir, 4, 0.4),
+        ],
+        [
+            _suggestion_from_grid(project_dir, 3, 0.3),
+            _suggestion_from_grid(project_dir, 5, 0.5),
+        ],
+    ]
 
 
 class FakeAdvisor:
@@ -50,24 +153,15 @@ class FakeAdvisor:
         self.updated_batches = 0
         self.updated_observations: list[object] = []
         grid = _project_variable_grid(project_dir)
-        # For generic 2-variable projects use the shared advisor_batches
-        # contract so these tests stay aligned with the other migrated suites.
-        # Projects with a different variable count (the 4-variable FN/WN/FP/WP
-        # template and multi-corner projects) keep the original hardcoded
-        # batches so those tests' values stay byte-identical to before.
+        # For generic 2-variable projects use the local advisor-batch helper
+        # so this file stays self-contained after the template-coupling cleanup.
+        # Projects with a different variable count (the 4-variable multi-corner
+        # projects) build their batches from each variable's configured grid so
+        # the suggestions stay in range without hardcoding variable names.
         if len(grid) == 2:
-            self._batches = advisor_batches(project_dir)
+            self._batches = _advisor_batches_for_project(project_dir)
         else:
-            self._batches = [
-                [
-                    {"FN": 2, "WN": 0.2, "FP": 3, "WP": 0.4},
-                    {"FN": 4, "WN": 1.0, "FP": 5, "WP": 1.2},
-                ],
-                [
-                    {"FN": 6, "WN": 1.4, "FP": 7, "WP": 1.6},
-                    {"FN": 8, "WN": 2.0, "FP": 9, "WP": 2.2},
-                ],
-            ]
+            self._batches = _grid_seeded_batches(grid)
 
     def get_suggestions(self, batch_size: int) -> list[dict[str, float]]:
         batch = self._batches.pop(0)
@@ -149,7 +243,7 @@ class ContinuationAdvisor:
         self.updated_batches = 0
         self.updated_observations: list[object] = []
         self.seen_prior_before_suggest = False
-        baseline = advisor_batches(project_dir)
+        baseline = _advisor_batches_for_project(project_dir)
         first_prior = baseline[0][0]
         unique_a = baseline[1][0]
         unique_b = baseline[1][1]
@@ -180,7 +274,7 @@ class ExhaustingContinuationAdvisor:
 
     def get_suggestions(self, batch_size: int) -> list[dict[str, float]]:
         self.calls += 1
-        baseline = advisor_batches(self._project_dir)
+        baseline = _advisor_batches_for_project(self._project_dir)
         first_prior = baseline[0][0]
         unique = baseline[1][0]
         if self.calls == 1:
@@ -221,16 +315,12 @@ def _project_variable_grid(project_dir: Path) -> list[dict[str, object]]:
     """Return each variable's name and the list of raw float values on its
     configured grid (lower, lower+step, ..., upper). Used to fabricate unique,
     in-range advisor suggestions keyed by the project's actual variable names,
-    regardless of whether the project is the generic (VAR_INT/VAR_WIDTH) or the
-    template (FN/WN/FP/WP) variant.
+    regardless of whether the project is the generic 2-variable variant or a
+    multi-corner/multi-testbench project with more variables.
     """
-    import yaml
-
     from hermes_workflow.openbox_backend import _parse_decimal_unit
 
-    payload = yaml.safe_load(
-        (project_dir / "config" / "variables.yaml").read_text(encoding="utf-8")
-    )
+    payload = _read_yaml(project_dir / "config" / "variables.yaml")
     grid: list[dict[str, object]] = []
     for variable in payload["variables"]:
         name = variable["name"]
@@ -251,6 +341,33 @@ def _project_variable_grid(project_dir: Path) -> list[dict[str, object]]:
             ]
         grid.append({"name": name, "grid": values})
     return grid
+
+
+def _grid_seeded_batches(
+    grid: list[dict[str, object]],
+) -> list[list[dict[str, float]]]:
+    """Build two batches of two suggestions each from a project's variable
+    grid. Used for multi-variable projects (e.g. the multi-testbench
+    requirement project) so the advisor returns in-range, config-derived
+    suggestions without hardcoding variable names.
+
+    Offsets start at 1 (not 0) to avoid colliding with the prepared
+    ``real_001`` candidate, which uses each variable's grid lower bound
+    (offset 0). Picks four distinct, well-separated offsets so each
+    suggestion is unique, clamping the upper offset to the grid length.
+    """
+    batches: list[list[dict[str, float]]] = []
+    for batch_offsets in ((1, 3), (5, 7)):
+        batch: list[dict[str, float]] = []
+        for offset in batch_offsets:
+            suggestion: dict[str, float] = {}
+            for variable in grid:
+                values = variable["grid"]
+                index = min(offset, len(values) - 1)
+                suggestion[variable["name"]] = values[index]
+            batch.append(suggestion)
+        batches.append(batch)
+    return batches
 
 
 class FakeVariable:
@@ -275,30 +392,47 @@ class FakeSpaceModule:
     Real = FakeVariable
 
 
+def _widen_variable_grid(project_dir: Path) -> None:
+    """Widen the generic project's two-variable grid so advisor/continuation
+    tests that need many unique candidates (e.g. the 45-evaluation model-replay
+    cap test) have enough headroom. VAR_INT 1..100 and VAR_WIDTH 0.1u..10u give
+    100x100 = 10_000 unique grid points."""
+    payload = {
+        "schema_version": "1.0",
+        "variables": [
+            {
+                "name": "VAR_INT",
+                "kind": "integer",
+                "lower": "1",
+                "upper": "100",
+                "step": "1",
+            },
+            {
+                "name": "VAR_WIDTH",
+                "kind": "continuous_step",
+                "lower": "0.1u",
+                "upper": "10u",
+                "step": "0.1u",
+            },
+        ],
+    }
+    _write_yaml(project_dir / "config" / "variables.yaml", payload)
+
+
 def create_approved_real_project_with_optimizer_max(
     tmp_path: Path,
     max_evaluations: int,
 ) -> Path:
-    project_dir = tmp_path / "bridge_test_inv"
-    create_project_from_template(project_dir)
-    optimizer_path = project_dir / "config" / "optimizer.yaml"
-    optimizer_text = optimizer_path.read_text(encoding="utf-8").replace(
-        "max_evaluations: 100",
-        f"max_evaluations: {max_evaluations}",
+    def _mutate(project_dir: Path) -> None:
+        _widen_variable_grid(project_dir)
+        _set_optimizer_value(project_dir, "max_evaluations", max_evaluations)
+
+    return _create_openbox_project(
+        tmp_path,
+        name="openbox_optimizer_max_project",
+        max_evaluations=max_evaluations,
+        mutate_config=_mutate,
     )
-    optimizer_path.write_text(optimizer_text, encoding="utf-8")
-    build_execution_package(project_dir, created_at_utc="2026-06-03T00:00:00Z")
-    write_pass_reports(project_dir)
-    instruction = decide_first_real_run(
-        project_dir,
-        created_at_utc="2026-06-03T00:10:00Z",
-    )
-    assert instruction["decision"] == "approve_first_real_run"
-    template_path = project_dir / "netlists" / "templates" / "template.scs"
-    template_path.parent.mkdir(parents=True, exist_ok=True)
-    template_path.write_text(_TEMPLATE_TEXT, encoding="utf-8")
-    prepare_real_run(project_dir, created_at_utc="2026-06-03T00:20:00Z")
-    return project_dir
 
 
 def test_openbox_space_uses_effective_grid_upper(tmp_path: Path) -> None:
@@ -351,14 +485,7 @@ def test_openbox_fake_runner_applies_optimizer_cpu_thread_limit(
     import hermes_workflow.openbox_backend as module
 
     project_dir = create_approved_real_project(tmp_path)
-    optimizer_path = project_dir / "config" / "optimizer.yaml"
-    optimizer_path.write_text(
-        optimizer_path.read_text(encoding="utf-8").replace(
-            "deduplicate_candidates: true",
-            "deduplicate_candidates: true\n  optimizer_cpu_threads: 3",
-        ),
-        encoding="utf-8",
-    )
+    _set_optimizer_value(project_dir, "optimizer_cpu_threads", 3)
     calls: list[tuple[int, dict[str, object]]] = []
 
     @contextmanager
@@ -565,7 +692,8 @@ def test_openbox_fake_continuation_caps_model_replay_observations(
 ) -> None:
     # This exercise needs a variable grid large enough for 45 unique candidates
     # so that the model-replay cap (40) is exercised; the generic 2-variable
-    # project's grid is too small, so it uses the template-backed project.
+    # project's grid is too small, so it uses a custom project with the
+    # optimizer max lifted.
     project_dir = create_approved_real_project_with_optimizer_max(
         tmp_path,
         max_evaluations=45,
@@ -694,18 +822,12 @@ def _set_optimizer_yaml_openbox_strategy(
     requirement-driven strategy instead of the default TuRBO algorithm.
     """
     optimizer_path = project_dir / "config" / "optimizer.yaml"
-    text = optimizer_path.read_text(encoding="utf-8")
-    text = text.replace(
-        "  algorithm: turbo",
-        f"  algorithm: openbox\n  strategy: {strategy}",
-        1,
-    )
+    payload = _read_yaml(optimizer_path)
+    payload["optimizer"]["algorithm"] = "openbox"
+    payload["optimizer"]["strategy"] = strategy
     if nested_openbox:
-        nested_lines = ["  openbox:"]
-        for key, value in nested_openbox.items():
-            nested_lines.append(f"    {key}: {value}")
-        text = text.rstrip() + "\n" + "\n".join(nested_lines) + "\n"
-    optimizer_path.write_text(text, encoding="utf-8")
+        payload["optimizer"]["openbox"] = dict(nested_openbox)
+    _write_yaml(optimizer_path, payload)
 
 
 def test_openbox_fake_continuation_resolves_requirement_strategy_openbox_gp_eic(
@@ -1011,26 +1133,13 @@ def test_run_openbox_real_optimization_applies_config_strategy_preset(
         write_fake_result_manifest,
     )
 
-    project_dir = tmp_path / "bridge_test_inv"
-    create_project_from_template(project_dir)
-    optimizer_path = project_dir / "config" / "optimizer.yaml"
-    optimizer_text = optimizer_path.read_text(encoding="utf-8").replace(
-        "  algorithm: turbo",
-        "  algorithm: openbox\n  strategy: openbox_gp_eic",
-        1,
+    project_dir = _create_openbox_project(
+        tmp_path,
+        name="openbox_config_strategy_project",
+        mutate_config=lambda pd: _set_optimizer_yaml_openbox_strategy(
+            pd, strategy="openbox_gp_eic"
+        ),
     )
-    optimizer_path.write_text(optimizer_text, encoding="utf-8")
-    build_execution_package(project_dir, created_at_utc="2026-06-03T00:00:00Z")
-    write_pass_reports(project_dir)
-    instruction = decide_first_real_run(
-        project_dir,
-        created_at_utc="2026-06-03T00:10:00Z",
-    )
-    assert instruction["decision"] == "approve_first_real_run"
-    template_path = project_dir / "netlists" / "templates" / "template.scs"
-    template_path.parent.mkdir(parents=True, exist_ok=True)
-    template_path.write_text(_TEMPLATE_TEXT, encoding="utf-8")
-    prepare_real_run(project_dir, created_at_utc="2026-06-03T00:20:00Z")
 
     def adapter(
         project_dir: Path,
@@ -1057,7 +1166,9 @@ def test_run_openbox_real_optimization_applies_config_strategy_preset(
         "surrogate_type": "gp",
         "acq_type": "eic",
         "acq_optimizer_type": "random_scipy",
-        "initial_trials": 8,
+        # initial_trials defaults to max(2 * num_variables, 1); the generic
+        # project has two variables so this resolves to 4.
+        "initial_trials": 4,
     }
 
 
@@ -1091,13 +1202,7 @@ def test_run_openbox_fake_optimization_applies_config_strategy_preset(
     tmp_path: Path,
 ) -> None:
     project_dir = create_approved_real_project(tmp_path)
-    optimizer_path = project_dir / "config" / "optimizer.yaml"
-    optimizer_text = optimizer_path.read_text(encoding="utf-8").replace(
-        "  algorithm: turbo",
-        "  algorithm: openbox\n  strategy: openbox_prf_eic",
-        1,
-    )
-    optimizer_path.write_text(optimizer_text, encoding="utf-8")
+    _set_optimizer_yaml_openbox_strategy(project_dir, strategy="openbox_prf_eic")
 
     run_openbox_fake_optimization(
         project_dir,
@@ -1477,28 +1582,15 @@ def _set_config_parallelism(
 ) -> None:
     """Update batch_size in optimizer.yaml and parallel_jobs in spectre.yaml.
 
-    Sets the values via YAML (rather than line replacement) so this works
-    regardless of the project factory's default parallelism values. Also strip
-    any prepared/request `parallel_jobs` from the spectre block of
+    Sets the values via structured YAML so this works regardless of the project
+    factory's default parallelism values. Also assert that the prepared/request
+    `parallel_jobs` is absent from the spectre block of
     `runs/real/real_001/real_run_manifest.json` and
     `metric_extraction_request.json` so the test reaches the scheduler value via
     config (`bundle.spectre.spectre.parallel_jobs`), not via runtime metadata.
     """
-    import yaml
-
-    optimizer_path = project_dir / "config" / "optimizer.yaml"
-    optimizer_payload = yaml.safe_load(optimizer_path.read_text(encoding="utf-8"))
-    optimizer_payload["optimizer"]["batch_size"] = batch_size
-    optimizer_path.write_text(
-        yaml.safe_dump(optimizer_payload, sort_keys=False), encoding="utf-8"
-    )
-
-    spectre_path = project_dir / "config" / "spectre.yaml"
-    spectre_payload = yaml.safe_load(spectre_path.read_text(encoding="utf-8"))
-    spectre_payload["spectre"]["parallel_jobs"] = parallel_jobs
-    spectre_path.write_text(
-        yaml.safe_dump(spectre_payload, sort_keys=False), encoding="utf-8"
-    )
+    _set_optimizer_value(project_dir, "batch_size", batch_size)
+    _set_spectre_value(project_dir, "parallel_jobs", parallel_jobs)
 
     # Tasks 1-2 already strip parallel_jobs from prepared/request spectre
     # contracts, but assert the runtime files do NOT contain it so this test
@@ -1591,17 +1683,8 @@ def test_openbox_real_uses_requirement_parallel_jobs_for_candidate_workers(
 def _set_keep_flags_for_retention(
     project_dir: Path, *, keep_failed_runs: bool, keep_successful_runs: bool
 ) -> None:
-    spectre_path = project_dir / "config" / "spectre.yaml"
-    text = spectre_path.read_text(encoding="utf-8")
-    text = text.replace(
-        "keep_failed_runs: true",
-        f"keep_failed_runs: {str(keep_failed_runs).lower()}",
-    )
-    text = text.replace(
-        "keep_successful_runs: true",
-        f"keep_successful_runs: {str(keep_successful_runs).lower()}",
-    )
-    spectre_path.write_text(text, encoding="utf-8")
+    _set_spectre_value(project_dir, "keep_failed_runs", keep_failed_runs)
+    _set_spectre_value(project_dir, "keep_successful_runs", keep_successful_runs)
 
 
 def _create_approved_real_project_with_keep_flags(
@@ -1610,25 +1693,18 @@ def _create_approved_real_project_with_keep_flags(
     keep_failed_runs: bool,
     keep_successful_runs: bool,
 ) -> Path:
-    project_dir = tmp_path / "bridge_test_inv"
-    create_project_from_template(project_dir)
-    _set_keep_flags_for_retention(
-        project_dir,
-        keep_failed_runs=keep_failed_runs,
-        keep_successful_runs=keep_successful_runs,
+    def _mutate(project_dir: Path) -> None:
+        _set_keep_flags_for_retention(
+            project_dir,
+            keep_failed_runs=keep_failed_runs,
+            keep_successful_runs=keep_successful_runs,
+        )
+
+    return _create_openbox_project(
+        tmp_path,
+        name="openbox_keep_flags_project",
+        mutate_config=_mutate,
     )
-    build_execution_package(project_dir, created_at_utc="2026-06-03T00:00:00Z")
-    write_pass_reports(project_dir)
-    instruction = decide_first_real_run(
-        project_dir,
-        created_at_utc="2026-06-03T00:10:00Z",
-    )
-    assert instruction["decision"] == "approve_first_real_run"
-    template_path = project_dir / "netlists" / "templates" / "template.scs"
-    template_path.parent.mkdir(parents=True, exist_ok=True)
-    template_path.write_text(_TEMPLATE_TEXT, encoding="utf-8")
-    prepare_real_run(project_dir, created_at_utc="2026-06-03T00:20:00Z")
-    return project_dir
 
 
 def test_openbox_batch_evaluator_deletes_run_dir_when_keep_successful_runs_false(
@@ -1650,13 +1726,13 @@ def test_openbox_batch_evaluator_deletes_run_dir_when_keep_successful_runs_false
         tmp_path, keep_failed_runs=True, keep_successful_runs=False
     )
     shutil.rmtree(project_dir / "runs")
+    int_name, width_name = variable_names(project_dir)
 
     def adapter(project: Path, *, run_id: str, cadence_cshrc: Path | None) -> None:
         write_fake_result_manifest(project, run_id=run_id)
         write_fake_metric_result_manifest(
             project,
             run_id=run_id,
-            values={"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-6},
         )
 
     candidate = NativeTurboBatchCandidate(
@@ -1667,8 +1743,8 @@ def test_openbox_batch_evaluator_deletes_run_dir_when_keep_successful_runs_false
         batch_slot=0,
         batch_size=1,
         selection_phase="initialization",
-        raw_x=[4.0, 0.5, 4.0, 1.1],
-        parameters={"FN": "4", "WN": "0.5u", "FP": "4", "WP": "1.1u"},
+        raw_x=[4.0, 0.5],
+        parameters={int_name: "4", width_name: "0.5u"},
         replacement_issues=[],
     )
 
@@ -1712,13 +1788,13 @@ def test_openbox_batch_evaluator_keeps_run_dir_when_keep_successful_runs_true(
         tmp_path, keep_failed_runs=True, keep_successful_runs=True
     )
     shutil.rmtree(project_dir / "runs")
+    int_name, width_name = variable_names(project_dir)
 
     def adapter(project: Path, *, run_id: str, cadence_cshrc: Path | None) -> None:
         write_fake_result_manifest(project, run_id=run_id)
         write_fake_metric_result_manifest(
             project,
             run_id=run_id,
-            values={"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-6},
         )
 
     candidate = NativeTurboBatchCandidate(
@@ -1729,8 +1805,8 @@ def test_openbox_batch_evaluator_keeps_run_dir_when_keep_successful_runs_true(
         batch_slot=0,
         batch_size=1,
         selection_phase="initialization",
-        raw_x=[4.0, 0.5, 4.0, 1.1],
-        parameters={"FN": "4", "WN": "0.5u", "FP": "4", "WP": "1.1u"},
+        raw_x=[4.0, 0.5],
+        parameters={int_name: "4", width_name: "0.5u"},
         replacement_issues=[],
     )
 
@@ -1753,8 +1829,11 @@ def test_openbox_batch_evaluator_keeps_run_dir_when_keep_successful_runs_true(
     assert decision["run_status"] == "successful"
 
 
-def _make_split_openbox_traces():
+def _make_split_openbox_traces(project_dir: Path):
     from hermes_workflow.native_turbo import NativeTurboEvaluationTrace
+
+    int_name, width_name = variable_names(project_dir)
+    failing_metrics = _constraint_failing_metric_values_from_config(project_dir)
 
     traces: list[NativeTurboEvaluationTrace] = []
     for index in range(7):
@@ -1764,12 +1843,12 @@ def _make_split_openbox_traces():
                 run_id=f"real_{index + 1:03d}",
                 selection_phase="initialization",
                 raw_x=[float(index), 0.5],
-                parameters={"FN": str(index + 2), "WN": "0.5u"},
+                parameters={int_name: str(index + 2), width_name: "0.5u"},
                 status="constraint_failed",
                 objective=1001.0,
                 fom=1.0,
                 constraint_penalty=1.0,
-                metrics={"rise": 1.0e-12, "fall": 1.0e-12, "DC": 1.0e-6},
+                metrics=failing_metrics,
                 result_manifest=None,
                 metric_result_manifest=None,
                 issues=["constraint failed"],
@@ -1789,7 +1868,7 @@ def _make_split_openbox_traces():
                 run_id=f"real_{8 + index:03d}",
                 selection_phase="initialization",
                 raw_x=[float(index + 7), 0.5],
-                parameters={"FN": str(index + 9), "WN": "0.5u"},
+                parameters={int_name: str(index + 9), width_name: "0.5u"},
                 status="metric_check_failed",
                 objective=1001.0,
                 fom=None,
@@ -1811,6 +1890,8 @@ def _make_split_openbox_traces():
 
 
 def _write_seven_ledger_rows_openbox(project_dir: Path) -> None:
+    int_name, _width_name = variable_names(project_dir)
+    failing_metrics = _constraint_failing_metric_values_from_config(project_dir)
     ledger_path = project_dir / "ledger" / "experiment_ledger.jsonl"
     ledger_path.parent.mkdir(parents=True, exist_ok=True)
     with ledger_path.open("w", encoding="utf-8") as handle:
@@ -1819,8 +1900,8 @@ def _write_seven_ledger_rows_openbox(project_dir: Path) -> None:
                 json.dumps(
                     {
                         "candidate_id": f"real_{index + 1:03d}",
-                        "parameters": {"FN": "2"},
-                        "metrics": {"rise": 1.0e-12},
+                        "parameters": {int_name: "2"},
+                        "metrics": {next(iter(failing_metrics)): 1.0},
                         "constraints_passed": False,
                         "objective": 1001.0,
                         "batch_id": 1,
@@ -1836,14 +1917,7 @@ def _write_seven_ledger_rows_openbox(project_dir: Path) -> None:
 
 
 def _set_optimizer_max_evals_openbox(project_dir: Path, value: int) -> None:
-    import yaml
-
-    optimizer_path = project_dir / "config" / "optimizer.yaml"
-    payload = yaml.safe_load(optimizer_path.read_text(encoding="utf-8"))
-    payload["optimizer"]["max_evaluations"] = value
-    optimizer_path.write_text(
-        yaml.safe_dump(payload, sort_keys=False), encoding="utf-8"
-    )
+    _set_optimizer_value(project_dir, "max_evaluations", value)
 
 
 def test_write_openbox_reports_syncs_optimizer_progress_state(tmp_path: Path) -> None:
@@ -1856,7 +1930,7 @@ def test_write_openbox_reports_syncs_optimizer_progress_state(tmp_path: Path) ->
     project_dir = create_approved_real_project(tmp_path)
     _set_optimizer_max_evals_openbox(project_dir, 10)
     _write_seven_ledger_rows_openbox(project_dir)
-    traces = _make_split_openbox_traces()
+    traces = _make_split_openbox_traces(project_dir)
     settings = OpenBoxBatchRunSettings(
         execution_mode="real",
         max_evals=10,
@@ -1980,21 +2054,20 @@ def _set_optimizer_initialization(
     initialization: str,
     algorithm: str = "openbox",
 ) -> None:
-    optimizer_path = project_dir / "config" / "optimizer.yaml"
-    body = [
-        'schema_version: "1.0"',
-        '',
-        'optimizer:',
-        f'  algorithm: {algorithm}',
-        f'  initialization: {initialization}',
-        '  max_evaluations: 4',
-        '  batch_size: 2',
-        '  random_seed: 20260528',
-        '  optimizer_cpu_threads: 4',
-        '  failure_penalty: 1000000.0',
-        '  deduplicate_candidates: true',
-    ]
-    optimizer_path.write_text("\n".join(body) + "\n", encoding="utf-8")
+    payload = {
+        "schema_version": "1.0",
+        "optimizer": {
+            "algorithm": algorithm,
+            "initialization": initialization,
+            "max_evaluations": 4,
+            "batch_size": 2,
+            "random_seed": 20260528,
+            "optimizer_cpu_threads": 4,
+            "failure_penalty": 1000000.0,
+            "deduplicate_candidates": True,
+        },
+    }
+    _write_yaml(project_dir / "config" / "optimizer.yaml", payload)
 
 
 @pytest.mark.parametrize(
@@ -2091,14 +2164,7 @@ def test_openbox_fake_run_writes_runtime_thread_audit(tmp_path: Path) -> None:
     """OpenBox fake run must write optimizer_effectiveness_audit.json with
     runtime_thread_limits containing env vars and threadpoolctl state."""
     project_dir = create_approved_real_project(tmp_path)
-    optimizer_path = project_dir / "config" / "optimizer.yaml"
-    optimizer_path.write_text(
-        optimizer_path.read_text(encoding="utf-8").replace(
-            "deduplicate_candidates: true",
-            "deduplicate_candidates: true\n  optimizer_cpu_threads: 32",
-        ),
-        encoding="utf-8",
-    )
+    _set_optimizer_value(project_dir, "optimizer_cpu_threads", 32)
 
     run_openbox_fake_optimization(
         project_dir,
@@ -2139,14 +2205,7 @@ def test_openbox_fake_run_writes_runtime_thread_audit(tmp_path: Path) -> None:
 def test_openbox_report_contains_runtime_thread_limits(tmp_path: Path) -> None:
     """OpenBox optimizer_run_report.json must contain runtime_thread_limits."""
     project_dir = create_approved_real_project(tmp_path)
-    optimizer_path = project_dir / "config" / "optimizer.yaml"
-    optimizer_path.write_text(
-        optimizer_path.read_text(encoding="utf-8").replace(
-            "deduplicate_candidates: true",
-            "deduplicate_candidates: true\n  optimizer_cpu_threads: 32",
-        ),
-        encoding="utf-8",
-    )
+    _set_optimizer_value(project_dir, "optimizer_cpu_threads", 32)
 
     run_openbox_fake_optimization(
         project_dir,
@@ -2175,14 +2234,7 @@ def test_openbox_separate_effectiveness_audit_file_has_runtime_thread_limits(
     """A dedicated optimizer_effectiveness_audit.json file must exist and
     contain runtime_thread_limits."""
     project_dir = create_approved_real_project(tmp_path)
-    optimizer_path = project_dir / "config" / "optimizer.yaml"
-    optimizer_path.write_text(
-        optimizer_path.read_text(encoding="utf-8").replace(
-            "deduplicate_candidates: true",
-            "deduplicate_candidates: true\n  optimizer_cpu_threads: 32",
-        ),
-        encoding="utf-8",
-    )
+    _set_optimizer_value(project_dir, "optimizer_cpu_threads", 32)
 
     run_openbox_fake_optimization(
         project_dir,

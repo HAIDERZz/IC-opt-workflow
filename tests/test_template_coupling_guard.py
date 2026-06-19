@@ -7,7 +7,6 @@ ALLOWED_TEMPLATE_CALLERS = {
     # Product/template behavior.
     "tests/test_package.py",
     # Not yet migrated. Shrink this list in follow-up waves.
-    "tests/test_openbox_backend.py",
     "tests/test_remote_fix_run_flow.py",
     "tests/test_remote_optimizer_flow.py",
     "tests/test_remote_spectre_ocean.py",

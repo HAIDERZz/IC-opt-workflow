@@ -20,7 +20,7 @@ run-retention and optimizer-progress-state tests; Phase 9 migrated the fix-run f
 tests; Phase 10 migrated the multi-testbench aggregation tests; Phase 11 migrated
 the real-result-record tests; Phase 12 migrated the real-run smoke helpers and
 adapted their consumer cluster; Phase 13 migrated the mock optimizer tests; R1
-migrated the native TuRBO tests. Remaining
+migrated the native TuRBO tests; R2 migrated the OpenBox backend tests. Remaining
 coupled files are explicitly deferred.
 
 ## Status summary
@@ -348,10 +348,6 @@ generic factory.
 
 ## Remaining migration waves
 
-### Optimizer backends (deepest coupling)
-
-- tests/test_openbox_backend.py
-
 ### Remote and adapter flows
 
 - tests/test_remote_optimizer_flow.py
@@ -375,6 +371,20 @@ The allowlist must shrink monotonically; the guard prevents any new unreviewed
 direct usage from being introduced.
 
 ## Verification
+
+### R2 OpenBox Backend
+
+- `pytest tests/test_openbox_backend.py -q` -> `45 passed, 13 warnings`
+- `pytest tests/test_template_coupling_guard.py -q` -> `1 passed`
+- `pytest tests/test_openbox_backend.py tests/test_template_coupling_guard.py -q` -> `46 passed, 13 warnings`
+- `pytest tests/test_openbox_backend.py tests/test_remote_spectre_ocean.py tests/test_multi_testbench_aggregation.py -q` -> `95 passed, 13 warnings`
+- `pytest -q` -> `1194 passed, 13 warnings`
+- `ruff check src tests` -> `All checks passed!`
+- `git diff --check` -> clean
+- `git -C ../ic-auto-opt-workflow-v0.1 status --short` -> clean (release checkout untouched)
+- grep forbidden tokens over `tests/test_openbox_backend.py` -> no matches
+- grep cross-imports -> no source-level matches
+- `ALLOWED_TEMPLATE_CALLERS` count: 6 -> 5.
 
 ### R1 Native TuRBO
 
