@@ -24,6 +24,7 @@ from matplotlib.axes import Axes
 import yaml
 
 from hermes_workflow.optimizer_artifacts import load_optimizer_artifacts
+from hermes_workflow.optimizer_html_report import render_optimizer_insight_html
 from hermes_workflow.optimizer_space_advisory import build_space_compression_advisory
 from hermes_workflow.optimizer_tradeoffs import build_pareto_tradeoff_summary
 from hermes_workflow.validate import evaluate_objective
@@ -31,6 +32,7 @@ from hermes_workflow.validate import evaluate_objective
 
 REPORT_RELATIVE = Path("reports/optimizer_insight_report.json")
 MARKDOWN_RELATIVE = Path("reports/optimizer_insight_report.md")
+HTML_RELATIVE = Path("reports/optimizer_insight_report.html")
 EFFECTIVENESS_AUDIT_RELATIVE = Path("reports/optimizer_effectiveness_audit.json")
 VISUALS_DIR_RELATIVE = Path("reports/optimizer_visuals")
 ALL_EVALUABLE_FOM_RELATIVE = VISUALS_DIR_RELATIVE / "all_evaluable_fom.png"
@@ -77,6 +79,8 @@ class OptimizerInsightReport:
     warnings: list[str] = field(default_factory=list)
     report_path: Path | None = None
     markdown_path: Path | None = None
+    html_path: Path | None = None
+    html_generation: dict[str, Any] = field(default_factory=dict)
 
 
 def generate_optimizer_insight_report(project_dir: str | Path) -> OptimizerInsightReport:
@@ -158,6 +162,11 @@ def generate_optimizer_insight_report(project_dir: str | Path) -> OptimizerInsig
         warnings=warnings,
         report_path=project_root / REPORT_RELATIVE,
         markdown_path=project_root / MARKDOWN_RELATIVE,
+        html_path=project_root / HTML_RELATIVE,
+        html_generation={
+            "path": HTML_RELATIVE.as_posix(),
+            "status": "generated",
+        },
     )
     _write_outputs(project_root, report, traces)
     return report
@@ -311,12 +320,17 @@ def _write_outputs(
         report.constraint_margin_summary,
     )
 
+    payload = asdict(report)
+    payload["schema_version"] = "1.0"
+    payload["report_path"] = REPORT_RELATIVE.as_posix()
+    payload["markdown_path"] = MARKDOWN_RELATIVE.as_posix()
+    payload["html_path"] = HTML_RELATIVE.as_posix()
+    payload["html_generation"] = {
+        "path": HTML_RELATIVE.as_posix(),
+        "status": "generated",
+    }
     if report.report_path is not None:
         report.report_path.parent.mkdir(parents=True, exist_ok=True)
-        payload = asdict(report)
-        payload["schema_version"] = "1.0"
-        payload["report_path"] = REPORT_RELATIVE.as_posix()
-        payload["markdown_path"] = MARKDOWN_RELATIVE.as_posix()
         report.report_path.write_text(
             json.dumps(payload, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
@@ -326,6 +340,23 @@ def _write_outputs(
             _markdown_report(report),
             encoding="utf-8",
         )
+    if report.html_path is not None:
+        try:
+            report.html_path.parent.mkdir(parents=True, exist_ok=True)
+            report.html_path.write_text(
+                render_optimizer_insight_html(payload),
+                encoding="utf-8",
+            )
+        except OSError as exc:
+            payload["html_generation"] = {
+                "reason": str(exc),
+                "status": "failed",
+            }
+            if report.report_path is not None:
+                report.report_path.write_text(
+                    json.dumps(payload, indent=2, sort_keys=True) + "\n",
+                    encoding="utf-8",
+                )
 
 
 def _remove_legacy_svg_visuals(visuals_dir: Path) -> None:

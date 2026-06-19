@@ -68,9 +68,15 @@ def test_generate_optimizer_insight_report_writes_json_markdown_and_pngs(
     assert report.best_observed["run_id"] == "real_006"
     assert report.report_path == project_dir / "reports/optimizer_insight_report.json"
     assert report.markdown_path == project_dir / "reports/optimizer_insight_report.md"
+    assert report.html_path == project_dir / "reports/optimizer_insight_report.html"
 
     payload = json.loads(report.report_path.read_text(encoding="utf-8"))
     assert payload["schema_version"] == "1.0"
+    assert payload["html_path"] == "reports/optimizer_insight_report.html"
+    assert payload["html_generation"] == {
+        "path": "reports/optimizer_insight_report.html",
+        "status": "generated",
+    }
     assert payload["advanced_surrogate_visualization"]["status"] == "not_generated"
     assert "FN" in payload["observed_relationships"]
     assert "objective" in payload["observed_relationships"]["FN"]
@@ -93,6 +99,12 @@ def test_generate_optimizer_insight_report_writes_json_markdown_and_pngs(
     assert "Best observed" in markdown
     assert "Observed Relationships" in markdown
     assert "all_evaluable_fom" in markdown
+    html_path = project_dir / "reports" / "optimizer_insight_report.html"
+    assert html_path.is_file()
+    html_text = html_path.read_text(encoding="utf-8")
+    assert "Optimizer Insight Report" in html_text
+    assert "Report-layer Pareto" in html_text
+    assert "Space Compression Advisory" in html_text
 
     for relative_plot in payload["plots"].values():
         plot_bytes = (project_dir / relative_plot).read_bytes()
