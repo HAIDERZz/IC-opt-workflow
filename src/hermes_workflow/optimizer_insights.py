@@ -24,6 +24,8 @@ from matplotlib.axes import Axes
 import yaml
 
 from hermes_workflow.optimizer_artifacts import load_optimizer_artifacts
+from hermes_workflow.optimizer_space_advisory import build_space_compression_advisory
+from hermes_workflow.optimizer_tradeoffs import build_pareto_tradeoff_summary
 from hermes_workflow.validate import evaluate_objective
 
 
@@ -68,6 +70,8 @@ class OptimizerInsightReport:
     openbox_parameter_importance: dict[str, Any]
     advanced_surrogate_visualization: dict[str, str]
     process_corner_summary: dict[str, Any]
+    pareto_tradeoff_summary: dict[str, Any]
+    space_compression_advisory: dict[str, Any]
     optimizer_effectiveness_audit: dict[str, Any]
     issues: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
@@ -127,6 +131,8 @@ def generate_optimizer_insight_report(project_dir: str | Path) -> OptimizerInsig
     advanced = _advanced_visualization_payload(report_payload)
     openbox_importance = _openbox_parameter_importance(project_root, advanced, metric_contract)
     process_corner_summary = _process_corner_summary(project_root, traces, best_observed)
+    pareto_tradeoff = build_pareto_tradeoff_summary(traces, metric_contract)
+    space_advisory = _space_compression_advisory(project_root, traces)
     effectiveness_audit = _load_optimizer_effectiveness_audit(project_root)
 
     report = OptimizerInsightReport(
@@ -145,6 +151,8 @@ def generate_optimizer_insight_report(project_dir: str | Path) -> OptimizerInsig
         openbox_parameter_importance=openbox_importance,
         advanced_surrogate_visualization=advanced,
         process_corner_summary=process_corner_summary,
+        pareto_tradeoff_summary=pareto_tradeoff,
+        space_compression_advisory=space_advisory,
         optimizer_effectiveness_audit=effectiveness_audit,
         issues=issues,
         warnings=warnings,
@@ -153,6 +161,22 @@ def generate_optimizer_insight_report(project_dir: str | Path) -> OptimizerInsig
     )
     _write_outputs(project_root, report, traces)
     return report
+
+
+def _space_compression_advisory(
+    project_root: Path,
+    traces: list[dict[str, Any]],
+) -> dict[str, Any]:
+    try:
+        return build_space_compression_advisory(project_root, traces)
+    except (OSError, ValueError) as exc:
+        return {
+            "status": "not_available",
+            "mode": "openbox_compressor_dry_run",
+            "advisory_only": True,
+            "applied_to_optimizer": False,
+            "reason": f"space compression advisory unavailable: {exc}",
+        }
 
 
 def _load_optimizer_effectiveness_audit(project_root: Path) -> dict[str, Any]:
@@ -1779,6 +1803,72 @@ def _optimizer_effectiveness_markdown(report: OptimizerInsightReport) -> list[st
     return lines
 
 
+def _pareto_tradeoff_markdown(report: OptimizerInsightReport) -> list[str]:
+    summary = report.pareto_tradeoff_summary
+    lines = [
+        "",
+        "## Report-layer Pareto Trade-Off",
+        "",
+        "- This is computed from existing raw metrics; optimizer mode was not changed.",
+        f"- Status: `{summary.get('status')}`",
+        f"- Mode: `{summary.get('mode')}`",
+    ]
+    if summary.get("status") == "available":
+        lines.extend(
+            [
+                f"- Metric directions: `{json.dumps(summary.get('metric_directions', {}), sort_keys=True)}`",
+                f"- Eligible/front/dominated: `{summary.get('eligible_count')}` / `{summary.get('front_count')}` / `{summary.get('dominated_count')}`",
+                f"- OpenBox utility: `{summary.get('openbox_utility')}`",
+            ]
+        )
+        for candidate in summary.get("front_candidates", [])[:5]:
+            if not isinstance(candidate, dict):
+                continue
+            lines.append(
+                "- "
+                f"{candidate.get('run_id')}: status={candidate.get('status')}, "
+                f"metrics={json.dumps(candidate.get('metrics', {}), sort_keys=True)}, "
+                f"parameters={json.dumps(candidate.get('parameters', {}), sort_keys=True)}"
+            )
+    else:
+        lines.append(f"- Reason: {summary.get('reason')}")
+    return lines
+
+
+def _space_compression_markdown(report: OptimizerInsightReport) -> list[str]:
+    summary = report.space_compression_advisory
+    lines = [
+        "",
+        "## Space Compression Advisory",
+        "",
+        "- advisory only; suggested ranges were not applied to optimizer execution.",
+        "- applied_to_optimizer: false",
+        f"- Status: `{summary.get('status')}`",
+        f"- Mode: `{summary.get('mode')}`",
+    ]
+    if summary.get("status") == "available":
+        lines.extend(
+            [
+                f"- Method: `{summary.get('method')}`",
+                f"- Confidence: `{summary.get('confidence')}`",
+                f"- Eligible/feasible rows: `{summary.get('eligible_count')}` / `{summary.get('feasible_count')}`",
+            ]
+        )
+        for suggestion in summary.get("suggestions", [])[:10]:
+            if not isinstance(suggestion, dict):
+                continue
+            display = suggestion.get("suggested_display") or {}
+            lines.append(
+                "- "
+                f"{suggestion.get('variable')}: "
+                f"{display.get('lower')} .. {display.get('upper')} "
+                f"(compression={suggestion.get('compression_ratio')})"
+            )
+    else:
+        lines.append(f"- Reason: {summary.get('reason')}")
+    return lines
+
+
 def _markdown_report(report: OptimizerInsightReport) -> str:
     best = report.best_observed or {}
     lines = [
@@ -1955,6 +2045,8 @@ def _markdown_report(report: OptimizerInsightReport) -> str:
             lines.append(f"- {constraint_name}: {top}")
     else:
         lines.append(f"- Status: `{report.openbox_parameter_importance.get('status')}`")
+    lines.extend(_pareto_tradeoff_markdown(report))
+    lines.extend(_space_compression_markdown(report))
     lines.extend(
         [
             "",

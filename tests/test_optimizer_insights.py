@@ -99,6 +99,76 @@ def test_generate_optimizer_insight_report_writes_json_markdown_and_pngs(
         assert plot_bytes.startswith(b"\x89PNG\r\n\x1a\n")
 
 
+def test_optimizer_insight_report_includes_tradeoff_and_space_advisory(
+    tmp_path: Path,
+) -> None:
+    rows = [
+        _trace_row(
+            evaluation_index=1,
+            run_id="real_001",
+            status="feasible",
+            objective=1.0,
+        ),
+        _trace_row(
+            evaluation_index=2,
+            run_id="real_002",
+            status="feasible",
+            objective=2.0,
+        ),
+        _trace_row(
+            evaluation_index=3,
+            run_id="real_003",
+            status="constraint_failed",
+            objective=3.0,
+        ),
+    ]
+    rows[0]["metrics"] = {"gain": 10.0, "power": 1.0}
+    rows[1]["metrics"] = {"gain": 12.0, "power": 1.5}
+    rows[2]["metrics"] = {"gain": 9.0, "power": 1.2}
+    project_dir = _write_accepted_optimizer_project(tmp_path, rows=rows)
+    (project_dir / "config" / "metrics.yaml").write_text(
+        '''
+schema_version: "1.0"
+metrics:
+  - name: gain
+    unit: dB
+  - name: power
+    unit: W
+constraints:
+  - metric: gain
+    op: ge
+    value: "8"
+  - metric: power
+    op: le
+    value: "2"
+objective:
+  direction: minimize
+  expression: "power"
+'''.lstrip(),
+        encoding="utf-8",
+    )
+
+    report = generate_optimizer_insight_report(project_dir)
+    payload = json.loads(report.report_path.read_text(encoding="utf-8"))
+    markdown = report.markdown_path.read_text(encoding="utf-8")
+
+    assert report.pareto_tradeoff_summary["status"] == "available"
+    assert payload["pareto_tradeoff_summary"]["mode"] == (
+        "report_layer_raw_metric_tradeoff"
+    )
+    assert payload["pareto_tradeoff_summary"]["optimizer_mode_changed"] is False
+    assert payload["pareto_tradeoff_summary"]["front_count"] == 2
+    assert payload["space_compression_advisory"]["mode"] == (
+        "openbox_compressor_dry_run"
+    )
+    assert payload["space_compression_advisory"]["advisory_only"] is True
+    assert payload["space_compression_advisory"]["applied_to_optimizer"] is False
+    assert "Report-layer Pareto Trade-Off" in markdown
+    assert "Space Compression Advisory" in markdown
+    assert "optimizer mode was not changed" in markdown
+    assert "advisory only" in markdown
+
+
 def test_generate_optimizer_insight_report_records_metric_relationships(
     tmp_path: Path,
 ) -> None:
@@ -414,6 +484,8 @@ def test_generate_optimizer_insight_report_fails_without_traces(tmp_path: Path) 
 
     assert report.status == "fail"
     assert "no optimizer trace rows found" in report.issues
+    assert report.pareto_tradeoff_summary["status"] == "not_available"
+    assert report.space_compression_advisory["status"] == "not_available"
 
 
 def test_generate_optimizer_insight_report_summarizes_process_corners(
