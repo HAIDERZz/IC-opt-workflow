@@ -354,7 +354,6 @@ generic factory.
 - tests/test_remote_fix_run_flow.py
 - tests/test_remote_spectre_ocean.py
 - tests/test_spectre_ocean_adapter.py
-- tests/test_real_result_record.py
 
 ## How to continue
 
