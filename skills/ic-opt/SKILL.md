@@ -56,6 +56,10 @@ optimize-project warm-start from previous same-circuit projects. It renders to
 only adds budget to the same optimizer project and does not reread a changed
 requirement. Do not use it for fix-run.
 
+Use `examples/spectre_maestro_project/opt_requirement.history_warm_start.md`
+as the checked example for a new same-circuit history run. It is a sanitized
+verified second-round multi-testbench Mixer requirement, not a toy snippet.
+
 The first supported contract is strict: current and previous projects must have
 exactly the same variable names, no variable-name mapping, and matching required
 metric definitions. Previous objective and constraint results are not reused;

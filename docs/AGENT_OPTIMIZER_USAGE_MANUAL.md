@@ -1,6 +1,6 @@
 # Agent Workflow Usage Manual
 
-This manual describes how an agent should operate IC Auto Opt v0.1.8.
+This manual describes how an agent should operate IC Auto Opt v0.1.9.
 
 The agent is an operator and report reader. It should use the product CLI,
 inspect workflow artifacts, and report evidence. It should not invent optimizer
@@ -70,6 +70,11 @@ optimize-project warm-start from previous same-circuit projects. It renders to
 `config/history_warm_start.yaml`. Do not recommend it for fix-run, and do not
 combine it with `--continue N`; continuation only extends an existing optimizer
 project and does not reread a changed requirement.
+
+Use `examples/spectre_maestro_project/opt_requirement.history_warm_start.md`
+as the checked example when the user asks for a new same-circuit history run.
+It is a sanitized version of a verified second-round multi-testbench Mixer
+requirement, not a synthetic minimal snippet.
 
 The first release of history warm-start is strict: current and previous projects
 must have exactly the same variable names, no variable-name mapping, and matching

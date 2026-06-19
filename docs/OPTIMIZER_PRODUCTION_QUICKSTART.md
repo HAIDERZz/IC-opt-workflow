@@ -48,11 +48,16 @@ examples/spectre_maestro_project/opt_requirement.md
 examples/spectre_maestro_project/opt_requirement.multi_corner.md
 examples/spectre_maestro_project/opt_requirement.multi_testbench.md
 examples/spectre_maestro_project/opt_requirement.multi_tb_corner.md
+examples/spectre_maestro_project/opt_requirement.history_warm_start.md
 examples/spectre_maestro_project/opt_requirement.fix_run.md
 ```
 
-Use `opt_requirement.fix_run.md` for fixed-point characterization and waveform
-CSV export. It is based on a real validated 15-corner Mixer requirement.
+Use `opt_requirement.multi_testbench.md` and `opt_requirement.multi_tb_corner.md`
+for real-run-based Mixer multi-testbench structures with separate CG/NF/BW,
+IIP3, and P1dB metric ownership. Use `opt_requirement.history_warm_start.md`
+for a verified second-round same-circuit history run. Use
+`opt_requirement.fix_run.md` for fixed-point characterization and waveform CSV
+export. It is based on a real validated 15-corner Mixer requirement.
 
 In fix-run mode, `parallel_jobs` controls child testbench/corner concurrency
 inside one fixed point. `threads_per_run` remains per Spectre process. Multiple

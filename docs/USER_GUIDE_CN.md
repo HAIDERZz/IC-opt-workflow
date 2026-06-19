@@ -1,4 +1,4 @@
-# IC Auto Opt Workflow v0.1.8 使用说明
+# IC Auto Opt Workflow v0.1.9 使用说明
 
 IC Auto Opt 用 `opt_requirement.md` 描述一次真实 Spectre/OCEAN 工作流。当前
 release 支持两种模式：
@@ -83,12 +83,16 @@ examples/spectre_maestro_project/opt_requirement.md
 examples/spectre_maestro_project/opt_requirement.multi_corner.md
 examples/spectre_maestro_project/opt_requirement.multi_testbench.md
 examples/spectre_maestro_project/opt_requirement.multi_tb_corner.md
+examples/spectre_maestro_project/opt_requirement.history_warm_start.md
 examples/spectre_maestro_project/opt_requirement.fix_run.md
 ```
 
-`opt_requirement.fix_run.md` 以真实跑通的 15-corner Mixer requirement 为结构基准。
-使用时把它复制为项目根目录的 `opt_requirement.md`，替换 Maestro point root、
-固定参数点、corner 变量和 waveform export。
+multi-testbench 模板以真实跑通的 Mixer 多 testbench requirement 为结构基准，
+保留 CG/NF/BW、IIP3、P1dB 指标到各自 testbench 的路由。
+`opt_requirement.history_warm_start.md` 以第二轮同电路 history 验证 requirement
+为结构基准。`opt_requirement.fix_run.md` 以真实跑通的 15-corner Mixer
+requirement 为结构基准。使用时把模板复制为项目根目录的 `opt_requirement.md`，
+替换 Maestro point root、旧项目路径、固定参数点、corner 变量和 waveform export。
 
 ## 优化模式
 

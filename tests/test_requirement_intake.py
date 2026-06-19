@@ -24,14 +24,14 @@ from hermes_workflow.validate import validate_project_files
 FIXTURE_ROOT = Path(__file__).parent / "fixtures" / "requirement_intake"
 VALID_PROJECT = FIXTURE_ROOT / "valid_project"
 VALID_MAESTRO_POINT = FIXTURE_ROOT / "valid_maestro_point"
-TEMPLATE_OPT_REQUIREMENT = (
+TEMPLATE_DIR = (
     Path(__file__).resolve().parents[1]
     / "src"
     / "hermes_workflow"
     / "templates"
     / "spectre_maestro_project"
-    / "opt_requirement.md"
 )
+TEMPLATE_OPT_REQUIREMENT = TEMPLATE_DIR / "opt_requirement.md"
 
 
 def _copy_requirement_project(tmp_path: Path) -> Path:
@@ -411,12 +411,11 @@ def test_optimizer_requirement_template_uses_explicit_strategy() -> None:
 
 
 def test_optimizer_requirement_template_includes_multi_corner_variants() -> None:
-    template_dir = TEMPLATE_OPT_REQUIREMENT.parent
-    multi_corner = (template_dir / "opt_requirement.multi_corner.md").read_text(
+    multi_corner = (TEMPLATE_DIR / "opt_requirement.multi_corner.md").read_text(
         encoding="utf-8"
     )
     multi_tb_corner = (
-        template_dir / "opt_requirement.multi_tb_corner.md"
+        TEMPLATE_DIR / "opt_requirement.multi_tb_corner.md"
     ).read_text(encoding="utf-8")
 
     assert "## Process Corners" in multi_corner
@@ -424,6 +423,53 @@ def test_optimizer_requirement_template_includes_multi_corner_variants() -> None
     assert "strategy: openbox_prf_eic" in multi_corner
     assert "## Process Corners" in multi_tb_corner
     assert "strategy: openbox_prf_eic" in multi_tb_corner
+
+
+def test_multi_testbench_template_preserves_verified_metric_routing() -> None:
+    text = (TEMPLATE_DIR / "opt_requirement.multi_testbench.md").read_text(
+        encoding="utf-8"
+    )
+    report = parse_requirement_text(
+        text,
+        constraints_text=None,
+        maestro_input_exists=lambda _path: True,
+    )
+
+    assert report.status == "pass", report.issues
+    testbench_ids = {
+        testbench["id"]
+        for testbench in report.sections["Maestro Source"]["testbenches"]
+    }
+    metric_routes = {
+        metric["name"]: metric.get("testbench")
+        for metric in report.sections["Metrics"]
+    }
+
+    assert testbench_ids == {"cg_nf", "iip3", "p1db"}
+    assert metric_routes == {
+        "BW": "cg_nf",
+        "MAX_GAIN": "cg_nf",
+        "NF_3G": "cg_nf",
+        "IIP3": "iip3",
+        "P1DB": "p1db",
+    }
+
+
+def test_history_warm_start_template_is_present_and_parses() -> None:
+    text = (TEMPLATE_DIR / "opt_requirement.history_warm_start.md").read_text(
+        encoding="utf-8"
+    )
+    report = parse_requirement_text(
+        text,
+        constraints_text=None,
+        maestro_input_exists=lambda _path: True,
+    )
+
+    assert report.status == "pass", report.issues
+    history = report.sections["History Warm Start"]
+    assert history["enabled"] is True
+    assert history["sources"][0]["path"] == "/absolute/path/to/previous_same_circuit_project"
+    assert history["warm_start_strategy"] == "topk"
 
 
 def test_optimizer_requirement_template_intake_accepts_placeholder_replacement(

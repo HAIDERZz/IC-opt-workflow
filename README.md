@@ -134,11 +134,16 @@ examples/spectre_maestro_project/opt_requirement.md
 examples/spectre_maestro_project/opt_requirement.multi_corner.md
 examples/spectre_maestro_project/opt_requirement.multi_testbench.md
 examples/spectre_maestro_project/opt_requirement.multi_tb_corner.md
+examples/spectre_maestro_project/opt_requirement.history_warm_start.md
 examples/spectre_maestro_project/opt_requirement.fix_run.md
 ```
 
-The fix-run template is based on the real validated 15-corner Mixer
-requirement. Replace only project-specific paths and circuit values.
+The multi-testbench templates are based on real validated Mixer requirements
+with CG/NF/BW, IIP3, and P1dB metrics routed to their owning testbenches. The
+history warm-start template is based on a verified second-round same-circuit
+Mixer run. The fix-run template is based on the real validated 15-corner Mixer
+requirement. Replace only project-specific paths, previous-project paths, and
+circuit values.
 
 ## Workflow Modes
 
@@ -298,12 +303,17 @@ probe status, selected candidate, and reported metrics.
 
 ## Current Release
 
-Version `0.1.8` includes:
+Version `0.1.9` includes:
 
 - local and remote fix-run workflow support
 - fix-run child-level parallelism through `Spectre Settings.parallel_jobs`
 - waveform CSV export manifests for fix-run child runs
 - requirement template `opt_requirement.fix_run.md`
+- OpenBox history warm-start for new same-circuit optimize projects
+- requirement template `opt_requirement.history_warm_start.md`
+- optimizer insight HTML/JSON/Markdown reports with best-point metrics,
+  report-layer raw-metric trade-off summaries, history reuse summaries, and
+  advisory space-compression dry-runs
 - requirement-driven local and remote optimization
 - OpenBox GP+EIC, OpenBox PRF+EIC, and native TuRBO
 - multi-testbench and multi-corner support
@@ -313,4 +323,4 @@ Version `0.1.8` includes:
 - optimizer CPU thread-limit runtime audit
 - release examples and agent skill guidance synchronized with the current CLI
 
-See `RELEASE_NOTES_v0.1.8.md`.
+See `RELEASE_NOTES_v0.1.9.md`.

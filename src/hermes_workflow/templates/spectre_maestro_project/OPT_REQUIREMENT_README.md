@@ -19,7 +19,7 @@ ic-opt <project> --real --continue N
 
 ## Example Files
 
-This directory contains five requirement templates.
+This directory contains six requirement templates.
 
 | File | Use when |
 | --- | --- |
@@ -27,12 +27,16 @@ This directory contains five requirement templates.
 | `opt_requirement.multi_corner.md` | one testbench optimization, multiple process corners |
 | `opt_requirement.multi_testbench.md` | multiple testbench optimization, source point corner |
 | `opt_requirement.multi_tb_corner.md` | multiple testbench optimization, multiple process corners |
+| `opt_requirement.history_warm_start.md` | new optimize project that reuses compatible history from a previous same-circuit project |
 | `opt_requirement.fix_run.md` | fixed point run across 15 process/corner-variable combinations with waveform CSV export |
 
-The fix-run template is based on a real validated local and remote 15-corner
-Mixer requirement. For a real project, copy the relevant template to
-`<project>/opt_requirement.md`, then replace private paths and circuit-specific
-values.
+The multi-testbench templates are based on real validated Mixer multi-testbench
+requirements with CG/NF/BW, IIP3, and P1dB metrics routed to their owning
+testbenches. The history warm-start template is based on the verified second
+round Mixer history run. The fix-run template is based on a real validated local
+and remote 15-corner Mixer requirement. For a real project, copy the relevant
+template to `<project>/opt_requirement.md`, then replace private paths,
+history source paths, and circuit-specific values.
 
 ## Shared Sections
 
@@ -281,8 +285,9 @@ After a run, inspect `reports/history_warm_start_audit.json`,
 `initial_configurations_from_history`; unconstrained single-objective projects
 may use `transfer_learning_history`.
 
-This optional snippet is not inserted into the verified `opt_requirement*.md`
-files in this directory.
+Use `opt_requirement.history_warm_start.md` for a complete verified second-round
+example. It keeps the real multi-testbench Mixer structure and replaces the
+previous-project path with `/absolute/path/to/previous_same_circuit_project`.
 
 ## Approval Checklist
 
