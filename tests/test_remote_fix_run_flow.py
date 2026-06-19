@@ -15,6 +15,85 @@ from hermes_workflow.fix_run_models import (
     FixRunReport,
 )
 from hermes_workflow.remote_project import RemoteProjectRef
+from tests.project_factory import create_generic_project
+
+
+def _read_yaml(path: Path) -> dict:
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    assert isinstance(payload, dict)
+    return payload
+
+
+def _write_yaml(path: Path, payload: dict) -> None:
+    path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+
+def _fixed_points(project_dir: Path) -> list[dict[str, object]]:
+    payload = _read_yaml(project_dir / "config" / "fixed_points.yaml")
+    points = payload["points"]
+    assert isinstance(points, list)
+    return points
+
+
+def _fixed_point_candidate_id(project_dir: Path) -> str:
+    candidate_id = _fixed_points(project_dir)[0]["candidate_id"]
+    assert isinstance(candidate_id, str)
+    return candidate_id
+
+
+def _fixed_point_parameters(project_dir: Path) -> dict[str, str]:
+    parameters = _fixed_points(project_dir)[0]["parameters"]
+    assert isinstance(parameters, dict)
+    return {str(key): str(value) for key, value in parameters.items()}
+
+
+def _write_remote_waveform_exports(project_dir: Path) -> None:
+    (project_dir / "config" / "waveform_exports.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": "1.0",
+                "exports": [
+                    {
+                        "name": "nf_pnoise",
+                        "testbench": "cg_nf",
+                        "expression": 'getData("NF" ?result "pnoise")',
+                        "output_format": "csv",
+                        "nil_policy": "fail",
+                    }
+                ],
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+
+def _set_remote_spectre_parallel_jobs(project_dir: Path, parallel_jobs: int) -> None:
+    spectre_path = project_dir / "config" / "spectre.yaml"
+    payload = yaml.safe_load(spectre_path.read_text(encoding="utf-8"))
+    payload["spectre"]["parallel_jobs"] = parallel_jobs
+    spectre_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+
+def _create_remote_fix_run_project(
+    tmp_path: Path,
+    *,
+    name: str = "remote_fix_run_project",
+    waveform_exports: bool = False,
+    parallel_jobs: int | None = None,
+) -> Path:
+    """Create a generic fix-run project for remote tests."""
+    project_dir = create_generic_project(
+        tmp_path,
+        name=name,
+        workflow_mode="fix_run",
+        parallel_jobs=parallel_jobs or 4,
+    )
+    if waveform_exports:
+        _write_remote_waveform_exports(project_dir)
+    if parallel_jobs is not None and parallel_jobs != 4:
+        _set_remote_spectre_parallel_jobs(project_dir, parallel_jobs)
+    return project_dir
 
 
 def _mock_intake(project_dir: Path) -> SimpleNamespace:
@@ -75,42 +154,6 @@ def _write_remote_fix_run_child_dirs(
         child_dir.mkdir(parents=True, exist_ok=True)
 
 
-def _set_remote_spectre_parallel_jobs(project_dir: Path, parallel_jobs: int) -> None:
-    spectre_path = project_dir / "config" / "spectre.yaml"
-    payload = yaml.safe_load(spectre_path.read_text(encoding="utf-8"))
-    payload["spectre"]["parallel_jobs"] = parallel_jobs
-    spectre_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
-
-
-def _strip_optimizer_configs_for_remote_fix_run(project_dir: Path) -> None:
-    """Make a genuine fix-run project: drop optimizer-only configs (avoids the
-    optimizer contract check batch_size <= parallel_jobs when lowering
-    parallel_jobs) and add a minimal waveform_exports.yaml so the fix-run
-    contract (at least one of metrics/waveform_exports) holds."""
-    for name in ("optimizer.yaml", "metrics.yaml"):
-        path = project_dir / "config" / name
-        if path.exists():
-            path.unlink()
-    (project_dir / "config" / "waveform_exports.yaml").write_text(
-        yaml.safe_dump(
-            {
-                "schema_version": "1.0",
-                "exports": [
-                    {
-                        "name": "nf_pnoise",
-                        "testbench": "cg_nf",
-                        "expression": 'getData("NF" ?result "pnoise")',
-                        "output_format": "csv",
-                        "nil_policy": "fail",
-                    }
-                ],
-            },
-            sort_keys=False,
-        ),
-        encoding="utf-8",
-    )
-
-
 def _write_remote_waveform_artifacts(
     project_dir: Path, run_id: str, tb: str, corner: str
 ) -> None:
@@ -155,46 +198,9 @@ def test_remote_fix_run_calls_remote_doctor_and_blocks_on_failure() -> None:
 # ---------------------------------------------------------------------------
 def test_remote_fix_run_uploads_fixed_point_artifacts(tmp_path: Path) -> None:
     """run_remote_fix_run_project must upload fixed-point artifacts to the remote project."""
-    from hermes_workflow.package import create_project_from_template
     from hermes_workflow.remote_fix_run_flow import run_remote_fix_run_project
 
-    import yaml
-
-    project_dir = tmp_path / "remote_fix_run_test"
-    create_project_from_template(project_dir)
-    # Write template
-    template_path = project_dir / "netlists" / "templates" / "template.scs"
-    template_path.parent.mkdir(parents=True, exist_ok=True)
-    template_path.write_text(
-        "simulator lang=spectre\nparameters FN={{FN}} WN={{WN}}\ntran tran stop=10n\n",
-        encoding="utf-8",
-    )
-    # Write workflow.yaml
-    workflow_yaml = project_dir / "config" / "workflow.yaml"
-    workflow_yaml.write_text(
-        yaml.safe_dump(
-            {"schema_version": "1.0", "mode": "fix_run", "starting_run_id": "real_001"},
-            sort_keys=False,
-        ),
-        encoding="utf-8",
-    )
-    # Write fixed_points.yaml
-    fixed_points_yaml = project_dir / "config" / "fixed_points.yaml"
-    fixed_points_yaml.write_text(
-        yaml.safe_dump(
-            {
-                "schema_version": "1.0",
-                "points": [
-                    {
-                        "candidate_id": "user_point_001",
-                        "parameters": {"FN": "2", "WN": "0.3u"},
-                    }
-                ],
-            },
-            sort_keys=False,
-        ),
-        encoding="utf-8",
-    )
+    project_dir = _create_remote_fix_run_project(tmp_path)
 
     ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
     mock_runner = MagicMock()
@@ -234,43 +240,9 @@ def test_remote_fix_run_uploads_fixed_point_artifacts(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 def test_remote_fix_run_writes_report_json(tmp_path: Path) -> None:
     """run_remote_fix_run_project must write reports/fix_run_report.json."""
-    from hermes_workflow.package import create_project_from_template
     from hermes_workflow.remote_fix_run_flow import run_remote_fix_run_project
 
-    import yaml
-
-    project_dir = tmp_path / "remote_fix_run_report"
-    create_project_from_template(project_dir)
-    template_path = project_dir / "netlists" / "templates" / "template.scs"
-    template_path.parent.mkdir(parents=True, exist_ok=True)
-    template_path.write_text(
-        "simulator lang=spectre\nparameters FN={{FN}} WN={{WN}}\ntran tran stop=10n\n",
-        encoding="utf-8",
-    )
-    workflow_yaml = project_dir / "config" / "workflow.yaml"
-    workflow_yaml.write_text(
-        yaml.safe_dump(
-            {"schema_version": "1.0", "mode": "fix_run", "starting_run_id": "real_001"},
-            sort_keys=False,
-        ),
-        encoding="utf-8",
-    )
-    fixed_points_yaml = project_dir / "config" / "fixed_points.yaml"
-    fixed_points_yaml.write_text(
-        yaml.safe_dump(
-            {
-                "schema_version": "1.0",
-                "points": [
-                    {
-                        "candidate_id": "user_point_001",
-                        "parameters": {"FN": "2", "WN": "0.3u"},
-                    }
-                ],
-            },
-            sort_keys=False,
-        ),
-        encoding="utf-8",
-    )
+    project_dir = _create_remote_fix_run_project(tmp_path, name="remote_fix_run_report")
 
     ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
     mock_runner = MagicMock()
@@ -314,43 +286,9 @@ def test_remote_fix_run_writes_report_json(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 def test_remote_fix_run_calls_remote_spectre_ocean_per_child(tmp_path: Path) -> None:
     """run_remote_fix_run_project must call run_remote_spectre_ocean_adapter for each child run."""
-    from hermes_workflow.package import create_project_from_template
     from hermes_workflow.remote_fix_run_flow import run_remote_fix_run_project
 
-    import yaml
-
-    project_dir = tmp_path / "remote_fix_run_children"
-    create_project_from_template(project_dir)
-    template_path = project_dir / "netlists" / "templates" / "template.scs"
-    template_path.parent.mkdir(parents=True, exist_ok=True)
-    template_path.write_text(
-        "simulator lang=spectre\nparameters FN={{FN}} WN={{WN}}\ntran tran stop=10n\n",
-        encoding="utf-8",
-    )
-    workflow_yaml = project_dir / "config" / "workflow.yaml"
-    workflow_yaml.write_text(
-        yaml.safe_dump(
-            {"schema_version": "1.0", "mode": "fix_run", "starting_run_id": "real_001"},
-            sort_keys=False,
-        ),
-        encoding="utf-8",
-    )
-    fixed_points_yaml = project_dir / "config" / "fixed_points.yaml"
-    fixed_points_yaml.write_text(
-        yaml.safe_dump(
-            {
-                "schema_version": "1.0",
-                "points": [
-                    {
-                        "candidate_id": "user_point_001",
-                        "parameters": {"FN": "2", "WN": "0.3u"},
-                    }
-                ],
-            },
-            sort_keys=False,
-        ),
-        encoding="utf-8",
-    )
+    project_dir = _create_remote_fix_run_project(tmp_path, name="remote_fix_run_children")
 
     ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
     mock_runner = MagicMock()
@@ -394,43 +332,9 @@ def test_remote_fix_run_calls_remote_spectre_ocean_per_child(tmp_path: Path) -> 
 def test_remote_failure_manifest_preserves_waveform_export_issues(tmp_path: Path) -> None:
     """When remote adapter fails, the fix-run report must preserve issues including
     waveform export problems."""
-    from hermes_workflow.package import create_project_from_template
     from hermes_workflow.remote_fix_run_flow import run_remote_fix_run_project
 
-    import yaml
-
-    project_dir = tmp_path / "remote_fix_run_fail"
-    create_project_from_template(project_dir)
-    template_path = project_dir / "netlists" / "templates" / "template.scs"
-    template_path.parent.mkdir(parents=True, exist_ok=True)
-    template_path.write_text(
-        "simulator lang=spectre\nparameters FN={{FN}} WN={{WN}}\ntran tran stop=10n\n",
-        encoding="utf-8",
-    )
-    workflow_yaml = project_dir / "config" / "workflow.yaml"
-    workflow_yaml.write_text(
-        yaml.safe_dump(
-            {"schema_version": "1.0", "mode": "fix_run", "starting_run_id": "real_001"},
-            sort_keys=False,
-        ),
-        encoding="utf-8",
-    )
-    fixed_points_yaml = project_dir / "config" / "fixed_points.yaml"
-    fixed_points_yaml.write_text(
-        yaml.safe_dump(
-            {
-                "schema_version": "1.0",
-                "points": [
-                    {
-                        "candidate_id": "user_point_001",
-                        "parameters": {"FN": "2", "WN": "0.3u"},
-                    }
-                ],
-            },
-            sort_keys=False,
-        ),
-        encoding="utf-8",
-    )
+    project_dir = _create_remote_fix_run_project(tmp_path, name="remote_fix_run_fail")
 
     ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
     mock_runner = MagicMock()
@@ -543,28 +447,8 @@ def test_remote_fix_run_report_collects_waveform_artifacts(tmp_path: Path) -> No
     """Remote parent report must list downloaded waveform manifests and CSV files."""
     from hermes_workflow.remote_fix_run_flow import run_remote_fix_run_project
 
-    project_dir = tmp_path / "remote_fix_run_artifacts"
-    config_dir = project_dir / "config"
-    config_dir.mkdir(parents=True, exist_ok=True)
-    (config_dir / "workflow.yaml").write_text(
-        json.dumps(
-            {"schema_version": "1.0", "mode": "fix_run", "starting_run_id": "real_001"}
-        ),
-        encoding="utf-8",
-    )
-    (config_dir / "fixed_points.yaml").write_text(
-        json.dumps(
-            {
-                "schema_version": "1.0",
-                "points": [
-                    {
-                        "candidate_id": "user_point_001",
-                        "parameters": {"FN": "2", "WN": "0.3u"},
-                    }
-                ],
-            }
-        ),
-        encoding="utf-8",
+    project_dir = _create_remote_fix_run_project(
+        tmp_path, name="remote_fix_run_artifacts", waveform_exports=True
     )
 
     run_dir = project_dir / "runs" / "real" / "real_001"
@@ -635,40 +519,14 @@ def test_remote_fix_run_flow_does_not_import_optimizer_approval() -> None:
 # Fix-run remote child-level parallelism (Spectre Settings.parallel_jobs)
 # ---------------------------------------------------------------------------
 def test_remote_fix_run_uses_parallel_jobs_for_child_runs(tmp_path: Path) -> None:
-    from hermes_workflow.package import create_project_from_template
     from hermes_workflow.remote_fix_run_flow import run_remote_fix_run_project
 
-    project_dir = tmp_path / "remote_fix_run_parallel"
-    create_project_from_template(project_dir)
-    (project_dir / "netlists" / "templates").mkdir(parents=True, exist_ok=True)
-    (project_dir / "netlists" / "templates" / "template.scs").write_text(
-        "simulator lang=spectre\nparameters FN={{FN}} WN={{WN}}\ntran tran stop=10n\n",
-        encoding="utf-8",
+    project_dir = _create_remote_fix_run_project(
+        tmp_path,
+        name="remote_fix_run_parallel",
+        waveform_exports=True,
+        parallel_jobs=2,
     )
-    (project_dir / "config" / "workflow.yaml").write_text(
-        yaml.safe_dump(
-            {"schema_version": "1.0", "mode": "fix_run", "starting_run_id": "real_001"},
-            sort_keys=False,
-        ),
-        encoding="utf-8",
-    )
-    (project_dir / "config" / "fixed_points.yaml").write_text(
-        yaml.safe_dump(
-            {
-                "schema_version": "1.0",
-                "points": [
-                    {
-                        "candidate_id": "user_point_001",
-                        "parameters": {"FN": "2", "WN": "0.3u"},
-                    }
-                ],
-            },
-            sort_keys=False,
-        ),
-        encoding="utf-8",
-    )
-    _strip_optimizer_configs_for_remote_fix_run(project_dir)
-    _set_remote_spectre_parallel_jobs(project_dir, 2)
 
     active = 0
     max_active = 0
@@ -727,40 +585,14 @@ def test_remote_fix_run_uses_parallel_jobs_for_child_runs(tmp_path: Path) -> Non
 def test_remote_fix_run_parallel_jobs_one_keeps_child_runs_serial(
     tmp_path: Path,
 ) -> None:
-    from hermes_workflow.package import create_project_from_template
     from hermes_workflow.remote_fix_run_flow import run_remote_fix_run_project
 
-    project_dir = tmp_path / "remote_fix_run_serial"
-    create_project_from_template(project_dir)
-    (project_dir / "netlists" / "templates").mkdir(parents=True, exist_ok=True)
-    (project_dir / "netlists" / "templates" / "template.scs").write_text(
-        "simulator lang=spectre\nparameters FN={{FN}} WN={{WN}}\ntran tran stop=10n\n",
-        encoding="utf-8",
+    project_dir = _create_remote_fix_run_project(
+        tmp_path,
+        name="remote_fix_run_serial",
+        waveform_exports=True,
+        parallel_jobs=1,
     )
-    (project_dir / "config" / "workflow.yaml").write_text(
-        yaml.safe_dump(
-            {"schema_version": "1.0", "mode": "fix_run", "starting_run_id": "real_001"},
-            sort_keys=False,
-        ),
-        encoding="utf-8",
-    )
-    (project_dir / "config" / "fixed_points.yaml").write_text(
-        yaml.safe_dump(
-            {
-                "schema_version": "1.0",
-                "points": [
-                    {
-                        "candidate_id": "user_point_001",
-                        "parameters": {"FN": "2", "WN": "0.3u"},
-                    }
-                ],
-            },
-            sort_keys=False,
-        ),
-        encoding="utf-8",
-    )
-    _strip_optimizer_configs_for_remote_fix_run(project_dir)
-    _set_remote_spectre_parallel_jobs(project_dir, 1)
 
     active = 0
     max_active = 0
@@ -821,40 +653,14 @@ def test_remote_fix_run_parallel_jobs_one_keeps_child_runs_serial(
 def test_remote_fix_run_parallel_child_failure_preserved_and_report_fails(
     tmp_path: Path,
 ) -> None:
-    from hermes_workflow.package import create_project_from_template
     from hermes_workflow.remote_fix_run_flow import run_remote_fix_run_project
 
-    project_dir = tmp_path / "remote_fix_run_failure"
-    create_project_from_template(project_dir)
-    (project_dir / "netlists" / "templates").mkdir(parents=True, exist_ok=True)
-    (project_dir / "netlists" / "templates" / "template.scs").write_text(
-        "simulator lang=spectre\nparameters FN={{FN}} WN={{WN}}\ntran tran stop=10n\n",
-        encoding="utf-8",
+    project_dir = _create_remote_fix_run_project(
+        tmp_path,
+        name="remote_fix_run_failure",
+        waveform_exports=True,
+        parallel_jobs=2,
     )
-    (project_dir / "config" / "workflow.yaml").write_text(
-        yaml.safe_dump(
-            {"schema_version": "1.0", "mode": "fix_run", "starting_run_id": "real_001"},
-            sort_keys=False,
-        ),
-        encoding="utf-8",
-    )
-    (project_dir / "config" / "fixed_points.yaml").write_text(
-        yaml.safe_dump(
-            {
-                "schema_version": "1.0",
-                "points": [
-                    {
-                        "candidate_id": "user_point_001",
-                        "parameters": {"FN": "2", "WN": "0.3u"},
-                    }
-                ],
-            },
-            sort_keys=False,
-        ),
-        encoding="utf-8",
-    )
-    _strip_optimizer_configs_for_remote_fix_run(project_dir)
-    _set_remote_spectre_parallel_jobs(project_dir, 2)
 
     def prepare_side_effect(*args, **kwargs):
         run_id = kwargs["run_id"]
