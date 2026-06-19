@@ -4,12 +4,7 @@ import json
 import shlex
 from pathlib import Path, PurePosixPath
 
-from hermes_workflow.remote_doctor import (
-    _build_remote_dirty_state,
-    _record_parallel_jobs_warning,
-    run_remote_doctor,
-)
-from hermes_workflow.requirement_intake import RequirementIntakeReport
+from hermes_workflow.remote_doctor import _build_remote_dirty_state, run_remote_doctor
 from hermes_workflow.remote_project import RemoteProjectRef
 from hermes_workflow.remote_ssh import RemoteCommandResult
 
@@ -193,34 +188,6 @@ def test_remote_doctor_warns_when_remote_parallel_jobs_above_threshold(
         item["code"] == "REMOTE_PARALLELISM_HIGH"
         for item in payload["structured_issues"]
     )
-
-
-def test_remote_parallel_jobs_warning_uses_fix_run_child_parallelism_wording() -> None:
-    checks: dict[str, dict[str, str]] = {}
-    structured_issues = []
-    req_report = RequirementIntakeReport(
-        status="pass",
-        issues=[],
-        structured_issues=[],
-        sections={"Spectre Settings": {"parallel_jobs": 12}},
-        constraints_md_present=False,
-        constraints_md_sha256=None,
-        workflow_mode="fix_run",
-    )
-
-    _record_parallel_jobs_warning(
-        checks,
-        req_report,
-        structured_issues=structured_issues,
-    )
-
-    message = checks["parallel_jobs"]["message"]
-    detail = structured_issues[0].detail or ""
-    combined = f"{message}\n{detail}"
-    assert "fix-run child_parallelism" in combined
-    assert "testbench/corner child runs inside one fixed point" in combined
-    assert "fixed points remain serial" in combined
-    assert "Testbenches/corners inside one candidate always run serially" not in combined
 
 
 def test_remote_doctor_supports_cli_max_evals_override(tmp_path: Path) -> None:

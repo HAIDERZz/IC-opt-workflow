@@ -16,14 +16,7 @@ from hermes_workflow.schemas import (
 )
 
 
-FIXTURE_CONFIG = (
-    Path(__file__).parent.parent
-    / "src"
-    / "hermes_workflow"
-    / "templates"
-    / "spectre_maestro_project"
-    / "config"
-)
+FIXTURE_CONFIG = Path(__file__).parent / "fixtures" / "bridge_test_inv" / "config"
 
 
 def load_yaml(file_name: str) -> dict:
@@ -37,22 +30,17 @@ def test_schema_models_parse_confirmed_contracts() -> None:
     spectre = SpectreConfig.model_validate(load_yaml("spectre.yaml"))
     optimizer = OptimizerConfig.model_validate(load_yaml("optimizer.yaml"))
 
-    assert project.project.name == "mixer_cg_nf_opt"
-    assert [variable.name for variable in variables.variables] == [
-        "F",
-        "W",
-        "L",
-        "VB_LO",
-    ]
-    assert [metric.name for metric in metrics.metrics] == ["NF_3G"]
+    assert project.project.name == "bridge_test_inv"
+    assert [variable.name for variable in variables.variables] == ["FN", "WN", "FP", "WP"]
+    assert [metric.name for metric in metrics.metrics] == ["rise", "fall", "DC"]
     assert spectre.spectre.engine == "spectre_x"
     assert spectre.spectre.preset is SpectrePreset.AX
-    assert optimizer.optimizer.algorithm is OptimizerAlgorithm.OPENBOX
+    assert optimizer.optimizer.algorithm is OptimizerAlgorithm.TURBO
 
 
 def test_variables_reject_duplicate_names() -> None:
     payload = load_yaml("variables.yaml")
-    payload["variables"][1]["name"] = "F"
+    payload["variables"][1]["name"] = "FN"
 
     with pytest.raises(ValidationError, match="variable names must be unique"):
         VariablesConfig.model_validate(payload)
@@ -203,7 +191,6 @@ def test_optimizer_accepts_openbox_strategy_settings() -> None:
 
 def test_optimizer_accepts_turbo_strategy_settings() -> None:
     payload = load_yaml("optimizer.yaml")
-    payload["optimizer"]["algorithm"] = "turbo"
     payload["optimizer"]["strategy"] = "turbo_trust_region"
     payload["optimizer"]["turbo"] = {
         "snap_to_step": True,
@@ -219,7 +206,6 @@ def test_optimizer_accepts_turbo_strategy_settings() -> None:
 
 def test_optimizer_rejects_incompatible_strategy_for_algorithm() -> None:
     payload = load_yaml("optimizer.yaml")
-    payload["optimizer"]["algorithm"] = "turbo"
     payload["optimizer"]["strategy"] = "openbox_gp_eic"
 
     with pytest.raises(

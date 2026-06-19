@@ -1,29 +1,36 @@
 import json
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
 from hermes_workflow.cli import app
 from hermes_workflow.openbox_backend import run_openbox_fake_optimization
 from hermes_workflow.optimizer_status import summarize_optimizer_status
-from tests.real_run_smoke_helpers import create_approved_real_project
+from tests.real_run_smoke_helpers import (
+    advisor_batches,
+    create_approved_real_project,
+    default_metric_values,
+)
 
 
 runner = CliRunner()
 
 
+def _patch_fake_metrics(project_dir: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import hermes_workflow.openbox_backend as _ob
+
+    values = default_metric_values(project_dir)
+
+    def _generic(_parameters: dict[str, str]) -> object:
+        return type("_FakeObs", (), {"metrics": dict(values), "issues": []})()
+
+    monkeypatch.setattr(_ob, "_fake_inverter_metrics", _generic)
+
+
 class FakeAdvisorForStatus:
-    def __init__(self) -> None:
-        self._batches = [
-            [
-                {"F": 22, "W": 0.8, "L": 40, "VB_LO": 300},
-                {"F": 24, "W": 1.0, "L": 30, "VB_LO": 340},
-            ],
-            [
-                {"F": 26, "W": 1.2, "L": 40, "VB_LO": 360},
-                {"F": 28, "W": 0.6, "L": 30, "VB_LO": 380},
-            ],
-        ]
+    def __init__(self, project_dir: Path) -> None:
+        self._batches = advisor_batches(project_dir)
 
     def get_suggestions(self, batch_size: int) -> list[dict[str, float]]:
         return self._batches.pop(0)[:batch_size]
@@ -37,12 +44,15 @@ def _write_fake_openbox_run(project_dir: Path) -> None:
         project_dir,
         max_evals=4,
         batch_size=2,
-        advisor_factory=lambda _space, _seed: FakeAdvisorForStatus(),
+        advisor_factory=lambda _space, _seed: FakeAdvisorForStatus(project_dir),
     )
 
 
-def test_summarize_optimizer_status_reads_closeout_reports(tmp_path: Path) -> None:
+def test_summarize_optimizer_status_reads_closeout_reports(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     project_dir = create_approved_real_project(tmp_path)
+    _patch_fake_metrics(project_dir, monkeypatch)
     _write_fake_openbox_run(project_dir)
 
     summary = summarize_optimizer_status(project_dir)

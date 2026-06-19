@@ -8,7 +8,6 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from hermes_workflow.approvals import decide_first_real_run
 from hermes_workflow.fix_run_models import WaveformExportResult
 from hermes_workflow.metric_requests import expression_sha256
 from hermes_workflow.metric_results import (
@@ -16,45 +15,38 @@ from hermes_workflow.metric_results import (
     WaveformExportRequestEntry,
     check_metric_results,
 )
-from hermes_workflow.package import (
-    build_execution_package,
-    create_project_from_template,
-    sha256_file,
-)
+from hermes_workflow.package import sha256_file
 from hermes_workflow.real_run import prepare_real_run
 from hermes_workflow.reports import (
     MetricResultCheckFlags,
     MetricResultCheckReport,
     MetricResultCheckStatus,
 )
-from tests.report_helpers import write_pass_reports
-
-
-TEMPLATE_TEXT = """simulator lang=spectre
-parameters F={{F}} W={{W}} L={{L}} VB_LO={{VB_LO}}
-tran tran stop=10n
-"""
+from tests.project_factory import create_approved_generic_project
 
 
 def _create_ready_project(tmp_path: Path) -> Path:
-    project_dir = tmp_path / "bridge_test_inv"
-    create_project_from_template(project_dir)
-    build_execution_package(project_dir, created_at_utc="2026-06-02T00:00:00Z")
-    write_pass_reports(project_dir)
-    instruction = decide_first_real_run(
-        project_dir,
-        created_at_utc="2026-06-02T00:10:00Z",
+    project_dir = create_approved_generic_project(
+        tmp_path,
+        created_at_utc="2026-06-02T00:00:00Z",
     )
-    assert instruction["decision"] == "approve_first_real_run"
-    template_path = project_dir / "netlists" / "templates" / "template.scs"
-    template_path.parent.mkdir(parents=True, exist_ok=True)
-    template_path.write_text(TEMPLATE_TEXT, encoding="utf-8")
     prepare_real_run(project_dir, created_at_utc="2026-06-02T00:20:00Z")
     return project_dir
 
 
 def _load_json(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _metric_names(project_dir: Path) -> list[str]:
+    request = _load_json(
+        project_dir / "runs" / "real" / "real_001" / "metric_extraction_request.json"
+    )
+    return [metric["name"] for metric in request["metrics"]]
+
+
+def _first_metric_name(project_dir: Path) -> str:
+    return _metric_names(project_dir)[0]
 
 
 def _write_json(path: Path, payload: dict) -> None:
@@ -141,7 +133,7 @@ def _default_metric_entries(project_dir: Path) -> list[dict]:
             "value": 1.25,
             "value_text": "1.25",
             "unit": request_metric["unit"],
-            "result": request_metric.get("result"),
+            "result": request_metric["result"],
             "expression": request_metric["expression"],
             "expression_sha256": request_metric["expression_sha256"],
             "expression_source": request_metric["expression_source"],
@@ -269,11 +261,11 @@ def test_check_metric_results_accepts_valid_manifest(tmp_path: Path) -> None:
     assert report.checks.artifact_paths_ok is True
     assert report.issues == []
     assert persisted["status"] == "pass"
-    assert persisted["metrics"]["NF_3G"]["status"] == "succeeded"
+    assert persisted["metrics"][_first_metric_name(project_dir)]["status"] == "succeeded"
 
 
 @pytest.mark.parametrize(
-    ("mutator", "expected_issue"),
+    ("mutator", "expected_issue_template"),
     [
         (
             lambda payload: payload.update({"request_sha256": "wrong"}),
@@ -305,53 +297,53 @@ def test_check_metric_results_accepts_valid_manifest(tmp_path: Path) -> None:
             lambda payload: payload["metrics"][0].update(
                 {"expression": 'value(VT("/OTHER") 1n)'}
             ),
-            "metric NF_3G expression does not match request",
+            "metric {metric} expression does not match request",
         ),
         (
             lambda payload: payload["metrics"][0].update({"expression_sha256": "wrong"}),
-            "metric NF_3G expression hash does not match request",
+            "metric {metric} expression hash does not match request",
         ),
         (
             lambda payload: payload["metrics"][0].update({"unit": "ps"}),
-            "metric NF_3G unit does not match request",
+            "metric {metric} unit does not match request",
         ),
         (
             lambda payload: payload["metrics"][0].update({"result": "dc"}),
-            "metric NF_3G result selector does not match request",
+            "metric {metric} result selector does not match request",
         ),
         (
             lambda payload: payload["metrics"][0].update(
                 {"expression_source": "agent_discovered"}
             ),
-            "metric NF_3G expression source does not match request",
+            "metric {metric} expression source does not match request",
         ),
         (
             lambda payload: payload["metrics"][0].update({"status": "failed"}),
-            "metric NF_3G did not succeed",
+            "metric {metric} did not succeed",
         ),
         (
             lambda payload: payload["metrics"][0].update(
                 {"value": math.nan, "value_text": "NaN"}
             ),
-            "metric NF_3G value is not finite",
+            "metric {metric} value is not finite",
         ),
         (
             lambda payload: payload["metrics"][0].update(
                 {"value": None, "value_text": "nil"}
             ),
-            "metric NF_3G value is not finite",
+            "metric {metric} value is not finite",
         ),
         (
             lambda payload: payload["metrics"][0].update(
                 {"value": 1.0, "value_text": ""}
             ),
-            "metric NF_3G value_text is not a finite scalar",
+            "metric {metric} value_text is not a finite scalar",
         ),
         (
             lambda payload: payload["metrics"][0].update(
                 {"value": 1.0, "value_text": "srrWave:0x123"}
             ),
-            "metric NF_3G value_text looks like a waveform object",
+            "metric {metric} value_text looks like a waveform object",
         ),
         (
             lambda payload: payload.update({"psf_dir": "../psf"}),
@@ -366,7 +358,7 @@ def test_check_metric_results_accepts_valid_manifest(tmp_path: Path) -> None:
 def test_check_metric_results_rejects_invalid_metric_contract(
     tmp_path: Path,
     mutator,
-    expected_issue: str,
+    expected_issue_template: str,
 ) -> None:
     project_dir = _create_ready_project(tmp_path)
     _write_result_manifest(project_dir)
@@ -385,6 +377,7 @@ def test_check_metric_results_rejects_invalid_metric_contract(
     report = check_metric_results(project_dir)
 
     assert report.status == MetricResultCheckStatus.FAIL
+    expected_issue = expected_issue_template.format(metric=_first_metric_name(project_dir))
     assert expected_issue in report.issues
 
 
@@ -399,7 +392,10 @@ def test_check_metric_results_rejects_missing_metric(tmp_path: Path) -> None:
     report = check_metric_results(project_dir)
 
     assert report.status == MetricResultCheckStatus.FAIL
-    assert "requested metric is missing from metric results: NF_3G" in report.issues
+    assert (
+        f"requested metric is missing from metric results: {_first_metric_name(project_dir)}"
+        in report.issues
+    )
 
 
 def test_check_metric_results_rejects_extra_metric(tmp_path: Path) -> None:
@@ -440,7 +436,10 @@ def test_check_metric_results_rejects_duplicate_metric(tmp_path: Path) -> None:
     report = check_metric_results(project_dir)
 
     assert report.status == MetricResultCheckStatus.FAIL
-    assert "duplicate metric in metric results: NF_3G" in report.issues
+    assert (
+        f"duplicate metric in metric results: {_first_metric_name(project_dir)}"
+        in report.issues
+    )
 
 
 def test_check_metric_results_rejects_non_succeeded_handoff(tmp_path: Path) -> None:
@@ -626,7 +625,7 @@ def test_check_metric_results_rejects_missing_metric_request(tmp_path: Path) -> 
     ("mutator", "expected_issue"),
     [
         (
-            lambda payload: payload.update({"metrics": {"NF_3G": {}}}),
+            lambda payload: payload.update({"metrics": {"not_a_metric_list": {}}}),
             "metric extraction request is invalid",
         ),
         (
@@ -814,8 +813,9 @@ def test_check_metric_results_rejects_invalid_formula_hash_even_when_manifests_a
     report = check_metric_results(project_dir)
 
     assert report.status == MetricResultCheckStatus.FAIL
-    assert "metric NF_3G request expression hash is invalid" in report.issues
-    assert "metric NF_3G expression hash is invalid" in report.issues
+    first_metric = _first_metric_name(project_dir)
+    assert f"metric {first_metric} request expression hash is invalid" in report.issues
+    assert f"metric {first_metric} expression hash is invalid" in report.issues
 
 
 def test_check_metric_results_rejects_current_prepared_input_hash_drift(
@@ -834,16 +834,16 @@ def test_check_metric_results_rejects_current_prepared_input_hash_drift(
 
 
 @pytest.mark.parametrize(
-    ("value", "expected_issue"),
+    ("value", "expected_issue_template"),
     [
-        ("1.25", "metric NF_3G value is not a JSON number"),
-        (True, "metric NF_3G value is not a JSON number"),
+        ("1.25", "metric {metric} value is not a JSON number"),
+        (True, "metric {metric} value is not a JSON number"),
     ],
 )
 def test_check_metric_results_rejects_non_numeric_json_metric_value(
     tmp_path: Path,
     value,
-    expected_issue: str,
+    expected_issue_template: str,
 ) -> None:
     project_dir = _create_ready_project(tmp_path)
     _write_result_manifest(project_dir)
@@ -855,6 +855,7 @@ def test_check_metric_results_rejects_non_numeric_json_metric_value(
     report = check_metric_results(project_dir)
 
     assert report.status == MetricResultCheckStatus.FAIL
+    expected_issue = expected_issue_template.format(metric=_first_metric_name(project_dir))
     assert expected_issue in report.issues
 
 
@@ -915,7 +916,7 @@ def test_metric_extraction_request_with_empty_waveform_exports_is_valid():
         },
         "metrics": [
             {
-                "name": "NF_3G",
+                "name": "metric_gain",
                 "unit": "s",
                 "required_signals": [],
                 "expression": 'value(VT("/net1") 1n)',
@@ -957,7 +958,7 @@ def test_metric_extraction_request_with_populated_waveform_exports_validates():
         },
         "metrics": [
             {
-                "name": "NF_3G",
+                "name": "metric_gain",
                 "unit": "s",
                 "required_signals": [],
                 "expression": 'value(VT("/net1") 1n)',
@@ -1027,7 +1028,7 @@ def test_check_metric_results_validates_waveform_export_manifest_if_present(
         "corner_id": "",
         "model_section": "",
         "corner_variables": {},
-        "parameters": {"F": "24", "W": "0.8u"},
+        "parameters": {"VAR_INT": "1", "VAR_WIDTH": "0.2u"},
         "exports": [
             {
                 "name": "nf_pnoise",

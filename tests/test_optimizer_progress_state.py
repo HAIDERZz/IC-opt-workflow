@@ -3,12 +3,18 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import yaml
+
 from hermes_workflow.optimizer_progress_state import (
     build_optimizer_progress_state,
     sync_optimizer_progress_state,
 )
-from hermes_workflow.package import create_project_from_template
+from tests.project_factory import create_generic_project
 from tests.report_helpers import write_json
+
+PROJECT_NAME = "progress_project"
+MAX_EVALUATIONS = 10
+BATCH_SIZE = 2
 
 
 def _ten_traces_seven_recorded_three_failed() -> list[dict[str, object]]:
@@ -34,11 +40,47 @@ def _ten_traces_seven_recorded_three_failed() -> list[dict[str, object]]:
     return traces
 
 
-def _set_optimizer_max_evaluations(project_dir: Path, max_evaluations: int) -> None:
-    optimizer_path = project_dir / "config" / "optimizer.yaml"
-    text = optimizer_path.read_text(encoding="utf-8")
-    text = text.replace("max_evaluations: 30", f"max_evaluations: {max_evaluations}")
-    optimizer_path.write_text(text, encoding="utf-8")
+def _create_progress_project(tmp_path: Path) -> Path:
+    return create_generic_project(
+        tmp_path,
+        name=PROJECT_NAME,
+        max_evaluations=MAX_EVALUATIONS,
+        batch_size=BATCH_SIZE,
+    )
+
+
+def _read_yaml(path: Path) -> dict[str, object]:
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    assert isinstance(payload, dict)
+    return payload
+
+
+def _variable_names(project_dir: Path) -> tuple[str, ...]:
+    payload = _read_yaml(project_dir / "config" / "variables.yaml")
+    variables = payload.get("variables")
+    assert isinstance(variables, list)
+    names: list[str] = []
+    for entry in variables:
+        assert isinstance(entry, dict)
+        name = entry.get("name")
+        assert isinstance(name, str)
+        names.append(name)
+    assert names
+    return tuple(names)
+
+
+def _metric_names(project_dir: Path) -> tuple[str, ...]:
+    payload = _read_yaml(project_dir / "config" / "metrics.yaml")
+    metrics = payload.get("metrics")
+    assert isinstance(metrics, list)
+    names: list[str] = []
+    for entry in metrics:
+        assert isinstance(entry, dict)
+        name = entry.get("name")
+        assert isinstance(name, str)
+        names.append(name)
+    assert names
+    return tuple(names)
 
 
 def _write_artifacts_for_progress(
@@ -50,6 +92,8 @@ def _write_artifacts_for_progress(
     traces: list[dict[str, object]] | None = None,
 ) -> None:
     traces = traces if traces is not None else _ten_traces_seven_recorded_three_failed()
+    variable_name = _variable_names(project_dir)[0]
+    metric_name = _metric_names(project_dir)[0]
     write_json(
         project_dir / "reports" / "optimizer_run_report.json",
         {
@@ -74,8 +118,8 @@ def _write_artifacts_for_progress(
                 json.dumps(
                     {
                         "candidate_id": f"real_{index + 1:03d}",
-                        "parameters": {"FN": "2"},
-                        "metrics": {"rise": 1.0e-12},
+                        "parameters": {variable_name: "2"},
+                        "metrics": {metric_name: 1.0e-12},
                         "constraints_passed": False,
                         "objective": 1.0,
                         "batch_id": 1,
@@ -92,7 +136,7 @@ def _write_artifacts_for_progress(
 
 def test_build_optimizer_progress_state_for_10_attempts_7_recorded_3_failed() -> None:
     state = build_optimizer_progress_state(
-        project_name="bridge_test_inv",
+        project_name=PROJECT_NAME,
         algorithm="openbox",
         initialization="lhs",
         max_evaluations=10,
@@ -118,7 +162,7 @@ def test_build_optimizer_progress_state_for_10_attempts_7_recorded_3_failed() ->
 
 def test_build_optimizer_progress_state_status_running_when_attempted_below_budget() -> None:
     state = build_optimizer_progress_state(
-        project_name="bridge_test_inv",
+        project_name=PROJECT_NAME,
         algorithm="openbox",
         initialization="lhs",
         max_evaluations=10,
@@ -140,7 +184,7 @@ def test_build_optimizer_progress_state_status_running_when_attempted_below_budg
 
 def test_build_optimizer_progress_state_status_completed_when_completed_early_under_budget() -> None:
     state = build_optimizer_progress_state(
-        project_name="bridge_test_inv",
+        project_name=PROJECT_NAME,
         algorithm="openbox",
         initialization="lhs",
         max_evaluations=10,
@@ -160,7 +204,7 @@ def test_build_optimizer_progress_state_status_completed_when_completed_early_un
 
 def test_build_optimizer_progress_state_preserves_existing_best_candidate_id() -> None:
     state = build_optimizer_progress_state(
-        project_name="bridge_test_inv",
+        project_name=PROJECT_NAME,
         algorithm="openbox",
         initialization="lhs",
         max_evaluations=10,
@@ -180,7 +224,7 @@ def test_build_optimizer_progress_state_preserves_existing_best_candidate_id() -
 
 def test_build_optimizer_progress_state_status_counts_match_traces() -> None:
     state = build_optimizer_progress_state(
-        project_name="bridge_test_inv",
+        project_name=PROJECT_NAME,
         algorithm="turbo",
         initialization="lhs",
         max_evaluations=10,
@@ -204,9 +248,7 @@ def test_build_optimizer_progress_state_status_counts_match_traces() -> None:
 def test_sync_optimizer_progress_state_reads_artifacts_and_writes_state(
     tmp_path: Path,
 ) -> None:
-    project_dir = tmp_path / "bridge_test_inv"
-    create_project_from_template(project_dir)
-    _set_optimizer_max_evaluations(project_dir, 10)
+    project_dir = _create_progress_project(tmp_path)
     _write_artifacts_for_progress(project_dir)
 
     state_path = sync_optimizer_progress_state(project_dir)
@@ -236,9 +278,7 @@ def test_sync_optimizer_progress_state_reads_artifacts_and_writes_state(
 def test_sync_optimizer_progress_state_preserves_existing_started_at_utc(
     tmp_path: Path,
 ) -> None:
-    project_dir = tmp_path / "bridge_test_inv"
-    create_project_from_template(project_dir)
-    _set_optimizer_max_evaluations(project_dir, 10)
+    project_dir = _create_progress_project(tmp_path)
     _write_artifacts_for_progress(project_dir)
     state_dir = project_dir / "state"
     state_dir.mkdir(parents=True, exist_ok=True)
@@ -246,7 +286,7 @@ def test_sync_optimizer_progress_state_preserves_existing_started_at_utc(
         state_dir / "optimizer_state.json",
         {
             "schema_version": "1.0",
-            "project_name": "bridge_test_inv",
+            "project_name": PROJECT_NAME,
             "algorithm": "turbo",
             "initialization": "lhs",
             "current_evaluations": 0,

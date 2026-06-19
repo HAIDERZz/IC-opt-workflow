@@ -12,6 +12,16 @@ from tests.report_helpers import write_pass_reports
 runner = CliRunner()
 
 
+# Inverter-shaped netlist template used by the template-based CLI tests below
+# (these tests drive `hermes-workflow init`, which materializes the release
+# template project with FN/WN/FP/WP variables). Owned locally rather than
+# imported from tests.test_metric_results, which has migrated off the template.
+TEMPLATE_TEXT = """simulator lang=spectre
+parameters FN={{FN}} WN={{WN}} FP={{FP}} WP={{WP}}
+tran tran stop=10n
+"""
+
+
 def test_cli_version_prints_package_version() -> None:
     result = runner.invoke(app, ["--version"])
 
@@ -287,7 +297,7 @@ def test_cli_prepare_netlist_writes_template_and_report(tmp_path: Path) -> None:
     runner.invoke(app, ["init", str(project_dir)])
     (project_dir / "netlists" / "exported" / "input.scs").write_text(
         """simulator lang=spectre
-parameters temperature=27 F=24 W=0.8u L=30n VB_LO=320m
+parameters temperature=27 FN=4 FP=4 WN=0.6u WP=1.2u
 tran tran stop=10n
 """,
         encoding="utf-8",
@@ -320,7 +330,7 @@ def test_cli_dry_run_writes_candidate_and_report(tmp_path: Path) -> None:
     runner.invoke(app, ["init", str(project_dir)])
     (project_dir / "netlists" / "templates" / "template.scs").write_text(
         """simulator lang=spectre
-parameters F={{F}} W={{W}} L={{L}} VB_LO={{VB_LO}}
+parameters FN={{FN}} WN={{WN}} FP={{FP}} WP={{WP}}
 tran tran stop=10n
 """,
         encoding="utf-8",
@@ -403,7 +413,7 @@ def test_cli_preapproval_flow_can_approve_without_real_execution(
     assert runner.invoke(app, ["package", str(project_dir)]).exit_code == 0
     (project_dir / "netlists" / "exported" / "input.scs").write_text(
         """simulator lang=spectre
-parameters temperature=27 F=24 W=0.8u L=30n VB_LO=320m
+parameters temperature=27 FN=4 FP=4 WN=0.6u WP=1.2u
 tran tran stop=10n
 """,
         encoding="utf-8",
@@ -437,7 +447,7 @@ def test_cli_prepare_real_run_writes_package_after_approval(
     assert runner.invoke(app, ["package", str(project_dir)]).exit_code == 0
     (project_dir / "netlists" / "exported" / "input.scs").write_text(
         """simulator lang=spectre
-parameters temperature=27 F=24 W=0.8u L=30n VB_LO=320m
+parameters temperature=27 FN=4 FP=4 WN=0.6u WP=1.2u
 tran tran stop=10n
 """,
         encoding="utf-8",
@@ -468,7 +478,7 @@ def test_cli_prepare_real_run_reports_missing_approval_without_traceback(
     assert runner.invoke(app, ["package", str(project_dir)]).exit_code == 0
     (project_dir / "netlists" / "templates" / "template.scs").write_text(
         """simulator lang=spectre
-parameters F={{F}} W={{W}} L={{L}} VB_LO={{VB_LO}}
+parameters FN={{FN}} WN={{WN}} FP={{FP}} WP={{WP}}
 tran tran stop=10n
 """,
         encoding="utf-8",
@@ -490,7 +500,7 @@ def test_cli_prepare_real_run_reports_config_drift_without_traceback(
     assert runner.invoke(app, ["package", str(project_dir)]).exit_code == 0
     (project_dir / "netlists" / "exported" / "input.scs").write_text(
         """simulator lang=spectre
-parameters temperature=27 F=24 W=0.8u L=30n VB_LO=320m
+parameters temperature=27 FN=4 FP=4 WN=0.6u WP=1.2u
 tran tran stop=10n
 """,
         encoding="utf-8",
@@ -502,7 +512,7 @@ tran tran stop=10n
     variables_path = project_dir / "config" / "variables.yaml"
     variables_path.write_text(
         variables_path.read_text(encoding="utf-8").replace(
-            'upper: "30"', 'upper: "32"', 1
+            'upper: "12"', 'upper: "14"', 1
         ),
         encoding="utf-8",
     )
@@ -520,7 +530,7 @@ def _prepare_cli_real_run(project_dir: Path) -> None:
     assert runner.invoke(app, ["package", str(project_dir)]).exit_code == 0
     (project_dir / "netlists" / "exported" / "input.scs").write_text(
         """simulator lang=spectre
-parameters temperature=27 F=24 W=0.8u L=30n VB_LO=320m
+parameters temperature=27 FN=4 FP=4 WN=0.6u WP=1.2u
 tran tran stop=10n
 """,
         encoding="utf-8",
@@ -600,7 +610,6 @@ def test_cli_check_metric_results_passes_for_valid_fake_ocean_results(
     tmp_path: Path,
 ) -> None:
     from tests.test_metric_results import (
-        TEMPLATE_TEXT,
         _load_json,
         _write_metric_result_manifest,
         _write_result_manifest,
@@ -640,7 +649,7 @@ def test_cli_check_metric_results_reports_failure_without_traceback(
     template_path.parent.mkdir(parents=True, exist_ok=True)
     template_path.write_text(
         "simulator lang=spectre\n"
-        "parameters F={{F}} W={{W}} L={{L}} VB_LO={{VB_LO}}\n",
+        "parameters FN={{FN}} WN={{WN}} FP={{FP}} WP={{WP}}\n",
         encoding="utf-8",
     )
     assert runner.invoke(app, ["prepare-real-run", str(project_dir)]).exit_code == 0

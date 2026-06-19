@@ -1,29 +1,37 @@
 import json
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
 from hermes_workflow.cli import app
 from hermes_workflow.openbox_backend import run_openbox_fake_optimization
 from hermes_workflow.optimizer_finalize import finalize_optimizer_run
-from tests.real_run_smoke_helpers import create_approved_real_project
+from tests.real_run_smoke_helpers import (
+    advisor_batches,
+    create_approved_real_project,
+    default_metric_values,
+)
+
+
+def _patch_fake_metrics(project_dir: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Patch _fake_inverter_metrics to emit the generic project's metric names."""
+    import hermes_workflow.openbox_backend as _ob
+
+    values = default_metric_values(project_dir)
+
+    def _generic(_parameters: dict[str, str]) -> object:
+        return type("_FakeObs", (), {"metrics": dict(values), "issues": []})()
+
+    monkeypatch.setattr(_ob, "_fake_inverter_metrics", _generic)
 
 
 runner = CliRunner()
 
 
 class FakeAdvisorForFinalize:
-    def __init__(self) -> None:
-        self._batches = [
-            [
-                {"F": 22, "W": 0.8, "L": 40, "VB_LO": 300},
-                {"F": 24, "W": 1.0, "L": 30, "VB_LO": 340},
-            ],
-            [
-                {"F": 26, "W": 1.2, "L": 40, "VB_LO": 360},
-                {"F": 28, "W": 0.6, "L": 30, "VB_LO": 380},
-            ],
-        ]
+    def __init__(self, project_dir: Path) -> None:
+        self._batches = advisor_batches(project_dir)
 
     def get_suggestions(self, batch_size: int) -> list[dict[str, float]]:
         return self._batches.pop(0)[:batch_size]
@@ -37,13 +45,22 @@ def _write_fake_openbox_run(project_dir: Path) -> None:
         project_dir,
         max_evals=4,
         batch_size=2,
-        advisor_factory=lambda _space, _seed: FakeAdvisorForFinalize(),
+        advisor_factory=lambda _space, _seed: FakeAdvisorForFinalize(project_dir),
     )
 
 
-def test_finalize_optimizer_run_writes_closeout_report(tmp_path: Path) -> None:
-    project_dir = create_approved_real_project(tmp_path)
+def _write_fake_openbox_run_with_patch(
+    project_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_fake_metrics(project_dir, monkeypatch)
     _write_fake_openbox_run(project_dir)
+
+
+def test_finalize_optimizer_run_writes_closeout_report(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project_dir = create_approved_real_project(tmp_path)
+    _write_fake_openbox_run_with_patch(project_dir, monkeypatch)
 
     report = finalize_optimizer_run(project_dir)
 

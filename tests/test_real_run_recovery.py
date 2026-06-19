@@ -5,14 +5,9 @@ from pathlib import Path
 
 import pytest
 
-from hermes_workflow.approvals import decide_first_real_run
 from hermes_workflow.metric_requests import expression_sha256
 from hermes_workflow.metric_results import check_metric_results
-from hermes_workflow.package import (
-    build_execution_package,
-    create_project_from_template,
-    sha256_file,
-)
+from hermes_workflow.package import sha256_file
 from hermes_workflow.real_result_record import record_real_result
 from hermes_workflow.real_run import prepare_next_real_run, prepare_real_run
 from hermes_workflow.real_run_recovery import (
@@ -28,13 +23,7 @@ from hermes_workflow.reports import (
     RealRunRecoveryStatus,
 )
 from hermes_workflow.result_handoff import check_real_run
-from tests.report_helpers import write_pass_reports
-
-
-TEMPLATE_TEXT = """simulator lang=spectre
-parameters F={{F}} W={{W}} L={{L}} VB_LO={{VB_LO}}
-tran tran stop=10n
-"""
+from tests.project_factory import create_approved_generic_project
 
 
 def test_recovery_report_schema_accepts_classification_and_actions() -> None:
@@ -110,18 +99,10 @@ def _load_json(path: Path) -> dict:
 
 
 def _create_ready_project(tmp_path: Path) -> Path:
-    project_dir = tmp_path / "bridge_test_inv"
-    create_project_from_template(project_dir)
-    build_execution_package(project_dir, created_at_utc="2026-06-02T00:00:00Z")
-    write_pass_reports(project_dir)
-    instruction = decide_first_real_run(
-        project_dir,
-        created_at_utc="2026-06-02T00:10:00Z",
+    project_dir = create_approved_generic_project(
+        tmp_path,
+        created_at_utc="2026-06-02T00:00:00Z",
     )
-    assert instruction["decision"] == "approve_first_real_run"
-    template_path = project_dir / "netlists" / "templates" / "template.scs"
-    template_path.parent.mkdir(parents=True, exist_ok=True)
-    template_path.write_text(TEMPLATE_TEXT, encoding="utf-8")
     prepare_real_run(project_dir, created_at_utc="2026-06-02T00:20:00Z")
     return project_dir
 
@@ -210,7 +191,7 @@ def _write_metric_result_manifest(
     script_path = metrics_dir / "metric_probe.ocn"
     script_path.write_text("sanitized ocean script\n", encoding="utf-8")
     request_by_name = {metric["name"]: metric for metric in request["metrics"]}
-    values = {"NF_3G": 6.5}
+    values = {name: 1.0e-6 for name in request_by_name}
     selected_candidate_id = candidate_id or request["candidate_id"]
     _write_json(
         metrics_dir / "metric_result_manifest.json",
@@ -242,7 +223,7 @@ def _write_metric_result_manifest(
                         f"{value:.12g}" if metric_status == "succeeded" else None
                     ),
                     "unit": request_by_name[name]["unit"],
-                    "result": request_by_name[name].get("result"),
+                    "result": request_by_name[name]["result"],
                     "expression": request_by_name[name]["expression"],
                     "expression_sha256": request_by_name[name]["expression_sha256"],
                     "expression_source": request_by_name[name]["expression_source"],
@@ -295,7 +276,7 @@ def _write_manual_retry_package(
             "candidate_id": candidate_file_id or candidate_id,
             "retry_of_run_id": "real_001",
             "retry_attempt_number": 2,
-            "parameters": {"F": "20", "W": "0.6u", "L": "30n", "VB_LO": "280m"},
+            "parameters": {"VAR_INT": "2", "VAR_WIDTH": "0.2u"},
         },
     )
 
@@ -839,7 +820,7 @@ def test_prepare_retry_preserves_rendered_input_after_template_change(
     ).read_text(encoding="utf-8")
     template_path = project_dir / "netlists" / "templates" / "template.scs"
     template_path.write_text(
-        TEMPLATE_TEXT.replace("stop=10n", "stop=20n"),
+        template_path.read_text(encoding="utf-8").replace("stop=10n", "stop=20n"),
         encoding="utf-8",
     )
 

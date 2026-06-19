@@ -15,7 +15,8 @@ from hermes_workflow.remote_project import RemoteProjectRef
 # Import shared test helpers from the existing test_remote_spectre_ocean module
 from tests.test_remote_spectre_ocean import (
     FakeRunner,
-    _ocean_scalars_from_local_request,
+    _ocean_scalars_tsv,
+    _request_for_metrics_dir,
     create_approved_real_project,
 )
 from hermes_workflow.execution_adapters.remote_spectre_ocean import (
@@ -51,7 +52,7 @@ class WaveformFakeRunner(FakeRunner):
         elif remote.endswith("/metrics"):
             # Standard metrics
             (Path(local_path) / "ocean_scalars.tsv").write_text(
-                _ocean_scalars_from_local_request(Path(local_path)),
+                _ocean_scalars_tsv(_request_for_metrics_dir(Path(local_path))),
                 encoding="utf-8",
             )
             (Path(local_path) / "ocean.stdout").write_text("ocean stdout output", encoding="utf-8")
@@ -237,7 +238,7 @@ class WaveformCsvOnlyRunner(FakeRunner):
             )
         elif remote.endswith("/metrics"):
             (Path(local_path) / "ocean_scalars.tsv").write_text(
-                _ocean_scalars_from_local_request(Path(local_path)),
+                _ocean_scalars_tsv(_request_for_metrics_dir(Path(local_path))),
                 encoding="utf-8",
             )
             (Path(local_path) / "ocean.stdout").write_text("ocean stdout", encoding="utf-8")

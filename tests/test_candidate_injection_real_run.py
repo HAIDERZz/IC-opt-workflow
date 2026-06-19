@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -17,19 +18,18 @@ from hermes_workflow.reports import (
     RealRunCheckStatus,
 )
 from hermes_workflow.result_handoff import check_real_run
-from tests.test_next_real_run import _create_ready_project, _record_real_001
-
-
-def _write_json(path: Path, payload: dict) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps(payload, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
-
-
-def _load_json(path: Path) -> dict:
-    return json.loads(path.read_text(encoding="utf-8"))
+from tests.real_run_cluster_helpers import (
+    create_ready_project as _create_ready_project,
+    extra_candidate_parameters,
+    invalid_candidate_cases,
+    load_json as _load_json,
+    missing_candidate_parameters,
+    record_real_001 as _record_real_001,
+    valid_candidate_parameters,
+    write_json as _write_json,
+    write_metric_result_manifest,
+    write_result_manifest,
+)
 
 
 def _candidate_request(
@@ -46,8 +46,7 @@ def _candidate_request(
             "schema_version": "1.0",
             "candidate_id": candidate_id,
             "source": source,
-            "parameters": parameters
-            or {"F": "24", "W": "0.8u", "L": "40n", "VB_LO": "320m"},
+            "parameters": parameters or valid_candidate_parameters(project_dir),
             "metadata": {"optimizer": "turbo", "evaluation_index": 9},
         },
     )
@@ -55,109 +54,11 @@ def _candidate_request(
 
 
 def _write_candidate_result_manifest(project_dir: Path, *, run_id: str) -> None:
-    run_dir = project_dir / "runs" / "real" / run_id
-    prepared = _load_json(run_dir / "real_run_manifest.json")
-    candidate = _load_json(run_dir / "candidate.json")
-    psf_dir = run_dir / "psf"
-    metrics_dir = run_dir / "metrics"
-    psf_dir.mkdir(parents=True, exist_ok=True)
-    metrics_dir.mkdir(parents=True, exist_ok=True)
-    (psf_dir / "spectre.out").write_text(
-        "sanitized spectre output\n",
-        encoding="utf-8",
-    )
-    (metrics_dir / "ocean.log").write_text(
-        "sanitized ocean log\n",
-        encoding="utf-8",
-    )
-    (metrics_dir / "ocean_scalars.tsv").write_text(
-        "metric\tvalue\tunit\tstatus\texpression_sha256\tmessage\n",
-        encoding="utf-8",
-    )
-    (run_dir / "spectre.stdout").write_text("sanitized stdout\n", encoding="utf-8")
-    (run_dir / "spectre.stderr").write_text("", encoding="utf-8")
-    _write_json(
-        run_dir / "result_manifest.json",
-        {
-            "schema_version": "1.0",
-            "run_id": run_id,
-            "candidate_id": candidate["candidate_id"],
-            "status": "succeeded",
-            "started_at_utc": "2026-06-04T00:30:00Z",
-            "completed_at_utc": "2026-06-04T00:31:00Z",
-            "simulator": {
-                "engine": "spectre_x",
-                "preset": "ax",
-                "command_label": "spectre_ocean_adapter",
-            },
-            "prepared_input_scs": prepared["rendered_input_scs"],
-            "prepared_input_sha256": prepared["rendered_input_sha256"],
-            "log_file": f"runs/real/{run_id}/spectre.stdout",
-            "artifact_files": [
-                f"runs/real/{run_id}/spectre.stderr",
-                f"runs/real/{run_id}/psf/spectre.out",
-                f"runs/real/{run_id}/metrics/ocean.log",
-                f"runs/real/{run_id}/metrics/ocean_scalars.tsv",
-            ],
-            "result_data": {
-                "kind": "spectre_psf",
-                "psf_dir": f"runs/real/{run_id}/psf",
-                "spectre_out": f"runs/real/{run_id}/psf/spectre.out",
-            },
-            "metric_result_manifest": (
-                f"runs/real/{run_id}/metrics/metric_result_manifest.json"
-            ),
-        },
-    )
+    write_result_manifest(project_dir, run_id=run_id)
 
 
 def _write_candidate_metric_result_manifest(project_dir: Path, *, run_id: str) -> None:
-    run_dir = project_dir / "runs" / "real" / run_id
-    request_path = run_dir / "metric_extraction_request.json"
-    request = _load_json(request_path)
-    candidate = _load_json(run_dir / "candidate.json")
-    metrics_dir = run_dir / "metrics"
-    script_path = metrics_dir / "metric_probe.ocn"
-    script_path.write_text("sanitized ocean script\n", encoding="utf-8")
-    request_by_name = {metric["name"]: metric for metric in request["metrics"]}
-    values = {"NF_3G": 6.5}
-    _write_json(
-        metrics_dir / "metric_result_manifest.json",
-        {
-            "schema_version": "1.0",
-            "run_id": run_id,
-            "candidate_id": candidate["candidate_id"],
-            "backend": "spectre_ocean_batch",
-            "status": "succeeded",
-            "request_file": f"runs/real/{run_id}/metric_extraction_request.json",
-            "request_sha256": sha256_file(request_path),
-            "psf_dir": f"runs/real/{run_id}/psf",
-            "ocean": {
-                "mode": "nograph_replay",
-                "return_code": 0,
-                "script_file": f"runs/real/{run_id}/metrics/metric_probe.ocn",
-                "script_sha256": sha256_file(script_path),
-                "log_file": f"runs/real/{run_id}/metrics/ocean.log",
-                "scalar_output_file": f"runs/real/{run_id}/metrics/ocean_scalars.tsv",
-            },
-            "metrics": [
-                {
-                    "name": name,
-                    "status": "succeeded",
-                    "value": value,
-                    "value_text": f"{value:.12g}",
-                    "unit": request_by_name[name]["unit"],
-                    "result": request_by_name[name].get("result"),
-                    "expression": request_by_name[name]["expression"],
-                    "expression_sha256": request_by_name[name]["expression_sha256"],
-                    "expression_source": request_by_name[name]["expression_source"],
-                    "issues": [],
-                }
-                for name, value in values.items()
-            ],
-            "issues": [],
-        },
-    )
+    write_metric_result_manifest(project_dir, run_id=run_id)
 
 
 def _write_abandon_decision(project_dir: Path, *, run_id: str) -> None:
@@ -184,7 +85,7 @@ def test_prepare_candidate_real_run_rejects_missing_parameter(
     _record_real_001(project_dir)
     request = _candidate_request(
         project_dir,
-        parameters={"F": "24", "W": "0.8u", "L": "40n"},
+        parameters=missing_candidate_parameters(project_dir),
     )
 
     with pytest.raises(
@@ -201,13 +102,7 @@ def test_prepare_candidate_real_run_rejects_extra_parameter(tmp_path: Path) -> N
     _record_real_001(project_dir)
     request = _candidate_request(
         project_dir,
-        parameters={
-            "F": "24",
-            "W": "0.8u",
-            "L": "40n",
-            "VB_LO": "320m",
-            "EXTRA": "1",
-        },
+        parameters=extra_candidate_parameters(project_dir),
     )
 
     with pytest.raises(
@@ -228,42 +123,14 @@ def test_prepare_candidate_real_run_rejects_bad_candidate_id(
         prepare_candidate_real_run(project_dir, candidate_file=request)
 
 
-@pytest.mark.parametrize(
-    ("parameters", "message"),
-    [
-            (
-                {"F": "20.5", "W": "0.8u", "L": "40n", "VB_LO": "320m"},
-                "F must be an integer",
-            ),
-            (
-                {"F": "99", "W": "0.8u", "L": "40n", "VB_LO": "320m"},
-                "F is outside approved bounds",
-            ),
-            (
-                {"F": "24", "W": "0.8 um", "L": "40n", "VB_LO": "320m"},
-                "W must use a Spectre-safe attached unit suffix",
-            ),
-            (
-                {"F": "24", "W": " 0.8u ", "L": "40n", "VB_LO": "320m"},
-                "W must use compact Spectre-safe formatting",
-            ),
-            (
-                {"F": "24", "W": "0.7u", "L": "40n", "VB_LO": "320m"},
-                "W is not aligned to approved step",
-            ),
-        ],
-    )
-def test_prepare_candidate_real_run_rejects_invalid_values(
-    tmp_path: Path,
-    parameters: dict[str, str],
-    message: str,
-) -> None:
+def test_prepare_candidate_real_run_rejects_invalid_values(tmp_path: Path) -> None:
     project_dir = _create_ready_project(tmp_path)
     _record_real_001(project_dir)
-    request = _candidate_request(project_dir, parameters=parameters)
-
-    with pytest.raises(ValueError, match=message):
-        prepare_candidate_real_run(project_dir, candidate_file=request)
+    for parameters, message in invalid_candidate_cases(project_dir):
+        request = _candidate_request(project_dir, parameters=parameters)
+        with pytest.raises(ValueError, match=re.escape(message)):
+            prepare_candidate_real_run(project_dir, candidate_file=request)
+        request.unlink()
 
 
 def test_prepare_candidate_real_run_writes_real_002_package(tmp_path: Path) -> None:
@@ -290,12 +157,7 @@ def test_prepare_candidate_real_run_writes_real_002_package(tmp_path: Path) -> N
     assert candidate["candidate_id"] == "candidate_000009"
     assert candidate["source"] == "explicit_candidate_request"
     assert candidate["requested_source"] == "optimizer_turbo_suggestion"
-    assert candidate["parameters"] == {
-        "F": "24",
-        "W": "0.8u",
-        "L": "40n",
-        "VB_LO": "320m",
-    }
+    assert candidate["parameters"] == valid_candidate_parameters(project_dir)
     assert candidate["candidate_request_file"] == (
         "runs/real/real_002/candidate_request.json"
     )
@@ -367,9 +229,12 @@ def test_prepare_candidate_real_run_rejects_duplicate_parameter_tuple_from_ledge
 ) -> None:
     project_dir = _create_ready_project(tmp_path)
     _record_real_001(project_dir)
+    first_candidate = _load_json(
+        project_dir / "runs" / "real" / "real_001" / "candidate.json"
+    )
     request = _candidate_request(
         project_dir,
-        parameters={"F": "20", "W": "0.6u", "L": "30n", "VB_LO": "280m"},
+        parameters=first_candidate["parameters"],
     )
 
     with pytest.raises(ValueError, match="ledger already contains candidate parameters"):
@@ -387,7 +252,9 @@ def test_prepare_candidate_real_run_rejects_duplicate_prepared_candidate_id(
     second = _candidate_request(
         project_dir,
         candidate_id="candidate_000009",
-        parameters={"F": "26", "W": "1.0u", "L": "30n", "VB_LO": "360m"},
+        parameters=valid_candidate_parameters(
+            project_dir, int_value="4", width_value="0.4u"
+        ),
     )
 
     with pytest.raises(
@@ -429,7 +296,9 @@ def test_prepare_candidate_real_run_rejects_unresolved_distinct_prepared_run(
     second = _candidate_request(
         project_dir,
         candidate_id="candidate_000010",
-        parameters={"F": "28", "W": "1.0u", "L": "30n", "VB_LO": "360m"},
+        parameters=valid_candidate_parameters(
+            project_dir, int_value="4", width_value="0.4u"
+        ),
     )
 
     with pytest.raises(ValueError, match="unresolved real run exists"):
@@ -539,9 +408,4 @@ def test_candidate_package_accepts_fake_c7_result_and_records(
     ]
     assert [row["run_id"] for row in ledger_rows] == ["real_001", "real_002"]
     assert ledger_rows[1]["candidate_id"] == "candidate_000009"
-    assert ledger_rows[1]["parameters"] == {
-        "F": "24",
-        "W": "0.8u",
-        "L": "40n",
-        "VB_LO": "320m",
-    }
+    assert ledger_rows[1]["parameters"] == valid_candidate_parameters(project_dir)

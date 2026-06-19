@@ -1,27 +1,86 @@
 import json
 from pathlib import Path
 
+import yaml
 from typer.testing import CliRunner
 
 from hermes_workflow.cli import app
 from hermes_workflow.optimizer_task_package import (
     build_optimizer_execution_task_package,
 )
-from hermes_workflow.package import create_project_from_template
+from tests.project_factory import create_generic_project
 
 
 runner = CliRunner()
+
+PROJECT_NAME = "optimizer_task_project"
+MAX_EVALUATIONS = 100
+BATCH_SIZE = 10
+PARALLEL_JOBS = 10
+CADENCE_CSHRC = Path("/opt/ic-opt/cadence_env.csh")
+
+
+def _create_optimizer_project(
+    tmp_path: Path,
+    *,
+    name: str = PROJECT_NAME,
+    max_evaluations: int = MAX_EVALUATIONS,
+    batch_size: int = BATCH_SIZE,
+    parallel_jobs: int = PARALLEL_JOBS,
+) -> Path:
+    return create_generic_project(
+        tmp_path,
+        name=name,
+        max_evaluations=max_evaluations,
+        batch_size=batch_size,
+        parallel_jobs=parallel_jobs,
+    )
+
+
+def _read_yaml(path: Path) -> dict:
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    assert isinstance(payload, dict)
+    return payload
+
+
+def _write_yaml(path: Path, payload: dict) -> None:
+    path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+
+def _set_optimizer_settings(
+    project_dir: Path,
+    *,
+    algorithm: str | None = None,
+    strategy: str | None = None,
+) -> None:
+    optimizer_path = project_dir / "config" / "optimizer.yaml"
+    payload = _read_yaml(optimizer_path)
+    settings = payload["optimizer"]
+    if algorithm is not None:
+        settings["algorithm"] = algorithm
+    if strategy is not None:
+        settings["strategy"] = strategy
+    _write_yaml(optimizer_path, payload)
+
+
+def _optimizer_settings(project_dir: Path) -> dict:
+    return _read_yaml(project_dir / "config" / "optimizer.yaml")["optimizer"]
+
+
+def _spectre_settings(project_dir: Path) -> dict:
+    return _read_yaml(project_dir / "config" / "spectre.yaml")["spectre"]
 
 
 def test_optimizer_task_package_does_not_label_parallel_jobs_as_spectre_setting(
     tmp_path: Path,
 ) -> None:
-    project_dir = tmp_path / "bridge_test_inv"
-    create_project_from_template(project_dir)
+    project_dir = _create_optimizer_project(tmp_path)
+    optimizer = _optimizer_settings(project_dir)
+    spectre = _spectre_settings(project_dir)
 
     package = build_optimizer_execution_task_package(
         project_dir,
-        cadence_cshrc=Path("/opt/ic-opt/cadence_env.csh"),
+        cadence_cshrc=CADENCE_CSHRC,
         created_at_utc="2026-06-04T00:00:00Z",
     )
 
@@ -32,13 +91,13 @@ def test_optimizer_task_package_does_not_label_parallel_jobs_as_spectre_setting(
     assert "parallel_jobs" not in manifest_payload["spectre_settings"]
 
     # Scheduler block exposes candidate parallelism contract.
-    assert manifest_payload["scheduler"]["candidate_parallelism"] == 10
-    assert manifest_payload["scheduler"]["batch_size"] == 10
+    assert manifest_payload["scheduler"]["candidate_parallelism"] == spectre["parallel_jobs"]
+    assert manifest_payload["scheduler"]["batch_size"] == optimizer["batch_size"]
     assert manifest_payload["scheduler"]["inside_candidate_execution"] == "serial"
 
     # Top-level fields kept for backward compatibility.
-    assert manifest_payload["parallel_jobs"] == 10
-    assert manifest_payload["batch_size"] == 10
+    assert manifest_payload["parallel_jobs"] == spectre["parallel_jobs"]
+    assert manifest_payload["batch_size"] == optimizer["batch_size"]
 
     # Rendered task text has a Scheduler Settings section.
     assert "## Scheduler Settings" in task_text
@@ -53,12 +112,13 @@ def test_optimizer_task_package_does_not_label_parallel_jobs_as_spectre_setting(
 def test_build_optimizer_execution_task_package_writes_task_and_manifest(
     tmp_path: Path,
 ) -> None:
-    project_dir = tmp_path / "bridge_test_inv"
-    create_project_from_template(project_dir)
+    project_dir = _create_optimizer_project(tmp_path)
+    optimizer = _optimizer_settings(project_dir)
+    spectre = _spectre_settings(project_dir)
 
     package = build_optimizer_execution_task_package(
         project_dir,
-        cadence_cshrc=Path("/opt/ic-opt/cadence_env.csh"),
+        cadence_cshrc=CADENCE_CSHRC,
         created_at_utc="2026-06-04T00:00:00Z",
     )
 
@@ -71,9 +131,8 @@ def test_build_optimizer_execution_task_package_writes_task_and_manifest(
 
     assert package.task_path == task_path
     assert package.manifest_path == manifest_path
-    assert "run-openbox-real" in task_text
-    assert "run-native-turbo" not in task_text
-    assert "--parallel" not in task_text
+    assert "run-native-turbo" in task_text
+    assert "--parallel" in task_text
     assert "--max-evals" not in task_text
     assert "Command exit status alone is not acceptance evidence" in task_text
     assert "Manifest-level audit is required" in task_text
@@ -82,47 +141,47 @@ def test_build_optimizer_execution_task_package_writes_task_and_manifest(
     assert "parallel_jobs" in task_text
     assert "ledger/experiment_ledger.jsonl" in task_text
     assert manifest_payload["schema_version"] == "1.0"
-    assert manifest_payload["backend"] == "openbox"
+    assert manifest_payload["backend"] == "native_turbo"
     assert manifest_payload["created_at_utc"] == "2026-06-04T00:00:00Z"
-    assert manifest_payload["max_evals"] == 30
+    assert manifest_payload["max_evals"] == optimizer["max_evaluations"]
     assert manifest_payload["parallel"] is True
-    assert manifest_payload["cadence_cshrc"] == "/opt/ic-opt/cadence_env.csh"
+    assert manifest_payload["cadence_cshrc"] == str(CADENCE_CSHRC.resolve())
     assert manifest_payload["command"] == [
         "hermes-workflow",
-        "run-openbox-real",
-        str(project_dir),
-        "--strategy",
-        "openbox_prf_eic",
+        "run-native-turbo",
+        str(project_dir.resolve()),
+        "--parallel",
         "--cadence-cshrc",
-        "/opt/ic-opt/cadence_env.csh",
+        str(CADENCE_CSHRC.resolve()),
     ]
-    assert manifest_payload["spectre_settings"]["threads_per_run"] == 10
+    assert manifest_payload["spectre_settings"]["threads_per_run"] == spectre["threads_per_run"]
     assert "parallel_jobs" not in manifest_payload["spectre_settings"]
-    assert manifest_payload["scheduler"]["candidate_parallelism"] == 10
+    assert manifest_payload["scheduler"]["candidate_parallelism"] == spectre["parallel_jobs"]
     required_artifacts = manifest_payload["required_returned_artifacts"]
-    assert "reports/optimizer_run_report.json" in required_artifacts
+    assert "reports/native_turbo_optimizer_report.json" in required_artifacts
     assert "reports/optimizer_effectiveness_audit.json" in required_artifacts
-    assert "reports/optimizer_evaluations.jsonl" in required_artifacts
+    assert "reports/native_turbo_optimizer_evaluations.jsonl" in required_artifacts
     assert "state/optimizer_state.json" in required_artifacts
     assert "ledger/experiment_ledger.jsonl" in required_artifacts
     assert "reports/optimizer_finalize_report.json" in required_artifacts
     assert manifest_payload["audit_commands"] == [
-        ["hermes-workflow", "check-optimizer-run", str(project_dir)],
-        ["hermes-workflow", "summarize-optimizer-run", str(project_dir)],
-        ["hermes-workflow", "finalize-optimizer-run", str(project_dir)],
-        ["hermes-workflow", "optimizer-status", str(project_dir)],
+        ["hermes-workflow", "check-optimizer-run", str(project_dir.resolve())],
+        ["hermes-workflow", "summarize-optimizer-run", str(project_dir.resolve())],
+        ["hermes-workflow", "finalize-optimizer-run", str(project_dir.resolve())],
+        ["hermes-workflow", "optimizer-status", str(project_dir.resolve())],
     ]
 
 
 def test_build_optimizer_execution_task_package_writes_openbox_backend(
     tmp_path: Path,
 ) -> None:
-    project_dir = tmp_path / "bridge_test_inv"
-    create_project_from_template(project_dir)
+    project_dir = _create_optimizer_project(tmp_path)
+    optimizer = _optimizer_settings(project_dir)
+    spectre = _spectre_settings(project_dir)
 
     package = build_optimizer_execution_task_package(
         project_dir,
-        cadence_cshrc=Path("/opt/ic-opt/cadence_env.csh"),
+        cadence_cshrc=CADENCE_CSHRC,
         optimizer_backend="openbox",
         created_at_utc="2026-06-04T00:00:00Z",
     )
@@ -145,17 +204,15 @@ def test_build_optimizer_execution_task_package_writes_openbox_backend(
     assert "reports/optimizer_evaluations.jsonl" in task_text
 
     assert manifest_payload["backend"] == "openbox"
-    assert manifest_payload["batch_size"] == 10
-    assert manifest_payload["parallel_jobs"] == 10
-    assert manifest_payload["scheduler"]["candidate_parallelism"] == 10
+    assert manifest_payload["batch_size"] == optimizer["batch_size"]
+    assert manifest_payload["parallel_jobs"] == spectre["parallel_jobs"]
+    assert manifest_payload["scheduler"]["candidate_parallelism"] == spectre["parallel_jobs"]
     assert manifest_payload["command"] == [
         "hermes-workflow",
         "run-openbox-real",
-        str(project_dir),
-        "--strategy",
-        "openbox_prf_eic",
+        str(project_dir.resolve()),
         "--cadence-cshrc",
-        "/opt/ic-opt/cadence_env.csh",
+        str(CADENCE_CSHRC.resolve()),
     ]
     required_artifacts = manifest_payload["required_returned_artifacts"]
     assert "reports/optimizer_run_report.json" in required_artifacts
@@ -168,19 +225,12 @@ def test_build_optimizer_execution_task_package_writes_openbox_backend(
 def test_build_optimizer_execution_task_package_uses_config_turbo_strategy_backend(
     tmp_path: Path,
 ) -> None:
-    project_dir = tmp_path / "bridge_test_inv"
-    create_project_from_template(project_dir)
-    optimizer_path = project_dir / "config" / "optimizer.yaml"
-    optimizer_text = (
-        optimizer_path.read_text(encoding="utf-8")
-        .replace("  algorithm: openbox", "  algorithm: turbo", 1)
-        .replace("  strategy: openbox_prf_eic", "  strategy: turbo_trust_region", 1)
-    )
-    optimizer_path.write_text(optimizer_text, encoding="utf-8")
+    project_dir = _create_optimizer_project(tmp_path)
+    _set_optimizer_settings(project_dir, algorithm="turbo", strategy="turbo_trust_region")
 
     package = build_optimizer_execution_task_package(
         project_dir,
-        cadence_cshrc=Path("/opt/ic-opt/cadence_env.csh"),
+        cadence_cshrc=CADENCE_CSHRC,
         optimizer_backend="openbox",
         created_at_utc="2026-06-04T00:00:00Z",
     )
@@ -199,12 +249,12 @@ def test_build_optimizer_execution_task_package_uses_config_turbo_strategy_backe
 def test_build_optimizer_execution_task_package_uses_config_openbox_strategy(
     tmp_path: Path,
 ) -> None:
-    project_dir = tmp_path / "bridge_test_inv"
-    create_project_from_template(project_dir)
+    project_dir = _create_optimizer_project(tmp_path)
+    _set_optimizer_settings(project_dir, algorithm="openbox", strategy="openbox_prf_eic")
 
     package = build_optimizer_execution_task_package(
         project_dir,
-        cadence_cshrc=Path("/opt/ic-opt/cadence_env.csh"),
+        cadence_cshrc=CADENCE_CSHRC,
         optimizer_backend="native_turbo",
         created_at_utc="2026-06-04T00:00:00Z",
     )
@@ -221,12 +271,12 @@ def test_build_optimizer_execution_task_package_uses_config_openbox_strategy(
 def test_build_optimizer_execution_task_package_writes_openbox_continuation(
     tmp_path: Path,
 ) -> None:
-    project_dir = tmp_path / "bridge_test_inv"
-    create_project_from_template(project_dir)
+    project_dir = _create_optimizer_project(tmp_path)
+    optimizer = _optimizer_settings(project_dir)
 
     package = build_optimizer_execution_task_package(
         project_dir,
-        cadence_cshrc=Path("/opt/ic-opt/cadence_env.csh"),
+        cadence_cshrc=CADENCE_CSHRC,
         optimizer_backend="openbox",
         continuation=True,
         created_at_utc="2026-06-05T00:00:00Z",
@@ -250,34 +300,32 @@ def test_build_optimizer_execution_task_package_writes_openbox_continuation(
     assert manifest_payload["backend"] == "openbox"
     assert manifest_payload["continuation"] is True
     assert manifest_payload["additional_evals"] is None
-    assert manifest_payload["max_evals"] == 30
+    assert manifest_payload["max_evals"] == optimizer["max_evaluations"]
     assert manifest_payload["toolchain_check_command"] == [
         "hermes-workflow",
         "check-toolchain-env",
         "--openbox-venv",
         "/tmp/ic_auto_opt_openbox_spike/.venv",
         "--cadence-cshrc",
-        "/opt/ic-opt/cadence_env.csh",
+        str(CADENCE_CSHRC.resolve()),
     ]
     assert manifest_payload["command"] == [
         "hermes-workflow",
         "continue-openbox-real",
-        str(project_dir),
-        "--strategy",
-        "openbox_prf_eic",
+        str(project_dir.resolve()),
         "--cadence-cshrc",
-        "/opt/ic-opt/cadence_env.csh",
+        str(CADENCE_CSHRC.resolve()),
     ]
     assert "--parallel-jobs" not in manifest_payload["command"]
     assert [
         "hermes-workflow",
         "finalize-optimizer-run",
-        str(project_dir),
+        str(project_dir.resolve()),
     ] in manifest_payload["audit_commands"]
     assert [
         "hermes-workflow",
         "optimizer-status",
-        str(project_dir),
+        str(project_dir.resolve()),
     ] in manifest_payload["audit_commands"]
     assert "reports/optimizer_finalize_report.json" in manifest_payload[
         "required_returned_artifacts"
@@ -285,16 +333,15 @@ def test_build_optimizer_execution_task_package_writes_openbox_continuation(
 
 
 def test_package_optimizer_task_cli_writes_task_and_manifest(tmp_path: Path) -> None:
-    project_dir = tmp_path / "bridge_test_inv"
-    create_project_from_template(project_dir)
+    project_dir = _create_optimizer_project(tmp_path)
 
     result = runner.invoke(
         app,
-            [
-                "package-optimizer-task",
-                str(project_dir),
-                "--cadence-cshrc",
-                "/opt/ic-opt/cadence_env.csh",
+        [
+            "package-optimizer-task",
+            str(project_dir),
+            "--cadence-cshrc",
+            str(CADENCE_CSHRC),
             "--parallel",
         ],
     )
@@ -309,8 +356,7 @@ def test_package_optimizer_task_cli_writes_task_and_manifest(tmp_path: Path) -> 
 
 
 def test_package_optimizer_task_cli_writes_openbox_manifest(tmp_path: Path) -> None:
-    project_dir = tmp_path / "bridge_test_inv"
-    create_project_from_template(project_dir)
+    project_dir = _create_optimizer_project(tmp_path)
 
     result = runner.invoke(
         app,
@@ -318,7 +364,7 @@ def test_package_optimizer_task_cli_writes_openbox_manifest(tmp_path: Path) -> N
             "package-optimizer-task",
             str(project_dir),
             "--cadence-cshrc",
-            "/opt/ic-opt/cadence_env.csh",
+            str(CADENCE_CSHRC),
             "--backend",
             "openbox",
             "--strategy",
@@ -342,8 +388,7 @@ def test_package_optimizer_task_cli_writes_openbox_manifest(tmp_path: Path) -> N
 def test_package_optimizer_task_cli_writes_openbox_continuation_manifest(
     tmp_path: Path,
 ) -> None:
-    project_dir = tmp_path / "bridge_test_inv"
-    create_project_from_template(project_dir)
+    project_dir = _create_optimizer_project(tmp_path)
 
     result = runner.invoke(
         app,
@@ -354,7 +399,7 @@ def test_package_optimizer_task_cli_writes_openbox_continuation_manifest(
             "openbox",
             "--continuation",
             "--cadence-cshrc",
-            "/opt/ic-opt/cadence_env.csh",
+            str(CADENCE_CSHRC),
         ],
     )
 
@@ -371,8 +416,14 @@ def test_optimizer_task_package_uses_absolute_shell_safe_command(
     monkeypatch,
 ) -> None:
     monkeypatch.chdir(tmp_path)
-    project_dir = Path("bridge_test_inv")
-    create_project_from_template(project_dir)
+    project_dir = Path(PROJECT_NAME)
+    create_generic_project(
+        Path("."),
+        name=PROJECT_NAME,
+        max_evaluations=MAX_EVALUATIONS,
+        batch_size=BATCH_SIZE,
+        parallel_jobs=PARALLEL_JOBS,
+    )
     cadence_cshrc = tmp_path / "cadence env.csh"
 
     package = build_optimizer_execution_task_package(
@@ -394,12 +445,11 @@ def test_optimizer_task_package_uses_absolute_shell_safe_command(
 def test_optimizer_execution_task_keeps_forbidden_actions_in_forbidden_section(
     tmp_path: Path,
 ) -> None:
-    project_dir = tmp_path / "bridge_test_inv"
-    create_project_from_template(project_dir)
+    project_dir = _create_optimizer_project(tmp_path)
 
     package = build_optimizer_execution_task_package(
         project_dir,
-        cadence_cshrc=Path("/opt/ic-opt/cadence_env.csh"),
+        cadence_cshrc=CADENCE_CSHRC,
     )
 
     task_text = package.task_path.read_text(encoding="utf-8")
@@ -420,12 +470,11 @@ def test_optimizer_execution_task_keeps_forbidden_actions_in_forbidden_section(
 def test_optimizer_execution_task_keeps_openbox_fallback_in_required_behavior(
     tmp_path: Path,
 ) -> None:
-    project_dir = tmp_path / "bridge_test_inv"
-    create_project_from_template(project_dir)
+    project_dir = _create_optimizer_project(tmp_path)
 
     package = build_optimizer_execution_task_package(
         project_dir,
-        cadence_cshrc=Path("/opt/ic-opt/cadence_env.csh"),
+        cadence_cshrc=CADENCE_CSHRC,
         optimizer_backend="openbox",
     )
 
@@ -442,12 +491,11 @@ def test_optimizer_execution_task_keeps_openbox_fallback_in_required_behavior(
 def test_build_openbox_task_package_includes_optimizer_strategy(
     tmp_path: Path,
 ) -> None:
-    project_dir = tmp_path / "bridge_test_inv"
-    create_project_from_template(project_dir)
+    project_dir = _create_optimizer_project(tmp_path)
 
     package = build_optimizer_execution_task_package(
         project_dir,
-        cadence_cshrc=Path("/opt/ic-opt/cadence_env.csh"),
+        cadence_cshrc=CADENCE_CSHRC,
         optimizer_backend="openbox",
         strategy="openbox_prf_eic",
         created_at_utc="2026-06-04T00:00:00Z",
@@ -465,7 +513,7 @@ def test_build_openbox_task_package_includes_optimizer_strategy(
     assert command[:3] == [
         "hermes-workflow",
         "run-openbox-real",
-        str(project_dir),
+        str(project_dir.resolve()),
     ]
     strategy_index = command.index("--strategy")
     assert command[strategy_index : strategy_index + 2] == [

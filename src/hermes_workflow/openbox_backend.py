@@ -208,7 +208,7 @@ def run_openbox_fake_optimization(
         max_evals=selected_max_evals,
         batch_size=batch_size,
         advisor_factory=advisor_factory,
-        evaluator=_make_fake_batch_evaluator(contract.metrics),
+        evaluator=_fake_batch_evaluator,
         execution_mode=FAKE_EXECUTION_MODE,
         random_seed=seed,
         parallel_jobs=batch_size,
@@ -1407,6 +1407,22 @@ def _next_run_offset(project_dir: Path, run_prefix: str) -> int:
     return next_index - 1
 
 
+def _fake_batch_evaluator(
+    candidates: list[NativeTurboBatchCandidate],
+) -> list[NativeTurboObservation]:
+    observations: list[NativeTurboObservation] = []
+    for candidate in candidates:
+        metric_observation = _fake_inverter_metrics(candidate.parameters)
+        observations.append(
+            NativeTurboObservation(
+                status="recorded",
+                metrics=metric_observation.metrics,
+                issues=metric_observation.issues,
+            )
+        )
+    return observations
+
+
 def make_openbox_real_candidate_batch_evaluator(
     project_dir: Path,
     *,
@@ -1549,65 +1565,20 @@ def _raw_values_from_suggestion(
     return raw_values
 
 
-def _fake_metric_observation(
-    parameters: dict[str, str],
-    metrics_config: MetricsConfig,
-) -> FakeMetricObservation:
-    """Generate a deterministic fake observation for every declared metric.
-
-    The fake evaluator is metric-generic: it must not assume any particular
-    circuit. For each metric declared in the project contract it returns a
-    finite, stable value that depends on the candidate parameters. When a
-    metric carries a constraint, the generated value satisfies it by default
-    (``lt``/``le`` below the threshold, ``gt``/``ge`` above it) so the default
-    fake path reports feasible candidates; tests that need failures inject
-    their own evaluator.
-    """
-    constraints_by_metric = {constraint.metric: constraint for constraint in metrics_config.constraints}
-    parameter_signal = sum(
-        _numeric_value(value) for value in parameters.values() if value
+def _fake_inverter_metrics(parameters: dict[str, str]) -> FakeMetricObservation:
+    fn = float(parameters.get("FN", "1"))
+    fp = float(parameters.get("FP", parameters.get("FN", "1")))
+    wn = _numeric_value(parameters.get("WN", "1u"))
+    wp = _numeric_value(parameters.get("WP", "1u"))
+    n_drive = max(fn * wn, 1e-9)
+    p_drive = max(fp * wp, 1e-9)
+    rise = max(15e-12, 105e-12 / p_drive)
+    fall = max(15e-12, 95e-12 / n_drive)
+    power = (n_drive + p_drive) * 9.0e-6
+    return FakeMetricObservation(
+        metrics={"rise": rise, "fall": fall, "DC": power},
+        issues=[],
     )
-    metrics: dict[str, float] = {}
-    for index, metric in enumerate(metrics_config.metrics):
-        constraint = constraints_by_metric.get(metric.name)
-        if constraint is not None:
-            threshold = _numeric_value(constraint.value)
-            margin = max(abs(threshold) * 0.1, 1.0)
-            jitter = 0.01 * parameter_signal
-            if constraint.op in (ConstraintOp.LT, ConstraintOp.LE):
-                metrics[metric.name] = threshold - margin - jitter
-            elif constraint.op in (ConstraintOp.GT, ConstraintOp.GE):
-                metrics[metric.name] = threshold + margin + jitter
-            else:
-                metrics[metric.name] = 1.0 + 0.1 * parameter_signal + 0.001 * index
-        else:
-            metrics[metric.name] = 1.0 + 0.1 * parameter_signal + 0.001 * index
-    return FakeMetricObservation(metrics=metrics, issues=[])
-
-
-def _make_fake_batch_evaluator(
-    metrics_config: MetricsConfig,
-) -> Callable[[list[NativeTurboBatchCandidate]], list[NativeTurboObservation]]:
-    """Build a metric-generic fake batch evaluator bound to a metrics contract."""
-
-    def evaluate(
-        candidates: list[NativeTurboBatchCandidate],
-    ) -> list[NativeTurboObservation]:
-        observations: list[NativeTurboObservation] = []
-        for candidate in candidates:
-            metric_observation = _fake_metric_observation(
-                candidate.parameters, metrics_config
-            )
-            observations.append(
-                NativeTurboObservation(
-                    status="recorded",
-                    metrics=metric_observation.metrics,
-                    issues=metric_observation.issues,
-                )
-            )
-        return observations
-
-    return evaluate
 
 
 def _make_openbox_observation(

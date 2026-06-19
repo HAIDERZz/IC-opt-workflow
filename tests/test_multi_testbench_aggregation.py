@@ -10,7 +10,10 @@ from hermes_workflow.approvals import decide_first_real_run
 from hermes_workflow.dry_run import run_dry_run
 from hermes_workflow.metric_results import check_metric_results
 from hermes_workflow.multi_testbench_aggregation import aggregate_multi_testbench_run
-from hermes_workflow.package import build_execution_package, create_project_from_template, sha256_file
+import yaml
+
+from hermes_workflow.package import build_execution_package, sha256_file
+from tests.project_factory import create_generic_project
 from hermes_workflow.real_run import prepare_real_run
 from hermes_workflow.reports import (
     MetricResultCheckStatus,
@@ -33,6 +36,39 @@ def _write_json(path: Path, payload: dict) -> None:
         json.dumps(payload, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+
+
+def _read_yaml(path: Path) -> dict:
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    assert isinstance(payload, dict)
+    return payload
+
+
+def _variable_names(project_dir: Path) -> tuple[str, ...]:
+    payload = _read_yaml(project_dir / "config" / "variables.yaml")
+    variables = payload["variables"]
+    assert isinstance(variables, list)
+    names: list[str] = []
+    for entry in variables:
+        assert isinstance(entry, dict)
+        name = entry["name"]
+        assert isinstance(name, str)
+        names.append(name)
+    return tuple(names)
+
+
+def _metric_names(project_dir: Path) -> tuple[str, ...]:
+    payload = _read_yaml(project_dir / "config" / "metrics.yaml")
+    metrics = payload["metrics"]
+    assert isinstance(metrics, list)
+    names: list[str] = []
+    for entry in metrics:
+        assert isinstance(entry, dict)
+        name = entry["name"]
+        assert isinstance(name, str)
+        names.append(name)
+    assert len(names) == 2
+    return tuple(names)
 
 
 def _inject_child_command_trace(
@@ -193,23 +229,19 @@ def _create_ready_single_testbench_corner_project(
     objective_policy: str = "worst_case",
     constraint_policy: str = "all_corners",
 ) -> Path:
-    project_dir = tmp_path / "bridge_test_inv"
-    create_project_from_template(project_dir)
+    project_dir = create_generic_project(
+        tmp_path,
+        name="single_testbench_corner_project",
+    )
     _write_process_corners_config(
         project_dir,
         corner_ids,
         objective_policy=objective_policy,
         constraint_policy=constraint_policy,
     )
-    template_path = project_dir / "netlists" / "templates" / "template.scs"
-    template_path.parent.mkdir(parents=True, exist_ok=True)
-    template_path.write_text(
-        "simulator lang=spectre\n"
-        "parameters F={{F}} W={{W}} L={{L}} VB_LO={{VB_LO}}\n"
-        "tran tran stop=10n\n",
-        encoding="utf-8",
+    template_text = (project_dir / "netlists" / "templates" / "template.scs").read_text(
+        encoding="utf-8"
     )
-    template_text = template_path.read_text(encoding="utf-8")
     for corner_id in corner_ids:
         corner_template = (
             project_dir / "netlists" / "corners" / corner_id / "template.scs"
@@ -217,7 +249,7 @@ def _create_ready_single_testbench_corner_project(
         corner_template.parent.mkdir(parents=True, exist_ok=True)
         corner_template.write_text(template_text, encoding="utf-8")
     build_execution_package(project_dir, created_at_utc="2026-06-13T00:00:00Z")
-    write_pass_reports(project_dir)
+    write_pass_reports(project_dir, variable_names=_variable_names(project_dir))
     instruction = decide_first_real_run(
         project_dir,
         created_at_utc="2026-06-13T00:10:00Z",
@@ -960,13 +992,16 @@ def test_aggregate_single_testbench_multi_corner_feasible_uses_worst_case_corner
         corner_ids=["tt", "ff", "ss"],
     )
 
-    for corner_id, nf in (("tt", 8.0), ("ff", 4.0), ("ss", 6.0)):
+    objective_metric, non_target_metric = _metric_names(project_dir)
+    objective_values = {"tt": 10.0, "ff": 4.0, "ss": 8.0}
+
+    for corner_id, value in objective_values.items():
         _write_corner_child_handoff(
             project_dir,
             testbench_id=None,
             corner_id=corner_id,
-            metric_name="NF_3G",
-            value=nf,
+            metric_name=objective_metric,
+            value=value,
         )
 
     report = aggregate_multi_testbench_run(project_dir, run_id="real_001")
@@ -974,14 +1009,26 @@ def test_aggregate_single_testbench_multi_corner_feasible_uses_worst_case_corner
     assert report.status == "succeeded"
     assert report.constraint_policy == "all_corners"
     assert report.objective_policy == "worst_case"
-    assert report.selected_corner == "tt"
-    assert report.worst_corner == "tt"
+    assert report.selected_corner == "ff"
+    assert report.worst_corner == "ff"
     assert report.corner_objectives == pytest.approx(
-        {"tt": 8.0, "ff": 4.0, "ss": 6.0}
+        {"tt": -(10.0 - 1.0e-4), "ff": -(4.0 - 1.0e-4), "ss": -(8.0 - 1.0e-4)}
     )
     assert report.corner_status_counts == {"feasible": 3}
-    assert {metric["name"]: metric["value"] for metric in _load_json(project_dir / "runs" / "real" / "real_001" / "metrics" / "metric_result_manifest.json")["metrics"]} == {
-        "NF_3G": 8.0,
+    aggregate_metrics = _load_json(
+        project_dir
+        / "runs"
+        / "real"
+        / "real_001"
+        / "metrics"
+        / "metric_result_manifest.json"
+    )
+    assert {
+        metric["name"]: metric["value"]
+        for metric in aggregate_metrics["metrics"]
+    } == {
+        objective_metric: 4.0,
+        non_target_metric: 1.0e-4,
     }
 
 
@@ -993,11 +1040,13 @@ def test_aggregate_single_testbench_explicit_one_corner_preserves_configured_sem
         corner_ids=["ss"],
     )
 
+    objective_metric, _non_target_metric = _metric_names(project_dir)
+
     _write_corner_child_handoff(
         project_dir,
         testbench_id=None,
         corner_id="ss",
-        metric_name="NF_3G",
+        metric_name=objective_metric,
         value=7.0,
     )
 
@@ -1008,7 +1057,7 @@ def test_aggregate_single_testbench_explicit_one_corner_preserves_configured_sem
     assert report.objective_policy == "worst_case"
     assert report.selected_corner == "ss"
     assert report.worst_corner == "ss"
-    assert report.corner_objectives == pytest.approx({"ss": 7.0})
+    assert report.corner_objectives == pytest.approx({"ss": -(7.0 - 1.0e-4)})
     assert report.corner_status_counts == {"feasible": 1}
     assert [(child.testbench, child.corner) for child in report.child_statuses] == [
         ("default_testbench", "ss")

@@ -20,9 +20,56 @@ from hermes_workflow.mock_optimizer import (
     write_ledger_row,
     write_optimizer_state,
 )
-from hermes_workflow.package import create_project_from_template
 from hermes_workflow.schemas import BestCandidate, LedgerRow, OptimizerState
 from hermes_workflow.validate import assert_valid_project, evaluate_objective
+
+import yaml
+from tests.project_factory import create_generic_project
+
+
+def _create_mock_project(tmp_path: Path, **kwargs: object) -> Path:
+    return create_generic_project(tmp_path, name="mock_optimizer_project", **kwargs)
+
+def _read_yaml(path: Path) -> dict:
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    assert isinstance(payload, dict)
+    return payload
+
+def _write_yaml(path: Path, payload: dict) -> None:
+    path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+def _variable_names(project_dir: Path) -> tuple[str, str]:
+    payload = _read_yaml(project_dir / "config" / "variables.yaml")
+    names = [variable["name"] for variable in payload["variables"]]
+    assert len(names) == 2
+    return names[0], names[1]
+
+def _metric_names(project_dir: Path) -> tuple[str, str]:
+    payload = _read_yaml(project_dir / "config" / "metrics.yaml")
+    names = [metric["name"] for metric in payload["metrics"]]
+    assert len(names) == 2
+    return names[0], names[1]
+
+def _candidate_parameters(
+    project_dir: Path,
+    *,
+    int_value: str = "3",
+    width_value: str = "0.3u",
+) -> dict[str, str]:
+    int_name, width_name = _variable_names(project_dir)
+    return {int_name: int_value, width_name: width_value}
+
+def _small_grid_project(tmp_path: Path) -> Path:
+    project_dir = _create_mock_project(tmp_path)
+    variables_path = project_dir / "config" / "variables.yaml"
+    variables = _read_yaml(variables_path)
+    int_name, width_name = _variable_names(project_dir)
+    variables["variables"] = [
+        {"name": int_name, "kind": "integer", "lower": "2", "upper": "3", "step": "1"},
+        {"name": width_name, "kind": "continuous_step", "lower": "0.3u", "upper": "0.3u", "step": "0.2u"},
+    ]
+    _write_yaml(variables_path, variables)
+    return project_dir
 
 
 # ---------------------------------------------------------------------------
@@ -31,8 +78,8 @@ from hermes_workflow.validate import assert_valid_project, evaluate_objective
 
 VALID_LEDGER_ROW = {
     "candidate_id": "cand_001",
-    "parameters": {"FN": "4", "WN": "1.0 um", "FP": "4", "WP": "1.0 um"},
-    "metrics": {"rise": 52.0, "fall": 43.0, "DC": 120.0},
+    "parameters": {"PARAM_A": "4", "PARAM_B": "1.0 um"},
+    "metrics": {"metric_a": 52.0, "metric_b": 43.0, "metric_c": 120.0},
     "constraints_passed": True,
     "objective": 11400.0,
     "batch_id": 1,
@@ -44,8 +91,8 @@ VALID_LEDGER_ROW = {
 def test_ledger_row_parses_valid_payload() -> None:
     row = LedgerRow.model_validate(VALID_LEDGER_ROW)
     assert row.candidate_id == "cand_001"
-    assert row.parameters["FN"] == "4"
-    assert row.metrics["rise"] == 52.0
+    assert row.parameters["PARAM_A"] == "4"
+    assert row.metrics["metric_a"] == 52.0
     assert row.constraints_passed is True
     assert row.objective == 11400.0
     assert row.batch_id == 1
@@ -81,8 +128,8 @@ def test_ledger_row_accepts_all_valid_statuses() -> None:
 def test_ledger_row_accepts_real_constraint_fail_status() -> None:
     row = LedgerRow(
         candidate_id="real_001",
-        parameters={"FN": "2"},
-        metrics={"rise": 1.0},
+        parameters={"PARAM_A": "2"},
+        metrics={"metric_a": 1.0},
         constraints_passed=False,
         objective=1.0,
         batch_id=1,
@@ -107,8 +154,8 @@ def test_ledger_row_rejects_bool_as_batch_id() -> None:
 
 VALID_BEST_CANDIDATE = {
     "candidate_id": "cand_001",
-    "parameters": {"FN": "4", "WN": "1.0 um", "FP": "4", "WP": "1.0 um"},
-    "metrics": {"rise": 52.0, "fall": 43.0, "DC": 120.0},
+    "parameters": {"PARAM_A": "4", "PARAM_B": "1.0 um"},
+    "metrics": {"metric_a": 52.0, "metric_b": 43.0, "metric_c": 120.0},
     "constraints_passed": True,
     "objective": 11400.0,
     "batch_id": 1,
@@ -119,7 +166,7 @@ VALID_BEST_CANDIDATE = {
 def test_best_candidate_parses_valid_payload() -> None:
     candidate = BestCandidate.model_validate(VALID_BEST_CANDIDATE)
     assert candidate.candidate_id == "cand_001"
-    assert candidate.metrics["DC"] == 120.0
+    assert candidate.metrics["metric_c"] == 120.0
     assert candidate.constraints_passed is True
 
 
@@ -141,7 +188,7 @@ def test_best_candidate_rejects_bool_as_batch_id() -> None:
 
 VALID_OPTIMIZER_STATE = {
     "schema_version": "1.0",
-    "project_name": "bridge_test_inv",
+    "project_name": "mock_optimizer_project",
     "algorithm": "turbo",
     "initialization": "sobol",
     "current_evaluations": 6,
@@ -157,7 +204,7 @@ VALID_OPTIMIZER_STATE = {
 
 def test_optimizer_state_parses_valid_payload() -> None:
     state = OptimizerState.model_validate(VALID_OPTIMIZER_STATE)
-    assert state.project_name == "bridge_test_inv"
+    assert state.project_name == "mock_optimizer_project"
     assert state.algorithm == "turbo"
     assert state.current_evaluations == 6
     assert state.best_candidate_id == "cand_001"
@@ -171,7 +218,7 @@ def test_optimizer_state_allows_null_best_candidate_id() -> None:
 
 
 def test_optimizer_state_rejects_extra_fields() -> None:
-    payload = {**VALID_OPTIMIZER_STATE, "surprise": True}
+    payload = {**VALID_OPTIMIZER_STATE, "extra_key": True}
     with pytest.raises(ValidationError, match="extra"):
         OptimizerState.model_validate(payload)
 
@@ -201,47 +248,47 @@ def test_optimizer_state_rejects_bool_as_integer() -> None:
 # evaluate_objective
 # ---------------------------------------------------------------------------
 
-METRICS = {"rise": 52.0, "fall": 43.0, "DC": 120.0}
+METRICS = {"metric_a": 52.0, "metric_b": 43.0, "metric_c": 120.0}
 
 
 def test_evaluate_objective_simple_arithmetic() -> None:
-    assert evaluate_objective("(rise + fall) * DC", METRICS) == (52.0 + 43.0) * 120.0
+    assert evaluate_objective("(metric_a + metric_b) * metric_c", METRICS) == (52.0 + 43.0) * 120.0
 
 
 def test_evaluate_objective_single_metric() -> None:
-    assert evaluate_objective("rise", METRICS) == 52.0
+    assert evaluate_objective("metric_a", METRICS) == 52.0
 
 
 def test_evaluate_objective_numeric_literal() -> None:
-    assert evaluate_objective("rise + 10.0", METRICS) == 62.0
+    assert evaluate_objective("metric_a + 10.0", METRICS) == 62.0
 
 
 def test_evaluate_objective_integer_literal() -> None:
-    assert evaluate_objective("rise * 2", METRICS) == 104.0
+    assert evaluate_objective("metric_a * 2", METRICS) == 104.0
 
 
 def test_evaluate_objective_negation() -> None:
-    assert evaluate_objective("-rise", METRICS) == -52.0
+    assert evaluate_objective("-metric_a", METRICS) == -52.0
 
 
 def test_evaluate_objective_division() -> None:
-    assert evaluate_objective("rise / fall", METRICS) == pytest.approx(52.0 / 43.0)
+    assert evaluate_objective("metric_a / metric_b", METRICS) == pytest.approx(52.0 / 43.0)
 
 
 def test_evaluate_objective_power() -> None:
-    assert evaluate_objective("rise ** 2", METRICS) == pytest.approx(52.0**2)
+    assert evaluate_objective("metric_a ** 2", METRICS) == pytest.approx(52.0**2)
 
 
 def test_evaluate_objective_modulo() -> None:
-    assert evaluate_objective("rise % fall", METRICS) == pytest.approx(52.0 % 43.0)
+    assert evaluate_objective("metric_a % metric_b", METRICS) == pytest.approx(52.0 % 43.0)
 
 
 def test_evaluate_objective_complex_expression() -> None:
-    assert evaluate_objective("(rise + fall) * DC", METRICS) == 11400.0
+    assert evaluate_objective("(metric_a + metric_b) * metric_c", METRICS) == 11400.0
 
 
 def test_evaluate_objective_safe_math_functions() -> None:
-    expression = "-min(max(rise, fall), ln(DC))"
+    expression = "-min(max(metric_a, metric_b), ln(metric_c))"
 
     assert evaluate_objective(expression, METRICS) == pytest.approx(
         -min(max(52.0, 43.0), 4.787491742782046)
@@ -250,17 +297,17 @@ def test_evaluate_objective_safe_math_functions() -> None:
 
 def test_evaluate_objective_rejects_unknown_metric() -> None:
     with pytest.raises(ValueError, match="unknown metric"):
-        evaluate_objective("rise + slew", METRICS)
+        evaluate_objective("metric_a + slew", METRICS)
 
 
 def test_evaluate_objective_rejects_unknown_function_calls() -> None:
     with pytest.raises(ValueError, match="unsupported objective function abs"):
-        evaluate_objective("abs(rise)", METRICS)
+        evaluate_objective("abs(metric_a)", METRICS)
 
 
 def test_evaluate_objective_rejects_boolean_literal() -> None:
     with pytest.raises(ValueError, match="unsupported objective literal"):
-        evaluate_objective("rise + True", METRICS)
+        evaluate_objective("metric_a + True", METRICS)
 
 
 def test_evaluate_objective_rejects_non_finite_literal() -> None:
@@ -268,24 +315,24 @@ def test_evaluate_objective_rejects_non_finite_literal() -> None:
     # They are caught by the unknown-metric check, not the non-finite check.
     # Use float literal notation to test the non-finite Constant path.
     with pytest.raises(ValueError, match="unknown metric"):
-        evaluate_objective("rise + inf", METRICS)
+        evaluate_objective("metric_a + inf", METRICS)
     with pytest.raises(ValueError, match="unknown metric"):
-        evaluate_objective("rise + nan", METRICS)
+        evaluate_objective("metric_a + nan", METRICS)
 
 
 def test_evaluate_objective_rejects_string_literal() -> None:
     with pytest.raises(ValueError, match="unsupported objective literal"):
-        evaluate_objective("'hello' + rise", METRICS)
+        evaluate_objective("'hello' + metric_a", METRICS)
 
 
 def test_evaluate_objective_rejects_syntax_error() -> None:
     with pytest.raises(ValueError, match="invalid objective expression"):
-        evaluate_objective("(rise + ", METRICS)
+        evaluate_objective("(metric_a + ", METRICS)
 
 
 def test_evaluate_objective_direction_maximize_is_caller_responsibility() -> None:
     """evaluate_objective computes the raw expression; maximize negation is at call site."""
-    raw = evaluate_objective("(rise + fall) * DC", METRICS)
+    raw = evaluate_objective("(metric_a + metric_b) * metric_c", METRICS)
     negated = -raw
     assert raw == 11400.0
     assert negated == -11400.0
@@ -348,20 +395,17 @@ class TestContinuousGrid:
 
 class TestGenerateCandidates:
     def test_generate_candidates_from_fixture(self, tmp_path: Path) -> None:
-        project_dir = tmp_path / "bridge_test_inv"
-        create_project_from_template(project_dir)
+        project_dir = _create_mock_project(tmp_path)
         bundle = assert_valid_project(project_dir)
         candidates = generate_candidates(bundle, n_candidates=6, seed=20260528)
         assert len(candidates) == 6
+        int_name, width_name = _variable_names(project_dir)
         for candidate in candidates:
-            assert "F" in candidate
-            assert "W" in candidate
-            assert "L" in candidate
-            assert "VB_LO" in candidate
+            assert int_name in candidate
+            assert width_name in candidate
 
     def test_generate_candidates_sobol_reproducible(self, tmp_path: Path) -> None:
-        project_dir = tmp_path / "bridge_test_inv"
-        create_project_from_template(project_dir)
+        project_dir = _create_mock_project(tmp_path)
         bundle = assert_valid_project(project_dir)
         cands_a = generate_candidates(
             bundle, n_candidates=10, seed=42, initialization="sobol"
@@ -372,8 +416,7 @@ class TestGenerateCandidates:
         assert cands_a == cands_b
 
     def test_generate_candidates_random_reproducible(self, tmp_path: Path) -> None:
-        project_dir = tmp_path / "bridge_test_inv"
-        create_project_from_template(project_dir)
+        project_dir = _create_mock_project(tmp_path)
         bundle = assert_valid_project(project_dir)
         cands_a = generate_candidates(
             bundle, n_candidates=10, seed=99, initialization="random"
@@ -384,8 +427,7 @@ class TestGenerateCandidates:
         assert cands_a == cands_b
 
     def test_generate_candidates_latin_hypercube(self, tmp_path: Path) -> None:
-        project_dir = tmp_path / "bridge_test_inv"
-        create_project_from_template(project_dir)
+        project_dir = _create_mock_project(tmp_path)
         bundle = assert_valid_project(project_dir)
         candidates = generate_candidates(
             bundle, n_candidates=8, seed=42, initialization="latin_hypercube"
@@ -393,26 +435,25 @@ class TestGenerateCandidates:
         assert len(candidates) == 8
 
     def test_generate_candidates_values_on_grid(self, tmp_path: Path) -> None:
-        project_dir = tmp_path / "bridge_test_inv"
-        create_project_from_template(project_dir)
+        project_dir = _create_mock_project(tmp_path)
         bundle = assert_valid_project(project_dir)
         candidates = generate_candidates(bundle, n_candidates=20, seed=42)
-        integer_grid = {str(v) for v in generate_integer_grid(20, 30, 2)}
+        integer_grid = {str(v) for v in generate_integer_grid(1, 5, 1)}
+        int_name, _width_name = _variable_names(project_dir)
         for candidate in candidates:
-            assert candidate["F"] in integer_grid
+            assert candidate[int_name] in integer_grid
 
     def test_deduplication_removes_duplicates(self) -> None:
         candidates = [
-            {"FN": "4", "WN": "1.0 um", "FP": "4", "WP": "1.0 um"},
-            {"FN": "4", "WN": "1.0 um", "FP": "4", "WP": "1.0 um"},
-            {"FN": "6", "WN": "1.2 um", "FP": "6", "WP": "1.2 um"},
+            {"PARAM_A": "4", "PARAM_B": "1.0 um"},
+            {"PARAM_A": "4", "PARAM_B": "1.0 um"},
+            {"PARAM_A": "6", "PARAM_B": "1.2 um"},
         ]
         result = _deduplicate(candidates)
         assert len(result) == 2
 
     def test_generate_candidates_deduplicates(self, tmp_path: Path) -> None:
-        project_dir = tmp_path / "bridge_test_inv"
-        create_project_from_template(project_dir)
+        project_dir = _create_mock_project(tmp_path)
         bundle = assert_valid_project(project_dir)
         # Request more candidates than the grid allows (2*6*2*6 = 144 combos)
         candidates = generate_candidates(
@@ -426,39 +467,7 @@ class TestGenerateCandidates:
             seen_keys.add(key)
 
     def test_generate_candidates_refills_after_deduplication(self, tmp_path: Path) -> None:
-        project_dir = tmp_path / "bridge_test_inv"
-        create_project_from_template(project_dir)
-        variables_path = project_dir / "config" / "variables.yaml"
-        variables_path.write_text(
-            "\n".join(
-                [
-                    'schema_version: "1.0"',
-                    "variables:",
-                    "  - name: FN",
-                    "    kind: integer",
-                    '    lower: "2"',
-                    '    upper: "3"',
-                    '    step: "1"',
-                    "  - name: WN",
-                    "    kind: continuous_step",
-                    '    lower: "0.3u"',
-                    '    upper: "0.3u"',
-                    '    step: "0.2u"',
-                    "  - name: FP",
-                    "    kind: integer",
-                    '    lower: "2"',
-                    '    upper: "2"',
-                    '    step: "1"',
-                    "  - name: WP",
-                    "    kind: continuous_step",
-                    '    lower: "0.3u"',
-                    '    upper: "0.3u"',
-                    '    step: "0.2u"',
-                    "",
-                ]
-            ),
-            encoding="utf-8",
-        )
+        project_dir = _small_grid_project(tmp_path)
         bundle = assert_valid_project(project_dir)
 
         candidates = generate_candidates(
@@ -469,7 +478,8 @@ class TestGenerateCandidates:
         )
 
         assert len(candidates) == 2
-        assert {candidate["FN"] for candidate in candidates} == {"2", "3"}
+        int_name, _width_name = _variable_names(project_dir)
+        assert {candidate[int_name] for candidate in candidates} == {"2", "3"}
 
 
 # ---------------------------------------------------------------------------
@@ -479,47 +489,42 @@ class TestGenerateCandidates:
 
 class TestComputeMockMetrics:
     def test_deterministic_same_params_same_result(self, tmp_path: Path) -> None:
-        project_dir = tmp_path / "bridge_test_inv"
-        create_project_from_template(project_dir)
+        project_dir = _create_mock_project(tmp_path)
         bundle = assert_valid_project(project_dir)
-        params = {"F": "26", "W": "1.2u", "L": "40n", "VB_LO": "300m"}
+        params = _candidate_parameters(project_dir, int_value="3", width_value="0.3u")
         a = compute_mock_metrics(bundle.metrics, bundle.variables, params)
         b = compute_mock_metrics(bundle.metrics, bundle.variables, params)
         assert a == b
 
     def test_different_params_different_metrics(self, tmp_path: Path) -> None:
-        project_dir = tmp_path / "bridge_test_inv"
-        create_project_from_template(project_dir)
+        project_dir = _create_mock_project(tmp_path)
         bundle = assert_valid_project(project_dir)
-        params_a = {"F": "24", "W": "1.0u", "L": "40n", "VB_LO": "300m"}
-        params_b = {"F": "30", "W": "1.8u", "L": "50n", "VB_LO": "360m"}
+        params_a = _candidate_parameters(project_dir, int_value="3", width_value="0.3u")
+        params_b = _candidate_parameters(project_dir, int_value="4", width_value="0.4u")
         a = compute_mock_metrics(bundle.metrics, bundle.variables, params_a)
         b = compute_mock_metrics(bundle.metrics, bundle.variables, params_b)
         assert a != b
 
     def test_returns_all_declared_metrics(self, tmp_path: Path) -> None:
-        project_dir = tmp_path / "bridge_test_inv"
-        create_project_from_template(project_dir)
+        project_dir = _create_mock_project(tmp_path)
         bundle = assert_valid_project(project_dir)
-        params = {"F": "26", "W": "1.2u", "L": "40n", "VB_LO": "300m"}
+        params = _candidate_parameters(project_dir, int_value="3", width_value="0.3u")
         result = compute_mock_metrics(bundle.metrics, bundle.variables, params)
         for metric in bundle.metrics.metrics:
             assert metric.name in result
 
     def test_metric_values_are_positive(self, tmp_path: Path) -> None:
-        project_dir = tmp_path / "bridge_test_inv"
-        create_project_from_template(project_dir)
+        project_dir = _create_mock_project(tmp_path)
         bundle = assert_valid_project(project_dir)
-        params = {"F": "26", "W": "1.2u", "L": "40n", "VB_LO": "300m"}
+        params = _candidate_parameters(project_dir, int_value="3", width_value="0.3u")
         result = compute_mock_metrics(bundle.metrics, bundle.variables, params)
         for name, value in result.items():
             assert value > 0, f"{name} should be positive, got {value}"
 
     def test_integer_params_parsed_correctly(self, tmp_path: Path) -> None:
-        project_dir = tmp_path / "bridge_test_inv"
-        create_project_from_template(project_dir)
+        project_dir = _create_mock_project(tmp_path)
         bundle = assert_valid_project(project_dir)
-        params = {"F": "26", "W": "0.8u", "L": "40n", "VB_LO": "300m"}
+        params = _candidate_parameters(project_dir, int_value="4", width_value="0.4u")
         result = compute_mock_metrics(bundle.metrics, bundle.variables, params)
         for name, value in result.items():
             assert isinstance(value, float)
@@ -533,13 +538,12 @@ class TestComputeMockMetrics:
 
 class TestEvaluateConstraints:
     def test_all_constraints_pass(self, tmp_path: Path) -> None:
-        project_dir = tmp_path / "bridge_test_inv"
-        create_project_from_template(project_dir)
+        project_dir = _create_mock_project(tmp_path)
         bundle = assert_valid_project(project_dir)
         # Use metrics that will definitely pass the constraints
-        # NF_3G < 10 dB (constraint values in metrics.yaml)
-        # Mock metrics are in range 1-100, so they should pass
-        params = {"F": "26", "W": "1.2u", "L": "40n", "VB_LO": "300m"}
+        # Constraint values in metrics.yaml; mock metrics are in a reasonable range.
+        # We test the infrastructure, not the pass/fail outcome.
+        params = _candidate_parameters(project_dir, int_value="3", width_value="0.3u")
         metrics = compute_mock_metrics(bundle.metrics, bundle.variables, params)
         # We can't easily predict mock metric values vs thresholds,
         # so we test the infrastructure, not the pass/fail outcome.
@@ -547,10 +551,10 @@ class TestEvaluateConstraints:
         assert isinstance(result, bool)
 
     def test_missing_metric_returns_false(self, tmp_path: Path) -> None:
-        project_dir = tmp_path / "bridge_test_inv"
-        create_project_from_template(project_dir)
+        project_dir = _create_mock_project(tmp_path)
         bundle = assert_valid_project(project_dir)
-        partial_metrics = {"gain": 50.0}
+        first_metric, _second_metric = _metric_names(project_dir)
+        partial_metrics = {first_metric: 50.0}
         assert evaluate_constraints(bundle.metrics, partial_metrics) is False
 
     def test_lt_constraint(self) -> None:
@@ -607,13 +611,13 @@ class TestEvaluateConstraints:
 
         metrics_config = MetricsConfig(
             schema_version="1.0",
-            metrics=[MetricSpec(name="rise", unit="ps", maestro_formula="x", required_signals=["time"])],
-            constraints=[ConstraintSpec(metric="rise", op=ConstraintOp.LT, value="80 ps")],
-            objective=ObjectiveSpec(direction=ObjectiveDirection.MINIMIZE, expression="rise"),
+            metrics=[MetricSpec(name="delay_a", unit="ps", maestro_formula="x", required_signals=["time"])],
+            constraints=[ConstraintSpec(metric="delay_a", op=ConstraintOp.LT, value="80 ps")],
+            objective=ObjectiveSpec(direction=ObjectiveDirection.MINIMIZE, expression="delay_a"),
         )
         # "80 ps" should parse to 80.0
-        assert evaluate_constraints(metrics_config, {"rise": 50.0}) is True
-        assert evaluate_constraints(metrics_config, {"rise": 90.0}) is False
+        assert evaluate_constraints(metrics_config, {"delay_a": 50.0}) is True
+        assert evaluate_constraints(metrics_config, {"delay_a": 90.0}) is False
 
 
 # ---------------------------------------------------------------------------
@@ -627,8 +631,8 @@ class TestWriteLedgerRow:
         project_dir.mkdir()
         row = LedgerRow(
             candidate_id="cand_001",
-            parameters={"FN": "4", "WN": "1.0 um", "FP": "4", "WP": "1.0 um"},
-            metrics={"rise": 52.0, "fall": 43.0, "DC": 120.0},
+            parameters={"PARAM_A": "4", "PARAM_B": "1.0 um"},
+            metrics={"metric_a": 52.0, "metric_b": 43.0, "metric_c": 120.0},
             constraints_passed=True,
             objective=11400.0,
             batch_id=1,
@@ -644,8 +648,8 @@ class TestWriteLedgerRow:
         project_dir.mkdir()
         row1 = LedgerRow(
             candidate_id="cand_001",
-            parameters={"FN": "4"},
-            metrics={"rise": 52.0},
+            parameters={"PARAM_A": "4"},
+            metrics={"metric_a": 52.0},
             constraints_passed=True,
             objective=52.0,
             batch_id=1,
@@ -654,8 +658,8 @@ class TestWriteLedgerRow:
         )
         row2 = LedgerRow(
             candidate_id="cand_002",
-            parameters={"FN": "6"},
-            metrics={"rise": 55.0},
+            parameters={"PARAM_A": "6"},
+            metrics={"metric_a": 55.0},
             constraints_passed=True,
             objective=55.0,
             batch_id=1,
@@ -674,8 +678,8 @@ class TestWriteLedgerRow:
         project_dir.mkdir()
         row = LedgerRow(
             candidate_id="cand_001",
-            parameters={"FN": "4", "WN": "1.0 um"},
-            metrics={"rise": 52.0},
+            parameters={"PARAM_A": "4", "PARAM_B": "1.0 um"},
+            metrics={"metric_a": 52.0},
             constraints_passed=True,
             objective=52.0,
             batch_id=1,
@@ -698,8 +702,8 @@ class TestWriteLedgerRow:
         project_dir.mkdir()
         row = LedgerRow(
             candidate_id="cand_001",
-            parameters={"FN": "4", "WN": "1.0 um"},
-            metrics={"rise": 52.0},
+            parameters={"PARAM_A": "4", "PARAM_B": "1.0 um"},
+            metrics={"metric_a": 52.0},
             constraints_passed=True,
             objective=52.0,
             batch_id=1,
@@ -727,7 +731,7 @@ class TestWriteOptimizerState:
         project_dir.mkdir()
         state = OptimizerState(
             schema_version="1.0",
-            project_name="bridge_test_inv",
+            project_name="mock_optimizer_project",
             algorithm="turbo",
             initialization="sobol",
             current_evaluations=6,
@@ -750,7 +754,7 @@ class TestWriteOptimizerState:
         project_dir.mkdir()
         state = OptimizerState(
             schema_version="1.0",
-            project_name="bridge_test_inv",
+            project_name="mock_optimizer_project",
             algorithm="turbo",
             initialization="sobol",
             current_evaluations=6,
@@ -764,7 +768,7 @@ class TestWriteOptimizerState:
         )
         write_optimizer_state(project_dir, state)
         parsed = json.loads((project_dir / "state" / "optimizer_state.json").read_text(encoding="utf-8"))
-        assert parsed["project_name"] == "bridge_test_inv"
+        assert parsed["project_name"] == "mock_optimizer_project"
         assert parsed["best_candidate_id"] is None
         assert parsed["status"] == "running"
 
@@ -773,7 +777,7 @@ class TestWriteOptimizerState:
         project_dir.mkdir()
         state_v1 = OptimizerState(
             schema_version="1.0",
-            project_name="bridge_test_inv",
+            project_name="mock_optimizer_project",
             algorithm="turbo",
             initialization="sobol",
             current_evaluations=6,
@@ -801,8 +805,8 @@ class TestWriteBestCandidate:
         project_dir.mkdir()
         candidate = BestCandidate(
             candidate_id="cand_001",
-            parameters={"FN": "4", "WN": "1.0 um", "FP": "4", "WP": "1.0 um"},
-            metrics={"rise": 52.0, "fall": 43.0, "DC": 120.0},
+            parameters={"PARAM_A": "4", "PARAM_B": "1.0 um"},
+            metrics={"metric_a": 52.0, "metric_b": 43.0, "metric_c": 120.0},
             constraints_passed=True,
             objective=11400.0,
             batch_id=1,
@@ -819,8 +823,8 @@ class TestWriteBestCandidate:
         project_dir.mkdir()
         candidate = BestCandidate(
             candidate_id="cand_003",
-            parameters={"FN": "8"},
-            metrics={"rise": 60.0},
+            parameters={"PARAM_A": "8"},
+            metrics={"metric_a": 60.0},
             constraints_passed=True,
             objective=60.0,
             batch_id=2,
@@ -909,8 +913,7 @@ class TestWriteHealthCheck:
 
 class TestRunMockOptimization:
     def test_run_mock_optimization_creates_all_artifacts(self, tmp_path: Path) -> None:
-        project_dir = tmp_path / "bridge_test_inv"
-        create_project_from_template(project_dir)
+        project_dir = _create_mock_project(tmp_path)
 
         run_mock_optimization(project_dir, max_evaluations=6)
 
@@ -920,8 +923,7 @@ class TestRunMockOptimization:
         assert (project_dir / "state" / "health_check.json").exists()
 
     def test_run_mock_optimization_ledger_has_correct_row_count(self, tmp_path: Path) -> None:
-        project_dir = tmp_path / "bridge_test_inv"
-        create_project_from_template(project_dir)
+        project_dir = _create_mock_project(tmp_path)
 
         run_mock_optimization(project_dir, max_evaluations=6)
 
@@ -931,8 +933,7 @@ class TestRunMockOptimization:
     def test_run_mock_optimization_state_completed(self, tmp_path: Path) -> None:
         import json
 
-        project_dir = tmp_path / "bridge_test_inv"
-        create_project_from_template(project_dir)
+        project_dir = _create_mock_project(tmp_path)
 
         state = run_mock_optimization(project_dir, max_evaluations=6)
 
@@ -940,17 +941,16 @@ class TestRunMockOptimization:
         assert state.current_evaluations == 6
         assert state.max_evaluations == 6
         assert state.best_candidate_id is not None
-        assert state.project_name == "mixer_cg_nf_opt"
+        assert state.project_name == "mock_optimizer_project"
 
         parsed = json.loads((project_dir / "state" / "optimizer_state.json").read_text(encoding="utf-8"))
-        assert parsed["algorithm"] == "openbox"
+        assert parsed["algorithm"] == "turbo"
         assert parsed["status"] == "completed"
 
     def test_run_mock_optimization_best_candidate_exists(self, tmp_path: Path) -> None:
         import json
 
-        project_dir = tmp_path / "bridge_test_inv"
-        create_project_from_template(project_dir)
+        project_dir = _create_mock_project(tmp_path)
 
         run_mock_optimization(project_dir, max_evaluations=6)
 
@@ -962,8 +962,7 @@ class TestRunMockOptimization:
     def test_run_mock_optimization_health_check_healthy(self, tmp_path: Path) -> None:
         import json
 
-        project_dir = tmp_path / "bridge_test_inv"
-        create_project_from_template(project_dir)
+        project_dir = _create_mock_project(tmp_path, batch_size=10, parallel_jobs=10)
 
         run_mock_optimization(project_dir, max_evaluations=6)
 
@@ -975,8 +974,7 @@ class TestRunMockOptimization:
         assert parsed["last_batch_id"] == 1
 
     def test_run_mock_optimization_respects_max_evaluations_override(self, tmp_path: Path) -> None:
-        project_dir = tmp_path / "bridge_test_inv"
-        create_project_from_template(project_dir)
+        project_dir = _create_mock_project(tmp_path)
 
         state = run_mock_optimization(project_dir, max_evaluations=3)
 
@@ -986,8 +984,7 @@ class TestRunMockOptimization:
         assert len(lines) == state.current_evaluations
 
     def test_run_mock_optimization_respects_seed_override(self, tmp_path: Path) -> None:
-        project_dir = tmp_path / "bridge_test_inv"
-        create_project_from_template(project_dir)
+        project_dir = _create_mock_project(tmp_path)
 
         state_a = run_mock_optimization(project_dir, max_evaluations=4, seed_override=42)
         # Reset ledger and state for second run
@@ -1003,8 +1000,7 @@ class TestRunMockOptimization:
     def test_run_mock_optimization_ledger_rows_are_valid(self, tmp_path: Path) -> None:
         import json
 
-        project_dir = tmp_path / "bridge_test_inv"
-        create_project_from_template(project_dir)
+        project_dir = _create_mock_project(tmp_path)
 
         run_mock_optimization(project_dir, max_evaluations=4)
 

@@ -11,13 +11,7 @@ from hermes_workflow.schemas import MetricsConfig, SpectreConfig
 from hermes_workflow.validate import assert_valid_project, validate_project_files
 
 
-FIXTURE_PROJECT = (
-    Path(__file__).parent.parent
-    / "src"
-    / "hermes_workflow"
-    / "templates"
-    / "spectre_maestro_project"
-)
+FIXTURE_PROJECT = Path(__file__).parent / "fixtures" / "bridge_test_inv"
 
 
 def copy_fixture_project(tmp_path: Path) -> Path:
@@ -65,7 +59,7 @@ def test_objective_expression_allows_safe_math_functions(tmp_path: Path) -> None
     project_dir = copy_fixture_project(tmp_path)
     metrics_path = project_dir / "config" / "metrics.yaml"
     payload = read_yaml(metrics_path)
-    payload["objective"]["expression"] = "min(max(NF_3G, NF_3G), ln(NF_3G))"
+    payload["objective"]["expression"] = "min(max(rise, fall), ln(DC))"
     write_yaml(metrics_path, payload)
 
     report = validate_project_files(project_dir)
@@ -77,7 +71,7 @@ def test_objective_expression_rejects_unknown_function_calls(tmp_path: Path) -> 
     project_dir = copy_fixture_project(tmp_path)
     metrics_path = project_dir / "config" / "metrics.yaml"
     payload = read_yaml(metrics_path)
-    payload["objective"]["expression"] = "abs(NF_3G)"
+    payload["objective"]["expression"] = "abs(rise)"
     write_yaml(metrics_path, payload)
 
     report = validate_project_files(project_dir)
@@ -93,7 +87,7 @@ def test_objective_expression_rejects_unknown_metric_names(tmp_path: Path) -> No
     project_dir = copy_fixture_project(tmp_path)
     metrics_path = project_dir / "config" / "metrics.yaml"
     payload = read_yaml(metrics_path)
-    payload["objective"]["expression"] = "NF_3G + slew"
+    payload["objective"]["expression"] = "(rise + slew) * DC"
     write_yaml(metrics_path, payload)
 
     report = validate_project_files(project_dir)
@@ -109,7 +103,7 @@ def test_objective_expression_rejects_boolean_literals(tmp_path: Path) -> None:
     project_dir = copy_fixture_project(tmp_path)
     metrics_path = project_dir / "config" / "metrics.yaml"
     payload = read_yaml(metrics_path)
-    payload["objective"]["expression"] = "NF_3G + True"
+    payload["objective"]["expression"] = "rise + True"
     write_yaml(metrics_path, payload)
 
     report = validate_project_files(project_dir)
@@ -125,7 +119,7 @@ def test_objective_expression_rejects_non_finite_literals(tmp_path: Path) -> Non
     project_dir = copy_fixture_project(tmp_path)
     metrics_path = project_dir / "config" / "metrics.yaml"
     payload = read_yaml(metrics_path)
-    payload["objective"]["expression"] = "NF_3G + 1e309"
+    payload["objective"]["expression"] = "rise + 1e309"
     write_yaml(metrics_path, payload)
 
     report = validate_project_files(project_dir)
@@ -182,7 +176,7 @@ def test_continuous_step_rejects_whitespace_unit_suffixes(tmp_path: Path) -> Non
 
     assert report.ok is False
     assert any(
-        "W lower must use a Spectre-safe attached unit suffix" in issue.message
+        "WN lower must use a Spectre-safe attached unit suffix" in issue.message
         for issue in report.issues
     )
 
@@ -213,7 +207,7 @@ def test_continuous_step_units_must_match(tmp_path: Path) -> None:
 
     assert report.ok is False
     assert any(
-        "W lower, upper, and step unit suffixes must match" in issue.message
+        "WN lower, upper, and step unit suffixes must match" in issue.message
         for issue in report.issues
     )
 

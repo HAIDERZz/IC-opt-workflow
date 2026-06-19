@@ -10,31 +10,23 @@ from hermes_workflow import real_run
 from hermes_workflow.approvals import decide_first_real_run
 from hermes_workflow.dry_run import run_dry_run
 from hermes_workflow.metric_requests import expression_sha256
-from hermes_workflow.package import (
-    build_execution_package,
-    create_project_from_template,
-    sha256_file,
-)
+from hermes_workflow.package import build_execution_package, sha256_file
 from hermes_workflow.real_run import prepare_real_run
 from hermes_workflow.requirement_intake import prepare_from_requirement
+from tests.project_factory import create_generic_project
 from tests.report_helpers import write_pass_reports
 from tests.test_requirement_intake import _copy_multi_testbench_requirement_project
 from tests.test_spectre_ocean_adapter import _create_ready_corner_project
 
 
-TEMPLATE_TEXT = """simulator lang=spectre
-parameters F={{F}} W={{W}} L={{L}} VB_LO={{VB_LO}}
-tran tran stop=10n
-"""
-
-
 def _create_project(tmp_path: Path) -> Path:
-    project_dir = tmp_path / "bridge_test_inv"
-    create_project_from_template(project_dir)
-    return project_dir
+    return create_generic_project(tmp_path)
 
 
-def _write_template(project_dir: Path, text: str = TEMPLATE_TEXT) -> None:
+def _write_template(project_dir: Path, text: str | None = None) -> None:
+    if text is None:
+        # The generic factory already writes a valid VAR_INT/VAR_WIDTH template.
+        return
     template_path = project_dir / "netlists" / "templates" / "template.scs"
     template_path.parent.mkdir(parents=True, exist_ok=True)
     template_path.write_text(text, encoding="utf-8")
@@ -42,7 +34,7 @@ def _write_template(project_dir: Path, text: str = TEMPLATE_TEXT) -> None:
 
 def _approve_project(project_dir: Path) -> None:
     build_execution_package(project_dir, created_at_utc="2026-05-31T00:00:00Z")
-    write_pass_reports(project_dir)
+    write_pass_reports(project_dir, variable_names=("VAR_INT", "VAR_WIDTH"))
     instruction = decide_first_real_run(
         project_dir,
         created_at_utc="2026-05-31T00:10:00Z",
@@ -125,7 +117,7 @@ def test_prepare_real_run_rejects_missing_supervisor_instruction(
     with pytest.raises(FileNotFoundError, match="supervisor instruction is missing"):
         prepare_real_run(project_dir)
 
-    assert not (project_dir / "runs" / "real").exists()
+    assert not (project_dir / "runs" / "real" / "real_001").exists()
 
 
 def test_prepare_real_run_rejects_reject_instruction(tmp_path: Path) -> None:
@@ -152,7 +144,7 @@ def test_prepare_real_run_rejects_reject_instruction(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="first real run is not approved"):
         prepare_real_run(project_dir)
 
-    assert not (project_dir / "runs" / "real").exists()
+    assert not (project_dir / "runs" / "real" / "real_001").exists()
 
 
 def test_prepare_real_run_rejects_missing_execution_manifest(
@@ -168,7 +160,7 @@ def test_prepare_real_run_rejects_missing_execution_manifest(
     with pytest.raises(FileNotFoundError, match="execution manifest is missing"):
         prepare_real_run(project_dir)
 
-    assert not (project_dir / "runs" / "real").exists()
+    assert not (project_dir / "runs" / "real" / "real_001").exists()
 
 
 def test_prepare_real_run_rejects_config_drift_after_approval(
@@ -180,7 +172,7 @@ def test_prepare_real_run_rejects_config_drift_after_approval(
     variables_path = project_dir / "config" / "variables.yaml"
     variables_path.write_text(
         variables_path.read_text(encoding="utf-8").replace(
-            'upper: "30"', 'upper: "32"', 1
+            "upper: '5'", "upper: '6'", 1
         ),
         encoding="utf-8",
     )
@@ -190,7 +182,7 @@ def test_prepare_real_run_rejects_config_drift_after_approval(
     ):
         prepare_real_run(project_dir)
 
-    assert not (project_dir / "runs" / "real").exists()
+    assert not (project_dir / "runs" / "real" / "real_001").exists()
 
 
 def test_prepare_real_run_rejects_instruction_missing_approved_hashes(
@@ -221,7 +213,7 @@ def test_prepare_real_run_rejects_instruction_missing_approved_hashes(
     ):
         prepare_real_run(project_dir)
 
-    assert not (project_dir / "runs" / "real").exists()
+    assert not (project_dir / "runs" / "real" / "real_001").exists()
 
 
 def test_prepare_real_run_rejects_instruction_hash_mismatch(
@@ -258,7 +250,7 @@ def test_prepare_real_run_rejects_instruction_hash_mismatch(
     ):
         prepare_real_run(project_dir)
 
-    assert not (project_dir / "runs" / "real").exists()
+    assert not (project_dir / "runs" / "real" / "real_001").exists()
 
 
 def test_prepare_real_run_writes_first_real_run_package(tmp_path: Path) -> None:
@@ -283,24 +275,20 @@ def test_prepare_real_run_writes_first_real_run_package(tmp_path: Path) -> None:
     assert package.manifest_path == run_dir / "real_run_manifest.json"
     assert "{{" not in rendered
     assert "}}" not in rendered
-    assert "F=20" in rendered
-    assert "W=0.6u" in rendered
-    assert "L=30n" in rendered
-    assert "VB_LO=280m" in rendered
+    for name, value in candidate["parameters"].items():
+        assert f"{name}={value}" in rendered
     assert candidate == {
         "schema_version": "1.0",
         "candidate_id": "real_001",
         "source": "lower_bound_first_real_run",
         "parameters": {
-            "F": "20",
-            "W": "0.6u",
-            "L": "30n",
-            "VB_LO": "280m",
+            "VAR_INT": "1",
+            "VAR_WIDTH": "0.1u",
         },
     }
     assert manifest["schema_version"] == "1.0"
     assert manifest["run_id"] == "real_001"
-    assert manifest["project_name"] == "mixer_cg_nf_opt"
+    assert manifest["project_name"] == project_dir.name
     assert manifest["created_at_utc"] == "2026-05-31T00:20:00Z"
     assert manifest["status"] == "prepared"
     assert manifest["supervisor_decision"] == "approve_first_real_run"
@@ -318,8 +306,8 @@ def test_prepare_real_run_writes_first_real_run_package(tmp_path: Path) -> None:
         "engine": "spectre_x",
         "preset": "ax",
         "output_format": "psfxl",
-        "threads_per_run": 10,
-            "timeout_s": 7200,
+        "threads_per_run": 2,
+        "timeout_s": 3600,
     }
     assert "modify_maestro_setup" in manifest["forbidden_actions"]
     assert not (project_dir / "ledger" / "experiment_ledger.jsonl").exists()
@@ -340,14 +328,14 @@ def test_prepare_real_run_omits_parallel_jobs_from_spectre_runtime_contract(
     manifest = _load_json(run_dir / "real_run_manifest.json")
 
     assert "parallel_jobs" not in manifest["spectre"]
-    assert manifest["spectre"]["threads_per_run"] == 10
-    assert manifest["spectre"]["timeout_s"] == 7200
+    assert manifest["spectre"]["threads_per_run"] == 2
+    assert manifest["spectre"]["timeout_s"] == 3600
 
     spectre_yaml = yaml.safe_load(
         (project_dir / "config" / "spectre.yaml").read_text(encoding="utf-8")
     )
     assert "parallel_jobs" in spectre_yaml["spectre"]
-    assert spectre_yaml["spectre"]["parallel_jobs"] == 10
+    assert spectre_yaml["spectre"]["parallel_jobs"] == 4
 
 
 def test_prepare_real_run_copies_exported_netlist_sidecars(tmp_path: Path) -> None:
@@ -356,7 +344,7 @@ def test_prepare_real_run_copies_exported_netlist_sidecars(tmp_path: Path) -> No
     _write_template(project_dir)
     exported_dir = project_dir / "netlists" / "exported"
     (exported_dir / "input.scs").write_text(
-        'include "ade_e.scs"\nparameters F=20\n',
+        'include "ade_e.scs"\nparameters VAR_INT=1\n',
         encoding="utf-8",
     )
     (exported_dir / "ade_e.scs").write_text(
@@ -384,7 +372,7 @@ def test_prepare_real_run_copies_exported_netlist_sidecars(tmp_path: Path) -> No
     assert (netlist_dir / ".modelFiles").read_text(encoding="utf-8") == (
         "model file sidecar\n"
     )
-    assert "F=20" in (netlist_dir / "input.scs").read_text(encoding="utf-8")
+    assert "VAR_INT=1" in (netlist_dir / "input.scs").read_text(encoding="utf-8")
 
 
 def test_prepare_real_run_rejects_exported_netlist_sidecar_symlink(
@@ -394,7 +382,7 @@ def test_prepare_real_run_rejects_exported_netlist_sidecar_symlink(
     _approve_project(project_dir)
     _write_template(project_dir)
     exported_dir = project_dir / "netlists" / "exported"
-    (exported_dir / "input.scs").write_text("parameters F=20\n", encoding="utf-8")
+    (exported_dir / "input.scs").write_text("parameters VAR_INT=1\n", encoding="utf-8")
     target = tmp_path / "protected.scs"
     target.write_text("external sidecar\n", encoding="utf-8")
     (exported_dir / "ade_e.scs").symlink_to(target)
@@ -436,8 +424,8 @@ def test_prepare_real_run_writes_metric_extraction_request(tmp_path: Path) -> No
         "engine": "spectre_x",
         "preset": "ax",
         "output_format": "psfxl",
-        "threads_per_run": 10,
-            "timeout_s": 7200,
+        "threads_per_run": 2,
+        "timeout_s": 3600,
     }
     assert request["ocean"] == {
         "mode": "nograph_replay",
@@ -445,18 +433,17 @@ def test_prepare_real_run_writes_metric_extraction_request(tmp_path: Path) -> No
         "log_file": "runs/real/real_001/metrics/ocean.log",
         "scalar_output_file": "runs/real/real_001/metrics/ocean_scalars.tsv",
     }
-    assert request["metrics"][0]["name"] == "NF_3G"
+    assert request["metrics"][0]["name"] == "metric_gain"
     assert request["metrics"][0]["expression"]
     assert request["metrics"][0]["expression_sha256"] == expression_sha256(
         request["metrics"][0]["expression"]
     )
     request_metrics = {metric["name"]: metric for metric in request["metrics"]}
-    assert set(request_metrics) == {"NF_3G"}
-    assert request_metrics["NF_3G"]["expression"] == (
-        'value(getData("NF" ?result "pnoise") 3e+09)'
-    )
-    assert request_metrics["NF_3G"]["unit"] == "dB"
-    assert request_metrics["NF_3G"]["required_signals"] == []
+    assert set(request_metrics) == {"metric_gain", "metric_power"}
+    assert request_metrics["metric_gain"]["expression"] == 'value(v("/OUT") 1n)'
+    assert request_metrics["metric_power"]["expression"] == 'value(i("/VDD") 1n)'
+    assert request_metrics["metric_power"]["unit"] == "W"
+    assert request_metrics["metric_power"]["required_signals"] == ["/VDD"]
     assert "rewrite_metric_formula" in request["forbidden_actions"]
     assert (
         manifest["metric_extraction_request"]
@@ -479,8 +466,8 @@ def test_metric_request_omits_parallel_jobs_from_spectre_runtime_contract(
 
     assert "parallel_jobs" not in request["spectre"]
     assert request["spectre"]["output_format"] == "psfxl"
-    assert request["spectre"]["threads_per_run"] == 10
-    assert request["spectre"]["timeout_s"] == 7200
+    assert request["spectre"]["threads_per_run"] == 2
+    assert request["spectre"]["timeout_s"] == 3600
 
 
 def test_prepare_real_run_writes_multi_testbench_child_packages(tmp_path: Path) -> None:
@@ -534,14 +521,15 @@ def test_prepare_real_run_writes_multi_testbench_child_packages(tmp_path: Path) 
 def test_prepare_real_run_rejects_metric_without_ocean_formula(tmp_path: Path) -> None:
     project_dir = _create_project(tmp_path)
     metrics_path = project_dir / "config" / "metrics.yaml"
-    payload = yaml.safe_load(metrics_path.read_text(encoding="utf-8"))
-    assert payload["metrics"][0]["name"] == "NF_3G"
-    payload["metrics"][0].pop("ocean")
-    metrics_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+    metrics = yaml.safe_load(metrics_path.read_text(encoding="utf-8"))
+    target = next(metric for metric in metrics["metrics"] if metric["name"] == "metric_gain")
+    assert "ocean" in target
+    del target["ocean"]
+    metrics_path.write_text(yaml.safe_dump(metrics, sort_keys=False), encoding="utf-8")
     _approve_project(project_dir)
     _write_template(project_dir)
 
-    with pytest.raises(ValueError, match="metric NF_3G is missing ocean formula"):
+    with pytest.raises(ValueError, match="metric metric_gain is missing ocean formula"):
         prepare_real_run(project_dir)
 
     assert not (project_dir / "runs" / "real" / "real_001").exists()
@@ -599,10 +587,8 @@ def test_prepare_real_run_rejects_placeholder_candidate_values(
             "candidate_id": run_id,
             "source": "lower_bound_first_real_run",
             "parameters": {
-                "F": "{{W}}",
-                "W": "0.6u",
-                "L": "30n",
-                "VB_LO": "280m",
+                "VAR_INT": "{{VAR_WIDTH}}",
+                "VAR_WIDTH": "0.2u",
             },
         }
 
@@ -610,7 +596,7 @@ def test_prepare_real_run_rejects_placeholder_candidate_values(
 
     with pytest.raises(
         ValueError,
-        match="candidate parameter values must not contain placeholders: F",
+        match="candidate parameter values must not contain placeholders: VAR_INT",
     ):
         prepare_real_run(project_dir, created_at_utc="2026-05-31T00:20:00Z")
 
@@ -625,12 +611,13 @@ def test_prepare_real_run_rejects_invalid_run_id(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match=r"run_id must match real_\[0-9\]\{3\}: run_1"):
         prepare_real_run(project_dir, run_id="run_1")
 
-    assert not (project_dir / "runs" / "real").exists()
+    assert not (project_dir / "runs" / "real" / "real_001").exists()
 
 
 def test_prepare_real_run_rejects_missing_template(tmp_path: Path) -> None:
     project_dir = _create_project(tmp_path)
     _approve_project(project_dir)
+    (project_dir / "netlists" / "templates" / "template.scs").unlink()
 
     with pytest.raises(
         FileNotFoundError,
@@ -638,7 +625,7 @@ def test_prepare_real_run_rejects_missing_template(tmp_path: Path) -> None:
     ):
         prepare_real_run(project_dir, created_at_utc="2026-05-31T00:20:00Z")
 
-    assert not (project_dir / "runs" / "real").exists()
+    assert not (project_dir / "runs" / "real" / "real_001").exists()
 
 
 def test_prepare_real_run_rejects_unexpected_template_variable(
@@ -649,7 +636,7 @@ def test_prepare_real_run_rejects_unexpected_template_variable(
     _write_template(
         project_dir,
         """simulator lang=spectre
-parameters F={{F}} W={{W}} L={{L}} VB_LO={{VB_LO}} EXTRA={{EXTRA}}
+parameters VAR_INT={{VAR_INT}} VAR_WIDTH={{VAR_WIDTH}} EXTRA={{EXTRA}}
 tran tran stop=10n
 """,
     )

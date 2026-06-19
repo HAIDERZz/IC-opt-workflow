@@ -1,23 +1,62 @@
 schema_version: "1.0"
 
 metrics:
-  - name: NF_3G
-    unit: dB
-    maestro_formula: value(getData("NF" ?result "pnoise") 3e+09)
-    required_signals: []
+  - name: rise
+    unit: s
+    maestro_formula: riseTime(VT("/VOUT") 0 nil 0.9 nil 10 90 nil "time")
+    required_signals:
+      - /VOUT
     ocean:
-      expression: value(getData("NF" ?result "pnoise") 3e+09)
+      expression: riseTime(VT("/VOUT") 0 nil 0.9 nil 10 90 nil "time")
+      result: tran
       expression_source: user_approved
-      source_reference: opt_requirement.md:NF_3G
+      source_reference: template:spectre_maestro_project:rise
+      expected_value_type: real_scalar
+      nil_policy: fail
+      non_finite_policy: fail
+
+  - name: fall
+    unit: s
+    maestro_formula: fallTime(VT("/VOUT") 0.9 nil 0 nil 10 90 nil "time")
+    required_signals:
+      - /VOUT
+    ocean:
+      expression: fallTime(VT("/VOUT") 0.9 nil 0 nil 10 90 nil "time")
+      result: tran
+      expression_source: user_approved
+      source_reference: template:spectre_maestro_project:fall
+      expected_value_type: real_scalar
+      nil_policy: fail
+      non_finite_policy: fail
+
+  - name: DC
+    unit: W
+    maestro_formula: VDC("/VDD") * IDC("/M0/S")
+    required_signals:
+      - /VDD
+      - /M0/S
+    ocean:
+      expression: VDC("/VDD") * IDC("/M0/S")
+      result: tran
+      expression_source: user_approved
+      source_reference: template:spectre_maestro_project:DC
       expected_value_type: real_scalar
       nil_policy: fail
       non_finite_policy: fail
 
 constraints:
-  - metric: NF_3G
+  - metric: rise
     op: lt
-    value: 9 dB
+    value: "80e-12 s"
+
+  - metric: fall
+    op: lt
+    value: "80e-12 s"
+
+  - metric: DC
+    op: lt
+    value: "4e-4 W"
 
 objective:
   direction: minimize
-  expression: NF_3G
+  expression: "(rise + fall) * DC"

@@ -240,10 +240,19 @@ def test_ic_opt_uses_cadence_env_variable(monkeypatch, tmp_path: Path) -> None:
     assert calls[0]["cadence_cshrc"] == cadence_cshrc
 
 
-def test_ic_opt_rejects_execution_agent_option(tmp_path: Path) -> None:
+def test_ic_opt_rejects_legacy_execution_agent_flag(monkeypatch, tmp_path: Path) -> None:
     project_dir = tmp_path / "project"
     project_dir.mkdir()
-    (project_dir / "cadence_env.csh").write_text("# test\n", encoding="utf-8")
+    cadence_cshrc = project_dir / "cadence_env.csh"
+    cadence_cshrc.write_text("# test\n", encoding="utf-8")
+
+    monkeypatch.setattr(
+        product_cli,
+        "optimize_project",
+        lambda *a, **kw: pytest.fail(
+            "optimize_project must not be called when --execution-agent is passed"
+        ),
+    )
 
     result = runner.invoke(
         product_cli.app,

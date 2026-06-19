@@ -6,8 +6,8 @@ from pathlib import Path
 import pytest
 
 from hermes_workflow.health import write_preflight_health
-from hermes_workflow.package import create_project_from_template
 from hermes_workflow.reports import HealthCheck, HealthStatus
+from tests.project_factory import create_generic_project
 
 
 def _load_health(project_dir: Path) -> HealthCheck:
@@ -18,8 +18,7 @@ def _load_health(project_dir: Path) -> HealthCheck:
 
 
 def test_write_preflight_health_writes_healthy_payload(tmp_path: Path) -> None:
-    project_dir = tmp_path / "bridge_test_inv"
-    create_project_from_template(project_dir)
+    project_dir = create_generic_project(tmp_path)
 
     report = write_preflight_health(project_dir)
 
@@ -37,8 +36,7 @@ def test_write_preflight_health_writes_healthy_payload(tmp_path: Path) -> None:
 def test_write_preflight_health_fails_closed_for_real_run_artifacts(
     tmp_path: Path,
 ) -> None:
-    project_dir = tmp_path / "bridge_test_inv"
-    create_project_from_template(project_dir)
+    project_dir = create_generic_project(tmp_path)
     (project_dir / "ledger" / "experiment_ledger.jsonl").write_text(
         "{}\n",
         encoding="utf-8",
@@ -79,8 +77,7 @@ def test_write_preflight_health_fails_closed_for_real_run_artifacts(
 def test_write_preflight_health_does_not_fabricate_report_for_invalid_config(
     tmp_path: Path,
 ) -> None:
-    project_dir = tmp_path / "bridge_test_inv"
-    create_project_from_template(project_dir)
+    project_dir = create_generic_project(tmp_path)
     (project_dir / "config" / "variables.yaml").unlink()
 
     with pytest.raises(ValueError, match="config/variables.yaml"):

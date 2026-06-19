@@ -4,17 +4,100 @@ import json
 from pathlib import Path
 
 import pytest
+import yaml
 
 from hermes_workflow.approvals import decide_first_real_run, decide_fix_run_real_run
-from hermes_workflow.package import build_execution_package, create_project_from_template
+from tests.project_factory import (
+    create_generic_project,
+    create_packaged_generic_project,
+)
 from tests.report_helpers import write_json, write_pass_reports
 
 
+def _variable_names(project_dir: Path) -> tuple[str, ...]:
+    payload = yaml.safe_load(
+        (project_dir / "config" / "variables.yaml").read_text(encoding="utf-8")
+    )
+    return tuple(variable["name"] for variable in payload["variables"])
+
+
+def _create_project(tmp_path: Path, *, name: str = "approval_project") -> Path:
+    return create_generic_project(tmp_path, name=name)
+
+
+def _create_packaged_project(
+    tmp_path: Path,
+    *,
+    name: str = "approval_project",
+    created_at_utc: str = "2026-05-28T00:00:00Z",
+) -> Path:
+    return create_packaged_generic_project(
+        tmp_path,
+        name=name,
+        created_at_utc=created_at_utc,
+    )
+
+
+def _create_packaged_fix_run_project(
+    tmp_path: Path,
+    *,
+    name: str = "fix_run_approval_project",
+    created_at_utc: str = "2026-06-16T00:00:00Z",
+) -> Path:
+    return create_packaged_generic_project(
+        tmp_path,
+        name=name,
+        workflow_mode="fix_run",
+        created_at_utc=created_at_utc,
+    )
+
+
+def _write_pass_reports(project_dir: Path) -> None:
+    write_pass_reports(project_dir, variable_names=_variable_names(project_dir))
+
+
+def _write_netlist_pass_report(project_dir: Path) -> None:
+    approved_variables = {name: True for name in _variable_names(project_dir)}
+    write_json(
+        project_dir / "reports" / "netlist_preparation_report.json",
+        {
+            "schema_version": "1.0",
+            "status": "pass",
+            "exported_input_scs": "netlists/exported/input.scs",
+            "template_scs": "netlists/templates/template.scs",
+            "approved_variables_template_status": approved_variables,
+            "analysis_statements": ["tran", "dc"],
+            "forbidden_setup_changes_detected": False,
+            "issues": [],
+        },
+    )
+
+
+def _write_dry_run_pass_report(project_dir: Path) -> None:
+    write_json(
+        project_dir / "reports" / "dry_run_report.json",
+        {
+            "schema_version": "1.0",
+            "status": "pass",
+            "rendered_candidate_scs": "runs/dry_run/input.scs",
+            "placeholder_check": {
+                "unresolved_placeholders": [],
+                "unexpected_template_variables": [],
+            },
+            "metrics_import_ok": True,
+            "mock_metrics_ok": True,
+            "objective_ok": True,
+            "constraints_ok": True,
+            "ledger_write_ok": True,
+            "state_write_ok": True,
+            "issues": [],
+        },
+    )
+
+
 def test_approval_gate_writes_approve_instruction(tmp_path: Path) -> None:
-    project_dir = tmp_path / "bridge_test_inv"
-    create_project_from_template(project_dir)
-    build_execution_package(project_dir, created_at_utc="2026-05-28T00:00:00Z")
-    write_pass_reports(project_dir)
+    project_dir = _create_packaged_project(tmp_path)
+    _write_pass_reports(project_dir)
 
     instruction = decide_first_real_run(
         project_dir,
@@ -33,29 +116,10 @@ def test_approval_gate_writes_approve_instruction(tmp_path: Path) -> None:
 def test_fix_run_approval_does_not_require_optimizer_preflight_reports(
     tmp_path: Path,
 ) -> None:
-    project_dir = tmp_path / "fix_run_test_inv"
-    create_project_from_template(project_dir)
-    (project_dir / "config" / "workflow.yaml").write_text(
-        "schema_version: '1.0'\nmode: fix_run\nstarting_run_id: real_001\n",
-        encoding="utf-8",
+    project_dir = _create_packaged_fix_run_project(
+        tmp_path,
+        name="fix_run_approval_project",
     )
-    (project_dir / "config" / "fixed_points.yaml").write_text(
-        "\n".join(
-            [
-                "schema_version: '1.0'",
-                "points:",
-                "  - candidate_id: user_point_001",
-                "    parameters:",
-                "      FN: '2'",
-                "      WN: 0.3u",
-                "      FP: '2'",
-                "      WP: 0.3u",
-                "",
-            ]
-        ),
-        encoding="utf-8",
-    )
-    build_execution_package(project_dir, created_at_utc="2026-06-16T00:00:00Z")
 
     instruction = decide_fix_run_real_run(
         project_dir,
@@ -72,10 +136,8 @@ def test_fix_run_approval_does_not_require_optimizer_preflight_reports(
 def test_approval_gate_writes_reject_instruction_when_preflight_fails(
     tmp_path: Path,
 ) -> None:
-    project_dir = tmp_path / "bridge_test_inv"
-    create_project_from_template(project_dir)
-    build_execution_package(project_dir, created_at_utc="2026-05-28T00:00:00Z")
-    write_pass_reports(project_dir)
+    project_dir = _create_packaged_project(tmp_path)
+    _write_pass_reports(project_dir)
     dry_run_path = project_dir / "reports" / "dry_run_report.json"
     dry_run_payload = json.loads(dry_run_path.read_text(encoding="utf-8"))
     dry_run_payload["status"] = "fail"
@@ -93,8 +155,7 @@ def test_approval_gate_writes_reject_instruction_when_preflight_fails(
 
 
 def test_approval_gate_rejects_missing_execution_manifest(tmp_path: Path) -> None:
-    project_dir = tmp_path / "bridge_test_inv"
-    create_project_from_template(project_dir)
+    project_dir = _create_project(tmp_path)
 
     instruction = decide_first_real_run(
         project_dir,
@@ -110,10 +171,8 @@ def test_approval_gate_rejects_missing_execution_manifest(tmp_path: Path) -> Non
 
 
 def test_approval_gate_rejects_invalid_project_config(tmp_path: Path) -> None:
-    project_dir = tmp_path / "bridge_test_inv"
-    create_project_from_template(project_dir)
-    build_execution_package(project_dir, created_at_utc="2026-05-28T00:00:00Z")
-    write_pass_reports(project_dir)
+    project_dir = _create_packaged_project(tmp_path)
+    _write_pass_reports(project_dir)
     (project_dir / "config" / "variables.yaml").unlink()
 
     instruction = decide_first_real_run(
@@ -128,10 +187,8 @@ def test_approval_gate_rejects_invalid_project_config(tmp_path: Path) -> None:
 
 
 def test_approval_gate_rejects_invalid_execution_manifest(tmp_path: Path) -> None:
-    project_dir = tmp_path / "bridge_test_inv"
-    create_project_from_template(project_dir)
-    build_execution_package(project_dir, created_at_utc="2026-05-28T00:00:00Z")
-    write_pass_reports(project_dir)
+    project_dir = _create_packaged_project(tmp_path)
+    _write_pass_reports(project_dir)
     manifest_path = project_dir / "execution_package" / "execution_manifest.json"
     manifest_path.write_text("{not-json", encoding="utf-8")
 
@@ -146,10 +203,8 @@ def test_approval_gate_rejects_invalid_execution_manifest(tmp_path: Path) -> Non
 
 
 def test_approval_gate_rejects_manifest_missing_config_hashes(tmp_path: Path) -> None:
-    project_dir = tmp_path / "bridge_test_inv"
-    create_project_from_template(project_dir)
-    build_execution_package(project_dir, created_at_utc="2026-05-28T00:00:00Z")
-    write_pass_reports(project_dir)
+    project_dir = _create_packaged_project(tmp_path)
+    _write_pass_reports(project_dir)
     manifest_path = project_dir / "execution_package" / "execution_manifest.json"
     manifest_payload = json.loads(manifest_path.read_text(encoding="utf-8"))
     del manifest_payload["immutable_config_files"]
@@ -168,10 +223,8 @@ def test_approval_gate_rejects_manifest_missing_config_hashes(tmp_path: Path) ->
 def test_approval_gate_rejects_health_report_with_real_run_started(
     tmp_path: Path,
 ) -> None:
-    project_dir = tmp_path / "bridge_test_inv"
-    create_project_from_template(project_dir)
-    build_execution_package(project_dir, created_at_utc="2026-05-28T00:00:00Z")
-    write_pass_reports(project_dir)
+    project_dir = _create_packaged_project(tmp_path)
+    _write_pass_reports(project_dir)
     (project_dir / "ledger").mkdir(parents=True, exist_ok=True)
     (project_dir / "ledger" / "experiment_ledger.jsonl").write_text("{}\n", encoding="utf-8")
     health_path = project_dir / "state" / "health_check.json"
@@ -198,29 +251,8 @@ def test_approval_gate_rejects_health_report_with_real_run_started(
 
 
 def test_approval_gate_rejects_missing_preflight_reports(tmp_path: Path) -> None:
-    project_dir = tmp_path / "bridge_test_inv"
-    create_project_from_template(project_dir)
-    build_execution_package(project_dir, created_at_utc="2026-05-28T00:00:00Z")
-
-    write_json(
-        project_dir / "reports" / "dry_run_report.json",
-        {
-            "schema_version": "1.0",
-            "status": "pass",
-            "rendered_candidate_scs": "runs/dry_run/input.scs",
-            "placeholder_check": {
-                "unresolved_placeholders": [],
-                "unexpected_template_variables": [],
-            },
-            "metrics_import_ok": True,
-            "mock_metrics_ok": True,
-            "objective_ok": True,
-            "constraints_ok": True,
-            "ledger_write_ok": True,
-            "state_write_ok": True,
-            "issues": [],
-        },
-    )
+    project_dir = _create_packaged_project(tmp_path)
+    _write_dry_run_pass_report(project_dir)
 
     instruction = decide_first_real_run(
         project_dir,
@@ -235,47 +267,9 @@ def test_approval_gate_rejects_missing_preflight_reports(tmp_path: Path) -> None
 
 
 def test_approval_gate_rejects_missing_health_check(tmp_path: Path) -> None:
-    project_dir = tmp_path / "bridge_test_inv"
-    create_project_from_template(project_dir)
-    build_execution_package(project_dir, created_at_utc="2026-05-28T00:00:00Z")
-
-    write_json(
-        project_dir / "reports" / "netlist_preparation_report.json",
-        {
-            "schema_version": "1.0",
-            "status": "pass",
-            "exported_input_scs": "netlists/exported/input.scs",
-            "template_scs": "netlists/templates/template.scs",
-            "approved_variables_template_status": {
-                "FN": True,
-                "WN": True,
-                "FP": True,
-                "WP": True,
-            },
-            "analysis_statements": ["tran", "dc"],
-            "forbidden_setup_changes_detected": False,
-            "issues": [],
-        },
-    )
-    write_json(
-        project_dir / "reports" / "dry_run_report.json",
-        {
-            "schema_version": "1.0",
-            "status": "pass",
-            "rendered_candidate_scs": "runs/dry_run/input.scs",
-            "placeholder_check": {
-                "unresolved_placeholders": [],
-                "unexpected_template_variables": [],
-            },
-            "metrics_import_ok": True,
-            "mock_metrics_ok": True,
-            "objective_ok": True,
-            "constraints_ok": True,
-            "ledger_write_ok": True,
-            "state_write_ok": True,
-            "issues": [],
-        },
-    )
+    project_dir = _create_packaged_project(tmp_path)
+    _write_netlist_pass_report(project_dir)
+    _write_dry_run_pass_report(project_dir)
 
     instruction = decide_first_real_run(
         project_dir,
@@ -291,9 +285,7 @@ def test_approval_gate_rejects_missing_health_check(tmp_path: Path) -> None:
 def test_approval_gate_preserves_strict_loading_for_malformed_present_report(
     tmp_path: Path,
 ) -> None:
-    project_dir = tmp_path / "bridge_test_inv"
-    create_project_from_template(project_dir)
-    build_execution_package(project_dir, created_at_utc="2026-05-28T00:00:00Z")
+    project_dir = _create_packaged_project(tmp_path)
     (project_dir / "reports").mkdir(parents=True, exist_ok=True)
     (project_dir / "reports" / "netlist_preparation_report.json").write_text(
         "not-valid-json", encoding="utf-8"
@@ -325,10 +317,12 @@ def test_optimizer_approval_still_requires_preflight_reports(tmp_path: Path) -> 
     """Optimizer mode must keep its full preflight gate even after the
     fix-run approval was added. This locks in that the fix did not
     weaken the optimizer path."""
-    project_dir = tmp_path / "optimizer_preflight_regression"
-    create_project_from_template(project_dir)
-    build_execution_package(project_dir, created_at_utc="2026-06-16T00:00:00Z")
-    # Intentionally do NOT call write_pass_reports — preflight is missing.
+    project_dir = _create_packaged_project(
+        tmp_path,
+        name="optimizer_preflight_regression",
+        created_at_utc="2026-06-16T00:00:00Z",
+    )
+    # Intentionally do NOT call _write_pass_reports -- preflight is missing.
 
     instruction = decide_first_real_run(
         project_dir,
@@ -345,20 +339,10 @@ def test_fix_run_approval_uses_distinct_allowed_actions(tmp_path: Path) -> None:
     """fix-run approval must NOT grant the optimizer-only action
     ``run_standalone_spectre_optimizer``; it must grant the fix-run-only
     action ``prepare_fixed_candidate_real_run``."""
-    project_dir = tmp_path / "fix_run_distinct_actions"
-    create_project_from_template(project_dir)
-    (project_dir / "config" / "workflow.yaml").write_text(
-        "schema_version: '1.0'\nmode: fix_run\nstarting_run_id: real_001\n",
-        encoding="utf-8",
+    project_dir = _create_packaged_fix_run_project(
+        tmp_path,
+        name="fix_run_distinct_actions",
     )
-    (project_dir / "config" / "fixed_points.yaml").write_text(
-        "schema_version: '1.0'\npoints:\n"
-        "  - candidate_id: user_point_001\n"
-        "    parameters:\n"
-        "      FN: '2'\n      WN: 0.3u\n      FP: '2'\n      WP: 0.3u\n",
-        encoding="utf-8",
-    )
-    build_execution_package(project_dir, created_at_utc="2026-06-16T00:00:00Z")
 
     instruction = decide_fix_run_real_run(
         project_dir,

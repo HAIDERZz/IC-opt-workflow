@@ -1,68 +1,9 @@
-# Python environments and local packaging
 .venv/
-venv/
-env/
-*.egg-info/
-build/
-dist/
-
-# Python caches and test/lint caches
 __pycache__/
 *.py[cod]
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
-.coverage
-htmlcov/
-
-# Local editor and OS files
-.idea/
-.vscode/
-*.swp
-*.swo
-.DS_Store
-
-# User/project Cadence environment anchors
-cadence_env.csh
-*.local.csh
-
-# Generated optimizer project artifacts
-runs/
-reports/
-ledger/
-state/
-execution_package/
-config/
-netlists/
-*.log
-*.out
-
-# Packaged project-template resources are source files even though their
-# directory names match generated project artifacts.
-!src/hermes_workflow/templates/spectre_maestro_project/config/
-!src/hermes_workflow/templates/spectre_maestro_project/config/*.yaml
-!src/hermes_workflow/templates/spectre_maestro_project/netlists/
-!src/hermes_workflow/templates/spectre_maestro_project/netlists/exported/
-!src/hermes_workflow/templates/spectre_maestro_project/netlists/exported/.gitkeep
-!src/hermes_workflow/templates/spectre_maestro_project/netlists/templates/
-!src/hermes_workflow/templates/spectre_maestro_project/netlists/templates/.gitkeep
-!src/hermes_workflow/templates/spectre_maestro_project/execution_package/
-!src/hermes_workflow/templates/spectre_maestro_project/execution_package/.gitkeep
-!src/hermes_workflow/templates/spectre_maestro_project/ledger/
-!src/hermes_workflow/templates/spectre_maestro_project/ledger/.gitkeep
-!src/hermes_workflow/templates/spectre_maestro_project/reports/
-!src/hermes_workflow/templates/spectre_maestro_project/reports/.gitkeep
-!src/hermes_workflow/templates/spectre_maestro_project/state/
-!src/hermes_workflow/templates/spectre_maestro_project/state/.gitkeep
-
-# Cadence/Spectre/OCEAN heavy or proprietary artifacts
-psf/
-psf*/
-*.raw
-*.psf
-*.ocn.log
-input.scs
-
-# Internal development evidence that must be sanitized before publication
+.serena/
 docs/OCEAN_DOC_*
 docs/toolchain_evidence/

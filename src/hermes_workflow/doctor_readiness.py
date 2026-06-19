@@ -24,13 +24,6 @@ from hermes_workflow.schemas import (
 LEDGER_RELATIVE = Path("ledger/experiment_ledger.jsonl")
 
 
-def _workflow_mode(sections: dict[str, Any]) -> str:
-    workflow = sections.get("Workflow")
-    if isinstance(workflow, dict) and workflow.get("mode") == "fix_run":
-        return "fix_run"
-    return "optimize"
-
-
 def build_requirement_summary(sections: dict[str, Any]) -> dict[str, Any]:
     """Summarize requirement sections for doctor reporting.
 
@@ -49,32 +42,16 @@ def build_requirement_summary(sections: dict[str, Any]) -> dict[str, Any]:
         corner_count = 1
         objective_policy = "nominal"
         constraint_policy = "nominal"
-    mode = _workflow_mode(sections)
-    summary = {
-        "workflow_mode": mode,
+    return {
         "has_multi_testbench": has_multi_testbench,
         "testbench_count": testbench_count,
         "has_process_corners": has_process_corners,
         "corner_count": corner_count,
         "objective_policy": objective_policy,
         "constraint_policy": constraint_policy,
+        "child_runs_per_candidate": testbench_count * corner_count,
+        "inside_candidate_execution": "serial",
     }
-    if mode == "fix_run":
-        summary.update(
-            {
-                "child_runs_per_fixed_point": testbench_count * corner_count,
-                "inside_fixed_point_execution": "parallel_child_runs",
-                "fixed_point_execution": "serial",
-            }
-        )
-    else:
-        summary.update(
-            {
-                "child_runs_per_candidate": testbench_count * corner_count,
-                "inside_candidate_execution": "serial",
-            }
-        )
-    return summary
 
 
 def build_evaluation_matrix_summary(sections: dict[str, Any]) -> dict[str, Any]:
@@ -86,20 +63,7 @@ def build_evaluation_matrix_summary(sections: dict[str, Any]) -> dict[str, Any]:
         value = spectre.get("parallel_jobs")
         if isinstance(value, int):
             parallel_jobs = value
-    mode = _workflow_mode(sections)
-    if mode == "fix_run":
-        return {
-            "workflow_mode": mode,
-            "fix_run_child_parallelism": parallel_jobs,
-            "fixed_point_parallelism": 1,
-            "testbench_count": requirement["testbench_count"],
-            "corner_count": requirement["corner_count"],
-            "child_runs_per_fixed_point": requirement["child_runs_per_fixed_point"],
-            "inside_fixed_point_execution": "parallel_child_runs",
-            "fixed_point_execution": "serial",
-        }
     return {
-        "workflow_mode": mode,
         "candidate_parallelism": parallel_jobs,
         "testbench_count": requirement["testbench_count"],
         "corner_count": requirement["corner_count"],

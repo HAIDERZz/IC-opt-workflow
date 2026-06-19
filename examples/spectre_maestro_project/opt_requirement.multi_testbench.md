@@ -1,13 +1,12 @@
 # Multi-Testbench Single-Corner Optimization Requirement
 
-Use this template when each optimizer candidate must be evaluated by more than
-one Maestro/ADE testbench at each testbench source point corner.
+Template derived from the verified Mixer requirement. This mode evaluates one candidate through several Maestro/ADE testbenches at their source point corners.
 
 ## Project
 
 ```yaml
 project_name: mixer_multi_tb_opt
-description: Optimize one Mixer candidate across CG/NF and gain testbenches
+description: Optimize one Mixer candidate across CG/NF/BW, IIP3, and P1dB testbenches
 backend: maestro_exported_spectre_deck
 ```
 
@@ -15,22 +14,30 @@ backend: maestro_exported_spectre_deck
 
 ```yaml
 testbenches:
-  - id: cg_nf
-    maestro_point_root: /absolute/path/to/Mixer_CS_CG_NF/point_root
-    virtuoso_library: Virtuoso_Bridge_test
-    cell: MixerCS_PSS_CG_Noise
-    design_view: maestro
-    maestro_view: maestro
-    test_name: Mixer_CS_CG_NF
-    corner: Nominal
-  - id: gain
-    maestro_point_root: /absolute/path/to/Mixer_CS_GAIN/point_root
-    virtuoso_library: Virtuoso_Bridge_test
-    cell: MixerCS_PSS_Gain
-    design_view: maestro
-    maestro_view: maestro
-    test_name: Mixer_CS_GAIN
-    corner: Nominal
+- id: cg_nf
+  maestro_point_root: /absolute/path/to/CG_NF_Test/point_root
+  virtuoso_library: Virtuoso_Bridge_test
+  cell: MixerCS_PSS_CG_Noise
+  design_view: schematic
+  maestro_view: maestro
+  test_name: Mixer_CS_CG_NF
+  corner: Nominal
+- id: iip3
+  maestro_point_root: /absolute/path/to/IIP3_Test/point_root
+  virtuoso_library: Virtuoso_Bridge_test
+  cell: MixerCS_PSS_IIP3
+  design_view: schematic
+  maestro_view: maestro
+  test_name: Mixer_CS_IIP3
+  corner: Nominal
+- id: p1db
+  maestro_point_root: /absolute/path/to/P1dB_Test/point_root
+  virtuoso_library: Virtuoso_Bridge_test
+  cell: MixerCS_PSS_P1dB
+  design_view: schematic
+  maestro_view: maestro
+  test_name: P1dB_Test
+  corner: Nominal
 ```
 
 ## Design Variables
@@ -56,37 +63,78 @@ testbenches:
   lower: 280m
   upper: 400m
   step: 20m
+- name: FCS
+  kind: integer
+  lower: '40'
+  upper: '56'
+  step: '2'
+- name: WCS
+  kind: continuous_step
+  lower: 0.6u
+  upper: 1.2u
+  step: 0.2u
+- name: LCS
+  kind: continuous_step
+  lower: 30n
+  upper: 50n
+  step: 10n
+- name: VB_RF
+  kind: continuous_step
+  lower: 300m
+  upper: 440m
+  step: 20m
 ```
 
 ## Metrics
 
 ```yaml
+- name: BW
+  unit: Hz
+  testbench: cg_nf
+  ocean_expression: bandwidth(db((harmonic((v("/IF_P" ?result "pac") - v("/IF_N" ?result "pac")) '-1) / harmonic(drplPacVolGnExpDen("(v(\"/RF_P\" ?result \"pac\")-v(\"/RF_N\" ?result \"pac\"))" '(0) nil) '-1))) 3 "low")
+- name: MAX_GAIN
+  unit: dB
+  testbench: cg_nf
+  ocean_expression: ymax(db((harmonic((v("/IF_P" ?result "pac") - v("/IF_N" ?result "pac")) '-1) / harmonic(drplPacVolGnExpDen("(v(\"/RF_P\" ?result \"pac\")-v(\"/RF_N\" ?result \"pac\"))" '(0) nil) '-1))))
 - name: NF_3G
   unit: dB
   testbench: cg_nf
-  ocean_expression: 'value(getData("NF" ?result "pnoise") 3e+09)'
-- name: MAX_GAIN
-  unit: dB
-  testbench: gain
-  ocean_expression: 'ymax(getData("gain" ?result "pac"))'
+  ocean_expression: value(getData("NF" ?result "pnoise") 3e+09)
+- name: IIP3
+  unit: dBm
+  testbench: iip3
+  ocean_expression: rapidIIPN("pac_ip3")
+- name: P1dB
+  unit: dBm
+  testbench: p1db
+  ocean_expression: compressionVRI((v("/IF_P" ?result "pss_fd") - v("/IF_N" ?result "pss_fd")) '1 ?rport resultParam("PORT2:r" ?result "pss_fd") ?gcomp 1)
 ```
 
 ## Constraints
 
 ```yaml
+- metric: BW
+  op: gt
+  value: 28e9 Hz
+- metric: MAX_GAIN
+  op: gt
+  value: 5.5 dB
 - metric: NF_3G
   op: lt
   value: 9 dB
-- metric: MAX_GAIN
+- metric: IIP3
   op: gt
-  value: 5 dB
+  value: 1 dBm
+- metric: P1dB
+  op: gt
+  value: -6 dBm
 ```
 
 ## Objective
 
 ```yaml
 direction: minimize
-expression: NF_3G - 0.1 * MAX_GAIN
+expression: -(0.1*min(max(0,min(1,10*(ln(BW/28e9)/ln(10))/0.6)),max(0,min(1,(MAX_GAIN-5.5)/2)),max(0,min(1,(9-NF_3G)/0.7)),max(0,min(1,(IIP3-1)/2)),max(0,min(1,(P1dB+6)/1.5)))+0.8*(0.1*max(0,min(1,10*(ln(BW/28e9)/ln(10))/0.6))+0.10*max(0,min(1,(MAX_GAIN-5.5)/2))+0.30*max(0,min(1,(9-NF_3G)/0.7))+0.20*max(0,min(1,(IIP3-1)/2))+0.30*max(0,min(1,(P1dB+6)/1.5))))
 ```
 
 ## Spectre Settings
@@ -106,8 +154,8 @@ keep_successful_runs: true
 ## Optimizer Settings
 
 ```yaml
-algorithm: openbox
-strategy: openbox_prf_eic
+algorithm: turbo
+strategy: turbo_trust_region
 initialization: sobol
 max_evaluations: 30
 batch_size: 10

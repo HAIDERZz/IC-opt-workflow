@@ -14,98 +14,63 @@ from hermes_workflow.fix_run_models import (
     FixRunPointReport,
     FixRunReport,
 )
-from hermes_workflow.package import create_project_from_template
+from tests.project_factory import create_generic_project
 
 
-TEMPLATE_TEXT = """simulator lang=spectre
-parameters FN={{FN}} WN={{WN}} FP={{FP}} WP={{WP}}
-tran tran stop=10n
-"""
+def _fixed_points(project_dir: Path) -> list[dict[str, object]]:
+    payload = yaml.safe_load(
+        (project_dir / "config" / "fixed_points.yaml").read_text(encoding="utf-8")
+    )
+    points = payload["points"]
+    assert isinstance(points, list)
+    return points
 
 
-def _write_template(project_dir: Path, text: str = TEMPLATE_TEXT) -> None:
-    template_path = project_dir / "netlists" / "templates" / "template.scs"
-    template_path.parent.mkdir(parents=True, exist_ok=True)
-    template_path.write_text(text, encoding="utf-8")
+def _fixed_point_parameters(project_dir: Path, index: int = 0) -> dict[str, str]:
+    parameters = _fixed_points(project_dir)[index]["parameters"]
+    assert isinstance(parameters, dict)
+    return {str(key): str(value) for key, value in parameters.items()}
+
+
+def _fixed_point_candidate_id(project_dir: Path, index: int = 0) -> str:
+    candidate_id = _fixed_points(project_dir)[index]["candidate_id"]
+    assert isinstance(candidate_id, str)
+    return candidate_id
 
 
 def _create_fix_run_project(tmp_path: Path) -> Path:
     """Create a minimal project with fix_run mode configured."""
-    project_dir = tmp_path / "fix_run_test_inv"
-    create_project_from_template(project_dir)
-    _write_template(project_dir)
-
-    # Write workflow.yaml to set fix_run mode
-    workflow_yaml = project_dir / "config" / "workflow.yaml"
-    workflow_yaml.write_text(
-        yaml.safe_dump(
-            {"schema_version": "1.0", "mode": "fix_run", "starting_run_id": "real_001"},
-            sort_keys=False,
-        ),
-        encoding="utf-8",
+    return create_generic_project(
+        tmp_path,
+        name="fix_run_project",
+        workflow_mode="fix_run",
     )
-
-    # Write fixed_points.yaml
-    fixed_points_yaml = project_dir / "config" / "fixed_points.yaml"
-    fixed_points_yaml.write_text(
-        yaml.safe_dump(
-            {
-                "schema_version": "1.0",
-                "points": [
-                    {
-                        "candidate_id": "user_point_001",
-                        "parameters": {"FN": "2", "WN": "0.3u", "FP": "2", "WP": "0.3u"},
-                    }
-                ],
-            },
-            sort_keys=False,
-        ),
-        encoding="utf-8",
-    )
-
-    return project_dir
 
 
 def _create_two_point_fix_run_project(tmp_path: Path) -> Path:
     """Create a fix_run project with two fixed points."""
-    project_dir = tmp_path / "fix_run_two_points"
-    create_project_from_template(project_dir)
-    _write_template(project_dir)
-
-    # Write workflow.yaml
-    workflow_yaml = project_dir / "config" / "workflow.yaml"
-    workflow_yaml.write_text(
-        yaml.safe_dump(
-            {"schema_version": "1.0", "mode": "fix_run", "starting_run_id": "real_001"},
-            sort_keys=False,
-        ),
-        encoding="utf-8",
+    project_dir = create_generic_project(
+        tmp_path,
+        name="fix_run_two_points",
+        workflow_mode="fix_run",
     )
-
-    # Write fixed_points.yaml with TWO points
-    fixed_points_yaml = project_dir / "config" / "fixed_points.yaml"
-    fixed_points_yaml.write_text(
+    first_point = _fixed_points(project_dir)[0]
+    first_parameters = _fixed_point_parameters(project_dir)
+    parameter_names = list(first_parameters)
+    assert len(parameter_names) == 2
+    second_parameters = {
+        parameter_names[0]: "4",
+        parameter_names[1]: "0.4u",
+    }
+    (project_dir / "config" / "fixed_points.yaml").write_text(
         yaml.safe_dump(
             {
                 "schema_version": "1.0",
                 "points": [
+                    first_point,
                     {
-                        "candidate_id": "user_point_001",
-                        "parameters": {
-                            "FN": "2",
-                            "WN": "0.3u",
-                            "FP": "2",
-                            "WP": "0.3u",
-                        },
-                    },
-                    {
-                        "candidate_id": "user_point_002",
-                        "parameters": {
-                            "FN": "4",
-                            "WN": "0.5u",
-                            "FP": "4",
-                            "WP": "0.5u",
-                        },
+                        "candidate_id": "fixed_002",
+                        "parameters": second_parameters,
                     },
                 ],
             },
@@ -113,7 +78,6 @@ def _create_two_point_fix_run_project(tmp_path: Path) -> Path:
         ),
         encoding="utf-8",
     )
-
     return project_dir
 
 
@@ -290,13 +254,8 @@ def test_fix_run_one_fixed_point_creates_one_candidate(tmp_path: Path) -> None:
         # prepare_explicit_candidate_real_run should be called once for 1 fixed point
         assert mock_prepare.call_count == 1
         call_kwargs = mock_prepare.call_args
-        assert call_kwargs.kwargs["candidate_id"] == "user_point_001"
-        assert call_kwargs.kwargs["parameters"] == {
-            "FN": "2",
-            "WN": "0.3u",
-            "FP": "2",
-            "WP": "0.3u",
-        }
+        assert call_kwargs.kwargs["candidate_id"] == _fixed_point_candidate_id(project_dir)
+        assert call_kwargs.kwargs["parameters"] == _fixed_point_parameters(project_dir)
 
 
 # ---------------------------------------------------------------------------
@@ -454,7 +413,7 @@ def test_fix_run_returns_fix_run_report(tmp_path: Path) -> None:
         assert report.status == "pass"
         assert len(report.points) == 1
         assert isinstance(report.points[0], FixRunPointReport)
-    assert report.points[0].candidate_id == "user_point_001"
+    assert report.points[0].candidate_id == _fixed_point_candidate_id(project_dir)
     assert report.points[0].run_id == "real_001"
     assert report.optimizer_state_created is False
     assert report.optimizer_decision_report_created is False

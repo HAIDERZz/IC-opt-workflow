@@ -293,68 +293,37 @@ def _record_parallel_jobs_warning(
     if not isinstance(parallel_jobs, int) or parallel_jobs <= 8:
         return
 
-    if req_report.workflow_mode == "fix_run":
-        checks["parallel_jobs"] = {
-            "status": "warn",
-            "message": (
-                f"remote fix-run child_parallelism (Spectre Settings.parallel_jobs)={parallel_jobs} is high; "
-                "this is the scheduler-level number of testbench/corner child runs inside one fixed point; "
-                "fixed points remain serial; start around 4-8 to avoid SSH server limits"
-            ),
-        }
-    else:
-        checks["parallel_jobs"] = {
-            "status": "warn",
-            "message": (
-                f"remote candidate_parallelism (Spectre Settings.parallel_jobs)={parallel_jobs} is high; "
-                "this is the scheduler-level number of candidates running concurrently, "
-                "not a Spectre child-runtime setting; "
-                "normal remote multi-testbench runs should start around 4-8 to avoid SSH server limits"
-            ),
-        }
+    checks["parallel_jobs"] = {
+        "status": "warn",
+        "message": (
+            f"remote candidate_parallelism (Spectre Settings.parallel_jobs)={parallel_jobs} is high; "
+            "this is the scheduler-level number of candidates running concurrently, "
+            "not a Spectre child-runtime setting; "
+            "normal remote multi-testbench runs should start around 4-8 to avoid SSH server limits"
+        ),
+    }
     if structured_issues is not None:
-        if req_report.workflow_mode == "fix_run":
-            message = (
-                f"remote fix-run child_parallelism (Spectre Settings.parallel_jobs)={parallel_jobs} is high."
-            )
-            detail = (
-                "fix-run child_parallelism is the scheduler-level number of "
-                "testbench/corner child runs inside one fixed point; fixed points remain serial. "
-                "High values can increase SSH connection pressure and may trigger remote transport errors."
-            )
-            likely_cause = (
-                "Remote fix-run child concurrency exceeds typical safe ranges for multi-testbench runs."
-            )
-            recommended_action = (
-                "Set Spectre Settings.parallel_jobs (fix-run child_parallelism) to values around "
-                "4 to 8 for remote fix-run projects."
-            )
-        else:
-            message = (
-                f"remote candidate_parallelism (Spectre Settings.parallel_jobs)={parallel_jobs} is high."
-            )
-            detail = (
-                "candidate_parallelism is the scheduler-level number of optimizer candidates "
-                "evaluated concurrently; high values can increase SSH connection pressure and may "
-                "trigger remote transport errors. Testbenches/corners inside one candidate always run serially."
-            )
-            likely_cause = (
-                "Remote candidate concurrency exceeds typical safe ranges for multi-testbench runs."
-            )
-            recommended_action = (
-                "Set Spectre Settings.parallel_jobs (candidate_parallelism) to values around 4 to 8 "
-                "for remote multi-testbench runs."
-            )
         structured_issues.append(
             Diagnostic(
                 code="REMOTE_PARALLELISM_HIGH",
                 severity=DiagnosticSeverity.WARN,
                 stage="remote_ssh",
                 component="remote_doctor",
-                message=message,
-                detail=detail,
-                likely_cause=likely_cause,
-                recommended_action=recommended_action,
+                message=(
+                    f"remote candidate_parallelism (Spectre Settings.parallel_jobs)={parallel_jobs} is high."
+                ),
+                detail=(
+                    "candidate_parallelism is the scheduler-level number of optimizer candidates "
+                    "evaluated concurrently; high values can increase SSH connection pressure and may "
+                    "trigger remote transport errors. Testbenches/corners inside one candidate always run serially."
+                ),
+                likely_cause=(
+                    "Remote candidate concurrency exceeds typical safe ranges for multi-testbench runs."
+                ),
+                recommended_action=(
+                    "Set Spectre Settings.parallel_jobs (candidate_parallelism) to values around 4 to 8 "
+                    "for remote multi-testbench runs."
+                ),
                 evidence=(evidence or []),
             )
         )

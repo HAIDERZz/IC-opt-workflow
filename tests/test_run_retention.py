@@ -5,8 +5,13 @@ from pathlib import Path, PurePosixPath
 from types import SimpleNamespace
 
 import pytest
+import yaml
 
-from hermes_workflow.package import create_project_from_template
+from tests.project_factory import create_generic_project
+
+
+def _create_retention_project(tmp_path: Path) -> Path:
+    return create_generic_project(tmp_path, name="retention_project")
 
 
 def _set_keep_flags(
@@ -14,16 +19,11 @@ def _set_keep_flags(
 ) -> None:
     """Edit config/spectre.yaml to set the two retention flags."""
     spectre_path = project_dir / "config" / "spectre.yaml"
-    text = spectre_path.read_text(encoding="utf-8")
-    text = text.replace(
-        "keep_failed_runs: true",
-        f"keep_failed_runs: {str(keep_failed_runs).lower()}",
-    )
-    text = text.replace(
-        "keep_successful_runs: true",
-        f"keep_successful_runs: {str(keep_successful_runs).lower()}",
-    )
-    spectre_path.write_text(text, encoding="utf-8")
+    payload = yaml.safe_load(spectre_path.read_text(encoding="utf-8"))
+    spectre = payload.setdefault("spectre", {})
+    spectre["keep_failed_runs"] = keep_failed_runs
+    spectre["keep_successful_runs"] = keep_successful_runs
+    spectre_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
 
 
 def _make_run_dir(project_dir: Path, run_id: str = "real_001") -> Path:
@@ -36,8 +36,7 @@ def _make_run_dir(project_dir: Path, run_id: str = "real_001") -> Path:
 def test_load_run_retention_policy_reads_spectre_settings(tmp_path: Path) -> None:
     from hermes_workflow.run_retention import load_run_retention_policy
 
-    project_dir = tmp_path / "project"
-    create_project_from_template(project_dir)
+    project_dir = _create_retention_project(tmp_path)
     _set_keep_flags(project_dir, keep_failed_runs=False, keep_successful_runs=True)
 
     policy = load_run_retention_policy(project_dir)
@@ -51,8 +50,7 @@ def test_apply_local_run_retention_keeps_successful_run_when_keep_successful_run
 ) -> None:
     from hermes_workflow.run_retention import apply_local_run_retention
 
-    project_dir = tmp_path / "project"
-    create_project_from_template(project_dir)
+    project_dir = _create_retention_project(tmp_path)
     _set_keep_flags(project_dir, keep_failed_runs=True, keep_successful_runs=True)
     run_dir = _make_run_dir(project_dir)
 
@@ -74,8 +72,7 @@ def test_apply_local_run_retention_deletes_successful_run_when_keep_successful_r
 ) -> None:
     from hermes_workflow.run_retention import apply_local_run_retention
 
-    project_dir = tmp_path / "project"
-    create_project_from_template(project_dir)
+    project_dir = _create_retention_project(tmp_path)
     _set_keep_flags(project_dir, keep_failed_runs=True, keep_successful_runs=False)
     run_dir = _make_run_dir(project_dir)
 
@@ -96,8 +93,7 @@ def test_apply_local_run_retention_keeps_failed_run_when_keep_failed_runs_true(
 ) -> None:
     from hermes_workflow.run_retention import apply_local_run_retention
 
-    project_dir = tmp_path / "project"
-    create_project_from_template(project_dir)
+    project_dir = _create_retention_project(tmp_path)
     _set_keep_flags(project_dir, keep_failed_runs=True, keep_successful_runs=False)
     run_dir = _make_run_dir(project_dir)
 
@@ -118,8 +114,7 @@ def test_apply_local_run_retention_deletes_failed_run_when_keep_failed_runs_fals
 ) -> None:
     from hermes_workflow.run_retention import apply_local_run_retention
 
-    project_dir = tmp_path / "project"
-    create_project_from_template(project_dir)
+    project_dir = _create_retention_project(tmp_path)
     _set_keep_flags(project_dir, keep_failed_runs=False, keep_successful_runs=True)
     run_dir = _make_run_dir(project_dir)
 
@@ -140,8 +135,7 @@ def test_apply_local_run_retention_writes_decision_report_with_required_fields(
 ) -> None:
     from hermes_workflow.run_retention import apply_local_run_retention
 
-    project_dir = tmp_path / "project"
-    create_project_from_template(project_dir)
+    project_dir = _create_retention_project(tmp_path)
     _set_keep_flags(project_dir, keep_failed_runs=True, keep_successful_runs=False)
     _make_run_dir(project_dir)
 
@@ -192,8 +186,7 @@ def test_apply_local_run_retention_records_missing_when_run_dir_does_not_exist(
 ) -> None:
     from hermes_workflow.run_retention import apply_local_run_retention
 
-    project_dir = tmp_path / "project"
-    create_project_from_template(project_dir)
+    project_dir = _create_retention_project(tmp_path)
     _set_keep_flags(project_dir, keep_failed_runs=False, keep_successful_runs=False)
     # Note: no run dir created.
 
@@ -226,8 +219,7 @@ def test_apply_local_run_retention_rejects_unsafe_run_id(
 ) -> None:
     from hermes_workflow.run_retention import apply_local_run_retention
 
-    project_dir = tmp_path / "project"
-    create_project_from_template(project_dir)
+    project_dir = _create_retention_project(tmp_path)
 
     with pytest.raises(ValueError):
         apply_local_run_retention(
@@ -243,8 +235,7 @@ def test_apply_local_run_retention_records_failed_when_rmtree_raises(
 ) -> None:
     from hermes_workflow import run_retention as module
 
-    project_dir = tmp_path / "project"
-    create_project_from_template(project_dir)
+    project_dir = _create_retention_project(tmp_path)
     _set_keep_flags(project_dir, keep_failed_runs=True, keep_successful_runs=False)
     _make_run_dir(project_dir)
 
@@ -295,8 +286,7 @@ def test_local_retention_after_remote_preserves_remote_fields_in_decision_report
     remote_run_dir written by the remote step."""
     from hermes_workflow import run_retention as module
 
-    project_dir = tmp_path / "project"
-    create_project_from_template(project_dir)
+    project_dir = _create_retention_project(tmp_path)
     _set_keep_flags(project_dir, keep_failed_runs=False, keep_successful_runs=False)
     _make_run_dir(project_dir)
 
@@ -340,8 +330,7 @@ def test_remote_retention_after_local_preserves_local_fields_in_decision_report(
     decision report must preserve local_action and local_run_dir from local."""
     from hermes_workflow import run_retention as module
 
-    project_dir = tmp_path / "project"
-    create_project_from_template(project_dir)
+    project_dir = _create_retention_project(tmp_path)
     _set_keep_flags(project_dir, keep_failed_runs=False, keep_successful_runs=False)
     _make_run_dir(project_dir)
 
@@ -380,8 +369,7 @@ def test_local_retention_preserves_existing_remote_issues_when_merging(
     later local retention write — local must not silently drop them."""
     from hermes_workflow import run_retention as module
 
-    project_dir = tmp_path / "project"
-    create_project_from_template(project_dir)
+    project_dir = _create_retention_project(tmp_path)
     _set_keep_flags(project_dir, keep_failed_runs=False, keep_successful_runs=False)
     _make_run_dir(project_dir)
 

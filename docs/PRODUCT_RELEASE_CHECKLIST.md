@@ -45,73 +45,19 @@ Entrypoints:
 
 ## Release Examples
 
-Keep the complete example-to-packaged-template mirror set current. The hard
-constraint tests in `tests/test_fix_run_docs.py` and `tests/test_package.py`
-verify that source-facing examples match packaged runtime templates and that
-packaged template resources are not hidden by `.gitignore`.
-
-Mirror roots:
+Keep these examples current and mirrored into package templates:
 
 ```text
-examples/spectre_maestro_project/
-src/hermes_workflow/templates/spectre_maestro_project/
-```
-
-Mirror set:
-
-```text
-examples/spectre_maestro_project/OPT_REQUIREMENT_README.md
-examples/spectre_maestro_project/METRICS.md
-examples/spectre_maestro_project/constraints.md
 examples/spectre_maestro_project/opt_requirement.md
-examples/spectre_maestro_project/opt_requirement.multi_corner.md
 examples/spectre_maestro_project/opt_requirement.multi_testbench.md
+examples/spectre_maestro_project/opt_requirement.multi_corner.md
 examples/spectre_maestro_project/opt_requirement.multi_tb_corner.md
 examples/spectre_maestro_project/opt_requirement.fix_run.md
-src/hermes_workflow/templates/spectre_maestro_project/OPT_REQUIREMENT_README.md
-src/hermes_workflow/templates/spectre_maestro_project/METRICS.md
-src/hermes_workflow/templates/spectre_maestro_project/constraints.md
-src/hermes_workflow/templates/spectre_maestro_project/opt_requirement.md
-src/hermes_workflow/templates/spectre_maestro_project/opt_requirement.multi_corner.md
-src/hermes_workflow/templates/spectre_maestro_project/opt_requirement.multi_testbench.md
-src/hermes_workflow/templates/spectre_maestro_project/opt_requirement.multi_tb_corner.md
 src/hermes_workflow/templates/spectre_maestro_project/opt_requirement.fix_run.md
-```
-
-Focused mirror/package-resource guard:
-
-```bash
-./.venv/bin/python -m pytest tests/test_fix_run_docs.py tests/test_package.py -q
 ```
 
 Requirement examples must parse with current requirement intake. Placeholder
 path failures are acceptable; schema/field failures are not.
-
-## Post-v0.1.8 Follow-up: Decouple Generic Tests From The Release Template
-
-The product runtime is metric/variable-generic (the fake evaluator derives
-values for every declared metric; `tests/helpers/project_factory.py` builds
-arbitrary projects and proves arbitrary metrics/variables flow through validate,
-dry-run, and the fake optimizer). For v0.1.8, several generic behavior tests
-still build a project via `create_project_from_template()` (the Mixer release
-example) and then derive netlist templates / fake-runner scalars / expected
-values from the project config, so they do not assume the Mixer circuit but
-they do still touch the packaged template.
-
-Tracked follow-up (do NOT block v0.1.8):
-
-- Migrate generic optimizer / result-recording / status / finalize / dry-run /
-  backend / adapter tests away from `create_project_from_template()` to the
-  generic `tests/helpers/project_factory.py` builder, so no generic test
-  depends on the packaged release template.
-- Consider making `optimizer_insights.py` figure-of-merit scoring and display
-  unit selection fully config/unit-driven instead of the current optional,
-  graceful name-based heuristics (mixer FOM fallback; `rise`/`fall`/`delay`/
-  `time` and `dc`/`power` display scaling). These are guarded and no-op for
-  arbitrary metrics today, so they are not a v0.1.8 blocker.
-
-A non-blocking guard test in `tests/test_fix_run_docs.py` asserts this section
-is present so the follow-up is not silently dropped.
 
 ## Real Optimization Acceptance
 

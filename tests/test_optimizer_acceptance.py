@@ -5,7 +5,7 @@ from typer.testing import CliRunner
 
 from hermes_workflow.cli import app
 from hermes_workflow.optimizer_acceptance import check_optimizer_run
-from tests.real_run_smoke_helpers import create_approved_real_project
+from tests.real_run_smoke_helpers import advisor_batches, create_approved_real_project
 
 
 runner = CliRunner()
@@ -166,17 +166,8 @@ def _write_minimal_optimizer_run(tmp_path: Path) -> Path:
 
 
 class FakeAdvisorForAcceptance:
-    def __init__(self) -> None:
-        self._batches = [
-            [
-                {"F": 22, "W": 0.8, "L": 40, "VB_LO": 300},
-                {"F": 24, "W": 1.0, "L": 30, "VB_LO": 340},
-            ],
-            [
-                {"F": 26, "W": 1.2, "L": 40, "VB_LO": 360},
-                {"F": 28, "W": 0.6, "L": 30, "VB_LO": 380},
-            ],
-        ]
+    def __init__(self, project_dir: Path) -> None:
+        self._batches = advisor_batches(project_dir)
 
     def get_suggestions(self, batch_size: int) -> list[dict[str, float]]:
         return self._batches.pop(0)[:batch_size]
@@ -223,7 +214,7 @@ def test_check_optimizer_run_accepts_fake_openbox_without_manifests(
         project_dir,
         max_evals=4,
         batch_size=2,
-        advisor_factory=lambda _space, _seed: FakeAdvisorForAcceptance(),
+        advisor_factory=lambda _space, _seed: FakeAdvisorForAcceptance(project_dir),
     )
 
     report = check_optimizer_run(project_dir)

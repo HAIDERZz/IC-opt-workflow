@@ -1,85 +1,88 @@
-"""Tests for the generic, release-template-independent project factory.
-
-These prove the product supports arbitrary variables/metrics (not just the
-release Mixer example): a project built with custom metric names validates,
-runs the dry-run fake path, and records a value for every declared metric.
-"""
 from __future__ import annotations
 
 import json
 from pathlib import Path
 
-from hermes_workflow.dry_run import run_dry_run
-from hermes_workflow.openbox_backend import run_openbox_fake_optimization
-from hermes_workflow.validate import assert_valid_project
+import yaml
 
-from tests.helpers.project_factory import build_project
-
-
-def test_factory_builds_valid_project_with_arbitrary_metrics(tmp_path: Path) -> None:
-    project_dir = build_project(
-        tmp_path / "project",
-        variables=[
-            {"name": "width", "kind": "continuous_step", "lower": "1u", "upper": "2u", "step": "0.2u"},
-            {"name": "current", "kind": "integer", "lower": "1", "upper": "8", "step": "1"},
-        ],
-        metrics=[
-            {"name": "gain_db", "unit": "dB", "maestro_formula": "gain"},
-            {"name": "power_mw", "unit": "mW", "maestro_formula": "pwr"},
-            {"name": "phase_margin", "unit": "deg", "maestro_formula": "pm"},
-        ],
-        constraints=[
-            {"metric": "gain_db", "op": "ge", "value": "10"},
-            {"metric": "power_mw", "op": "le", "value": "5"},
-        ],
-        objective={"direction": "maximize", "expression": "gain_db"},
-    )
-
-    bundle = assert_valid_project(project_dir)
-    assert [variable.name for variable in bundle.variables.variables] == [
-        "width",
-        "current",
-    ]
-    assert [metric.name for metric in bundle.metrics.metrics] == [
-        "gain_db",
-        "power_mw",
-        "phase_margin",
-    ]
+from hermes_workflow.validate import assert_valid_project, validate_project_files
+from tests.project_factory import (
+    create_approved_generic_project,
+    create_generic_project,
+    create_packaged_generic_project,
+)
 
 
-def test_factory_default_project_runs_dry_run_and_records_metric(
+def test_create_generic_project_is_valid_and_template_independent(
     tmp_path: Path,
 ) -> None:
-    project_dir = build_project(tmp_path / "project")
+    project_dir = create_generic_project(tmp_path)
 
-    report = run_dry_run(project_dir)
+    assert project_dir.name == "generic_project"
+    assert validate_project_files(project_dir).ok is True
+    assert_valid_project(project_dir)
+    variables = yaml.safe_load(
+        (project_dir / "config" / "variables.yaml").read_text(encoding="utf-8")
+    )
+    variable_names = [entry["name"] for entry in variables["variables"]]
+    assert variable_names == ["VAR_INT", "VAR_WIDTH"]
+    assert "bridge_test_inv" not in (
+        project_dir / "config" / "project_config.yaml"
+    ).read_text(encoding="utf-8")
 
-    assert report.status.value == "pass"
 
-
-def test_factory_project_fake_optimization_records_every_declared_metric(
+def test_create_packaged_generic_project_writes_execution_manifest(
     tmp_path: Path,
 ) -> None:
-    project_dir = build_project(
-        tmp_path / "project",
-        metrics=[
-            {"name": "gain_db", "unit": "dB", "maestro_formula": "gain"},
-            {"name": "power_mw", "unit": "mW", "maestro_formula": "pwr"},
-        ],
-        constraints=[{"metric": "power_mw", "op": "le", "value": "5"}],
-        objective={"direction": "maximize", "expression": "gain_db"},
+    project_dir = create_packaged_generic_project(tmp_path)
+
+    manifest = json.loads(
+        (
+            project_dir / "execution_package" / "execution_manifest.json"
+        ).read_text(encoding="utf-8")
     )
+    assert manifest["project_name"] == "generic_project"
+    assert "config/variables.yaml" in manifest["immutable_config_files"]
 
-    result = run_openbox_fake_optimization(project_dir, batch_size=4, max_evals=4)
 
-    evaluations_path = project_dir / "reports" / "optimizer_evaluations.jsonl"
-    rows = [
-        json.loads(line)
-        for line in evaluations_path.read_text(encoding="utf-8").splitlines()
-        if line.strip()
-    ]
-    assert rows
-    metrics_block = rows[0]["metrics"]
-    assert "gain_db" in metrics_block
-    assert "power_mw" in metrics_block
-    assert result.traces
+def test_create_approved_generic_project_approves_first_real_run(
+    tmp_path: Path,
+) -> None:
+    project_dir = create_approved_generic_project(tmp_path)
+
+    instruction = json.loads(
+        (project_dir / "supervisor_instruction.json").read_text(encoding="utf-8")
+    )
+    assert instruction["decision"] == "approve_first_real_run"
+    report = json.loads(
+        (project_dir / "reports" / "netlist_preparation_report.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert report["approved_variables_template_status"] == {
+        "VAR_INT": True,
+        "VAR_WIDTH": True,
+    }
+
+
+def test_create_generic_project_fix_run_mode_is_valid(tmp_path: Path) -> None:
+    project_dir = create_generic_project(tmp_path, workflow_mode="fix_run")
+
+    assert validate_project_files(project_dir).ok is True
+    assert_valid_project(project_dir)
+
+    workflow = yaml.safe_load(
+        (project_dir / "config" / "workflow.yaml").read_text(encoding="utf-8")
+    )
+    assert workflow["mode"] == "fix_run"
+    assert workflow["starting_run_id"] == "real_001"
+
+    fixed_points = yaml.safe_load(
+        (project_dir / "config" / "fixed_points.yaml").read_text(encoding="utf-8")
+    )
+    assert fixed_points["points"][0]["parameters"] == {
+        "VAR_INT": "2",
+        "VAR_WIDTH": "0.2u",
+    }
+
+    assert not (project_dir / "config" / "optimizer.yaml").exists()

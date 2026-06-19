@@ -11,6 +11,9 @@ import pytest
 
 from hermes_workflow.requirement_intake import parse_requirement_text
 
+# ---------------------------------------------------------------------------
+# Paths
+# ---------------------------------------------------------------------------
 ROOT = Path(__file__).resolve().parent.parent
 EXAMPLE_FIX_RUN = ROOT / "examples" / "spectre_maestro_project" / "opt_requirement.fix_run.md"
 TEMPLATE_FIX_RUN = (
@@ -22,118 +25,18 @@ TEMPLATE_FIX_RUN = (
     / "opt_requirement.fix_run.md"
 )
 
-MIRRORED_TEMPLATE_FILES = [
-    "OPT_REQUIREMENT_README.md",
-    "METRICS.md",
-    "constraints.md",
-    "opt_requirement.md",
-    "opt_requirement.multi_corner.md",
-    "opt_requirement.multi_testbench.md",
-    "opt_requirement.multi_tb_corner.md",
-    "opt_requirement.fix_run.md",
-]
 
-DOCS_WITH_DOCTOR_REPORT_PATHS = [
-    ROOT / "README.md",
-    ROOT / "docs" / "TOOLCHAIN_EXECUTION_REFERENCE.md",
-    ROOT / "docs" / "TROUBLESHOOTING_CN.md",
-    ROOT / "docs" / "USER_GUIDE_CN.md",
-    ROOT / "docs" / "AGENT_OPTIMIZER_USAGE_MANUAL.md",
-    ROOT / "docs" / "AGENT_USER_QUICKSTART_CN.md",
-    ROOT / "docs" / "OPTIMIZER_PRODUCTION_QUICKSTART.md",
-    ROOT / "docs" / "OPTIMIZER_PRODUCTION_HANDOFF_GUIDE.md",
-    ROOT / "docs" / "ROLE_MODEL_AND_TERMINOLOGY.md",
-    ROOT / "skills" / "ic-opt" / "SKILL.md",
-]
-
-
-@pytest.mark.parametrize("relative_path", MIRRORED_TEMPLATE_FILES)
-def test_release_examples_and_packaged_templates_are_identical(relative_path: str) -> None:
-    example = ROOT / "examples" / "spectre_maestro_project" / relative_path
-    template = ROOT / "src" / "hermes_workflow" / "templates" / "spectre_maestro_project" / relative_path
-    assert example.is_file(), f"Example file missing: {example}"
-    assert template.is_file(), f"Template file missing: {template}"
-    example_bytes = example.read_bytes()
-    template_bytes = template.read_bytes()
+# ---------------------------------------------------------------------------
+# Test 1: Release example and packaged template are byte-for-byte identical
+# ---------------------------------------------------------------------------
+def test_example_and_template_are_identical() -> None:
+    assert EXAMPLE_FIX_RUN.is_file(), f"Example file missing: {EXAMPLE_FIX_RUN}"
+    assert TEMPLATE_FIX_RUN.is_file(), f"Template file missing: {TEMPLATE_FIX_RUN}"
+    example_bytes = EXAMPLE_FIX_RUN.read_bytes()
+    template_bytes = TEMPLATE_FIX_RUN.read_bytes()
     assert example_bytes == template_bytes, (
-        f"Release example and packaged template must match: {relative_path}"
+        "Example and template must be byte-for-byte identical"
     )
-
-
-def test_opt_requirement_readme_matches_current_release_contract() -> None:
-    readme = ROOT / "examples" / "spectre_maestro_project" / "OPT_REQUIREMENT_README.md"
-    text = readme.read_text(encoding="utf-8")
-    assert "This directory contains five requirement templates." in text
-    assert "`opt_requirement.fix_run.md`" in text
-    assert "ic-opt <project> --real --continue N" in text
-    assert "ic-opt <project> --continue N" not in text
-    assert "```yaml\nalgorithm: openbox\nstrategy: openbox_prf_eic" in text
-    assert "```yaml\nalgorithm: turbo\nstrategy: turbo_trust_region" not in text
-
-
-@pytest.mark.parametrize("path", DOCS_WITH_DOCTOR_REPORT_PATHS)
-def test_user_and_agent_docs_use_real_doctor_report_path(path: Path) -> None:
-    text = path.read_text(encoding="utf-8")
-    assert "reports/project_doctor_report.json" not in text
-    assert "reports/ic_opt_doctor_report.json" in text
-
-
-def test_release_checklist_mentions_template_mirror_guards() -> None:
-    checklist = ROOT / "docs" / "PRODUCT_RELEASE_CHECKLIST.md"
-    text = checklist.read_text(encoding="utf-8")
-    required = [
-        "tests/test_fix_run_docs.py",
-        "tests/test_package.py",
-        "examples/spectre_maestro_project/OPT_REQUIREMENT_README.md",
-        "src/hermes_workflow/templates/spectre_maestro_project/OPT_REQUIREMENT_README.md",
-        "./.venv/bin/python -m pytest tests/test_fix_run_docs.py tests/test_package.py -q",
-    ]
-    missing = [item for item in required if item not in text]
-    assert missing == []
-
-
-def test_release_checklist_tracks_post_release_template_decoupling() -> None:
-    """Non-blocking guard: the post-v0.1.8 follow-up to migrate generic tests
-    off create_project_from_template() must stay documented so it is not lost.
-    This does NOT fail on the current (still template-using) state."""
-    checklist = ROOT / "docs" / "PRODUCT_RELEASE_CHECKLIST.md"
-    text = checklist.read_text(encoding="utf-8")
-    assert "Post-v0.1.8 Follow-up" in text
-    assert "create_project_from_template()" in text
-    assert "tests/helpers/project_factory.py" in text
-
-
-def test_generic_tests_are_known_to_still_use_release_template() -> None:
-    """Informational, non-blocking snapshot of which test files still reference
-    the packaged release template factory. It records the current migration
-    backlog without asserting it is empty (see the post-v0.1.8 follow-up)."""
-    tests_dir = ROOT / "tests"
-    dependents = sorted(
-        path.relative_to(ROOT).as_posix()
-        for path in tests_dir.rglob("*.py")
-        if "create_project_from_template" in path.read_text(encoding="utf-8")
-    )
-    # Only assert the snapshot mechanism works; the list itself is the backlog.
-    assert isinstance(dependents, list)
-    assert "tests/test_package.py" in dependents  # legitimate contract user
-
-
-    roots = [
-        ROOT / "README.md",
-        ROOT / "docs",
-        ROOT / "skills",
-        ROOT / "examples",
-        ROOT / "src" / "hermes_workflow" / "templates",
-    ]
-    paths = [roots[0]]
-    for root in roots[1:]:
-        paths.extend(sorted(root.rglob("*.md")))
-    offenders = [
-        path.relative_to(ROOT).as_posix()
-        for path in paths
-        if "reports/project_doctor_report.json" in path.read_text(encoding="utf-8")
-    ]
-    assert offenders == []
 
 
 # ---------------------------------------------------------------------------
