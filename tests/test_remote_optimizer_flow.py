@@ -5,20 +5,38 @@ from pathlib import Path, PurePosixPath
 from types import SimpleNamespace
 
 import pytest
+import yaml
 
 from hermes_workflow.remote_optimizer_flow import optimize_remote_project
 from hermes_workflow.remote_project import RemoteProjectRef
-from hermes_workflow.package import create_project_from_template
+from tests.project_factory import create_generic_project
+
+
+def _read_yaml(path: Path) -> dict:
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    assert isinstance(payload, dict)
+    return payload
+
+
+def _write_yaml(path: Path, payload: dict) -> None:
+    path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+
+def _create_remote_optimizer_project(
+    tmp_path: Path,
+    *,
+    name: str = "remote_optimizer_project",
+    **kwargs: object,
+) -> Path:
+    return create_generic_project(tmp_path, name=name, **kwargs)
 
 
 def _set_optimizer_strategy(project_dir: Path, strategy: str, algorithm: str) -> None:
     optimizer_path = project_dir / "config" / "optimizer.yaml"
-    optimizer_text = optimizer_path.read_text(encoding="utf-8").replace(
-        "  algorithm: turbo",
-        f"  algorithm: {algorithm}\n  strategy: {strategy}",
-        1,
-    )
-    optimizer_path.write_text(optimizer_text, encoding="utf-8")
+    payload = _read_yaml(optimizer_path)
+    payload["optimizer"]["algorithm"] = algorithm
+    payload["optimizer"]["strategy"] = strategy
+    _write_yaml(optimizer_path, payload)
 
 
 def test_optimize_remote_project_runs_doctor_prepare_openbox_and_sync(tmp_path: Path, monkeypatch) -> None:
@@ -83,7 +101,7 @@ def test_optimize_remote_project_routes_turbo_strategy_through_remote_adapter(
 ) -> None:
     ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
     cache_dir = tmp_path / "cache"
-    create_project_from_template(cache_dir)
+    _create_remote_optimizer_project(cache_dir.parent, name=cache_dir.name)
     runner = object()
     calls: list[str] = []
 
@@ -264,7 +282,7 @@ def test_optimize_remote_project_allows_config_turbo_strategy_before_local_execu
 ) -> None:
     ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
     cache_dir = tmp_path / "cache" / "project"
-    create_project_from_template(cache_dir)
+    _create_remote_optimizer_project(cache_dir.parent, name=cache_dir.name)
     _set_optimizer_strategy(cache_dir, "turbo_trust_region", "turbo")
     calls: list[str] = []
 
@@ -1034,16 +1052,10 @@ def _set_keep_flags_for_retention_remote(
     project_dir: Path, *, keep_failed_runs: bool, keep_successful_runs: bool
 ) -> None:
     spectre_path = project_dir / "config" / "spectre.yaml"
-    text = spectre_path.read_text(encoding="utf-8")
-    text = text.replace(
-        "keep_failed_runs: true",
-        f"keep_failed_runs: {str(keep_failed_runs).lower()}",
-    )
-    text = text.replace(
-        "keep_successful_runs: true",
-        f"keep_successful_runs: {str(keep_successful_runs).lower()}",
-    )
-    spectre_path.write_text(text, encoding="utf-8")
+    payload = _read_yaml(spectre_path)
+    payload["spectre"]["keep_failed_runs"] = keep_failed_runs
+    payload["spectre"]["keep_successful_runs"] = keep_successful_runs
+    _write_yaml(spectre_path, payload)
 
 
 class _RemoteRetentionFakeRunner:
@@ -1082,7 +1094,7 @@ def test_remote_adapter_wrapper_deletes_remote_run_dir_when_keep_successful_runs
 
     ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
     cache_dir = tmp_path / "cache" / "project"
-    create_project_from_template(cache_dir)
+    _create_remote_optimizer_project(cache_dir.parent, name=cache_dir.name)
     _set_keep_flags_for_retention_remote(
         cache_dir, keep_failed_runs=True, keep_successful_runs=False
     )
@@ -1166,7 +1178,7 @@ def test_remote_adapter_wrapper_deletes_remote_run_dir_when_keep_successful_runs
 
     ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
     cache_dir = tmp_path / "cache" / "project"
-    create_project_from_template(cache_dir)
+    _create_remote_optimizer_project(cache_dir.parent, name=cache_dir.name)
     _set_keep_flags_for_retention_remote(
         cache_dir, keep_failed_runs=True, keep_successful_runs=False
     )
@@ -1255,7 +1267,7 @@ def test_remote_adapter_wrapper_keeps_remote_run_dir_when_keep_successful_runs_t
 
     ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
     cache_dir = tmp_path / "cache" / "project"
-    create_project_from_template(cache_dir)
+    _create_remote_optimizer_project(cache_dir.parent, name=cache_dir.name)
     _set_keep_flags_for_retention_remote(
         cache_dir, keep_failed_runs=True, keep_successful_runs=True
     )
@@ -1333,7 +1345,7 @@ def test_remote_adapter_wrapper_deletes_remote_run_dir_when_keep_failed_runs_fal
 
     ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
     cache_dir = tmp_path / "cache" / "project"
-    create_project_from_template(cache_dir)
+    _create_remote_optimizer_project(cache_dir.parent, name=cache_dir.name)
     _set_keep_flags_for_retention_remote(
         cache_dir, keep_failed_runs=False, keep_successful_runs=True
     )
@@ -1412,7 +1424,7 @@ def test_remote_adapter_wrapper_remote_command_has_no_glob_and_is_under_remote_p
 
     ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
     cache_dir = tmp_path / "cache" / "project"
-    create_project_from_template(cache_dir)
+    _create_remote_optimizer_project(cache_dir.parent, name=cache_dir.name)
     _set_keep_flags_for_retention_remote(
         cache_dir, keep_failed_runs=True, keep_successful_runs=False
     )
@@ -1566,7 +1578,7 @@ def test_remote_optimizer_audit_records_remote_transport_mode(
     from remote transport mode."""
     ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
     cache_dir = tmp_path / "cache"
-    create_project_from_template(cache_dir)
+    _create_remote_optimizer_project(cache_dir.parent, name=cache_dir.name)
     _set_optimizer_strategy(cache_dir, "turbo_trust_region", "turbo")
 
     monkeypatch.setattr(
