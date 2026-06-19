@@ -21,7 +21,8 @@ tests; Phase 10 migrated the multi-testbench aggregation tests; Phase 11 migrate
 the real-result-record tests; Phase 12 migrated the real-run smoke helpers and
 adapted their consumer cluster; Phase 13 migrated the mock optimizer tests; R1
 migrated the native TuRBO tests; R2 migrated the OpenBox backend tests; R3 migrated the remote fix-run flow tests; R4 migrated the remote optimizer flow tests; R5 migrated the Spectre/OCEAN adapter
-tests. Remaining
+tests; R6 migrated the remote Spectre/OCEAN tests and removed all legacy
+rise/fall/DC scalar fallbacks. Remaining
 coupled files are explicitly deferred.
 
 ## Status summary
@@ -351,7 +352,8 @@ generic factory.
 
 ### Remote and adapter flows
 
-- tests/test_remote_spectre_ocean.py
+All remote and adapter flow tests have been migrated. No remaining files in this
+category.
 
 ## How to continue
 
@@ -368,6 +370,21 @@ The allowlist must shrink monotonically; the guard prevents any new unreviewed
 direct usage from being introduced.
 
 ## Verification
+
+### R6 Remote Spectre/OCEAN
+
+- `pytest tests/test_remote_spectre_ocean.py -q` -> `38 passed, 13 warnings`
+- `pytest tests/test_remote_spectre_ocean.py tests/test_remote_spectre_ocean_waveform.py -q` -> `45 passed, 13 warnings`
+- `pytest tests/test_template_coupling_guard.py -q` -> `1 passed`
+- `pytest tests/test_remote_spectre_ocean.py tests/test_remote_spectre_ocean_waveform.py tests/test_template_coupling_guard.py -q` -> `46 passed, 13 warnings`
+- `pytest -q` -> `1194 passed, 13 warnings`
+- `ruff check src tests` -> `All checks passed!`
+- `git diff --check` -> clean
+- `git -C ../ic-auto-opt-workflow-v0.1 status --short` -> clean (release checkout untouched)
+- grep `create_project_from_template|bridge_test_inv|FN|WN|FP|WP` -> no matches
+- grep `\b(rise|fall|DC)\b` -> no matches
+- grep cross-imports -> known waveform consumer only (test_remote_spectre_ocean_waveform.py)
+- `ALLOWED_TEMPLATE_CALLERS` count: 2 -> 1 (only tests/test_package.py remains).
 
 ### R5 Spectre/OCEAN Adapter
 

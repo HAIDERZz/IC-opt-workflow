@@ -6,8 +6,7 @@ from pathlib import Path
 ALLOWED_TEMPLATE_CALLERS = {
     # Product/template behavior.
     "tests/test_package.py",
-    # Not yet migrated. Shrink this list in follow-up waves.
-    "tests/test_remote_spectre_ocean.py",
+    # Intentionally template-based: create_project_from_template is the product/template API.
 }
 
 

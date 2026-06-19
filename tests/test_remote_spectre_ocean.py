@@ -6,6 +6,8 @@ import shlex
 from pathlib import Path, PurePosixPath
 from types import SimpleNamespace
 
+import yaml
+
 from hermes_workflow.approvals import decide_first_real_run
 from hermes_workflow.dry_run import run_dry_run
 from hermes_workflow.execution_adapters.remote_spectre_ocean import (
@@ -13,11 +15,12 @@ from hermes_workflow.execution_adapters.remote_spectre_ocean import (
     run_remote_spectre_ocean_adapter,
 )
 from hermes_workflow.execution_adapters.spectre_ocean import load_adapter_context
-from hermes_workflow.package import build_execution_package, create_project_from_template, sha256_file
+from hermes_workflow.package import build_execution_package, sha256_file
 from hermes_workflow.real_run import prepare_real_run
 from hermes_workflow.remote_project import RemoteProjectRef
 from hermes_workflow.remote_ssh import RemoteCommandResult
 from hermes_workflow.requirement_intake import prepare_from_requirement
+from tests.project_factory import create_generic_project
 from tests.report_helpers import write_pass_reports
 from tests.real_run_smoke_helpers import (
     create_approved_real_project,
@@ -31,6 +34,13 @@ def _metric_names(project_dir: Path) -> list[str]:
         .read_text(encoding="utf-8")
     )
     return [metric["name"] for metric in request["metrics"]]
+
+
+def _variable_names(project_dir: Path) -> list[str]:
+    payload = yaml.safe_load(
+        (project_dir / "config" / "variables.yaml").read_text(encoding="utf-8")
+    )
+    return [variable["name"] for variable in payload["variables"]]
 
 
 def _request_for_metrics_dir(metrics_dir: Path) -> dict | None:
@@ -57,18 +67,14 @@ def _request_for_metrics_dir(metrics_dir: Path) -> dict | None:
 def _ocean_scalars_tsv(request: dict | None) -> str:
     """Build an ocean_scalars.tsv body from a metric request.
 
-    When no request is available, falls back to legacy rise/fall/DC rows so
-    that projects created via create_project_from_template (bridge_test_inv)
-    keep working unchanged.
+    A metric request is always required; the legacy hardcoded fallback rows
+    have been removed.
     """
-    header = "metric\tvalue\tunit\tstatus\texpression_sha256\tmessage\n"
     if not request:
-        return (
-            header
-            + "rise\t1e-12\ts\tpass\t352e7b3256d5417f58d087382bd2054efbcf696d06b58fc6d39002bb09489748\t\n"
-            + "fall\t1e-12\ts\tpass\t8ba00c0d961decb9275b9636f61dbbd5659b5ed066a74b0083cd0e1d6d3d5493\t\n"
-            + "DC\t1e-06\tW\tpass\tcb82f3f25ee13ea3cb45f605a763ed0806ebb7f47fd27ce4a9c4a4cd902bb7c4\t\n"
+        raise AssertionError(
+            "ocean_scalars.tsv requires a resolvable metric_extraction_request, got None"
         )
+    header = "metric\tvalue\tunit\tstatus\texpression_sha256\tmessage\n"
     rows = "".join(
         f"{metric['name']}\t1e-12\t{metric['unit']}\tpass\t{metric['expression_sha256']}\t\n"
         for metric in request["metrics"]
@@ -155,23 +161,19 @@ def _create_ready_multi_corner_single_testbench_project(
     objective_policy: str = "worst_case",
     constraint_policy: str = "all_corners",
 ) -> Path:
-    project_dir = tmp_path / "bridge_test_inv"
-    create_project_from_template(project_dir)
+    project_dir = create_generic_project(
+        tmp_path,
+        name="multi_corner_project",
+    )
     _write_process_corners_config(
         project_dir,
         corner_ids,
         objective_policy=objective_policy,
         constraint_policy=constraint_policy,
     )
-    template_path = project_dir / "netlists" / "templates" / "template.scs"
-    template_path.parent.mkdir(parents=True, exist_ok=True)
-    template_path.write_text(
-        "simulator lang=spectre\n"
-        "parameters FN={{FN}} WN={{WN}} FP={{FP}} WP={{WP}}\n"
-        "tran tran stop=10n\n",
-        encoding="utf-8",
-    )
-    template_text = template_path.read_text(encoding="utf-8")
+    template_text = (
+        project_dir / "netlists" / "templates" / "template.scs"
+    ).read_text(encoding="utf-8")
     for corner_id in corner_ids:
         corner_template = (
             project_dir / "netlists" / "corners" / corner_id / "template.scs"
@@ -179,7 +181,7 @@ def _create_ready_multi_corner_single_testbench_project(
         corner_template.parent.mkdir(parents=True, exist_ok=True)
         corner_template.write_text(template_text, encoding="utf-8")
     build_execution_package(project_dir, created_at_utc="2026-06-13T00:00:00Z")
-    write_pass_reports(project_dir)
+    write_pass_reports(project_dir, variable_names=tuple(_variable_names(project_dir)))
     instruction = decide_first_real_run(
         project_dir,
         created_at_utc="2026-06-13T00:10:00Z",
@@ -753,7 +755,12 @@ class MultiTestbenchFakeRunner(FakeRunner):
                 testbench_id = parts[i + 1]
                 if testbench_id in self.child_metric_names:
                     return self.child_metric_names[testbench_id]
-        return ["rise", "fall", "DC"]
+        request = _request_for_metrics_dir(local_path)
+        if request is not None:
+            return [str(metric["name"]) for metric in request["metrics"]]
+        raise AssertionError(
+            f"could not resolve metric names for metrics dir: {local_path}"
+        )
 
     def _resolve_expression_sha256(self, local_path: Path) -> dict[str, str]:
         parts = local_path.parts
@@ -1230,8 +1237,8 @@ class MetricFailFakeRunner(FakeRunner):
     """FakeRunner that writes ocean_scalars.tsv with a metric row marked fail.
 
     The last metric from the project's metric_extraction_request.json is the
-    one marked fail (matching the legacy "fall" semantics).  Falls back to the
-    legacy rise/fall/DC rows when no request is resolvable.
+    one marked fail.  A resolvable metric request is required; the legacy
+    hardcoded fallback rows have been removed.
     """
 
     def download_tree(self, remote_path, local_path, include=None, exclude=None) -> None:
@@ -1242,23 +1249,19 @@ class MetricFailFakeRunner(FakeRunner):
             (Path(local_path) / "spectre.out").write_text("spectre output", encoding="utf-8")
         elif remote.endswith("/metrics"):
             request = _request_for_metrics_dir(Path(local_path))
-            if request is not None:
-                metrics = request["metrics"]
-                failing = metrics[-1]["name"]
-                rows = "".join(
-                    f"{metric['name']}\t\t{metric['unit']}\t"
-                    f"{'fail' if metric['name'] == failing else 'pass'}\t"
-                    f"{metric['expression_sha256']}\t\n"
-                    for metric in metrics
+            if request is None:
+                raise AssertionError(
+                    "MetricFailFakeRunner requires a resolvable metric_extraction_request"
                 )
-                tsv = "metric\tvalue\tunit\tstatus\texpression_sha256\tmessage\n" + rows
-            else:
-                tsv = (
-                    "metric\tvalue\tunit\tstatus\texpression_sha256\tmessage\n"
-                    "rise\t1e-12\ts\tpass\t352e7b3256d5417f58d087382bd2054efbcf696d06b58fc6d39002bb09489748\t\n"
-                    "fall\t\ts\tfail\t8ba00c0d961decb9275b9636f61dbbd5659b5ed066a74b0083cd0e1d6d3d5493\t\n"
-                    "DC\t1e-06\tW\tpass\tcb82f3f25ee13ea3cb45f605a763ed0806ebb7f47fd27ce4a9c4a4cd902bb7c4\t\n"
-                )
+            metrics = request["metrics"]
+            failing = metrics[-1]["name"]
+            rows = "".join(
+                f"{metric['name']}\t\t{metric['unit']}\t"
+                f"{'fail' if metric['name'] == failing else 'pass'}\t"
+                f"{metric['expression_sha256']}\t\n"
+                for metric in metrics
+            )
+            tsv = "metric\tvalue\tunit\tstatus\texpression_sha256\tmessage\n" + rows
             (Path(local_path) / "ocean_scalars.tsv").write_text(tsv, encoding="utf-8")
             (Path(local_path) / "ocean.stdout").write_text("ocean stdout output", encoding="utf-8")
             (Path(local_path) / "ocean.stderr").write_text("", encoding="utf-8")
@@ -1300,8 +1303,8 @@ def test_remote_adapter_propagates_metric_failure(tmp_path: Path) -> None:
         "metric_result_manifest must report failed when a metric row has status=fail"
     )
     failing_name = _metric_names(project_dir)[-1]
-    fall_metric = next(m for m in metric_manifest["metrics"] if m["name"] == failing_name)
-    assert fall_metric["status"] == "failed", (
+    failed_metric = next(m for m in metric_manifest["metrics"] if m["name"] == failing_name)
+    assert failed_metric["status"] == "failed", (
         "individual metric with status=fail in TSV must be marked failed in manifest"
     )
 
@@ -1567,8 +1570,6 @@ def test_remote_multi_testbench_adapter_does_not_multiply_parallel_jobs(tmp_path
     assert len(spectre_cmds) == 2
 
     # Read the expected thread count from the project config.
-    import yaml
-
     spectre_cfg = yaml.safe_load(
         (project_dir / "config" / "spectre.yaml").read_text(encoding="utf-8")
     )
