@@ -45,9 +45,13 @@ from hermes_workflow.schemas import (
 )
 from hermes_workflow.validate import ContractBundle, assert_valid_project
 from hermes_workflow.history_warm_start import (
+    HISTORY_WARM_START_AUDIT_MD_RELATIVE,
+    HISTORY_WARM_START_AUDIT_RELATIVE,
     WarmStartAdapterResult,
     audit_history_warm_start,
+    audit_with_openbox_application,
     build_warm_start_openbox_adapter,
+    write_history_warm_start_reports,
 )
 
 
@@ -128,6 +132,7 @@ class OpenBoxBatchRunSettings:
     resolved_strategy: dict[str, object] = field(default_factory=dict)
     initialization: str = "sobol"
     effective_init_strategy: str = "sobol"
+    history_warm_start: dict[str, object] | None = None
 
 
 @dataclass(frozen=True)
@@ -278,9 +283,10 @@ def _build_warm_start_adapter(
             warm_start_strategy=None,
         )
     if advisor_factory is not None:
-        audit = audit_history_warm_start(project_dir, bundle)
+        base_audit = audit_history_warm_start(project_dir, bundle, write_reports=False)
         strategy = config.history_warm_start.warm_start_strategy
-        if audit.accepted_observation_count == 0:
+        accepted = base_audit.accepted_observation_count
+        if accepted == 0:
             mode = "no_accepted_observations"
         else:
             mode = (
@@ -288,12 +294,25 @@ def _build_warm_start_adapter(
                 if num_constraints == 0
                 else "initial_configurations_from_history"
             )
+        applied_to_advisor = accepted > 0 and mode in (
+            "transfer_learning_history",
+            "initial_configurations_from_history",
+        )
+        final_audit = audit_with_openbox_application(
+            base_audit,
+            applied_to_advisor=applied_to_advisor,
+            application_mode=mode,
+            applied_observation_count=accepted,
+            not_applied_reason=None,
+            warm_start_strategy=strategy,
+        )
+        write_history_warm_start_reports(project_dir, final_audit)
         return WarmStartAdapterResult(
-            audit=audit,
+            audit=final_audit,
             transfer_learning_history=[],
             initial_configurations=[],
-            accepted_observation_count=audit.accepted_observation_count,
-            applied_observation_count=audit.accepted_observation_count,
+            accepted_observation_count=accepted,
+            applied_observation_count=accepted,
             application_mode=mode,
             not_applied_reason=None,
             warm_start_strategy=strategy,
@@ -472,6 +491,34 @@ def _write_openbox_effectiveness_audit(
     return audit_path
 
 
+def _history_warm_start_report_payload(
+    adapter: WarmStartAdapterResult | None,
+) -> dict[str, object] | None:
+    """Build the ``openbox.history_warm_start`` report payload.
+
+    Returns ``None`` when warm-start is absent or disabled so the key is omitted
+    from the optimizer report entirely.
+    """
+    if adapter is None or adapter.application_mode == "disabled":
+        return None
+    applied_to_advisor = (
+        adapter.application_mode
+        in ("transfer_learning_history", "initial_configurations_from_history")
+        and adapter.applied_observation_count > 0
+    )
+    return {
+        "enabled": True,
+        "audit": HISTORY_WARM_START_AUDIT_RELATIVE.as_posix(),
+        "audit_markdown": HISTORY_WARM_START_AUDIT_MD_RELATIVE.as_posix(),
+        "accepted_observation_count": adapter.accepted_observation_count,
+        "applied_observation_count": adapter.applied_observation_count,
+        "applied_to_advisor": applied_to_advisor,
+        "application_mode": adapter.application_mode,
+        "warm_start_strategy": adapter.warm_start_strategy,
+        "not_applied_reason": adapter.not_applied_reason,
+    }
+
+
 def write_openbox_reports(
     project_dir: Path,
     result: NativeTurboRunResult,
@@ -560,6 +607,8 @@ def write_openbox_reports(
             },
         },
     }
+    if settings.history_warm_start is not None:
+        payload["openbox"]["history_warm_start"] = settings.history_warm_start
     if effectiveness_audit_relative is not None:
         payload["effectiveness_audit"] = effectiveness_audit_relative
     if runtime_thread_limits is not None:
@@ -911,6 +960,7 @@ def _run_openbox_batches(
         },
         initialization=contract.optimizer.optimizer.initialization.value,
         effective_init_strategy=contract.optimizer.optimizer.initialization.value,
+        history_warm_start=_history_warm_start_report_payload(warm_start_adapter),
     )
     effectiveness_audit_batches: list[dict[str, Any]] = []
     if model_replay_traces:

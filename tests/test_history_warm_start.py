@@ -697,6 +697,25 @@ class _FakeOBInitialConfigProvider:
         self.config_sources = ["warm_start"] * len(self.config_queue)
 
 
+class _FakeOBInitialConfigProviderWithoutWarmStart:
+    def __init__(
+        self,
+        *,
+        config_space: object,
+        init_num: int,
+        init_strategy: str,
+        transfer_learning_history: list[_FakeOBHistory],
+        warm_start_strategy: str,
+        rng: object,
+    ) -> None:
+        self.config_queue = [
+            observation
+            for history in transfer_learning_history
+            for observation in history.observations
+        ]
+        self.config_sources = ["sobol"] * len(self.config_queue)
+
+
 def _run_builder(
     tmp_path: Path,
     rows: list[str],
@@ -705,6 +724,7 @@ def _run_builder(
     num_sources: int = 1,
     num_constraints: int = 0,
     enabled: bool = True,
+    initial_config_provider: object | None = _FakeOBInitialConfigProvider,
 ) -> object:
     sources: list[dict[str, object]] = []
     for index in range(num_sources):
@@ -722,7 +742,7 @@ def _run_builder(
         observation_factory=_FakeOBObservation,
         history_factory=history_factory,
         config_builder=lambda parameters: _FakeOBConfiguration(parameters),
-        initial_config_provider=_FakeOBInitialConfigProvider,
+        initial_config_provider=initial_config_provider,
         random_seed=7,
         initial_trials=None,
         initialization="sobol",
@@ -795,6 +815,26 @@ def test_build_adapter_constrained_extracts_initial_configurations(
     assert adapter.transfer_learning_history == []
     # Only warm-start-extracted configurations are passed (not OpenBox fallback).
     assert len(adapter.initial_configurations) == 2
+    assert adapter.applied_observation_count == 2
+
+
+def test_build_adapter_constrained_not_applied_when_no_warm_start_configs(
+    tmp_path: Path,
+) -> None:
+    adapter = _run_builder(
+        tmp_path,
+        [_row(evaluation_index=1), _row(evaluation_index=2)],
+        history_factory=_FakeOBHistory,
+        num_constraints=1,
+        initial_config_provider=_FakeOBInitialConfigProviderWithoutWarmStart,
+    )
+
+    assert adapter.accepted_observation_count == 2
+    assert adapter.applied_observation_count == 0
+    assert adapter.application_mode == "not_applied"
+    assert adapter.not_applied_reason == "no_warm_start_configurations_extracted"
+    assert adapter.initial_configurations == []
+    assert adapter.audit.openbox_transfer_learning.applied_to_advisor is False
 
 
 def test_build_adapter_openbox_rejection_is_non_fatal(tmp_path: Path) -> None:
@@ -814,3 +854,115 @@ def test_build_adapter_openbox_rejection_is_non_fatal(tmp_path: Path) -> None:
     assert adapter.not_applied_reason == "history_object_rejected_by_openbox"
     assert adapter.transfer_learning_history == []
     assert adapter.applied_observation_count == 0
+
+
+# ---------------------------------------------------------------------------
+# Task 5: final audit application state + report writing
+# ---------------------------------------------------------------------------
+
+
+def _builder_with_audit(
+    tmp_path: Path,
+    rows: list[str],
+    *,
+    history_factory: object,
+    num_constraints: int = 0,
+) -> tuple[Path, object]:
+    source = _matching_source(tmp_path, rows, name="source_0")
+    project_dir, bundle = _current_project_with_warm_start(
+        tmp_path, sources=[{"path": str(source), "label": "round0"}]
+    )
+    adapter = build_warm_start_openbox_adapter(
+        project_dir,
+        bundle,
+        space="config-space",
+        observation_factory=_FakeOBObservation,
+        history_factory=history_factory,
+        config_builder=lambda parameters: _FakeOBConfiguration(parameters),
+        initial_config_provider=_FakeOBInitialConfigProvider,
+        random_seed=7,
+        initial_trials=None,
+        initialization="sobol",
+        num_constraints=num_constraints,
+    )
+    return project_dir, adapter
+
+
+def test_final_audit_applied_to_advisor_true_when_applied(tmp_path: Path) -> None:
+    project_dir, adapter = _builder_with_audit(
+        tmp_path,
+        [_row(evaluation_index=1)],
+        history_factory=_FakeOBHistory,
+        num_constraints=0,
+    )
+
+    payload = json.loads(
+        (project_dir / HISTORY_WARM_START_AUDIT_RELATIVE).read_text(encoding="utf-8")
+    )
+    assert payload["openbox_transfer_learning"]["applied_to_advisor"] is True
+    assert payload["application_mode"] == "transfer_learning_history"
+    assert adapter.application_mode == "transfer_learning_history"
+    markdown = (
+        project_dir / HISTORY_WARM_START_AUDIT_MD_RELATIVE
+    ).read_text(encoding="utf-8")
+    assert "Application mode: transfer_learning_history" in markdown
+    assert "Applied to advisor: true" in markdown
+
+
+def test_final_audit_applied_to_advisor_false_when_zero_accepted(
+    tmp_path: Path,
+) -> None:
+    project_dir, adapter = _builder_with_audit(
+        tmp_path,
+        [_row(status="metric_failed")],
+        history_factory=_FakeOBHistory,
+        num_constraints=0,
+    )
+
+    payload = json.loads(
+        (project_dir / HISTORY_WARM_START_AUDIT_RELATIVE).read_text(encoding="utf-8")
+    )
+    assert payload["openbox_transfer_learning"]["applied_to_advisor"] is False
+    assert payload["application_mode"] == "no_accepted_observations"
+    assert adapter.application_mode == "no_accepted_observations"
+
+
+def test_final_audit_applied_to_advisor_false_when_all_rejected(
+    tmp_path: Path,
+) -> None:
+    def rejecting_factory(*, config_space, num_constraints):  # type: ignore[no-untyped-def]
+        return _FakeOBHistory(
+            config_space=config_space, num_constraints=num_constraints, reject=True
+        )
+
+    project_dir, adapter = _builder_with_audit(
+        tmp_path,
+        [_row(evaluation_index=1), _row(evaluation_index=2)],
+        history_factory=rejecting_factory,
+        num_constraints=0,
+    )
+
+    payload = json.loads(
+        (project_dir / HISTORY_WARM_START_AUDIT_RELATIVE).read_text(encoding="utf-8")
+    )
+    assert payload["openbox_transfer_learning"]["applied_to_advisor"] is False
+    assert payload["application_mode"] == "not_applied"
+    assert payload["not_applied_reason"] == "history_object_rejected_by_openbox"
+    assert adapter.not_applied_reason == "history_object_rejected_by_openbox"
+    markdown = (
+        project_dir / HISTORY_WARM_START_AUDIT_MD_RELATIVE
+    ).read_text(encoding="utf-8")
+    assert "Applied to advisor: false" in markdown
+    assert "history_object_rejected_by_openbox" in markdown
+
+
+def test_audit_history_warm_start_write_reports_false_writes_no_files(
+    tmp_path: Path,
+) -> None:
+    project_dir = create_generic_project(tmp_path, name="current_project")
+    bundle = assert_valid_project(project_dir)
+
+    audit_history_warm_start(project_dir, bundle, write_reports=False)
+
+    assert not (project_dir / HISTORY_WARM_START_AUDIT_RELATIVE).exists()
+    assert not (project_dir / HISTORY_WARM_START_AUDIT_MD_RELATIVE).exists()

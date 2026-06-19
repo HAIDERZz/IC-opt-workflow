@@ -16,7 +16,7 @@ from __future__ import annotations
 import json
 import math
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Callable
@@ -122,6 +122,10 @@ class HistoryWarmStartAudit:
     openbox_transfer_learning: OpenBoxTransferLearningAudit
     issues: list[str]
     accepted_observations: list[AcceptedObservation]
+    # Final OpenBox application state (populated by the adapter / report path).
+    application_mode: str = ""
+    applied_observation_count: int = 0
+    not_applied_reason: str | None = None
 
 
 @dataclass
@@ -156,6 +160,45 @@ def audit_history_warm_start(
     if write_reports:
         _write_reports(project_dir, audit)
     return audit
+
+
+def audit_with_openbox_application(
+    audit: HistoryWarmStartAudit,
+    *,
+    applied_to_advisor: bool,
+    application_mode: str,
+    applied_observation_count: int,
+    not_applied_reason: str | None,
+    warm_start_strategy: str | None = None,
+) -> HistoryWarmStartAudit:
+    """Return a copy of ``audit`` updated with final OpenBox application state.
+
+    Uses :func:`dataclasses.replace` so the frozen audit is never mutated.
+    """
+    transfer = audit.openbox_transfer_learning
+    strategy = (
+        warm_start_strategy
+        if warm_start_strategy is not None
+        else transfer.warm_start_strategy
+    )
+    return replace(
+        audit,
+        openbox_transfer_learning=replace(
+            transfer,
+            applied_to_advisor=applied_to_advisor,
+            warm_start_strategy=strategy,
+        ),
+        application_mode=application_mode,
+        applied_observation_count=applied_observation_count,
+        not_applied_reason=not_applied_reason,
+    )
+
+
+def write_history_warm_start_reports(
+    project_dir: Path, audit: HistoryWarmStartAudit
+) -> None:
+    """Write the final history warm-start audit JSON and Markdown reports."""
+    _write_reports(project_dir, audit)
 
 
 def _disabled_audit() -> HistoryWarmStartAudit:
@@ -698,6 +741,9 @@ def _audit_to_payload(audit: HistoryWarmStartAudit) -> dict[str, object]:
         "accepted_observations": [
             _accepted_to_payload(observation) for observation in audit.accepted_observations
         ],
+        "application_mode": audit.application_mode,
+        "applied_observation_count": audit.applied_observation_count,
+        "not_applied_reason": audit.not_applied_reason,
         "issues": list(audit.issues),
     }
 
@@ -738,6 +784,14 @@ def _audit_to_markdown(audit: HistoryWarmStartAudit) -> str:
     lines.append(f"Enabled: {'true' if audit.enabled else 'false'}")
     lines.append(f"Accepted observations: {audit.accepted_observation_count}")
     lines.append(f"Rejected observations: {audit.rejected_observation_count}")
+    if audit.application_mode:
+        lines.append(f"Application mode: {audit.application_mode}")
+        lines.append(f"Applied observations: {audit.applied_observation_count}")
+        lines.append(
+            f"Applied to advisor: {'true' if audit.openbox_transfer_learning.applied_to_advisor else 'false'}"
+        )
+        if audit.not_applied_reason is not None:
+            lines.append(f"Not applied reason: {audit.not_applied_reason}")
     lines.append("")
     lines.append("## Sources")
     lines.append("")
@@ -767,6 +821,7 @@ _APPLICATION_MODE_TRANSFER = "transfer_learning_history"
 _APPLICATION_MODE_INITIAL_CONFIGS = "initial_configurations_from_history"
 _APPLICATION_MODE_NOT_APPLIED = "not_applied"
 _NOT_APPLIED_REJECTED_BY_OPENBOX = "history_object_rejected_by_openbox"
+_NOT_APPLIED_NO_WARM_START_CONFIGURATIONS = "no_warm_start_configurations_extracted"
 
 
 @dataclass(frozen=True)
@@ -800,131 +855,127 @@ def build_warm_start_openbox_adapter(
     The OpenBox factories are injected so this is unit-testable without the
     real OpenBox library. No OpenBox import lives in this module.
     """
-    audit = audit_history_warm_start(project_dir, bundle)
+    audit = audit_history_warm_start(project_dir, bundle, write_reports=False)
     config = bundle.history_warm_start
-    if config is None or not config.history_warm_start.enabled:
-        return WarmStartAdapterResult(
-            audit=audit,
-            transfer_learning_history=[],
-            initial_configurations=[],
-            accepted_observation_count=audit.accepted_observation_count,
-            applied_observation_count=0,
-            application_mode=_APPLICATION_MODE_DISABLED,
-            not_applied_reason=None,
-            warm_start_strategy=None,
-        )
+    disabled = config is None or not config.history_warm_start.enabled
+    strategy = None if disabled else config.history_warm_start.warm_start_strategy
 
-    strategy = config.history_warm_start.warm_start_strategy
-    if audit.accepted_observation_count == 0:
-        return WarmStartAdapterResult(
-            audit=audit,
-            transfer_learning_history=[],
-            initial_configurations=[],
-            accepted_observation_count=0,
-            applied_observation_count=0,
-            application_mode=_APPLICATION_MODE_NO_ACCEPTED,
-            not_applied_reason=None,
-            warm_start_strategy=strategy,
-        )
+    transfer_learning_history: list[object] = []
+    initial_configurations: list[object] = []
 
-    # Group accepted observations by source, preserving acceptance order, so
-    # each source maps to exactly one OpenBox History.
-    grouped: dict[str, list[AcceptedObservation]] = {}
-    for observation in audit.accepted_observations:
-        grouped.setdefault(observation.source_path, []).append(observation)
+    if disabled:
+        mode = _APPLICATION_MODE_DISABLED
+        applied = 0
+        not_applied_reason: str | None = None
+    elif audit.accepted_observation_count == 0:
+        mode = _APPLICATION_MODE_NO_ACCEPTED
+        applied = 0
+        not_applied_reason = None
+    else:
+        # Group accepted observations by source, preserving acceptance order, so
+        # each source maps to exactly one OpenBox History.
+        grouped: dict[str, list[AcceptedObservation]] = {}
+        for observation in audit.accepted_observations:
+            grouped.setdefault(observation.source_path, []).append(observation)
 
-    histories: list[object] = []
-    applied = 0
-    for observations in grouped.values():
-        history = history_factory(config_space=space, num_constraints=num_constraints)
-        for accepted in observations:
-            configuration = config_builder(accepted.parameters)
-            observation = observation_factory(
-                config=configuration,
-                objectives=[accepted.objective],
-                constraints=list(accepted.constraint_residuals),
-                extra_info={
-                    "history_warm_start": True,
-                    "source_path": accepted.source_path,
-                    "source_label": accepted.source_label,
-                    "source_run_id": accepted.source_run_id,
-                    "source_evaluation_index": accepted.source_evaluation_index,
-                    "status": accepted.status,
-                },
+        histories: list[object] = []
+        applied = 0
+        for observations in grouped.values():
+            history = history_factory(config_space=space, num_constraints=num_constraints)
+            for accepted in observations:
+                configuration = config_builder(accepted.parameters)
+                observation = observation_factory(
+                    config=configuration,
+                    objectives=[accepted.objective],
+                    constraints=list(accepted.constraint_residuals),
+                    extra_info={
+                        "history_warm_start": True,
+                        "source_path": accepted.source_path,
+                        "source_label": accepted.source_label,
+                        "source_run_id": accepted.source_run_id,
+                        "source_evaluation_index": accepted.source_evaluation_index,
+                        "status": accepted.status,
+                    },
+                )
+                try:
+                    history.update_observation(observation)
+                except ValueError:
+                    # OpenBox rejected this observation (invalid for its
+                    # history); skip it and continue with the remaining ones.
+                    continue
+                applied += 1
+            histories.append(history)
+
+        if applied == 0:
+            mode = _APPLICATION_MODE_NOT_APPLIED
+            not_applied_reason = _NOT_APPLIED_REJECTED_BY_OPENBOX
+        elif num_constraints == 0:
+            # Direct transfer history is only supported by OpenBox for
+            # unconstrained single-objective problems.
+            mode = _APPLICATION_MODE_TRANSFER
+            transfer_learning_history = histories
+            not_applied_reason = None
+        else:
+            # Constrained problem: OpenBox.check_setup() rejects transfer
+            # history, so extract initial configurations from the built histories
+            # using OpenBox's own InitialConfigProvider and pass those instead.
+            if initial_config_provider is None:
+                raise RuntimeError(
+                    "initial_config_provider is required for constrained "
+                    "warm-start initial-configuration extraction"
+                )
+            import numpy as np  # local: only needed for the extraction rng
+
+            init_num = (
+                initial_trials
+                if initial_trials is not None
+                else max(2 * len(bundle.variables.variables), 1)
             )
-            try:
-                history.update_observation(observation)
-            except ValueError:
-                # OpenBox rejected this observation (invalid for its history);
-                # skip it and continue with the remaining observations.
-                continue
-            applied += 1
-        histories.append(history)
+            provider = initial_config_provider(
+                config_space=space,
+                init_num=init_num,
+                init_strategy=initialization or "sobol",
+                transfer_learning_history=histories,
+                warm_start_strategy=strategy,
+                rng=np.random.RandomState(random_seed),
+            )
+            # Keep only the warm-start-extracted configurations;
+            # InitialConfigProvider also fills its queue with OpenBox-generated
+            # sobol/random fallback configs which must not be labeled warm-start.
+            initial_configurations = [
+                config
+                for config, source in zip(provider.config_queue, provider.config_sources)
+                if source == "warm_start"
+            ]
+            if initial_configurations:
+                mode = _APPLICATION_MODE_INITIAL_CONFIGS
+                applied = len(initial_configurations)
+                not_applied_reason = None
+            else:
+                mode = _APPLICATION_MODE_NOT_APPLIED
+                applied = 0
+                not_applied_reason = _NOT_APPLIED_NO_WARM_START_CONFIGURATIONS
 
-    if applied == 0:
-        return WarmStartAdapterResult(
-            audit=audit,
-            transfer_learning_history=[],
-            initial_configurations=[],
-            accepted_observation_count=audit.accepted_observation_count,
-            applied_observation_count=0,
-            application_mode=_APPLICATION_MODE_NOT_APPLIED,
-            not_applied_reason=_NOT_APPLIED_REJECTED_BY_OPENBOX,
-            warm_start_strategy=strategy,
-        )
-
-    if num_constraints == 0:
-        # Direct transfer history is only supported by OpenBox for unconstrained
-        # single-objective problems.
-        return WarmStartAdapterResult(
-            audit=audit,
-            transfer_learning_history=histories,
-            initial_configurations=[],
-            accepted_observation_count=audit.accepted_observation_count,
-            applied_observation_count=applied,
-            application_mode=_APPLICATION_MODE_TRANSFER,
-            not_applied_reason=None,
-            warm_start_strategy=strategy,
-        )
-
-    # Constrained problem: OpenBox.check_setup() rejects transfer history, so
-    # extract initial configurations from the built histories using OpenBox's own
-    # InitialConfigProvider and pass those instead.
-    if initial_config_provider is None:
-        raise RuntimeError(
-            "initial_config_provider is required for constrained warm-start "
-            "initial-configuration extraction"
-        )
-    import numpy as np  # local: only needed for the constrained extraction rng
-
-    init_num = (
-        initial_trials
-        if initial_trials is not None
-        else max(2 * len(bundle.variables.variables), 1)
+    applied_to_advisor = (
+        mode in (_APPLICATION_MODE_TRANSFER, _APPLICATION_MODE_INITIAL_CONFIGS)
+        and applied > 0
     )
-    provider = initial_config_provider(
-        config_space=space,
-        init_num=init_num,
-        init_strategy=initialization or "sobol",
-        transfer_learning_history=histories,
+    final_audit = audit_with_openbox_application(
+        audit,
+        applied_to_advisor=applied_to_advisor,
+        application_mode=mode,
+        applied_observation_count=applied,
+        not_applied_reason=not_applied_reason,
         warm_start_strategy=strategy,
-        rng=np.random.RandomState(random_seed),
     )
-    # Keep only the warm-start-extracted configurations; InitialConfigProvider
-    # also fills its queue with OpenBox-generated sobol/random fallback configs
-    # which must not be labeled as warm-start.
-    extracted = [
-        config
-        for config, source in zip(provider.config_queue, provider.config_sources)
-        if source == "warm_start"
-    ]
+    write_history_warm_start_reports(project_dir, final_audit)
     return WarmStartAdapterResult(
-        audit=audit,
-        transfer_learning_history=[],
-        initial_configurations=extracted,
+        audit=final_audit,
+        transfer_learning_history=transfer_learning_history,
+        initial_configurations=initial_configurations,
         accepted_observation_count=audit.accepted_observation_count,
         applied_observation_count=applied,
-        application_mode=_APPLICATION_MODE_INITIAL_CONFIGS,
-        not_applied_reason=None,
+        application_mode=mode,
+        not_applied_reason=not_applied_reason,
         warm_start_strategy=strategy,
     )

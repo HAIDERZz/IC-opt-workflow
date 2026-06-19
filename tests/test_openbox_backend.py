@@ -2492,3 +2492,191 @@ def test_run_openbox_real_no_config_and_disabled_warm_start_preserve_behavior(
     )
     assert disabled_result.evaluation_count == 1
     assert not (disabled_dir / HISTORY_WARM_START_AUDIT_RELATIVE).exists()
+
+
+# ---------------------------------------------------------------------------
+# Task 5: history warm-start report payload integration
+# ---------------------------------------------------------------------------
+
+
+def _history_evaluations_row(project_dir: Path) -> str:
+    """A single accepted JSONL row valid for an approved real project's contract.
+
+    Parameters are each variable's lower bound (always in range and on grid);
+    metrics are the project's passing values; old status is feasible.
+    """
+    variables = _read_yaml(project_dir / "config" / "variables.yaml")["variables"]
+    parameters = {variable["name"]: variable["lower"] for variable in variables}
+    return json.dumps(
+        {
+            "parameters": parameters,
+            "metrics": _passing_metric_values_from_config(project_dir),
+            "status": "feasible",
+            "evaluation_index": 1,
+            "run_id": "real_001",
+        }
+    )
+
+
+def _write_history_evaluations(project_dir: Path, rows: list[str]) -> None:
+    path = project_dir / EVALUATIONS_RELATIVE
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("".join(line + "\n" for line in rows), encoding="utf-8")
+
+
+def _run_real_with_warm_start(
+    project_dir: Path, *, advisor_factory: object | None = None
+) -> dict:
+    _runs, adapter = _fake_manifest_adapter()
+    run_openbox_real_optimization(
+        project_dir,
+        max_evals=1,
+        batch_size=1,
+        parallel_jobs=1,
+        advisor_factory=advisor_factory
+        if advisor_factory is not None
+        else (lambda _space, _seed: FakeAdvisor(project_dir)),
+        adapter=adapter,
+    )
+    return json.loads((project_dir / REPORT_RELATIVE).read_text(encoding="utf-8"))
+
+
+def test_optimizer_report_includes_history_warm_start_when_enabled(
+    tmp_path: Path,
+) -> None:
+    project_dir = create_approved_real_project(tmp_path)
+    source_dir = create_approved_real_project(tmp_path / "source")
+    _write_history_evaluations(source_dir, [_history_evaluations_row(source_dir)])
+    _write_warm_start_config(
+        project_dir,
+        enabled=True,
+        sources=[{"path": str(source_dir), "label": "round1"}],
+    )
+
+    payload = _run_real_with_warm_start(project_dir)
+
+    history_payload = payload["openbox"]["history_warm_start"]
+    assert history_payload["enabled"] is True
+    assert history_payload["audit"] == "reports/history_warm_start_audit.json"
+    assert history_payload["audit_markdown"] == "reports/history_warm_start_audit.md"
+    assert history_payload["accepted_observation_count"] >= 1
+    assert history_payload["application_mode"] in {
+        "transfer_learning_history",
+        "initial_configurations_from_history",
+    }
+
+
+def test_optimizer_report_omits_history_warm_start_when_no_config(
+    tmp_path: Path,
+) -> None:
+    project_dir = create_approved_real_project(tmp_path)
+
+    payload = _run_real_with_warm_start(project_dir)
+
+    assert "history_warm_start" not in payload["openbox"]
+
+
+def test_optimizer_report_omits_history_warm_start_when_disabled(
+    tmp_path: Path,
+) -> None:
+    project_dir = create_approved_real_project(tmp_path)
+    _write_warm_start_config(
+        project_dir,
+        enabled=False,
+        sources=[{"path": str(tmp_path / "previous_project"), "label": "round1"}],
+    )
+
+    payload = _run_real_with_warm_start(project_dir)
+
+    assert "history_warm_start" not in payload["openbox"]
+
+
+def test_optimizer_report_history_warm_start_zero_accepted(tmp_path: Path) -> None:
+    project_dir = create_approved_real_project(tmp_path)
+    # Valid project source with no optimizer evaluations file -> source rejected
+    # as missing_optimizer_evaluations -> zero accepted observations.
+    source_dir = create_generic_project(tmp_path, name="warm_start_source")
+    _write_warm_start_config(
+        project_dir,
+        enabled=True,
+        sources=[{"path": str(source_dir), "label": "round1"}],
+    )
+
+    payload = _run_real_with_warm_start(project_dir)
+
+    history_payload = payload["openbox"]["history_warm_start"]
+    assert history_payload["application_mode"] == "no_accepted_observations"
+    assert history_payload["applied_to_advisor"] is False
+    assert history_payload["accepted_observation_count"] == 0
+
+
+def test_partial_and_final_report_share_history_warm_start_payload(
+    tmp_path: Path, monkeypatch
+) -> None:
+    import hermes_workflow.openbox_backend as module
+
+    project_dir = create_approved_real_project(tmp_path)
+    source_dir = create_approved_real_project(tmp_path / "source")
+    _write_history_evaluations(source_dir, [_history_evaluations_row(source_dir)])
+    _write_warm_start_config(
+        project_dir,
+        enabled=True,
+        sources=[{"path": str(source_dir), "label": "round1"}],
+    )
+
+    captured: list[object] = []
+    real_write = module.write_openbox_reports
+
+    def recording_write(*args, **kwargs) -> object:
+        captured.append(kwargs["settings"].history_warm_start)
+        return real_write(*args, **kwargs)
+
+    monkeypatch.setattr(module, "write_openbox_reports", recording_write)
+    _runs, adapter = _fake_manifest_adapter()
+    run_openbox_real_optimization(
+        project_dir,
+        max_evals=2,
+        batch_size=1,
+        parallel_jobs=1,
+        advisor_factory=lambda _surface, _seed: FakeAdvisor(project_dir),
+        adapter=adapter,
+    )
+
+    # At least one partial report and the final report.
+    assert len(captured) >= 2
+    assert all(item is not None for item in captured)
+    assert all(item == captured[0] for item in captured)
+
+
+def test_history_warm_start_report_payload_not_applied_mode(tmp_path: Path) -> None:
+    """The report helper must project the not_applied adapter state faithfully
+    (this branch is otherwise only exercised at the audit level)."""
+    import hermes_workflow.openbox_backend as module
+    from hermes_workflow.history_warm_start import (
+        WarmStartAdapterResult,
+        audit_history_warm_start,
+    )
+
+    project_dir = create_generic_project(tmp_path, name="audit_source")
+    bundle = assert_valid_project(project_dir)
+    base_audit = audit_history_warm_start(project_dir, bundle, write_reports=False)
+    adapter = WarmStartAdapterResult(
+        audit=base_audit,
+        transfer_learning_history=[],
+        initial_configurations=[],
+        accepted_observation_count=2,
+        applied_observation_count=0,
+        application_mode="not_applied",
+        not_applied_reason="history_object_rejected_by_openbox",
+        warm_start_strategy="topk",
+    )
+
+    payload = module._history_warm_start_report_payload(adapter)
+
+    assert payload is not None
+    assert payload["application_mode"] == "not_applied"
+    assert payload["applied_to_advisor"] is False
+    assert payload["not_applied_reason"] == "history_object_rejected_by_openbox"
+    assert payload["accepted_observation_count"] == 2
+    assert payload["applied_observation_count"] == 0
+    assert payload["enabled"] is True
