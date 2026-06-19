@@ -12,6 +12,7 @@ import yaml
 from pydantic import BaseModel, ValidationError
 
 from hermes_workflow.schemas import (
+    HistoryWarmStartConfig,
     MetricsConfig,
     OptimizerAlgorithm,
     OptimizerConfig,
@@ -48,6 +49,7 @@ OPTIONAL_CONFIG_MODELS: dict[str, type[BaseModel]] = {
     "testbenches.yaml": TestbenchesConfig,
     "process_corners.yaml": ProcessCornerConfig,
     "waveform_exports.yaml": WaveformExportsConfig,
+    "history_warm_start.yaml": HistoryWarmStartConfig,
 }
 
 INTEGER_RE = re.compile(r"^[+-]?\d+$")
@@ -110,6 +112,7 @@ class ContractBundle:
     spectre: SpectreConfig
     optimizer: OptimizerConfig | None
     waveform_exports: WaveformExportsConfig | None = None
+    history_warm_start: HistoryWarmStartConfig | None = None
 
 
 def validate_project_files(project_dir: Path) -> ValidationReport:
@@ -263,6 +266,11 @@ def _bundle_from_loaded(
         waveform_exports=(
             _cast_model(WaveformExportsConfig, loaded["waveform_exports.yaml"])
             if "waveform_exports.yaml" in loaded
+            else None
+        ),
+        history_warm_start=(
+            _cast_model(HistoryWarmStartConfig, loaded["history_warm_start.yaml"])
+            if "history_warm_start.yaml" in loaded
             else None
         ),
     )

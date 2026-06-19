@@ -14,6 +14,7 @@ from pydantic import BaseModel, ValidationError
 
 from hermes_workflow.netlists import prepare_netlist
 from hermes_workflow.schemas import (
+    HistoryWarmStartConfig,
     MetricsConfig,
     OptimizerConfig,
     ProcessCornerConfig,
@@ -45,6 +46,7 @@ OPTIONAL_SECTIONS = [
     "Workflow",
     "Fixed Points",
     "Waveform Exports",
+    "History Warm Start",
 ]
 FIX_RUN_REQUIRED_SECTIONS = [
     "Project",
@@ -72,6 +74,7 @@ OPTIONAL_CONFIG_FILE_MODELS: dict[str, type[BaseModel]] = {
     "process_corners.yaml": ProcessCornerConfig,
     "fixed_points.yaml": FixedPointsConfig,
     "waveform_exports.yaml": WaveformExportsConfig,
+    "history_warm_start.yaml": HistoryWarmStartConfig,
 }
 
 
@@ -252,6 +255,11 @@ def render_config_payloads(sections: dict[str, Any], *, workflow_mode: str = "op
             "schema_version": "1.0",
             "optimizer": optimizer,
         }
+        if "History Warm Start" in sections:
+            payloads["history_warm_start.yaml"] = {
+                "schema_version": "1.0",
+                "history_warm_start": _dict_section(sections, "History Warm Start"),
+            }
 
     if "testbenches" in maestro:
         payloads["testbenches.yaml"] = {
@@ -881,6 +889,9 @@ def _validate_required_fields(sections: dict[str, Any], *, workflow_mode: str = 
         ],
     }
     issues: list[str] = []
+
+    if workflow_mode == "fix_run" and "History Warm Start" in sections:
+        issues.append("History Warm Start is only supported for optimize workflow mode")
 
     if workflow_mode == "fix_run":
         # Skip Objective, Constraints, Optimizer Settings required-field checks

@@ -14,7 +14,9 @@ from hermes_workflow.netlists import prepare_netlist
 from hermes_workflow.requirement_intake import (
     check_requirement,
     import_maestro_point_netlist,
+    parse_requirement_text,
     prepare_from_requirement,
+    render_config_payloads,
 )
 from hermes_workflow.reports import PassFail
 from hermes_workflow.validate import validate_project_files
@@ -734,3 +736,167 @@ def test_parse_requirement_text_reports_remote_maestro_missing() -> None:
 
     assert report.status == "fail"
     assert "maestro_point_root/netlist/input.scs is missing: /remote/missing_point/netlist/input.scs" in report.issues
+
+
+HISTORY_WARM_START_SECTION = """## History Warm Start
+
+```yaml
+enabled: true
+sources:
+  - path: /tmp/old_project
+    label: round1
+max_observations: 200
+warm_start_strategy: topk
+```
+
+"""
+
+
+def _insert_history_warm_start_section(text: str) -> str:
+    return text.replace(
+        "## Approval Checklist\n",
+        HISTORY_WARM_START_SECTION + "## Approval Checklist\n",
+    )
+
+
+EXPECTED_HISTORY_WARM_START_CONFIG = {
+    "schema_version": "1.0",
+    "history_warm_start": {
+        "enabled": True,
+        "sources": [{"path": "/tmp/old_project", "label": "round1"}],
+        "max_observations": 200,
+        "warm_start_strategy": "topk",
+    },
+}
+
+
+def test_parse_requirement_text_accepts_history_warm_start_section(
+    tmp_path: Path,
+) -> None:
+    project_dir = _copy_requirement_project(tmp_path)
+    text = _insert_history_warm_start_section(
+        (project_dir / "opt_requirement.md").read_text(encoding="utf-8")
+    )
+
+    report = parse_requirement_text(
+        text,
+        constraints_text=None,
+        maestro_input_exists=lambda _path: True,
+    )
+
+    assert report.status == "pass", report.issues
+    assert "History Warm Start" in report.sections
+    assert report.sections["History Warm Start"]["enabled"] is True
+    assert report.sections["History Warm Start"]["sources"][0]["path"] == "/tmp/old_project"
+
+
+def test_render_config_payloads_emits_history_warm_start_yaml(
+    tmp_path: Path,
+) -> None:
+    project_dir = _copy_requirement_project(tmp_path)
+    text = _insert_history_warm_start_section(
+        (project_dir / "opt_requirement.md").read_text(encoding="utf-8")
+    )
+    report = parse_requirement_text(
+        text,
+        constraints_text=None,
+        maestro_input_exists=lambda _path: True,
+    )
+    assert report.status == "pass", report.issues
+
+    payloads = render_config_payloads(report.sections)
+
+    assert payloads["history_warm_start.yaml"] == EXPECTED_HISTORY_WARM_START_CONFIG
+
+
+def test_prepare_from_requirement_writes_history_warm_start_config(
+    tmp_path: Path,
+) -> None:
+    project_dir = _copy_requirement_project(tmp_path)
+    text = _insert_history_warm_start_section(
+        (project_dir / "opt_requirement.md").read_text(encoding="utf-8")
+    )
+    (project_dir / "opt_requirement.md").write_text(text, encoding="utf-8")
+
+    report = prepare_from_requirement(project_dir)
+
+    assert report.status == "pass", report.issues
+    warm_start = yaml.safe_load(
+        (project_dir / "config" / "history_warm_start.yaml").read_text(encoding="utf-8")
+    )
+    assert warm_start == EXPECTED_HISTORY_WARM_START_CONFIG
+
+
+_FIX_RUN_DROP_SECTIONS = {
+    "Metrics",
+    "Constraints",
+    "Objective",
+    "Optimizer Settings",
+}
+
+
+def _rebuild_as_fix_run_requirement(text: str) -> str:
+    """Convert the optimize-mode fixture requirement into fix-run shape.
+
+    Drops optimize-only sections, keeps the fix-run required sections, and
+    appends Workflow (mode: fix_run), a complete Fixed Points block, a
+    Waveform Exports block (so fix-run's metrics/waveform one-of check holds),
+    and a History Warm Start block."""
+    sections: list[tuple[str, str]] = []
+    heading: str | None = None
+    body: list[str] = []
+    for line in text.splitlines(keepends=True):
+        if line.startswith("## "):
+            if heading is not None:
+                sections.append((heading, "".join(body)))
+            heading = line[3:].strip()
+            body = []
+        elif heading is None:
+            continue
+        else:
+            body.append(line)
+    if heading is not None:
+        sections.append((heading, "".join(body)))
+
+    rebuilt = ["# Optimization Requirement\n"]
+    for name, section_body in sections:
+        if name in _FIX_RUN_DROP_SECTIONS:
+            continue
+        rebuilt.append(f"## {name}\n{section_body}")
+    rebuilt.append("## Workflow\n\n```yaml\nmode: fix_run\nstarting_run_id: real_001\n```\n")
+    rebuilt.append(
+        "## Fixed Points\n\n```yaml\npoints:\n"
+        "  - candidate_id: fp_001\n"
+        "    parameters:\n"
+        '      FN: "2"\n'
+        '      WN: "0.3u"\n'
+        '      FP: "2"\n'
+        '      WP: "0.3u"\n'
+        "```\n"
+    )
+    rebuilt.append(
+        "## Waveform Exports\n\n```yaml\nexports:\n"
+        "  - name: nf\n"
+        '    expression: \'getData("NF" ?result "pnoise")\'\n'
+        "    output_format: csv\n"
+        "    nil_policy: fail\n"
+        "```\n"
+    )
+    rebuilt.append(HISTORY_WARM_START_SECTION)
+    return "".join(rebuilt)
+
+
+def test_fix_run_requirement_rejects_history_warm_start(tmp_path: Path) -> None:
+    project_dir = _copy_requirement_project(tmp_path)
+    text = _rebuild_as_fix_run_requirement(
+        (project_dir / "opt_requirement.md").read_text(encoding="utf-8")
+    )
+    (project_dir / "opt_requirement.md").write_text(text, encoding="utf-8")
+
+    report = check_requirement(project_dir)
+
+    assert report.status == "fail"
+    assert (
+        "History Warm Start is only supported for optimize workflow mode"
+        in report.issues
+    )

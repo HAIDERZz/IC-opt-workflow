@@ -5,6 +5,7 @@ import yaml
 from pydantic import ValidationError
 
 from hermes_workflow.schemas import (
+    HistoryWarmStartConfig,
     OptimizerAlgorithm,
     MetricsConfig,
     OptimizerConfig,
@@ -253,3 +254,66 @@ def test_testbenches_config_rejects_duplicate_ids() -> None:
 
     with pytest.raises(ValidationError, match="testbench ids must be unique"):
         BenchesConfigModel.model_validate(payload)
+
+
+def _history_warm_start_payload(**overrides: object) -> dict:
+    payload: dict = {
+        "schema_version": "1.0",
+        "history_warm_start": {
+            "enabled": True,
+            "sources": [{"path": "/tmp/old_project", "label": "round1"}],
+            "max_observations": 200,
+            "warm_start_strategy": "topk",
+        },
+    }
+    payload["history_warm_start"].update(overrides)  # type: ignore[union-attr]
+    return payload
+
+
+def test_history_warm_start_config_accepts_enabled_source() -> None:
+    config = HistoryWarmStartConfig.model_validate(_history_warm_start_payload())
+
+    assert config.history_warm_start.enabled is True
+    assert config.history_warm_start.sources[0].path == "/tmp/old_project"
+    assert config.history_warm_start.sources[0].label == "round1"
+    assert config.history_warm_start.max_observations == 200
+    assert config.history_warm_start.warm_start_strategy == "topk"
+
+
+def test_history_warm_start_config_rejects_enabled_without_sources() -> None:
+    payload = {"schema_version": "1.0", "history_warm_start": {"enabled": True}}
+
+    with pytest.raises(
+        ValidationError,
+        match="history_warm_start.sources is required when enabled is true",
+    ):
+        HistoryWarmStartConfig.model_validate(payload)
+
+
+def test_history_warm_start_config_rejects_enabled_with_empty_sources() -> None:
+    payload = _history_warm_start_payload(sources=[])
+
+    with pytest.raises(
+        ValidationError,
+        match="history_warm_start.sources is required when enabled is true",
+    ):
+        HistoryWarmStartConfig.model_validate(payload)
+
+
+def test_history_warm_start_config_accepts_disabled_without_sources() -> None:
+    payload = {"schema_version": "1.0", "history_warm_start": {"enabled": False}}
+
+    config = HistoryWarmStartConfig.model_validate(payload)
+
+    assert config.history_warm_start.enabled is False
+    assert config.history_warm_start.sources == []
+    # max_observations and warm_start_strategy keep their defaults when omitted.
+    assert config.history_warm_start.max_observations is None
+    assert config.history_warm_start.warm_start_strategy == "topk"
+
+
+def test_history_warm_start_config_rejects_unsupported_strategy() -> None:
+    payload = _history_warm_start_payload(warm_start_strategy="turbo")
+
+    with pytest.raises(ValidationError):
+        HistoryWarmStartConfig.model_validate(payload)

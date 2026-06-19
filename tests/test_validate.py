@@ -9,6 +9,7 @@ from pydantic import ValidationError
 
 from hermes_workflow.schemas import MetricsConfig, SpectreConfig
 from hermes_workflow.validate import assert_valid_project, validate_project_files
+from tests.project_factory import create_generic_project
 
 
 FIXTURE_PROJECT = Path(__file__).parent / "fixtures" / "bridge_test_inv"
@@ -425,3 +426,39 @@ def test_validate_fix_run_project_accepts_metrics_only(tmp_path: Path) -> None:
     report = validate_project_files(project_dir)
 
     assert report.ok is True, report.format()
+
+
+def test_assert_valid_project_loads_history_warm_start(tmp_path: Path) -> None:
+    project_dir = create_generic_project(tmp_path)
+    write_yaml(
+        project_dir / "config" / "history_warm_start.yaml",
+        {
+            "schema_version": "1.0",
+            "history_warm_start": {
+                "enabled": True,
+                "sources": [{"path": "/tmp/old_project", "label": "round1"}],
+                "max_observations": 200,
+                "warm_start_strategy": "topk",
+            },
+        },
+    )
+
+    bundle = assert_valid_project(project_dir)
+
+    assert bundle.history_warm_start is not None
+    settings = bundle.history_warm_start.history_warm_start
+    assert settings.enabled is True
+    assert settings.sources[0].path == "/tmp/old_project"
+    assert settings.sources[0].label == "round1"
+    assert settings.max_observations == 200
+    assert settings.warm_start_strategy == "topk"
+
+
+def test_assert_valid_project_without_history_warm_start_is_none(
+    tmp_path: Path,
+) -> None:
+    project_dir = create_generic_project(tmp_path)
+
+    bundle = assert_valid_project(project_dir)
+
+    assert bundle.history_warm_start is None
