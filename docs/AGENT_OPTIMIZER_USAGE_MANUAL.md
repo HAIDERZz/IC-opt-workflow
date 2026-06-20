@@ -7,6 +7,27 @@ inspect workflow artifacts, and report evidence. It should not invent optimizer
 settings, rewrite formulas, choose candidate points by hand, or treat a command
 exit code as workflow acceptance.
 
+The agent is also an IC optimization advisor. It should combine the user's
+circuit notes, topology knowledge, specifications, and constraints with IC Auto
+Opt reports and raw artifacts, then explain what the results imply for the next
+optimization step.
+
+## Document Map
+
+- `README.md`: install path, local/remote split, command shapes, product scope.
+- `docs/USER_GUIDE_CN.md`: complete Chinese user guide.
+- `docs/AGENT_USER_QUICKSTART_CN.md`: compact agent checklist.
+- `docs/AGENT_OPTIMIZER_USAGE_MANUAL.md`: detailed agent behavior rules.
+- `docs/OPTIMIZER_PRODUCTION_QUICKSTART.md`: production execution sequence.
+- `docs/TOOLCHAIN_EXECUTION_REFERENCE.md`: CLI, Cadence setup, and evidence files.
+- `docs/OPTIMIZER_ALGORITHM_MODES.md`: OpenBox and TuRBO strategy selection.
+- `docs/PROCESS_CORNER_OPTIMIZATION_FLOW_CN.md`: process-corner aggregation.
+- `docs/TROUBLESHOOTING_CN.md`: failure diagnosis.
+- `examples/spectre_maestro_project/OPT_REQUIREMENT_README.md`: requirement
+  section contract and template selection.
+- `examples/spectre_maestro_project/*.md`: real validated sanitized
+  requirements. Use these as examples instead of inventing snippets.
+
 ## Project Inputs
 
 ```text
@@ -76,6 +97,17 @@ ic-opt PROJECT_DIR --real --continue N
 ```
 
 All other values stay inherited from `opt_requirement.md` and generated config.
+
+## Requirement Modes
+
+| User goal | Template | Mode |
+| --- | --- | --- |
+| Single testbench, source-point corner optimization | `opt_requirement.md` | `optimize` |
+| Single testbench, multiple process corners | `opt_requirement.multi_corner.md` | `optimize` |
+| Multiple testbenches, source-point corner | `opt_requirement.multi_testbench.md` | `optimize` |
+| Multiple testbenches and multiple process corners | `opt_requirement.multi_tb_corner.md` | `optimize` |
+| New same-circuit run using previous project history | `opt_requirement.history_warm_start.md` | `optimize` + History Warm Start |
+| User-specified fixed points and waveform CSV export | `opt_requirement.fix_run.md` | `fix_run` |
 
 ## History Warm Start
 
@@ -202,6 +234,10 @@ The agent should:
 - inspect reports and manifests before reporting success
 - report command status, failed child count, run id, corner policy, metrics,
   waveform CSV paths, warnings, and artifact paths
+- use user-provided circuit knowledge together with report evidence
+- explain next-step choices such as continuing the same project, creating a new
+  requirement with adjusted ranges, switching backend, revising the objective,
+  or running fix-run waveform export
 
 The agent must not:
 

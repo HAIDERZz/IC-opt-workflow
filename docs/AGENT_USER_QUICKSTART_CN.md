@@ -1,11 +1,37 @@
 # IC Auto Opt Agent 使用速查
 
-agent 操作当前版本的 IC Auto Opt 时，只做三件事：读取
-`opt_requirement.md`、调用产品 CLI、检查过程文件后汇报。
+agent 操作当前版本的 IC Auto Opt 时，不只是替用户运行命令。agent 的身份是电路优化
+协助者：读取用户的 requirement 和电路背景资料，调用产品 CLI，检查报告与 raw 数据，
+再把结果翻译成对电路调参有用的反馈。
 
 `opt_requirement.md` 是初次运行的唯一配置入口。它通过 `Workflow.mode` 选择
 优化或 fix-run。预算、并行数、Spectre 线程数、优化器 CPU 限制、算法、策略、
 初始化、工艺角、输出格式、metric 公式、固定点和 waveform export 都在这个文件里。
+
+## 文档怎么用
+
+- `README.md`：安装、local/remote 模式、命令形态和产品能力总览。
+- `docs/USER_GUIDE_CN.md`：面向人的完整中文使用说明。
+- `docs/AGENT_USER_QUICKSTART_CN.md`：agent 快速操作清单。
+- `docs/AGENT_OPTIMIZER_USAGE_MANUAL.md`：agent 的详细行为边界和 artifact checklist。
+- `docs/OPTIMIZER_PRODUCTION_QUICKSTART.md`：生产运行流程。
+- `docs/TOOLCHAIN_EXECUTION_REFERENCE.md`：CLI、Cadence 环境和证据文件。
+- `docs/OPTIMIZER_ALGORITHM_MODES.md`：OpenBox / TuRBO 策略选择。
+- `docs/PROCESS_CORNER_OPTIMIZATION_FLOW_CN.md`：multi-corner 聚合逻辑。
+- `docs/TROUBLESHOOTING_CN.md`：失败排查。
+- `examples/spectre_maestro_project/OPT_REQUIREMENT_README.md`：requirement section 合同。
+- `examples/spectre_maestro_project/*.md`：真实跑通过后脱敏的 requirement 模板。
+
+## 模式选择
+
+| 目标 | 模板 | 模式 |
+| --- | --- | --- |
+| 单 testbench、source-point corner 优化 | `opt_requirement.md` | `optimize` |
+| 单 testbench、多 process corner 优化 | `opt_requirement.multi_corner.md` | `optimize` |
+| 多 testbench、source-point corner 优化 | `opt_requirement.multi_testbench.md` | `optimize` |
+| 多 testbench、多 process corner 优化 | `opt_requirement.multi_tb_corner.md` | `optimize` |
+| 新项目引用同电路旧项目历史 | `opt_requirement.history_warm_start.md` | `optimize` + History Warm Start |
+| 固定参数点和 waveform CSV 导出 | `opt_requirement.fix_run.md` | `fix_run` |
 
 ## 命令
 
