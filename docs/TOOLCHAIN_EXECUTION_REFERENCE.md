@@ -10,7 +10,6 @@ package.
 ic-opt PROJECT_DIR --doctor
 ic-opt PROJECT_DIR --real
 ic-opt PROJECT_DIR --real --continue N
-ic-opt PROJECT_DIR --real --dry-orchestration
 ic-opt --ssh-profile PROFILE PROJECT_DIR --doctor
 ic-opt --ssh-profile PROFILE PROJECT_DIR --real
 ic-opt --ssh-profile PROFILE PROJECT_DIR --real --continue N

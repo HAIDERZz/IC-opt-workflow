@@ -41,6 +41,22 @@ root in `opt_requirement.md`; it must contain:
 <maestro_point_root>/netlist/input.scs
 ```
 
+The value should be the Maestro result point directory itself, not the
+`input.scs` file and not the `psf/` directory. The usual shape is:
+
+```text
+/home/username/simulation/<virtuoso_library>/<cellview_name>/maestro/results/maestro/Interactive.N/1/<test_name>
+```
+
+Example:
+
+```text
+/home/username/simulation/Virtuoso_Bridge_test/MixerCS_PSS_IIP3/maestro/results/maestro/Interactive.28/1/Mixer_CS_IIP3
+```
+
+Use the actual `Interactive.N` number and final testbench directory produced by
+your Maestro run.
+
 Start from one of:
 
 ```text
@@ -97,7 +113,9 @@ Continuation:
 ```
 
 Optional History Warm Start is for a new optimize project that references
-previous same-circuit project directories through `config/history_warm_start.yaml`.
+previous same-circuit project directories through the `History Warm Start`
+section in `opt_requirement.md`; the workflow renders that section to
+`config/history_warm_start.yaml`.
 It is not a CLI flag, is not supported for fix-run, and must not be combined
 with `--continue N`. Treat `reports/history_warm_start_audit.json` and
 `openbox.history_warm_start` in `reports/optimizer_run_report.json` as the

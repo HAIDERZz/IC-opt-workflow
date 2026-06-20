@@ -101,7 +101,7 @@ requirement for backward compatibility.
 Single-testbench projects use a top-level Maestro source:
 
 ```yaml
-maestro_point_root: /absolute/path/to/Mixer_CS_CG_NF/point_root
+maestro_point_root: /home/username/simulation/Virtuoso_Bridge_test/MixerCS_PSS_CG_Noise/maestro/results/maestro/Interactive.N/1/Mixer_CS_CG_NF
 virtuoso_library: Virtuoso_Bridge_test
 cell: MixerCS_PSS_CG_Noise
 design_view: schematic
@@ -116,17 +116,32 @@ then uses a `testbench:` routing key.
 ```yaml
 testbenches:
   - id: cg_nf
-    maestro_point_root: /absolute/path/to/Mixer_CS_CG_NF/point_root
+    maestro_point_root: /home/username/simulation/Virtuoso_Bridge_test/Mixer_PSS_CG_Noise/maestro/results/maestro/Interactive.N/1/CG_NF_Test
     virtuoso_library: Virtuoso_Bridge_test
-    cell: MixerCS_PSS_CG_Noise
-    design_view: maestro
+    cell: Mixer_PSS_CG_Noise
+    design_view: schematic
     maestro_view: maestro
-    test_name: Mixer_CS_CG_NF
+    test_name: CG_NF_Test
     corner: Nominal
 ```
 
 `maestro_point_root` must be the Maestro/ADE result point directory that
 contains `netlist/input.scs`. Do not point to `input.scs` directly.
+
+The path normally follows this shape:
+
+```text
+/home/username/simulation/<virtuoso_library>/<cellview_name>/maestro/results/maestro/Interactive.N/1/<test_name>
+```
+
+For example:
+
+```text
+/home/username/simulation/Virtuoso_Bridge_test/MixerCS_PSS_IIP3/maestro/results/maestro/Interactive.28/1/Mixer_CS_IIP3
+```
+
+Use the actual `Interactive.N` directory and final testbench directory from
+your Maestro run.
 
 ## Process Corners
 
@@ -156,7 +171,7 @@ corners:
 
 ## Optimization Metrics
 
-`ocean_expression` is copied into the OCEAN replay script. Hermes does not
+`ocean_expression` is copied into the OCEAN replay script. IC Auto Opt does not
 rewrite or reinterpret Calculator/OCEAN formulas.
 
 Single-testbench metric:

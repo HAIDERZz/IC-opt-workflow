@@ -103,6 +103,19 @@ history warm-start application、advanced surrogate visualization、parameter im
 - Process Corners 和 multi-corner policy
 - retention、license check、artifact policy
 
+Maestro/ADE point root 是结果点目录本身，不是 `input.scs` 文件，也不是 `psf/`
+目录。它必须包含 `netlist/input.scs`。常见目录形态：
+
+```text
+/home/username/simulation/<virtuoso_library>/<cellview_name>/maestro/results/maestro/Interactive.N/1/<test_name>
+```
+
+例如：
+
+```text
+/home/username/simulation/Virtuoso_Bridge_test/MixerCS_PSS_IIP3/maestro/results/maestro/Interactive.28/1/Mixer_CS_IIP3
+```
+
 fix-run requirement 还包含：
 
 - `Workflow.mode: fix_run`

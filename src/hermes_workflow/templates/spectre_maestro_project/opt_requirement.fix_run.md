@@ -26,10 +26,10 @@ backend: maestro_exported_spectre_deck
 ```yaml
 testbenches:
   - id: cg_nf
-    maestro_point_root: /absolute/path/to/Mixer_CS_CG_NF/point_root
+    maestro_point_root: /home/username/simulation/Virtuoso_Bridge_test/MixerCS_PSS_CG_Noise/maestro/results/maestro/Interactive.N/1/Mixer_CS_CG_NF
     virtuoso_library: Virtuoso_Bridge_test
     cell: MixerCS_PSS_CG_Noise
-    design_view: maestro
+    design_view: schematic
     maestro_view: maestro
     test_name: Mixer_CS_CG_NF
     corner: Nominal

@@ -117,7 +117,7 @@ Created at UTC: `{manifest_payload["created_at_utc"]}`
 
 ## Scope
 
-Use `virtuoso-bridge-lite` skills only for tool-side actions. Inspect or export the configured Maestro testbench, then export or place the Spectre deck at `netlists/exported/input.scs`. Do not run deterministic preflight or a real Spectre optimization before Hermes approval.
+Use `virtuoso-bridge-lite` skills only for tool-side actions. Inspect or export the configured Maestro testbench, then export or place the Spectre deck at `netlists/exported/input.scs`. Do not run deterministic preflight or a real Spectre optimization before IC Auto Opt approval.
 
 ## Testbench
 
@@ -130,7 +130,7 @@ Use `virtuoso-bridge-lite` skills only for tool-side actions. Inspect or export 
 
 ## Allowed Variables
 
-Hermes may template only these variables in `netlists/templates/template.scs`: {variable_names}
+IC Auto Opt may template only these variables in `netlists/templates/template.scs`: {variable_names}
 
 ## Metrics
 
@@ -160,13 +160,13 @@ Hermes may template only these variables in `netlists/templates/template.scs`: {
 - Do not write `reports/netlist_preparation_report.json`.
 - Do not write `reports/dry_run_report.json`.
 - Do not write `state/health_check.json`.
-- Stop after export and wait for Hermes deterministic preflight.
+- Stop after export and wait for IC Auto Opt deterministic preflight.
 - Command exit status alone is not acceptance evidence.
 - Manifest-level audit is required for any real-tool run.
 
-## Hermes Preflight Commands
+## IC Auto Opt Preflight Commands
 
-Hermes will run these commands from the supervisor side:
+IC Auto Opt will run these commands from the supervisor side:
 
 ```bash
 hermes-workflow prepare-netlist PROJECT_DIR
@@ -179,7 +179,7 @@ hermes-workflow approve PROJECT_DIR
 
 - Do not modify Maestro setup.
 - Do not change analysis statements, model includes, simulator options, save options, constraints, objective, variable bounds, or variable step sizes.
-- Template only approved variables when Hermes prepares `netlists/templates/template.scs`.
+- Template only approved variables when IC Auto Opt prepares `netlists/templates/template.scs`.
 - Wait for `supervisor_instruction.json` before the first real Spectre run.
 
 ## Immutable Config Hashes
