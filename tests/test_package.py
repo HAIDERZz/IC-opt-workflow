@@ -109,7 +109,7 @@ def test_build_execution_package_copies_config_and_records_hashes(tmp_path: Path
 
     assert manifest.path == manifest_path
     assert manifest_payload["schema_version"] == "1.0"
-    assert manifest_payload["project_name"] == "bridge_test_inv"
+    assert manifest_payload["project_name"] == "mixer_cg_nf_opt"
     assert manifest_payload["created_at_utc"] == "2026-05-28T00:00:00Z"
     for file_name in CONFIG_FILE_NAMES:
         copied_config = project_dir / "execution_package" / "config" / file_name
@@ -154,17 +154,17 @@ def test_build_execution_package_writes_execution_task(tmp_path: Path) -> None:
     )
     assert "# Execution Agent Task" in task_text
     assert "Claude Code" not in task_text
-    assert "Project: `bridge_test_inv`" in task_text
+    assert "Project: `mixer_cg_nf_opt`" in task_text
     assert "Backend: `maestro_exported_spectre_deck`" in task_text
     assert "Spectre X preset: `ax`" in task_text
-    assert "`FN`, `WN`, `FP`, `WP`" in task_text
+    assert "`F`, `W`, `L`, `VB_LO`" in task_text
     assert (
-        "Hermes may template only these variables in `netlists/templates/template.scs`"
+        "IC Auto Opt may template only these variables in `netlists/templates/template.scs`"
         in task_text
     )
     assert "Do not modify Maestro setup" in task_text
     assert (
-        "Template only approved variables when Hermes prepares "
+        "Template only approved variables when IC Auto Opt prepares "
         "`netlists/templates/template.scs`"
     ) in task_text
     assert (

@@ -1,26 +1,22 @@
-schema_version: "1.0"
-
+schema_version: '1.0'
 variables:
-  - name: FN
-    kind: integer
-    lower: "2"
-    upper: "12"
-    step: "1"
-
-  - name: WN
-    kind: continuous_step
-    lower: "0.3u"
-    upper: "3u"
-    step: "0.2u"
-
-  - name: FP
-    kind: integer
-    lower: "2"
-    upper: "12"
-    step: "1"
-
-  - name: WP
-    kind: continuous_step
-    lower: "0.3u"
-    upper: "3u"
-    step: "0.2u"
+- name: F
+  kind: integer
+  lower: '20'
+  upper: '30'
+  step: '2'
+- name: W
+  kind: continuous_step
+  lower: 0.6u
+  upper: 1.2u
+  step: 0.2u
+- name: L
+  kind: continuous_step
+  lower: 30n
+  upper: 40n
+  step: 10n
+- name: VB_LO
+  kind: continuous_step
+  lower: 280m
+  upper: 400m
+  step: 20m

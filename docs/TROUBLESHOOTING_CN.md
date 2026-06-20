@@ -21,6 +21,22 @@ ic-opt PROJECT_DIR --doctor
 <maestro_point_root>/netlist/input.scs
 ```
 
+常见的 Maestro 结果点目录形态是：
+
+```text
+/home/username/simulation/<virtuoso_library>/<cellview_name>/maestro/results/maestro/Interactive.N/1/<test_name>
+```
+
+例如：
+
+```text
+/home/username/simulation/Virtuoso_Bridge_test/MixerCS_PSS_IIP3/maestro/results/maestro/Interactive.28/1/Mixer_CS_IIP3
+```
+
+如果 `opt_requirement.md` 里填到了 `.../netlist/input.scs`，就把最后的
+`/netlist/input.scs` 去掉；如果填到了 `psf/`，回到同一个 run 下的 testbench
+结果点目录。
+
 ## 找不到 Cadence 环境
 
 按下面顺序提供 Cadence setup：

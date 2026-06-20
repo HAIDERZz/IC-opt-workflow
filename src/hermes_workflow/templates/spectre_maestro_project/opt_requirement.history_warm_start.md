@@ -17,7 +17,7 @@ backend: maestro_exported_spectre_deck
 ```yaml
 testbenches:
   - id: cg_nf
-    maestro_point_root: /absolute/path/to/CG_NF_Test/point_root
+    maestro_point_root: /home/username/simulation/Virtuoso_Bridge_test/MixerCS_PSS_CG_Noise/maestro/results/maestro/Interactive.N/1/Mixer_CS_CG_NF
     virtuoso_library: Virtuoso_Bridge_test
     cell: Mixer_PSS_CG_Noise
     design_view: schematic
@@ -26,7 +26,7 @@ testbenches:
     corner: Nominal
 
   - id: iip3
-    maestro_point_root: /absolute/path/to/IIP3_Test/point_root
+    maestro_point_root: /home/username/simulation/Virtuoso_Bridge_test/MixerCS_PSS_IIP3/maestro/results/maestro/Interactive.N/1/Mixer_CS_IIP3
     virtuoso_library: Virtuoso_Bridge_test
     cell: Mixer_PSS_IIP3
     design_view: schematic
@@ -35,7 +35,7 @@ testbenches:
     corner: Nominal
 
   - id: p1db
-    maestro_point_root: /absolute/path/to/P1dB_Test/point_root
+    maestro_point_root: /home/username/simulation/Virtuoso_Bridge_test/MixerCS_PSS_P1dB/maestro/results/maestro/Interactive.N/1/P1dB_Test
     virtuoso_library: Virtuoso_Bridge_test
     cell: Mixer_PSS_P1dB
     design_view: schematic

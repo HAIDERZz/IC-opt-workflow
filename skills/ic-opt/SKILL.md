@@ -169,6 +169,20 @@ Optimization initial-run values stay in `opt_requirement.md`, including:
 - testbenches, metric routes, objective, constraints
 - Process Corners and multi-corner policies
 
+For Maestro/ADE testbenches, `maestro_point_root` is the result point directory
+itself. It is not the `input.scs` file and not the `psf/` directory. It must
+contain `netlist/input.scs`. A typical path is:
+
+```text
+/home/username/simulation/<virtuoso_library>/<cellview_name>/maestro/results/maestro/Interactive.N/1/<test_name>
+```
+
+Example:
+
+```text
+/home/username/simulation/Virtuoso_Bridge_test/MixerCS_PSS_IIP3/maestro/results/maestro/Interactive.28/1/Mixer_CS_IIP3
+```
+
 Fix-run values also stay in `opt_requirement.md`, including:
 
 - `Fixed Points`

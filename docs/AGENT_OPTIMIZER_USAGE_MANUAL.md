@@ -42,6 +42,20 @@ Optimization values stay in `opt_requirement.md`:
 - `output_format: psfxl`
 - retention policy, license probe, and Process Corners
 
+For each Maestro/ADE testbench, the point root is the result point directory
+itself, not `input.scs` and not `psf/`. It must contain `netlist/input.scs`.
+A typical path is:
+
+```text
+/home/username/simulation/<virtuoso_library>/<cellview_name>/maestro/results/maestro/Interactive.N/1/<test_name>
+```
+
+Example:
+
+```text
+/home/username/simulation/Virtuoso_Bridge_test/MixerCS_PSS_IIP3/maestro/results/maestro/Interactive.28/1/Mixer_CS_IIP3
+```
+
 Fix-run values also stay in `opt_requirement.md`:
 
 - fixed candidate points

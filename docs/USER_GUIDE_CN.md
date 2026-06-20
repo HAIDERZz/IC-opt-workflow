@@ -3,29 +3,22 @@
 IC Auto Opt 用 `opt_requirement.md` 描述一次真实 Spectre/OCEAN 工作流。当前
 release 支持两种模式：
 
-- `optimize`：运行优化器，搜索满足约束的候选参数
-- `fix_run`：运行用户指定的固定参数点，导出指定 waveform CSV，不创建优化器状态
+- `optimize`：运行优化器，搜索满足约束的候选参数。
+- `fix_run`：运行用户指定的固定参数点，导出指定 waveform CSV，不创建优化器状态。
 
 两种模式都通过 `opt_requirement.md` 的 `Workflow.mode` 选择。没有单独的 fix-run
 命令行开关。
 
-## 常用入口
+## 从 GitHub 安装
+
+默认使用 HTTPS clone：
 
 ```bash
-ic-opt PROJECT_DIR --doctor
-ic-opt PROJECT_DIR --real
-ic-opt PROJECT_DIR --real --continue N
-ic-opt --ssh-profile PROFILE PROJECT_DIR --doctor
-ic-opt --ssh-profile PROFILE PROJECT_DIR --real
+git clone https://github.com/HAIDERZz/IC-opt-workflow.git
+cd IC-opt-workflow
 ```
 
-`--continue N` 只用于已经存在的优化任务。初次运行的预算、batch size、并行数、
-Spectre 线程数、优化器 CPU 限制、算法、策略、初始化、工艺角、输出格式、
-metric 公式、固定点和 waveform export 都来自 `opt_requirement.md`。
-
-## 安装
-
-在 release 根目录执行：
+创建 Python 环境：
 
 ```bash
 python3 -m venv .venv
@@ -33,16 +26,72 @@ python3 -m venv .venv
 ./.venv/bin/python -m pip install -r requirements-product.txt
 ```
 
-检查入口：
+检查命令是否可用：
 
 ```bash
 ./.venv/bin/ic-opt --help
 ./.venv/bin/hermes-workflow --help
 ```
 
+高级报告依赖单独安装：
+
+```bash
+./.venv/bin/python -m pip install -r requirements-advanced.txt
+```
+
+这组依赖只在需要 OpenBox advanced surrogate visualization、
+hyperparameter importance、SHAP/lightgbm 相关分析时安装。它包含一些较大的包，
+在 Linux 上也可能需要 Python development headers。
+
+不要把 `.venv` 建在用户的优化项目目录里。工具仓库和每个电路优化项目应该分开。
+
+## 选择本地模式还是远程模式
+
+如果同一台 Linux EDA 机器既能安装 Python 环境，又能访问 Cadence/Spectre/OCEAN、
+PDK 和 license，就用本地模式。此时控制端和仿真端是同一台机器。
+
+如果你不方便在 EDA 服务器上安装 Python 环境，且你想用个人的 macOS、Windows WSL
+或普通 Linux 工作站作为控制端运行脚本，就用远程模式。此时 Python workflow 在控制端
+运行，Spectre/OCEAN 通过 SSH 在远端 Linux EDA 服务器上运行。
+
+## SSH Profile 是什么
+
+远程模式里的 `--ssh-profile PROFILE` 指的是 OpenSSH profile，通常写在控制端的
+`~/.ssh/config`。
+
+示例：
+
+```sshconfig
+Host eda-lab
+  HostName eda-server.example.com
+  User username
+  IdentityFile ~/.ssh/id_ed25519
+```
+
+先确认 SSH 本身可用：
+
+```bash
+ssh eda-lab 'hostname'
+```
+
+远程模式传给 `ic-opt` 的 `PROJECT_DIR` 是远端 Linux EDA 服务器上的绝对路径。这个
+目录需要包含 `opt_requirement.md`，并且 requirement 里引用的 Maestro/ADE result
+point 也必须是远端服务器上存在的路径。
+
+远程运行时，IC Auto Opt 会读取远端 requirement，把 exported netlist 下载到控制端
+`~/.ic-opt/remote_runs` 下的 cache；每个真实仿真 child 会上传到远端执行，再把
+Spectre/OCEAN 结果下载回来，并尽量把报告同步回远端项目目录。
+
+远程命令形态：
+
+```bash
+./.venv/bin/ic-opt --ssh-profile eda-lab /remote/absolute/project --doctor
+./.venv/bin/ic-opt --ssh-profile eda-lab /remote/absolute/project --real
+```
+
 ## Cadence 环境
 
-`ic-opt` 按下面顺序寻找 Cadence setup：
+提供一个能在 `csh` 或 `tcsh` 中使用的 Cadence setup 文件。`ic-opt` 按下面顺序查找：
 
 ```text
 --cadence-cshrc PATH
@@ -53,6 +102,51 @@ IC_OPT_CADENCE_CSHRC
 
 这个脚本需要能找到 `spectre`、`ocean` 和 license 工具。不要把 `.bashrc` 或
 `.zshrc` 当作 Cadence `csh` 环境脚本。
+
+远程模式下，Cadence setup 路径按远端 Linux EDA 服务器上的路径理解。
+
+## 常用命令
+
+本地 doctor：
+
+```bash
+./.venv/bin/ic-opt PROJECT_DIR --doctor
+```
+
+本地真实运行：
+
+```bash
+./.venv/bin/ic-opt PROJECT_DIR --real
+```
+
+本地 optimize-only dry orchestration gate：
+
+```bash
+./.venv/bin/ic-opt PROJECT_DIR --real --dry-orchestration
+```
+
+这个命令会跑完真实优化器启动前的离线编排检查，并在真实 backend 开始执行
+Spectre/OCEAN candidate 之前停住。当前 release 中只把它作为本地 optimize 初次运行的
+高级 gate 使用；它不是 continuation，不是 fix-run，也不是远程模式入口。
+
+继续已有优化：
+
+```bash
+./.venv/bin/ic-opt PROJECT_DIR --real --continue N
+```
+
+远程：
+
+```bash
+./.venv/bin/ic-opt --ssh-profile eda-lab /remote/absolute/project --doctor
+./.venv/bin/ic-opt --ssh-profile eda-lab /remote/absolute/project --real
+./.venv/bin/ic-opt --ssh-profile eda-lab /remote/absolute/project --real --continue N
+```
+
+`--continue N` 只用于已经存在的优化项目追加预算，不重新读取用户改写后的
+`opt_requirement.md`。初次运行的预算、batch size、并行数、Spectre 线程数、
+优化器 CPU 限制、算法、策略、初始化、工艺角、输出格式、metric 公式、固定点和
+waveform export 都来自 `opt_requirement.md`。
 
 ## 项目目录
 
@@ -76,6 +170,22 @@ PROJECT_DIR/
 <maestro_point_root>/netlist/input.scs
 ```
 
+这里的 `maestro_point_root` 填 Maestro/ADE 结果点目录本身，不是
+`netlist/input.scs` 文件，也不是 `psf/` 目录。常见目录形态是：
+
+```text
+/home/username/simulation/<virtuoso_library>/<cellview_name>/maestro/results/maestro/Interactive.N/1/<test_name>
+```
+
+例如：
+
+```text
+/home/username/simulation/Virtuoso_Bridge_test/MixerCS_PSS_IIP3/maestro/results/maestro/Interactive.28/1/Mixer_CS_IIP3
+```
+
+`Interactive.N` 用你自己的 Maestro run 实际生成的编号，最后一级目录用对应的
+testbench 名称。
+
 ## Requirement 模板
 
 ```text
@@ -87,14 +197,15 @@ examples/spectre_maestro_project/opt_requirement.history_warm_start.md
 examples/spectre_maestro_project/opt_requirement.fix_run.md
 ```
 
-multi-testbench 模板以真实跑通的 Mixer 多 testbench requirement 为结构基准，
-保留 CG/NF/BW、IIP3、P1dB 指标到各自 testbench 的路由。
-`opt_requirement.history_warm_start.md` 以第二轮同电路 history 验证 requirement
-为结构基准。`opt_requirement.fix_run.md` 以真实跑通的 15-corner Mixer
-requirement 为结构基准。使用时把模板复制为项目根目录的 `opt_requirement.md`，
-替换 Maestro point root、旧项目路径、固定参数点、corner 变量和 waveform export。
+multi-testbench 模板以真实跑通的 Mixer 多 testbench requirement 为结构基准，保留
+CG/NF/BW、IIP3、P1dB 指标到各自 testbench 的路由。history 模板以第二轮同电路
+history 验证 requirement 为结构基准。fix-run 模板以真实跑通的 15-corner Mixer
+requirement 为结构基准。
 
-## 优化模式
+使用时，把模板复制为项目根目录的 `opt_requirement.md`，替换 Maestro point root、
+旧项目路径、固定参数点、corner 变量、waveform export 和电路相关公式。
+
+## Optimize 模式
 
 优化 requirement 可以省略 `Workflow` section；省略时默认 `mode: optimize`。
 
@@ -121,8 +232,8 @@ requirement 为结构基准。使用时把模板复制为项目根目录的 `opt
 
 ## History Warm Start
 
-`History Warm Start` 用于“新建一个 optimize 项目，但参考同一电路之前跑过的优化
-历史”。典型流程是：用户看完上一轮报告后，新建项目目录，复制并修改新的
+`History Warm Start` 用于新建一个 optimize 项目，同时参考同一电路之前跑过的优化
+历史。典型流程是：用户看完上一轮报告后，新建项目目录，复制并修改新的
 `opt_requirement.md`，然后在新 requirement 里加入 `History Warm Start` section：
 
 ```yaml
@@ -135,8 +246,7 @@ warm_start_strategy: topk
 ```
 
 这个 section 会渲染为 `config/history_warm_start.yaml`。它和 `--continue N` 不是
-同一个用途：`--continue N` 只用于同一个项目追加优化预算，不重新读取用户改写后的
-`opt_requirement.md`。History warm-start 只支持 optimize，不支持 fix-run，也不能和
+同一个用途。History warm-start 只支持 optimize，不支持 fix-run，也不能和
 `--continue` 一起使用。
 
 第一版规则是严格的：新旧项目变量名必须完全一致，不做变量名映射，也不接受旧项目
@@ -175,13 +285,12 @@ starting_run_id: real_001
 fix-run 不运行优化器，不生成 `state/optimizer_state.json`，也不生成
 `reports/optimizer_decision_report.md`。
 
-示例中的 `temperature` 只是传给 netlist 的普通参数名，workflow 不会把它特殊映射成
-Spectre simulator option。
-
 fix-run 模式下，`Spectre Settings.parallel_jobs` 控制同一个 fixed point 内最多
 同时运行多少个 testbench/corner child Spectre/OCEAN 仿真；`threads_per_run` 仍然是
-每个 Spectre 进程的 `+mt` 线程数。当前 release 中多个 fixed point 仍按顺序执行，
-没有用于覆盖 fix-run 并行数的 CLI 参数。
+每个 Spectre 进程的 `+mt` 线程数。当前 release 中多个 fixed point 仍按顺序执行。
+
+示例中的 `temperature` 只是传给 netlist 的普通参数名，workflow 不会把它特殊映射成
+Spectre simulator option。
 
 ## 多工艺角
 
@@ -228,18 +337,12 @@ runs/**/result_manifest.json
 runs/**/metric_result_manifest.json
 ```
 
-`reports/optimizer_insight_report.html` 是优化结束后优先阅读的报告。
-JSON 是机器可读合同，Markdown 是文本备份。该 HTML 报告里的
-Pareto/trade-off 分析只使用本轮已有 raw metrics 做报告层 trade-off 总结；
-它不会把 OpenBox 切换成 multi-objective optimizer mode，也不会改变 candidate
-选择或改写 objective。
+`reports/optimizer_insight_report.html` 是优化结束后优先阅读的报告。HTML 适合快速
+阅读和定位问题；JSON/JSONL 是更底层的事实来源。判断 trade-off、history 是否有效、
+或者下一轮变量范围时，应同时查看本轮实际存在的 JSON/JSONL 和 child manifest。
 
-HTML 报告用于快速阅读和定位问题；JSON/JSONL 是更底层的事实来源。如果要判断
-trade-off、history 是否有效、或者下一轮变量范围，应同时查看
-`reports/optimizer_insight_report.json`、`reports/optimizer_run_report.json`、
-`reports/history_warm_start_audit.json`、`reports/optimizer_evaluations.jsonl` /
-`reports/native_turbo_optimizer_evaluations.jsonl`、`ledger/experiment_ledger.jsonl`
-和 `runs/**/metric_result_manifest.json` 中实际存在的文件。
+Pareto/trade-off 分析只使用本轮已有 raw metrics 做报告层总结；它不会把 OpenBox
+切换成 multi-objective optimizer mode，也不会改变 candidate 选择或改写 objective。
 
 Space Compression Advisory 使用 OpenBox compressor dry-run，在当前变量合同和已观测
 run 上生成搜索空间收窄建议。建议只用于人工复盘，不会自动应用到 optimizer 执行。

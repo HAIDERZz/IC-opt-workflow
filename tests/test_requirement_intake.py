@@ -477,7 +477,7 @@ def test_optimizer_requirement_template_intake_accepts_placeholder_replacement(
 ) -> None:
     project_dir = _copy_requirement_project(tmp_path)
     text = TEMPLATE_OPT_REQUIREMENT.read_text(encoding="utf-8").replace(
-        "/absolute/path/to/Mixer_CS_CG_NF/point_root",
+        "/home/username/simulation/Virtuoso_Bridge_test/MixerCS_PSS_CG_Noise/maestro/results/maestro/Interactive.N/1/Mixer_CS_CG_NF",
         VALID_MAESTRO_POINT.as_posix(),
     )
     (project_dir / "opt_requirement.md").write_text(text, encoding="utf-8")

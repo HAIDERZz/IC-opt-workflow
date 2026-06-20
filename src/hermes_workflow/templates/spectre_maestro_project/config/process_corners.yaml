@@ -1,0 +1,5 @@
+schema_version: '1.0'
+objective_policy: nominal
+constraint_policy: nominal
+corners:
+- id: nominal

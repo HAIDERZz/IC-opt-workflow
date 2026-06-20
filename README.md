@@ -1,117 +1,168 @@
 # IC Auto Opt Workflow
 
-`ic-auto-opt-workflow` is a requirement-driven workflow for real IC
-Spectre/OCEAN work. It supports two product modes:
+IC Auto Opt is a requirement-driven workflow for real IC Spectre/OCEAN
+optimization and fixed-point characterization. A user describes the circuit,
+metrics, search space, simulator resources, and workflow mode in
+`opt_requirement.md`; the product CLI validates the project, prepares netlists,
+runs Spectre/OCEAN locally or through SSH, and writes auditable reports.
 
-- optimization: run an optimizer over approved design variables and metrics
-- fix-run: run user-specified fixed design points and export requested
-  waveform CSV artifacts without creating optimizer state
+Current release modes:
 
-Both modes are selected in `PROJECT_DIR/opt_requirement.md`. The product CLI
-does not use a separate fix-run switch.
+- `optimize`: run OpenBox or native TuRBO over approved design variables.
+- `fix_run`: run user-specified fixed design points and export requested
+  waveform CSV artifacts without creating optimizer state.
 
-## Product Entry
+Both modes are selected in `PROJECT_DIR/opt_requirement.md`. There is no
+separate fix-run command-line switch.
 
-Doctor check:
+## Install From GitHub
+
+Use HTTPS unless your site requires SSH Git access:
 
 ```bash
-ic-opt /path/to/project --doctor
+git clone https://github.com/HAIDERZz/IC-opt-workflow.git
+cd IC-opt-workflow
 ```
 
-Run the workflow described by `opt_requirement.md`:
+Create the Python environment from the repository root:
 
 ```bash
-ic-opt /path/to/project --real
+python3 -m venv .venv
+./.venv/bin/python -m pip install --upgrade pip setuptools wheel
+./.venv/bin/python -m pip install -r requirements-product.txt
 ```
+
+Check the entrypoints:
+
+```bash
+./.venv/bin/ic-opt --help
+./.venv/bin/hermes-workflow --help
+```
+
+Optional advanced report dependencies are separate:
+
+```bash
+./.venv/bin/python -m pip install -r requirements-advanced.txt
+```
+
+Install the advanced set only if you need OpenBox advanced surrogate
+visualization, hyperparameter-importance views, or SHAP/lightgbm-backed
+analysis. Some packages in that set are larger or may need Python development
+headers on Linux.
+
+Do not create this virtual environment inside a user optimization project
+directory. Keep the tool checkout and each IC optimization project separate.
+
+## Choose Local Or Remote Mode
+
+Use local mode when the same Linux machine can host both:
+
+- the IC Auto Opt Python environment
+- Cadence/Spectre/OCEAN/PDK/license access
+- the user project directory
+
+Use remote mode when you want the Python control environment on a personal
+Linux workstation, macOS machine, or Windows WSL, while Spectre/OCEAN runs on a
+separate Linux EDA server through SSH. Remote mode is useful when installing a
+Python environment directly on the EDA server is inconvenient.
+
+## SSH Profile For Remote Mode
+
+`--ssh-profile PROFILE` refers to an OpenSSH host profile, usually defined in
+`~/.ssh/config` on the control machine.
+
+Example:
+
+```sshconfig
+Host eda-lab
+  HostName eda-server.example.com
+  User username
+  IdentityFile ~/.ssh/id_ed25519
+```
+
+Check that SSH works before using IC Auto Opt:
+
+```bash
+ssh eda-lab 'hostname'
+```
+
+The remote `PROJECT_DIR` passed to `ic-opt` is an absolute path on the remote
+Linux EDA server. It must contain `opt_requirement.md` and the referenced
+Maestro/ADE result point directories. IC Auto Opt reads the remote requirement,
+downloads the exported netlists into a local cache under `~/.ic-opt/remote_runs`,
+uploads per-run Spectre/OCEAN work directories, downloads results, and writes
+reports back to the remote project when possible.
+
+Remote command shape:
+
+```bash
+./.venv/bin/ic-opt --ssh-profile eda-lab /remote/absolute/project --doctor
+./.venv/bin/ic-opt --ssh-profile eda-lab /remote/absolute/project --real
+```
+
+## Cadence Environment
+
+Provide a `csh` or `tcsh` Cadence setup file. The workflow discovers it in this
+order:
+
+```text
+--cadence-cshrc PATH
+PROJECT_DIR/cadence_env.csh
+IC_OPT_CADENCE_CSHRC
+~/.ic-opt/cadence_env.csh
+```
+
+The setup must expose `spectre`, `ocean`, and license tools. Do not use
+`.bashrc` or `.zshrc` as a Cadence `csh` setup file.
+
+For remote mode, the Cadence setup path is interpreted on the remote Linux EDA
+server.
+
+## Product Commands
+
+Local doctor:
+
+```bash
+./.venv/bin/ic-opt /path/to/project --doctor
+```
+
+Local real run:
+
+```bash
+./.venv/bin/ic-opt /path/to/project --real
+```
+
+Local optimize-only dry orchestration gate:
+
+```bash
+./.venv/bin/ic-opt /path/to/project --real --dry-orchestration
+```
+
+This runs the offline orchestration gates through package generation and stops
+before the real optimizer backend starts Spectre/OCEAN candidate execution. Use
+it only for first-run local optimize projects. It is not the continuation path,
+not a fix-run mode, and not the remote execution path in this release.
 
 Continue an existing optimization run:
 
 ```bash
-ic-opt /path/to/project --real --continue N
+./.venv/bin/ic-opt /path/to/project --real --continue N
 ```
 
-Remote execution through an SSH profile:
+Remote:
 
 ```bash
-ic-opt --ssh-profile PROFILE /remote/project --doctor
-ic-opt --ssh-profile PROFILE /remote/project --real
+./.venv/bin/ic-opt --ssh-profile eda-lab /remote/absolute/project --doctor
+./.venv/bin/ic-opt --ssh-profile eda-lab /remote/absolute/project --real
+./.venv/bin/ic-opt --ssh-profile eda-lab /remote/absolute/project --real --continue N
 ```
 
-`--continue N` is only for existing optimizer runs. First-run budget, batch
-size, parallelism, Spectre thread count, optimizer CPU cap, algorithm, strategy,
-initialization, process corners, output format, retention, objective,
-constraints, fixed points, waveform exports, and metric routes all come from
-`opt_requirement.md`.
-
-### History Warm Start
-
-Use `History Warm Start` when a new optimize project should learn from previous
-same-circuit runs. This is different from `--continue N`: continuation only adds
-budget to the same project and does not reread a changed `opt_requirement.md`.
-
-```yaml
-enabled: true
-sources:
-  - path: /path/to/previous_same_circuit_project
-    label: round1
-max_observations: 200
-warm_start_strategy: topk
-```
-
-The section renders to `config/history_warm_start.yaml`. History warm-start is
-optimize-only, cannot be combined with `--continue`, and is not supported for
-fix-run. History application is supported by the OpenBox backend. Native TuRBO
-does not consume history warm-start data; use OpenBox when previous run history
-must affect candidate suggestions. Current and previous projects must use the
-exact same variable names; old objective and constraint values are not reused. Inspect
-`reports/history_warm_start_audit.json`,
-`reports/history_warm_start_audit.md`, and `openbox.history_warm_start` in
-`reports/optimizer_run_report.json` before saying the history was applied.
-
-### Optimizer Insight Report
-
-Successful optimization flows run `visualize-optimizer-run` after optimizer
-finalization and write:
-
-```text
-reports/optimizer_insight_report.json
-reports/optimizer_insight_report.md
-reports/optimizer_insight_report.html
-```
-
-The HTML file is the first reader-facing report to inspect. The JSON file is
-the machine-readable contract, and the Markdown file is a text fallback.
-Use the HTML report for orientation, not as the only evidence for engineering
-recommendations. For trade-off, history, or next-range decisions, inspect the
-dense artifacts that exist for the run: `reports/optimizer_insight_report.json`,
-`reports/optimizer_run_report.json`, `reports/history_warm_start_audit.json`,
-`reports/optimizer_evaluations.jsonl`,
-`reports/native_turbo_optimizer_evaluations.jsonl`, `ledger/experiment_ledger.jsonl`,
-and the `runs/**/metric_result_manifest.json` files.
-
-The report-layer Pareto/trade-off analyzer uses existing raw metrics from the
-optimizer run. It does not enable OpenBox multi-objective optimizer mode, does
-not change candidate selection, and does not rewrite the configured objective.
-
-The Space Compression Advisory uses an OpenBox compressor dry-run on the
-current variable contract and observed rows. Suggestions are advisory only:
-they are not applied to optimizer execution. A user may copy reviewed suggested
-ranges into a new `opt_requirement.md` for a later run.
-
-For native TuRBO runs, the report keeps backend-neutral sections such as
-best observed point, actual measured metrics, evaluation counts, plots, raw
-metric trade-off summaries, and advisory space-compression dry-runs when the
-required artifacts exist. OpenBox-specific sections are not available for TuRBO:
-history warm-start application, advanced surrogate visualization, and parameter
-importance may be absent or marked `not_available`.
-
-If an objective expression directly multiplies or divides signed or log-domain
-metrics such as dB or dBm, especially values that may cross zero, the ranking can
-be hard to interpret. The workflow preserves the user-provided objective; choose
-objective formulas deliberately and consider linear-domain or normalized terms
-when needed.
+`--continue N` only adds budget to an existing optimizer project. It does not
+reread a changed `opt_requirement.md`.
 
 ## Project Directory
+
+A user project is data-only:
 
 ```text
 PROJECT_DIR/
@@ -124,6 +175,30 @@ Only `opt_requirement.md` is required. Use `constraints.md` for human guidance
 and `context/` for notes, screenshots, or previous reports. Generated
 directories such as `config/`, `netlists/`, `runs/`, `reports/`, `ledger/`, and
 `state/` are created by the workflow.
+
+For each testbench, first run one known-good point in Maestro/ADE. The
+`maestro_point_root` in `opt_requirement.md` is the Maestro result point
+directory itself, not the `input.scs` file and not the `psf/` directory. It
+must contain:
+
+```text
+<maestro_point_root>/netlist/input.scs
+```
+
+A typical Maestro result point looks like:
+
+```text
+/home/username/simulation/<virtuoso_library>/<cellview_name>/maestro/results/maestro/Interactive.N/1/<test_name>
+```
+
+For example:
+
+```text
+/home/username/simulation/Virtuoso_Bridge_test/MixerCS_PSS_IIP3/maestro/results/maestro/Interactive.28/1/Mixer_CS_IIP3
+```
+
+Use the actual `Interactive.N` directory and final testbench directory produced
+by the Maestro run.
 
 ## Requirement Templates
 
@@ -142,36 +217,13 @@ The multi-testbench templates are based on real validated Mixer requirements
 with CG/NF/BW, IIP3, and P1dB metrics routed to their owning testbenches. The
 history warm-start template is based on a verified second-round same-circuit
 Mixer run. The fix-run template is based on the real validated 15-corner Mixer
-requirement. Replace only project-specific paths, previous-project paths, and
-circuit values.
+requirement. Replace project-specific paths, previous-project paths, fixed
+points, corner values, and circuit-specific expressions with your reviewed
+values.
 
-## Workflow Modes
+## Optimize Mode
 
-Optimization mode:
-
-```yaml
-Workflow:
-  mode: optimize
-```
-
-If the `Workflow` section is omitted, the requirement is treated as an
-optimization requirement for backward compatibility.
-
-Fix-run mode:
-
-```yaml
-Workflow:
-  mode: fix_run
-  starting_run_id: real_001
-```
-
-Fix-run requirements include `Fixed Points` and optional `Waveform Exports`
-sections. They do not include optimizer settings and do not create
-`state/optimizer_state.json` or `reports/optimizer_decision_report.md`.
-
-## Optimization Requirements
-
-Optimization `opt_requirement.md` files define:
+Optimization requirements define:
 
 - Maestro/ADE point roots and testbench routes
 - OCEAN scalar metric expressions
@@ -183,20 +235,45 @@ Optimization `opt_requirement.md` files define:
 - `algorithm`, `strategy`, `initialization`, and `random_seed`
 - `output_format: psfxl`
 - license probe, retention, and artifact policy
-- Process Corners and multi-corner policies
+- Process Corners and multi-corner policies, when needed
 
-Production strategy choices are peers:
+Production strategy choices:
 
 - `algorithm: openbox`, `strategy: openbox_gp_eic`
 - `algorithm: openbox`, `strategy: openbox_prf_eic`
 - `algorithm: turbo`, `strategy: turbo_trust_region`
 
-`random_baseline` is for diagnostics. See
-`docs/OPTIMIZER_ALGORITHM_MODES.md`.
+`random_baseline` is for diagnostics, not production optimization.
 
-## Fix-Run Requirements
+## History Warm Start
 
-Fix-run `opt_requirement.md` files define:
+Use `History Warm Start` when a new optimize project should learn from previous
+same-circuit runs. This is different from `--continue N`: continuation only adds
+budget to the same project and does not reread a changed `opt_requirement.md`.
+
+```yaml
+enabled: true
+sources:
+  - path: /path/to/previous_same_circuit_project
+    label: round1
+max_observations: 200
+warm_start_strategy: topk
+```
+
+The section renders to `config/history_warm_start.yaml`. History warm-start is
+optimize-only, cannot be combined with `--continue`, and is not supported for
+fix-run. In this release, OpenBox can apply history warm-start; native TuRBO
+does not consume it for candidate suggestions.
+
+Current and previous projects must use the exact same variable names. Old
+objective and constraint values are not reused; old raw metrics are re-evaluated
+with the current requirement. Inspect `reports/history_warm_start_audit.json`,
+`reports/history_warm_start_audit.md`, and `openbox.history_warm_start` in
+`reports/optimizer_run_report.json` before saying the history was applied.
+
+## Fix-Run Mode
+
+Fix-run requirements define:
 
 - `Workflow.mode: fix_run`
 - one or more fixed candidate points
@@ -204,69 +281,17 @@ Fix-run `opt_requirement.md` files define:
 - Spectre settings and Process Corners
 - optional waveform CSV exports, for example
   `getData("NF" ?result "pnoise")`
-- the same approval checklist used by real optimization runs
+- the approval checklist used by real runs
 
-The 15-corner fix-run example uses TT/SS/FF model sections and five corner
-variable values per section. The `temperature` field in that example is a
-generic netlist parameter override; the workflow does not special-case that
-name.
+Fix-run does not run an optimizer, does not create `state/optimizer_state.json`,
+and does not create `reports/optimizer_decision_report.md`.
 
 In fix-run mode, Spectre `parallel_jobs` controls the maximum number of
 testbench/corner child runs for one fixed point that may run concurrently.
 `threads_per_run` remains the Spectre `+mt` thread count for each child process.
-Fixed points are processed serially in this release, and there is no CLI
-override for fix-run parallelism.
+Fixed points are processed serially in this release.
 
-## Install
-
-From the release root:
-
-```bash
-python3 -m venv .venv
-./.venv/bin/python -m pip install --upgrade pip setuptools wheel
-./.venv/bin/python -m pip install -r requirements-product.txt
-```
-
-Check entrypoints:
-
-```bash
-./.venv/bin/ic-opt --help
-./.venv/bin/hermes-workflow --help
-```
-
-## Cadence Environment
-
-The Cadence/Spectre/OCEAN setup is user supplied. Configure it through one of:
-
-```text
---cadence-cshrc PATH
-PROJECT_DIR/cadence_env.csh
-IC_OPT_CADENCE_CSHRC
-~/.ic-opt/cadence_env.csh
-```
-
-Use doctor before real runs:
-
-```bash
-ic-opt /path/to/project --doctor
-```
-
-When `require_license_check: true`, doctor runs the real Spectre/license probe
-and writes `reports/license_probe_report.json`.
-
-## Agent Use
-
-For agent-assisted operation, give the agent:
-
-```text
-skills/ic-opt/SKILL.md
-PROJECT_DIR
-```
-
-The agent should use the same product CLI and inspect workflow artifacts before
-reporting success.
-
-## Workflow Evidence
+## Read Results
 
 Optimization evidence:
 
@@ -297,24 +322,47 @@ runs/real/real_001/testbenches/<tb>/corners/<corner>/metrics/waveform_export_man
 runs/real/real_001/testbenches/<tb>/corners/<corner>/metrics/waveforms/<name>.csv
 ```
 
-Multi-testbench and multi-corner optimization runs also write parent aggregate
-manifests. Artifacts record requirement pass-through, command traces, license
-probe status, selected candidate, and reported metrics.
+`reports/optimizer_insight_report.html` is the first reader-facing optimization
+report. Use it for orientation, but use JSON/JSONL and child manifests for
+precise engineering decisions. The report-layer Pareto/trade-off analyzer uses
+existing raw metrics; it does not enable OpenBox multi-objective optimizer mode.
+Space Compression Advisory uses an OpenBox compressor dry-run and is advisory
+only. Suggested ranges are not applied automatically.
+
+For native TuRBO runs, backend-neutral report sections remain useful: best
+observed point, measured metrics, evaluation counts, plots, raw-metric
+trade-off summaries, and advisory space-compression dry-runs when artifacts
+exist. OpenBox-specific sections such as history warm-start application,
+advanced surrogate visualization, and parameter importance may be absent or
+marked `not_available`.
+
+Do not treat a command exit code alone as acceptance. Check the reports and
+artifacts.
+
+## Agent Use
+
+For agent-assisted operation, give the agent:
+
+```text
+skills/ic-opt/SKILL.md
+PROJECT_DIR
+```
+
+The agent should use the product CLI and inspect workflow artifacts before
+reporting success.
 
 ## Current Release
 
 Version `0.1.9` includes:
 
-- local and remote fix-run workflow support
+- local and remote optimize workflows
+- local and remote fix-run workflows
 - fix-run child-level parallelism through `Spectre Settings.parallel_jobs`
 - waveform CSV export manifests for fix-run child runs
-- requirement template `opt_requirement.fix_run.md`
 - OpenBox history warm-start for new same-circuit optimize projects
-- requirement template `opt_requirement.history_warm_start.md`
 - optimizer insight HTML/JSON/Markdown reports with best-point metrics,
   report-layer raw-metric trade-off summaries, history reuse summaries, and
   advisory space-compression dry-runs
-- requirement-driven local and remote optimization
 - OpenBox GP+EIC, OpenBox PRF+EIC, and native TuRBO
 - multi-testbench and multi-corner support
 - psfxl-only metric flow
