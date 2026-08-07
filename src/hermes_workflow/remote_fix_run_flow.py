@@ -27,7 +27,6 @@ from hermes_workflow.remote_doctor import run_remote_doctor
 from hermes_workflow.remote_prepare import prepare_remote_project_cache
 from hermes_workflow.remote_project import RemoteProjectRef
 from hermes_workflow.remote_ssh import RemoteSshRunner
-from hermes_workflow.requirement_intake import check_requirement, prepare_from_requirement
 from hermes_workflow.validate import assert_valid_project
 
 from hermes_workflow.execution_adapters.remote_spectre_ocean import (
@@ -272,6 +271,7 @@ def run_remote_fix_run_project(
     remote_cadence_cshrc: PurePosixPath,
     real: bool = True,
     runner: Any | None = None,
+    doctor_report: Any | None = None,
 ) -> FixRunReport:
     """Execute the remote fix-run workflow for a project.
 
@@ -286,7 +286,7 @@ def run_remote_fix_run_project(
     ssh = runner or RemoteSshRunner(remote_ref.ssh_profile)
 
     # --- Remote doctor ---
-    doctor = run_remote_doctor(
+    doctor = doctor_report or run_remote_doctor(
         remote_ref,
         runner=ssh,
         cadence_cshrc=remote_cadence_cshrc,
@@ -295,14 +295,18 @@ def run_remote_fix_run_project(
         raise ValueError("remote doctor failed: " + "; ".join(doctor.issues))
 
     # --- Prepare remote project cache ---
-    prepared = prepare_remote_project_cache(remote_ref, runner=ssh)
+    prepared = prepare_remote_project_cache(
+        remote_ref,
+        runner=ssh,
+        persist_snapshot=True,
+    )
     if prepared.status != "pass":
         raise ValueError("remote prepare failed: " + "; ".join(prepared.issues))
 
     project_dir = prepared.cache_dir
 
     # --- Requirement intake ---
-    intake = check_requirement(project_dir)
+    intake = prepared.requirement_report
     if intake.status != "pass":
         raise ValueError("requirement intake failed: " + "; ".join(intake.issues))
     if intake.workflow_mode != "fix_run":
@@ -311,7 +315,7 @@ def run_remote_fix_run_project(
         )
 
     # --- Prepare from requirement ---
-    prep = prepare_from_requirement(project_dir)
+    prep = prepared.preparation_report
     if prep.status != "pass":
         raise ValueError("prepare from requirement failed: " + "; ".join(prep.issues))
 
@@ -515,19 +519,24 @@ def _sync_report_to_remote(
     ssh: Any,
 ) -> None:
     """Upload the fix-run report and run artifacts back to remote."""
-    local_report = cache_dir / REPORT_RELATIVE
-    if local_report.is_file():
-        remote_report = ref.remote_project_dir / REPORT_RELATIVE
-        try:
-            ssh.upload(local_report, remote_report)
-        except Exception:
-            pass  # best-effort upload
-
     # Upload run artifacts (PSF, metrics, manifests) back to remote
     runs_dir = cache_dir / "runs"
     if runs_dir.is_dir():
         remote_runs = ref.remote_project_dir / "runs"
         try:
             ssh.upload_tree(runs_dir, remote_runs)
-        except Exception:
-            pass  # best-effort upload
+        except Exception as exc:
+            raise RuntimeError(
+                f"failed to upload fix-run artifacts {remote_runs}: {exc}"
+            ) from exc
+
+    # The pass report is the completion marker and must be published last.
+    local_report = cache_dir / REPORT_RELATIVE
+    if local_report.is_file():
+        remote_report = ref.remote_project_dir / REPORT_RELATIVE
+        try:
+            ssh.upload(local_report, remote_report)
+        except Exception as exc:
+            raise RuntimeError(
+                f"failed to upload fix-run report {remote_report}: {exc}"
+            ) from exc

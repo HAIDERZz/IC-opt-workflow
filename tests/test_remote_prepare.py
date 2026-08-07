@@ -3,6 +3,10 @@ from __future__ import annotations
 from pathlib import Path, PurePosixPath
 
 import shlex
+import shutil
+
+import pytest
+import yaml
 
 from hermes_workflow.remote_prepare import prepare_remote_project_cache
 from hermes_workflow.remote_project import RemoteProjectRef
@@ -44,6 +48,24 @@ class FakeRunner:
         )
 
 
+class MaestroProbeRunner(FakeRunner):
+    def __init__(self, return_code: int, stderr: str = "") -> None:
+        super().__init__()
+        self.return_code = return_code
+        self.stderr = stderr
+
+    def run(self, command: str, **kwargs: object) -> RemoteCommandResult:
+        if command == "test -f /remote/maestro/point_1/netlist/input.scs":
+            self.commands_run.append(command)
+            return RemoteCommandResult(
+                self.return_code,
+                "",
+                self.stderr,
+                ["ssh", "lab", command],
+            )
+        return super().run(command, **kwargs)
+
+
 def test_prepare_remote_project_cache_writes_local_controller_project(tmp_path: Path) -> None:
     ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
     runner = FakeRunner()
@@ -51,13 +73,301 @@ def test_prepare_remote_project_cache_writes_local_controller_project(tmp_path: 
     result = prepare_remote_project_cache(ref, runner=runner, cache_root=tmp_path)
 
     assert result.status == "pass"
+    assert result.requirement_report.status == "pass"
+    assert result.preparation_report.status == "pass"
     assert (result.cache_dir / "opt_requirement.md").is_file()
     assert (result.cache_dir / "constraints.md").is_file()
     assert (result.cache_dir / "config" / "optimizer.yaml").is_file()
+    assert (result.cache_dir / "reports" / "requirement_intake_report.json").is_file()
     assert runner.downloads == [
         ("/remote/maestro/point_1/netlist", result.cache_dir / "netlists" / "exported")
     ]
     assert any("readlink -f" in cmd and "netlist" in cmd for cmd in runner.commands_run)
+
+
+@pytest.mark.parametrize(
+    ("return_code", "expected_status"),
+    [(0, "pass"), (1, "fail")],
+)
+def test_prepare_remote_project_cache_maestro_probe_maps_test_f_exit_codes(
+    tmp_path: Path,
+    return_code: int,
+    expected_status: str,
+) -> None:
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+
+    result = prepare_remote_project_cache(
+        ref,
+        runner=MaestroProbeRunner(return_code),
+        cache_root=tmp_path,
+    )
+
+    assert result.status == expected_status
+    if return_code == 1:
+        assert any(
+            "maestro_point_root/netlist/input.scs is missing" in issue
+            for issue in result.issues
+        )
+
+
+def test_prepare_remote_project_cache_maestro_probe_raises_transport_error(
+    tmp_path: Path,
+) -> None:
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+
+    with pytest.raises(RuntimeError, match="ssh transport timed out"):
+        prepare_remote_project_cache(
+            ref,
+            runner=MaestroProbeRunner(255, "ssh transport timed out"),
+            cache_root=tmp_path,
+        )
+
+
+def test_prepare_remote_project_cache_replaces_stale_snapshot_files(
+    tmp_path: Path,
+) -> None:
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    first_runner = FakeRunner()
+    first = prepare_remote_project_cache(
+        ref,
+        runner=first_runner,
+        cache_root=tmp_path,
+    )
+    stale_netlist = first.cache_dir / "netlists" / "exported" / "stale.inc"
+    stale_netlist.write_text("stale\n", encoding="utf-8")
+
+    class NoConstraintsRunner(FakeRunner):
+        def run(self, command: str, **kwargs: object):
+            if command == "test -f /remote/project/constraints.md":
+                return RemoteCommandResult(1, "", "", ["ssh", "lab", command])
+            return super().run(command, **kwargs)
+
+        def read_text(self, remote_path: PurePosixPath | str) -> str:
+            if str(remote_path) == "/remote/project/constraints.md":
+                raise FileNotFoundError(str(remote_path))
+            return super().read_text(remote_path)
+
+    second = prepare_remote_project_cache(
+        ref,
+        runner=NoConstraintsRunner(),
+        cache_root=tmp_path,
+    )
+
+    assert second.status == "pass"
+    assert not (second.cache_dir / "constraints.md").exists()
+    assert not stale_netlist.exists()
+
+
+def test_prepare_remote_project_cache_fails_closed_on_constraints_read_error(
+    tmp_path: Path,
+) -> None:
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+
+    class BrokenConstraintsRunner(FakeRunner):
+        def read_text(self, remote_path: PurePosixPath | str) -> str:
+            if str(remote_path) == "/remote/project/constraints.md":
+                raise RuntimeError("ssh transport failed")
+            return super().read_text(remote_path)
+
+    with pytest.raises(RuntimeError, match="ssh transport failed"):
+        prepare_remote_project_cache(
+            ref,
+            runner=BrokenConstraintsRunner(),
+            cache_root=tmp_path,
+        )
+
+
+def test_prepare_remote_project_cache_materializes_history_warm_start_sources(
+    tmp_path: Path,
+) -> None:
+    history_requirement = VALID_REQUIREMENT.replace(
+        "## Approval Checklist",
+        """## History Warm Start
+
+```yaml
+enabled: true
+sources:
+  - path: /remote/history/round1
+    label: round1
+max_observations: 20
+warm_start_strategy: topk
+```
+
+## Approval Checklist""",
+    )
+
+    class HistoryRunner(FakeRunner):
+        def __init__(self) -> None:
+            super().__init__()
+            self.file_downloads: list[tuple[str, Path]] = []
+
+        def read_text(self, remote_path: PurePosixPath | str) -> str:
+            if str(remote_path) == "/remote/project/opt_requirement.md":
+                return history_requirement
+            return super().read_text(remote_path)
+
+        def download(
+            self,
+            remote_path: PurePosixPath | str,
+            local_path: Path,
+        ) -> None:
+            self.file_downloads.append((str(remote_path), local_path))
+            local_path.parent.mkdir(parents=True, exist_ok=True)
+            if local_path.name == "optimizer_evaluations.jsonl":
+                local_path.write_text('{"evaluation_index": 1}\n', encoding="utf-8")
+                return
+            source = Path("tests/fixtures/bridge_test_inv/config") / local_path.name
+            local_path.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    runner = HistoryRunner()
+
+    result = prepare_remote_project_cache(ref, runner=runner, cache_root=tmp_path)
+
+    assert result.status == "pass"
+    history_config = yaml.safe_load(
+        (result.cache_dir / "config" / "history_warm_start.yaml").read_text(
+            encoding="utf-8"
+        )
+    )
+    materialized_path = history_config["history_warm_start"]["sources"][0]["path"]
+    assert materialized_path == "history_sources/source_001"
+    source_root = result.cache_dir / materialized_path
+    assert (source_root / "config" / "optimizer.yaml").is_file()
+    assert (source_root / "reports" / "optimizer_evaluations.jsonl").is_file()
+    assert all(remote.startswith("/remote/history/round1/") for remote, _ in runner.file_downloads)
+
+
+def test_prepare_remote_project_cache_persists_and_restores_frozen_snapshot(
+    tmp_path: Path,
+) -> None:
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    snapshot_store = tmp_path / "remote_snapshot_store"
+
+    class SnapshotRunner(FakeRunner):
+        def __init__(self) -> None:
+            super().__init__()
+            self.live_reads_enabled = True
+            self.snapshot_downloaded = False
+
+        def read_text(self, remote_path: PurePosixPath | str) -> str:
+            if not self.live_reads_enabled:
+                raise AssertionError("frozen restore must not read live requirement files")
+            return super().read_text(remote_path)
+
+        def run(self, command: str, **kwargs: object):
+            self.commands_run.append(command)
+            if command.startswith("test -d "):
+                return RemoteCommandResult(
+                    0 if snapshot_store.is_dir() else 1,
+                    "",
+                    "",
+                    ["ssh", "lab", command],
+                )
+            if command.startswith("rm -rf -- "):
+                if snapshot_store.exists():
+                    shutil.rmtree(snapshot_store)
+                return RemoteCommandResult(0, "", "", ["ssh", "lab", command])
+            return RemoteCommandResult(0, "", "", ["ssh", "lab", command])
+
+        def write_text(
+            self,
+            remote_path: PurePosixPath | str,
+            text: str,
+        ) -> None:
+            assert str(remote_path).endswith("/.complete")
+            snapshot_store.mkdir(parents=True, exist_ok=True)
+            (snapshot_store / ".complete").write_text(text, encoding="utf-8")
+
+        def upload_tree(
+            self,
+            local_path: Path,
+            remote_path: PurePosixPath | str,
+            **kwargs: object,
+        ) -> None:
+            assert "/state/remote_preparation_snapshots/" in str(remote_path)
+            shutil.copytree(local_path, snapshot_store)
+
+        def download_tree(
+            self,
+            remote_path,
+            local_path,
+            include=None,
+            exclude=None,
+            dereference=False,
+        ) -> None:
+            if str(remote_path).endswith("state/remote_preparation_snapshot"):
+                shutil.copytree(snapshot_store, local_path, dirs_exist_ok=True)
+                self.snapshot_downloaded = True
+                return
+            super().download_tree(
+                remote_path,
+                local_path,
+                include=include,
+                exclude=exclude,
+                dereference=dereference,
+            )
+
+    runner = SnapshotRunner()
+    initial = prepare_remote_project_cache(
+        ref,
+        runner=runner,
+        cache_root=tmp_path / "cache",
+        persist_snapshot=True,
+    )
+    assert initial.status == "pass"
+    assert (snapshot_store / "reports" / "remote_preparation_snapshot.json").is_file()
+    assert (snapshot_store / ".complete").is_file()
+    assert any("mv -Tf" in command for command in runner.commands_run)
+
+    runner.live_reads_enabled = False
+    restored = prepare_remote_project_cache(
+        ref,
+        runner=runner,
+        cache_root=tmp_path / "cache",
+        frozen_snapshot=True,
+    )
+
+    assert restored.status == "pass"
+    assert runner.snapshot_downloaded is True
+    assert (restored.cache_dir / "config" / "optimizer.yaml").is_file()
+    assert (restored.cache_dir / "netlists" / "templates" / "template.scs").is_file()
+
+    with (snapshot_store / "config" / "optimizer.yaml").open(
+        "a",
+        encoding="utf-8",
+    ) as handle:
+        handle.write("# tampered\n")
+    with pytest.raises(RuntimeError, match="snapshot integrity check failed"):
+        prepare_remote_project_cache(
+            ref,
+            runner=runner,
+            cache_root=tmp_path / "cache",
+            frozen_snapshot=True,
+        )
+
+
+def test_prepare_remote_project_cache_fails_closed_without_frozen_snapshot(
+    tmp_path: Path,
+) -> None:
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+
+    class MissingSnapshotRunner(FakeRunner):
+        def run(self, command: str, **kwargs: object):
+            if command.startswith("test -d "):
+                return RemoteCommandResult(1, "", "", ["ssh", "lab", command])
+            return super().run(command, **kwargs)
+
+        def read_text(self, remote_path: PurePosixPath | str) -> str:
+            raise AssertionError("missing frozen snapshot must not fall back to live files")
+
+    with pytest.raises(RuntimeError, match="remote preparation snapshot is missing"):
+        prepare_remote_project_cache(
+            ref,
+            runner=MissingSnapshotRunner(),
+            cache_root=tmp_path,
+            frozen_snapshot=True,
+        )
 
 
 def test_prepare_remote_project_cache_quotes_paths_with_spaces(tmp_path: Path) -> None:

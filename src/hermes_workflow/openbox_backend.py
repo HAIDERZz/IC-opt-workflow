@@ -926,7 +926,7 @@ def _run_openbox_batches(
     early_stop_reason: str | None = None
     batch_index = _max_batch_index(traces)
     run_offset = (
-        _next_run_offset(project_dir, "real")
+        _next_run_offset(project_dir, "real", prior_traces=traces)
         if execution_mode == REAL_EXECUTION_MODE
         else prior_count
     )
@@ -1586,12 +1586,25 @@ def _prepare_unique_batch(
     )
 
 
-def _next_run_offset(project_dir: Path, run_prefix: str) -> int:
+def _next_run_offset(
+    project_dir: Path,
+    run_prefix: str,
+    *,
+    prior_traces: list[NativeTurboEvaluationTrace] | None = None,
+) -> int:
     root = project_dir / "runs" / "real"
     next_index = 1
     while (root / f"{run_prefix}_{next_index:03d}").exists():
         next_index += 1
-    return next_index - 1
+    highest_historical_index = 0
+    expected_prefix = f"{run_prefix}_"
+    for trace in prior_traces or []:
+        if not trace.run_id.startswith(expected_prefix):
+            continue
+        suffix = trace.run_id.removeprefix(expected_prefix)
+        if suffix.isdecimal():
+            highest_historical_index = max(highest_historical_index, int(suffix))
+    return max(next_index - 1, highest_historical_index)
 
 
 def _fake_batch_evaluator(

@@ -949,6 +949,67 @@ def test_real_candidate_evaluator_runs_fake_adapter_checks_and_records(
     assert (project_dir / "ledger" / "experiment_ledger.jsonl").exists()
 
 
+def test_real_candidate_evaluator_fails_when_adapter_raises_after_local_manifests(
+    tmp_path: Path,
+) -> None:
+    project_dir = create_approved_real_project(tmp_path)
+    import shutil
+
+    shutil.rmtree(project_dir / "runs")
+
+    def adapter(project: Path, *, run_id: str, cadence_cshrc: Path | None) -> None:
+        write_fake_result_manifest(project, run_id=run_id)
+        write_fake_metric_result_manifest(project, run_id=run_id)
+        raise RuntimeError("remote parent upload failed")
+
+    observation = evaluate_real_candidate(
+        project_dir,
+        candidate_id="candidate_000001",
+        parameters={"VAR_INT": "3", "VAR_WIDTH": "0.3u"},
+        run_id="real_001",
+        adapter=adapter,
+    )
+
+    assert observation.status == "adapter_failed"
+    assert observation.issues == ["adapter raised: remote parent upload failed"]
+    assert observation.result_manifest == "runs/real/real_001/result_manifest.json"
+    assert (
+        observation.metric_result_manifest
+        == "runs/real/real_001/metrics/metric_result_manifest.json"
+    )
+    assert not (project_dir / "ledger" / "experiment_ledger.jsonl").exists()
+
+
+def test_real_candidate_evaluator_honors_explicit_failed_adapter_result(
+    tmp_path: Path,
+) -> None:
+    project_dir = create_approved_real_project(tmp_path)
+    import shutil
+
+    shutil.rmtree(project_dir / "runs")
+
+    def adapter(project: Path, *, run_id: str, cadence_cshrc: Path | None) -> object:
+        write_fake_result_manifest(project, run_id=run_id)
+        write_fake_metric_result_manifest(project, run_id=run_id)
+        return type(
+            "AdapterResult",
+            (),
+            {"status": "failed", "issues": ["remote parent missing"]},
+        )()
+
+    observation = evaluate_real_candidate(
+        project_dir,
+        candidate_id="candidate_000001",
+        parameters={"VAR_INT": "3", "VAR_WIDTH": "0.3u"},
+        run_id="real_001",
+        adapter=adapter,
+    )
+
+    assert observation.status == "adapter_failed"
+    assert observation.issues == ["remote parent missing"]
+    assert not (project_dir / "ledger" / "experiment_ledger.jsonl").exists()
+
+
 def test_real_batch_evaluator_caps_parallel_adapter_calls(tmp_path: Path) -> None:
     project_dir = create_approved_real_project(tmp_path)
     import shutil

@@ -66,6 +66,12 @@ Linux workstation, macOS machine, or Windows WSL, while Spectre/OCEAN runs on a
 separate Linux EDA server through SSH. Remote mode is useful when installing a
 Python environment directly on the EDA server is inconvenient.
 
+Controller and Remote Host filesystems are assumed to be isolated in remote
+mode. A Remote-owned path is never checked through the Controller filesystem;
+it is accessed through the configured SSH transport or explicitly materialized
+under the Controller cache. A same-named path that happens to exist on both
+machines is not part of the remote-mode contract.
+
 ## SSH Profile For Remote Mode
 
 `--ssh-profile PROFILE` refers to an OpenSSH host profile, usually defined in
@@ -91,7 +97,17 @@ Linux EDA server. It must contain `opt_requirement.md` and the referenced
 Maestro/ADE result point directories. IC Auto Opt reads the remote requirement,
 downloads the exported netlists into a local cache under `~/.ic-opt/remote_runs`,
 uploads per-run Spectre/OCEAN work directories, downloads results, and writes
-reports back to the remote project when possible.
+the resulting artifacts and reports back to the remote project. Remote Maestro
+input existence checks execute `test -f` over SSH: exit status 0 means present,
+1 means absent, and any other status is a transport/probe error rather than a
+missing file.
+
+For optimizer runs, a pass-status
+`reports/optimizer_flow_run_report.json` is the final success marker. It is
+published only after the Remote Host has verified the SHA-256 content and
+project-relative references of all expected parent and child manifests. A
+failure-status flow report is published independently, so an incomplete run can
+retain failure evidence without being presented as successful.
 
 Remote command shape:
 

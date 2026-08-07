@@ -6,6 +6,10 @@
 ic-opt PROJECT_DIR --doctor
 ```
 
+Remote 模式默认 Controller 与 Remote Host 的文件系统完全隔离。远端路径只能通过
+配置的 SSH transport 检查，或先明确下载到 Controller cache 后再由本地代码读取；
+Controller 上偶然存在同名路径不能作为远端文件存在的依据。
+
 ## 找不到 `opt_requirement.md`
 
 检查传入的 `PROJECT_DIR`。`opt_requirement.md` 必须在项目根目录。
@@ -36,6 +40,23 @@ ic-opt PROJECT_DIR --doctor
 如果 `opt_requirement.md` 里填到了 `.../netlist/input.scs`，就把最后的
 `/netlist/input.scs` 去掉；如果填到了 `psf/`，回到同一个 run 下的 testbench
 结果点目录。
+
+Remote 模式下，这项存在性检查会通过 SSH 在 Remote Host 上执行 `test -f`，不会
+查询 Controller 的本地文件系统。SSH exit status 0 表示文件存在，1 表示文件不
+存在；任何其他返回值都必须按 SSH transport/probe 错误处理，不能降级成“文件缺失”，
+也不能回退到 Controller 上检查同名路径。
+
+## Remote flow 的完成标记
+
+优化流程只有在 Remote Host 上核验全部 parent/child manifest 的 SHA-256 内容和
+project-relative 引用后，才会发布 status 为 `pass` 的最终成功标记：
+
+```text
+reports/optimizer_flow_run_report.json
+```
+
+失败报告独立发布，不受成功完整性门槛阻挡。传输中断或 partial run 可以保留明确的
+失败证据，但不得留下或沿用一个看似成功的 flow marker。
 
 ## 找不到 Cadence 环境
 

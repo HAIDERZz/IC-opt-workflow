@@ -14,8 +14,20 @@ class RemoteProjectRef:
     remote_project_dir: PurePosixPath
 
     def __post_init__(self) -> None:
-        if not self.ssh_profile.strip():
+        profile = self.ssh_profile.strip()
+        if not profile:
             raise ValueError("ssh profile must not be empty")
+        if (
+            profile in {".", ".."}
+            or "/" in profile
+            or "\\" in profile
+            or "\x00" in profile
+            or profile.startswith("-")
+        ):
+            raise ValueError(
+                "ssh profile must be a single path component and must not "
+                "start with '-'"
+            )
         if not self.remote_project_dir.is_absolute():
             raise ValueError("remote project path must be absolute")
 

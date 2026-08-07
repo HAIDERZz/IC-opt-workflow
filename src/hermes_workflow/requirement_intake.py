@@ -135,9 +135,16 @@ class RequirementPreparationReport:
     issues: list[str]
 
 
-def check_requirement(project_dir: str | Path) -> RequirementIntakeReport:
+def check_requirement(
+    project_dir: str | Path,
+    *,
+    maestro_input_exists: Callable[[str], bool] | None = None,
+) -> RequirementIntakeReport:
     project_root = Path(project_dir)
-    report = _parse_and_validate_requirement(project_root)
+    report = _parse_and_validate_requirement(
+        project_root,
+        maestro_input_exists=maestro_input_exists,
+    )
     _write_requirement_report(project_root, report)
     return report
 
@@ -520,7 +527,11 @@ def parse_requirement_text(
     )
 
 
-def _parse_and_validate_requirement(project_dir: Path) -> RequirementIntakeReport:
+def _parse_and_validate_requirement(
+    project_dir: Path,
+    *,
+    maestro_input_exists: Callable[[str], bool] | None = None,
+) -> RequirementIntakeReport:
     requirement_path = project_dir / "opt_requirement.md"
     issues: list[str] = []
     sections: dict[str, Any] = {}
@@ -556,7 +567,11 @@ def _parse_and_validate_requirement(project_dir: Path) -> RequirementIntakeRepor
     return parse_requirement_text(
         requirement_text,
         constraints_text=constraints_text,
-        maestro_input_exists=lambda path: Path(path).expanduser().is_file(),
+        maestro_input_exists=(
+            maestro_input_exists
+            if maestro_input_exists is not None
+            else lambda path: Path(path).expanduser().is_file()
+        ),
     )
 
 

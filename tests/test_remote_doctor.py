@@ -4,8 +4,10 @@ import json
 import shlex
 from pathlib import Path, PurePosixPath
 
+import pytest
+
 from hermes_workflow.remote_doctor import _build_remote_dirty_state, run_remote_doctor
-from hermes_workflow.remote_project import RemoteProjectRef
+from hermes_workflow.remote_project import RemoteProjectRef, remote_cache_dir
 from hermes_workflow.remote_ssh import RemoteCommandResult
 
 
@@ -69,6 +71,24 @@ class FakeRunner:
         self.run(f"mkdir -p {remote_path}")
 
 
+class MaestroProbeRunner(FakeRunner):
+    def __init__(self, return_code: int, stderr: str = "") -> None:
+        super().__init__()
+        self.return_code = return_code
+        self.stderr = stderr
+
+    def run(self, command: str, **kwargs: object) -> RemoteCommandResult:
+        if command == "test -f /remote/maestro/point_1/netlist/input.scs":
+            self.commands.append(command)
+            return RemoteCommandResult(
+                self.return_code,
+                "",
+                self.stderr,
+                ["ssh", "lab", command],
+            )
+        return super().run(command, **kwargs)
+
+
 def test_remote_doctor_writes_remote_and_local_reports(tmp_path: Path) -> None:
     runner = FakeRunner()
     ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
@@ -82,6 +102,72 @@ def test_remote_doctor_writes_remote_and_local_reports(tmp_path: Path) -> None:
     payload = json.loads(report.local_report_path.read_text(encoding="utf-8"))
     assert payload["checks"]["ssh"]["status"] == "pass"
     assert payload["checks"]["spectre_ocean"]["status"] == "pass"
+
+
+@pytest.mark.parametrize(
+    ("return_code", "expected_status"),
+    [(0, "pass"), (1, "fail")],
+)
+def test_remote_doctor_maestro_probe_maps_test_f_exit_codes(
+    tmp_path: Path,
+    return_code: int,
+    expected_status: str,
+) -> None:
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+
+    report = run_remote_doctor(
+        ref,
+        runner=MaestroProbeRunner(return_code),
+        cache_root=tmp_path,
+    )
+
+    assert report.status == expected_status
+    if return_code == 1:
+        assert any(
+            "maestro_point_root/netlist/input.scs is missing" in issue
+            for issue in report.issues
+        )
+
+
+def test_remote_doctor_maestro_probe_raises_transport_error(tmp_path: Path) -> None:
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+
+    with pytest.raises(RuntimeError, match="ssh transport timed out"):
+        run_remote_doctor(
+            ref,
+            runner=MaestroProbeRunner(255, "ssh transport timed out"),
+            cache_root=tmp_path,
+        )
+
+
+def test_remote_doctor_preserves_local_failure_report_when_remote_write_fails(
+    tmp_path: Path,
+) -> None:
+    class FailingReportWriteRunner(FakeRunner):
+        def write_text(
+            self,
+            remote_path: PurePosixPath | str,
+            text: str,
+        ) -> None:
+            raise RuntimeError("connection reset")
+
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+
+    report = run_remote_doctor(
+        ref,
+        runner=FailingReportWriteRunner(),
+        cache_root=tmp_path,
+    )
+
+    assert report.status == "fail"
+    assert report.local_report_path.is_file()
+    payload = json.loads(report.local_report_path.read_text(encoding="utf-8"))
+    assert payload["status"] == "fail"
+    assert payload["checks"]["remote_doctor_report_write"]["status"] == "fail"
+    assert any(
+        issue["code"] == "REMOTE_DOCTOR_REPORT_WRITE_FAILED"
+        for issue in payload["structured_issues"]
+    )
 
 
 def test_remote_doctor_fails_before_optimizer_when_ssh_is_not_ready(
@@ -262,6 +348,38 @@ def test_remote_doctor_reports_optimizer_progress_summary_in_payload(
     assert "state_current_evaluations" in progress
     assert "state_recorded_observation_count" in progress
     assert "ledger_row_count" in progress
+
+
+def test_remote_doctor_ignores_unmaterialized_controller_cache_history(
+    tmp_path: Path,
+) -> None:
+    runner = FakeRunner()
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    cache_dir = remote_cache_dir(ref, cache_root=tmp_path)
+    reports = cache_dir / "reports"
+    state = cache_dir / "state"
+    reports.mkdir(parents=True)
+    state.mkdir(parents=True)
+    (reports / "optimizer_evaluations.jsonl").write_text(
+        '{"evaluation_index": 1}\n',
+        encoding="utf-8",
+    )
+    (reports / "optimizer_run_report.json").write_text(
+        '{"evaluation_count": 1}\n',
+        encoding="utf-8",
+    )
+    (state / "optimizer_state.json").write_text(
+        '{"current_evaluations": 99}\n',
+        encoding="utf-8",
+    )
+
+    report = run_remote_doctor(ref, runner=runner, cache_root=tmp_path)
+
+    assert report.status == "pass"
+    assert not any(
+        issue.code == "OPTIMIZER_PROGRESS_STATE_MISMATCH"
+        for issue in report.structured_issues
+    )
 
 
 class _DirtyFakeRunner:

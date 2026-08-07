@@ -715,25 +715,36 @@ def execute_and_check_real_candidate(
     adapter: Callable[..., object] | None = None,
 ) -> NativeTurboObservation:
     selected_adapter = adapter or _run_default_adapter
-    adapter_error: str | None = None
+    adapter_failure_issues: list[str] = []
     try:
-        selected_adapter(project_dir, run_id=run_id, cadence_cshrc=cadence_cshrc)
+        adapter_result = selected_adapter(
+            project_dir,
+            run_id=run_id,
+            cadence_cshrc=cadence_cshrc,
+        )
     except Exception as exc:
-        adapter_error = str(exc)
+        adapter_failure_issues = [f"adapter raised: {exc}"]
+    else:
+        adapter_status = getattr(adapter_result, "status", None)
+        if isinstance(adapter_status, str) and adapter_status != "succeeded":
+            adapter_issues = getattr(adapter_result, "issues", None)
+            if isinstance(adapter_issues, (list, tuple)) and adapter_issues:
+                adapter_failure_issues = [str(issue) for issue in adapter_issues]
+            else:
+                adapter_failure_issues = [f"adapter status is {adapter_status}"]
 
     real_report = check_real_run(project_dir, run_id=run_id, persist_report=False)
     if real_report.status.value != "pass":
         _try_abandon_candidate(project_dir, run_id, "real-run check failed")
-        issues = real_report.issues or ([adapter_error] if adapter_error else [])
         return NativeTurboObservation(
             status="real_check_failed",
-            issues=issues,
+            issues=real_report.issues or adapter_failure_issues,
             result_manifest=f"runs/real/{run_id}/result_manifest.json",
         )
     if real_report.result_status != RealRunResultStatus.SUCCEEDED:
         # A failed result manifest means the real tool/transport failed even if
         # the manifest exists, so classify before metric extraction.
-        issues = real_report.issues or ([adapter_error] if adapter_error else [])
+        issues = real_report.issues or adapter_failure_issues
         status_label = (
             real_report.result_status.value
             if real_report.result_status is not None
@@ -768,6 +779,14 @@ def execute_and_check_real_candidate(
         return NativeTurboObservation(
             status="metric_failed",
             issues=["metric result contains non-finite scalar"],
+            result_manifest=real_report.result_manifest,
+            metric_result_manifest=metric_report.metric_result_manifest,
+        )
+    if adapter_failure_issues:
+        _try_abandon_candidate(project_dir, run_id, "adapter failed")
+        return NativeTurboObservation(
+            status="adapter_failed",
+            issues=adapter_failure_issues,
             result_manifest=real_report.result_manifest,
             metric_result_manifest=metric_report.metric_result_manifest,
         )

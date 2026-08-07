@@ -84,7 +84,10 @@ def test_remote_runner_write_text_uses_cat_with_input() -> None:
 
     runner.write_text(PurePosixPath("/remote/file.txt"), "hello world")
 
-    assert calls[0][0][-1] == "cat > /remote/file.txt"
+    command = calls[0][0][-1]
+    assert command.startswith("cat > /remote/.file.txt.upload-")
+    assert " && mv -f -- /remote/.file.txt.upload-" in command
+    assert command.endswith(" /remote/file.txt")
     assert calls[0][1] == "hello world"
 
 
@@ -125,6 +128,11 @@ def test_remote_runner_empty_profile_raises() -> None:
         RemoteSshRunner("")
 
 
+def test_remote_runner_rejects_option_like_profile() -> None:
+    with pytest.raises(ValueError, match="must not start with '-'"):
+        RemoteSshRunner("-ProxyCommand=bad")
+
+
 def test_remote_runner_check_raises_generic_error_for_non_255() -> None:
     def fake_execute(argv: list[str], *, input_text: str | None, timeout_s: int | None) -> RemoteCommandResult:
         return RemoteCommandResult(return_code=1, stdout="", stderr="bad", argv=argv)
@@ -161,7 +169,7 @@ def test_remote_runner_download_uses_scp(tmp_path: Path) -> None:
     ]
 
 
-def test_remote_runner_upload_uses_scp(tmp_path: Path) -> None:
+def test_remote_runner_upload_uses_atomic_scp_publish(tmp_path: Path) -> None:
     calls: list[list[str]] = []
 
     def fake_execute(argv: list[str], *, input_text: str | None, timeout_s: int | None) -> RemoteCommandResult:
@@ -174,13 +182,16 @@ def test_remote_runner_upload_uses_scp(tmp_path: Path) -> None:
     local_path.write_text("data")
     runner.upload(local_path, PurePosixPath("/remote/upload.txt"))
 
-    assert calls[0] == [
+    assert calls[0][:4] == [
         "scp",
         "-o",
         "BatchMode=yes",
         str(local_path),
-        "lab:/remote/upload.txt",
     ]
+    assert calls[0][4].startswith("lab:/remote/.upload.txt.upload-")
+    assert calls[1][:4] == ["ssh", "-o", "BatchMode=yes", "lab"]
+    assert calls[1][4].startswith("mv -f -- /remote/.upload.txt.upload-")
+    assert calls[1][4].endswith(" /remote/upload.txt")
 
 
 # --- download_tree / upload_tree tests ---
