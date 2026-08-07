@@ -15,10 +15,12 @@ from hermes_workflow.requirement_intake import check_requirement
 from hermes_workflow.remote_doctor import run_remote_doctor
 from hermes_workflow.remote_fix_run_flow import run_remote_fix_run_project
 from hermes_workflow.remote_optimizer_flow import (
+    begin_remote_optimizer_attempt,
     continue_remote_project,
     optimize_remote_project,
 )
-from hermes_workflow.remote_project import RemoteProjectRef
+from hermes_workflow.remote_project import RemoteProjectRef, remote_cache_dir
+from hermes_workflow.remote_ssh import RemoteSshRunner
 
 CADENCE_CSHRC_ENV_VAR = "IC_OPT_CADENCE_CSHRC"
 PROJECT_CADENCE_CSHRC = Path("cadence_env.csh")
@@ -167,7 +169,12 @@ def main(
             remote_project_dir=PurePosixPath(project_dir.as_posix()),
         )
         if doctor:
-            report = run_remote_doctor(ref, cadence_cshrc=cadence_cshrc)
+            remote_cshrc = (
+                PurePosixPath(cadence_cshrc.as_posix())
+                if cadence_cshrc is not None
+                else None
+            )
+            report = run_remote_doctor(ref, cadence_cshrc=remote_cshrc)
             if report.status == "pass":
                 typer.echo("doctor completed")
                 typer.echo("transport: remote")
@@ -186,7 +193,7 @@ def main(
                     ValueError("--continue requires --real")
                 )
             remote_cshrc = (
-                PurePosixPath(str(cadence_cshrc))
+                PurePosixPath(cadence_cshrc.as_posix())
                 if cadence_cshrc is not None
                 else ref.remote_project_dir / "cadence_env.csh"
             )
@@ -211,33 +218,58 @@ def main(
             raise typer.Exit(code=1)
         if real:
             remote_cshrc = (
-                PurePosixPath(str(cadence_cshrc))
+                PurePosixPath(cadence_cshrc.as_posix())
                 if cadence_cshrc is not None
                 else ref.remote_project_dir / "cadence_env.csh"
             )
-            # Detect workflow mode: if fix_run, dispatch to remote fix-run flow
+            remote_runner = RemoteSshRunner(ref.ssh_profile)
             try:
-                intake = check_requirement(project_dir)
-            except Exception:
-                intake = None
-            if intake is not None and getattr(intake, "workflow_mode", None) == "fix_run":
+                begin_remote_optimizer_attempt(ref, runner=remote_runner)
+                doctor_report = run_remote_doctor(
+                    ref,
+                    runner=remote_runner,
+                    cadence_cshrc=remote_cshrc,
+                )
+            except (OSError, RuntimeError, ValueError) as exc:
+                _exit_with_error(exc)
+            if doctor_report.status != "pass":
+                _exit_with_error(
+                    ValueError(
+                        "remote doctor failed: " + "; ".join(doctor_report.issues)
+                    )
+                )
+            workflow_mode = doctor_report.workflow_mode
+            if workflow_mode == "fix_run":
                 try:
                     fix_report = run_remote_fix_run_project(
                         ref,
                         remote_cadence_cshrc=remote_cshrc,
                         real=True,
+                        runner=remote_runner,
+                        doctor_report=doctor_report,
                     )
                 except (OSError, RuntimeError, ValueError) as exc:
                     _exit_with_error(exc)
                 if fix_report.status == "pass":
                     typer.echo("remote fix-run flow completed")
-                    _echo_report_path(
-                        project_dir,
-                        project_dir / "reports" / "fix_run_report.json",
+                    typer.echo(
+                        "local report: "
+                        f"{remote_cache_dir(ref) / 'reports' / 'fix_run_report.json'}"
+                    )
+                    typer.echo(
+                        "remote report: "
+                        f"{ref.remote_project_dir / 'reports' / 'fix_run_report.json'}"
                     )
                     return
                 typer.echo("remote fix-run flow failed")
                 raise typer.Exit(code=1)
+            if workflow_mode != "optimize":
+                _exit_with_error(
+                    ValueError(
+                        "remote requirement has unsupported workflow mode: "
+                        f"{workflow_mode!r}"
+                    )
+                )
             try:
                 report = optimize_remote_project(
                     ref,
@@ -247,6 +279,9 @@ def main(
                     batch_size=None,
                     parallel_jobs=None,
                     strategy=None,
+                    runner=remote_runner,
+                    doctor_report=doctor_report,
+                    attempt_started=True,
                 )
             except (OSError, RuntimeError, ValueError) as exc:
                 _exit_with_error(exc)

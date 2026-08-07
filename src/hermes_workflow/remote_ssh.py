@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import shlex
 import subprocess
+import uuid
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Callable
@@ -54,6 +55,8 @@ class RemoteSshRunner:
     ) -> None:
         if not profile.strip():
             raise ValueError("ssh profile must not be empty")
+        if profile.strip().startswith("-"):
+            raise ValueError("ssh profile must not start with '-'")
         self.profile = profile
         self._execute = execute
 
@@ -80,7 +83,13 @@ class RemoteSshRunner:
         return result.stdout
 
     def write_text(self, remote_path: PurePosixPath | str, text: str) -> None:
-        command = f"cat > {quote_remote_path(remote_path)}"
+        target = PurePosixPath(remote_path)
+        temporary = _remote_upload_temp_path(target)
+        command = (
+            f"cat > {quote_remote_path(temporary)} && "
+            f"mv -f -- {quote_remote_path(temporary)} "
+            f"{quote_remote_path(target)}"
+        )
         self.run(command, input_text=text, check=True)
 
     def exists(self, remote_path: PurePosixPath | str) -> bool:
@@ -104,16 +113,23 @@ class RemoteSshRunner:
             self._raise_checked_error(result)
 
     def upload(self, local_path: Path, remote_path: PurePosixPath | str) -> None:
+        target = PurePosixPath(remote_path)
+        temporary = _remote_upload_temp_path(target)
         argv = [
             "scp",
             "-o",
             "BatchMode=yes",
             str(local_path),
-            f"{self.profile}:{quote_remote_path(remote_path)}",
+            f"{self.profile}:{quote_remote_path(temporary)}",
         ]
         result = self._execute(argv, input_text=None, timeout_s=None)
         if result.return_code != 0:
             self._raise_checked_error(result)
+        self.run(
+            f"mv -f -- {quote_remote_path(temporary)} "
+            f"{quote_remote_path(target)}",
+            check=True,
+        )
 
     def download_tree(
         self,
@@ -234,3 +250,7 @@ class RemoteSshRunner:
             f"return_code={result.return_code}, command={result.argv[-1]!r}, "
             f"stderr={result.stderr.strip()}"
         )
+
+
+def _remote_upload_temp_path(target: PurePosixPath) -> PurePosixPath:
+    return target.parent / f".{target.name}.upload-{uuid.uuid4().hex}"

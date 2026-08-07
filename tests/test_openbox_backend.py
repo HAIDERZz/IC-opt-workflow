@@ -1087,6 +1087,64 @@ def test_run_openbox_real_continuation_allows_completed_prior_state(
     assert rows[-1]["run_id"] == "real_010"
 
 
+def test_run_openbox_real_continuation_uses_history_when_local_runs_are_missing(
+    tmp_path: Path,
+) -> None:
+    import shutil
+
+    project_dir = create_approved_real_project(tmp_path)
+    continuation_run_ids: list[str] = []
+
+    def adapter(project_dir: Path, *, run_id: str, cadence_cshrc: Path | None) -> None:
+        from tests.real_run_smoke_helpers import (
+            write_fake_metric_result_manifest,
+            write_fake_result_manifest,
+        )
+
+        continuation_run_ids.append(run_id)
+        write_fake_result_manifest(project_dir, run_id=run_id)
+        write_fake_metric_result_manifest(project_dir, run_id=run_id)
+
+    run_openbox_real_optimization(
+        project_dir,
+        max_evals=2,
+        batch_size=2,
+        parallel_jobs=2,
+        advisor_factory=lambda _space, _seed: SequentialAdvisor(project_dir),
+        adapter=adapter,
+    )
+    evaluations_path = project_dir / EVALUATIONS_RELATIVE
+    prior_rows = [
+        json.loads(line) for line in evaluations_path.read_text().splitlines()
+    ]
+    assert [row["run_id"] for row in prior_rows] == ["real_002", "real_003"]
+
+    shutil.rmtree(project_dir / "runs" / "real")
+    continuation_run_ids.clear()
+
+    run_openbox_real_optimization(
+        project_dir,
+        additional_evals=1,
+        continue_from_existing=True,
+        batch_size=1,
+        parallel_jobs=1,
+        advisor_factory=lambda _space, _seed: SequentialAdvisor(
+            project_dir,
+            start=2,
+        ),
+        adapter=adapter,
+    )
+
+    rows = [json.loads(line) for line in evaluations_path.read_text().splitlines()]
+    assert rows[:2] == prior_rows
+    assert continuation_run_ids == ["real_004"]
+    assert [row["run_id"] for row in rows] == [
+        "real_002",
+        "real_003",
+        "real_004",
+    ]
+
+
 def test_run_openbox_real_optimization_applies_strategy_preset(
     tmp_path: Path,
 ) -> None:

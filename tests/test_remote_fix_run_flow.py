@@ -108,7 +108,13 @@ def _mock_intake(project_dir: Path) -> SimpleNamespace:
 
 def _mock_preparation(project_dir: Path) -> SimpleNamespace:
     """Create a mock preparation result."""
-    return SimpleNamespace(status="pass", issues=[], cache_dir=project_dir)
+    return SimpleNamespace(
+        status="pass",
+        issues=[],
+        cache_dir=project_dir,
+        requirement_report=_mock_intake(project_dir),
+        preparation_report=SimpleNamespace(status="pass", issues=[]),
+    )
 
 
 def _mock_adapter_result(
@@ -193,6 +199,107 @@ def test_remote_fix_run_calls_remote_doctor_and_blocks_on_failure() -> None:
         mock_doctor.assert_called_once()
 
 
+def test_remote_fix_run_reuses_frozen_remote_preparation_snapshot(
+    tmp_path: Path,
+) -> None:
+    """Remote-owned Maestro paths must not be checked on the Controller."""
+    from hermes_workflow.remote_fix_run_flow import run_remote_fix_run_project
+
+    project_dir = _create_remote_fix_run_project(
+        tmp_path,
+        name="remote_fix_run_snapshot",
+    )
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    mock_runner = MagicMock()
+
+    with (
+        patch("hermes_workflow.remote_fix_run_flow.run_remote_doctor") as mock_doctor,
+        patch(
+            "hermes_workflow.remote_fix_run_flow.prepare_remote_project_cache"
+        ) as mock_prepare,
+    ):
+        mock_doctor.return_value = MagicMock(status="pass", issues=[])
+        mock_prepare.return_value = _mock_preparation(project_dir)
+
+        report = run_remote_fix_run_project(
+            ref,
+            remote_cadence_cshrc=PurePosixPath(
+                "/remote/project/cadence_env.csh"
+            ),
+            real=False,
+            runner=mock_runner,
+        )
+
+    assert report.status == "pass"
+    mock_prepare.assert_called_once()
+    assert mock_prepare.call_args.kwargs["persist_snapshot"] is True
+
+
+def test_remote_fix_run_fails_when_report_upload_fails(tmp_path: Path) -> None:
+    """A Controller-only report is not a successful remote fix-run."""
+    from hermes_workflow.remote_fix_run_flow import run_remote_fix_run_project
+
+    project_dir = _create_remote_fix_run_project(
+        tmp_path,
+        name="remote_fix_run_sync_failure",
+    )
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    mock_runner = MagicMock()
+    mock_runner.upload.side_effect = RuntimeError("scp failed")
+
+    with (
+        patch("hermes_workflow.remote_fix_run_flow.run_remote_doctor") as mock_doctor,
+        patch(
+            "hermes_workflow.remote_fix_run_flow.prepare_remote_project_cache"
+        ) as mock_prepare,
+    ):
+        mock_doctor.return_value = MagicMock(status="pass", issues=[])
+        mock_prepare.return_value = _mock_preparation(project_dir)
+
+        with pytest.raises(RuntimeError, match="failed to upload fix-run report"):
+            run_remote_fix_run_project(
+                ref,
+                remote_cadence_cshrc=PurePosixPath(
+                    "/remote/project/cadence_env.csh"
+                ),
+                real=False,
+                runner=mock_runner,
+            )
+
+    assert (project_dir / "reports" / "fix_run_report.json").is_file()
+
+
+def test_remote_fix_run_publishes_pass_report_after_run_artifacts(
+    tmp_path: Path,
+) -> None:
+    from hermes_workflow.remote_fix_run_flow import (
+        REPORT_RELATIVE,
+        _sync_report_to_remote,
+    )
+
+    cache_dir = tmp_path / "cache"
+    report_path = cache_dir / REPORT_RELATIVE
+    report_path.parent.mkdir(parents=True)
+    report_path.write_text('{"status": "pass"}\n', encoding="utf-8")
+    (cache_dir / "runs" / "real" / "real_001").mkdir(parents=True)
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    calls: list[str] = []
+
+    class RecordingRunner:
+        def upload_tree(self, local_path, remote_path) -> None:
+            calls.append(f"tree:{remote_path}")
+
+        def upload(self, local_path, remote_path) -> None:
+            calls.append(f"file:{remote_path}")
+
+    _sync_report_to_remote(ref, cache_dir, RecordingRunner())
+
+    assert calls == [
+        "tree:/remote/project/runs",
+        "file:/remote/project/reports/fix_run_report.json",
+    ]
+
+
 # ---------------------------------------------------------------------------
 # Test 2: Remote fix-run uploads fixed-point request artifacts
 # ---------------------------------------------------------------------------
@@ -209,15 +316,11 @@ def test_remote_fix_run_uploads_fixed_point_artifacts(tmp_path: Path) -> None:
     with (
         patch("hermes_workflow.remote_fix_run_flow.run_remote_doctor") as mock_doctor,
         patch("hermes_workflow.remote_fix_run_flow.prepare_remote_project_cache") as mock_prep,
-        patch("hermes_workflow.remote_fix_run_flow.check_requirement") as mock_check,
-        patch("hermes_workflow.remote_fix_run_flow.prepare_from_requirement") as mock_prep_req,
         patch("hermes_workflow.remote_fix_run_flow.prepare_explicit_candidate_real_run") as mock_prepare,
         patch("hermes_workflow.remote_fix_run_flow.run_remote_spectre_ocean_adapter") as mock_adapter,
     ):
         mock_doctor.return_value = MagicMock(status="pass", issues=[])
         mock_prep.return_value = _mock_preparation(project_dir)
-        mock_check.return_value = _mock_intake(project_dir)
-        mock_prep_req.return_value = MagicMock(status="pass", issues=[])
         mock_prepare.return_value = MagicMock(
             run_id="real_001",
             run_dir=project_dir / "runs" / "real" / "real_001",
@@ -251,15 +354,11 @@ def test_remote_fix_run_writes_report_json(tmp_path: Path) -> None:
     with (
         patch("hermes_workflow.remote_fix_run_flow.run_remote_doctor") as mock_doctor,
         patch("hermes_workflow.remote_fix_run_flow.prepare_remote_project_cache") as mock_prep,
-        patch("hermes_workflow.remote_fix_run_flow.check_requirement") as mock_check,
-        patch("hermes_workflow.remote_fix_run_flow.prepare_from_requirement") as mock_prep_req,
         patch("hermes_workflow.remote_fix_run_flow.prepare_explicit_candidate_real_run") as mock_prepare,
         patch("hermes_workflow.remote_fix_run_flow.run_remote_spectre_ocean_adapter") as mock_adapter,
     ):
         mock_doctor.return_value = MagicMock(status="pass", issues=[])
         mock_prep.return_value = _mock_preparation(project_dir)
-        mock_check.return_value = _mock_intake(project_dir)
-        mock_prep_req.return_value = MagicMock(status="pass", issues=[])
         mock_prepare.return_value = MagicMock(
             run_id="real_001",
             run_dir=project_dir / "runs" / "real" / "real_001",
@@ -297,15 +396,11 @@ def test_remote_fix_run_calls_remote_spectre_ocean_per_child(tmp_path: Path) -> 
     with (
         patch("hermes_workflow.remote_fix_run_flow.run_remote_doctor") as mock_doctor,
         patch("hermes_workflow.remote_fix_run_flow.prepare_remote_project_cache") as mock_prep,
-        patch("hermes_workflow.remote_fix_run_flow.check_requirement") as mock_check,
-        patch("hermes_workflow.remote_fix_run_flow.prepare_from_requirement") as mock_prep_req,
         patch("hermes_workflow.remote_fix_run_flow.prepare_explicit_candidate_real_run") as mock_prepare,
         patch("hermes_workflow.remote_fix_run_flow.run_remote_spectre_ocean_adapter") as mock_adapter,
     ):
         mock_doctor.return_value = MagicMock(status="pass", issues=[])
         mock_prep.return_value = _mock_preparation(project_dir)
-        mock_check.return_value = _mock_intake(project_dir)
-        mock_prep_req.return_value = MagicMock(status="pass", issues=[])
         mock_prepare.return_value = MagicMock(
             run_id="real_001",
             run_dir=project_dir / "runs" / "real" / "real_001",
@@ -343,15 +438,11 @@ def test_remote_failure_manifest_preserves_waveform_export_issues(tmp_path: Path
     with (
         patch("hermes_workflow.remote_fix_run_flow.run_remote_doctor") as mock_doctor,
         patch("hermes_workflow.remote_fix_run_flow.prepare_remote_project_cache") as mock_prep,
-        patch("hermes_workflow.remote_fix_run_flow.check_requirement") as mock_check,
-        patch("hermes_workflow.remote_fix_run_flow.prepare_from_requirement") as mock_prep_req,
         patch("hermes_workflow.remote_fix_run_flow.prepare_explicit_candidate_real_run") as mock_prepare,
         patch("hermes_workflow.remote_fix_run_flow.run_remote_spectre_ocean_adapter") as mock_adapter,
     ):
         mock_doctor.return_value = MagicMock(status="pass", issues=[])
         mock_prep.return_value = _mock_preparation(project_dir)
-        mock_check.return_value = _mock_intake(project_dir)
-        mock_prep_req.return_value = MagicMock(status="pass", issues=[])
         mock_prepare.return_value = MagicMock(
             run_id="real_001",
             run_dir=project_dir / "runs" / "real" / "real_001",
@@ -398,9 +489,7 @@ def test_product_cli_remote_real_dispatches_to_remote_fix_run(
     from hermes_workflow import product_cli
 
     runner = CliRunner()
-    project_dir = tmp_path / "project"
-    project_dir.mkdir()
-    (project_dir / "opt_requirement.md").write_text("# requirement\n", encoding="utf-8")
+    project_dir = tmp_path / "controller_cannot_see_remote_project"
 
     remote_fix_run_calls: list[dict[str, object]] = []
 
@@ -420,12 +509,29 @@ def test_product_cli_remote_real_dispatches_to_remote_fix_run(
 
     monkeypatch.setattr(product_cli, "run_remote_fix_run_project", fake_run_remote_fix_run_project)
     monkeypatch.setattr(product_cli, "optimize_remote_project", fail_optimize_remote)
+    monkeypatch.setattr(
+        product_cli,
+        "begin_remote_optimizer_attempt",
+        lambda *args, **kwargs: None,
+    )
 
-    # Mock check_requirement to return fix_run mode
+    monkeypatch.setattr(
+        product_cli,
+        "run_remote_doctor",
+        lambda *a, **kw: SimpleNamespace(
+            status="pass",
+            workflow_mode="fix_run",
+            issues=[],
+        ),
+    )
+
+    # Remote dispatch must never inspect the Controller's same-named path.
     monkeypatch.setattr(
         product_cli,
         "check_requirement",
-        lambda *a, **kw: SimpleNamespace(workflow_mode="fix_run", status="pass"),
+        lambda *a, **kw: pytest.fail(
+            "remote workflow mode must not be read from the Controller filesystem"
+        ),
     )
 
     result = runner.invoke(
@@ -471,8 +577,6 @@ def test_remote_fix_run_report_collects_waveform_artifacts(tmp_path: Path) -> No
     with (
         patch("hermes_workflow.remote_fix_run_flow.run_remote_doctor") as mock_doctor,
         patch("hermes_workflow.remote_fix_run_flow.prepare_remote_project_cache") as mock_prep,
-        patch("hermes_workflow.remote_fix_run_flow.check_requirement") as mock_check,
-        patch("hermes_workflow.remote_fix_run_flow.prepare_from_requirement") as mock_prep_req,
         patch("hermes_workflow.remote_fix_run_flow.build_execution_package") as mock_build,
         patch("hermes_workflow.remote_fix_run_flow.prepare_explicit_candidate_real_run"),
         patch("hermes_workflow.remote_fix_run_flow._collect_child_runs") as mock_children,
@@ -482,8 +586,6 @@ def test_remote_fix_run_report_collects_waveform_artifacts(tmp_path: Path) -> No
     ):
         mock_doctor.return_value = MagicMock(status="pass", issues=[])
         mock_prep.return_value = _mock_preparation(project_dir)
-        mock_check.return_value = _mock_intake(project_dir)
-        mock_prep_req.return_value = MagicMock(status="pass", issues=[])
         mock_build.return_value = MagicMock(status="pass")
         mock_children.return_value = [{"testbench_id": "cg_nf", "corner_id": "tt"}]
         mock_adapter.side_effect = _adapter_side_effect
@@ -557,15 +659,11 @@ def test_remote_fix_run_uses_parallel_jobs_for_child_runs(tmp_path: Path) -> Non
     with (
         patch("hermes_workflow.remote_fix_run_flow.run_remote_doctor") as mock_doctor,
         patch("hermes_workflow.remote_fix_run_flow.prepare_remote_project_cache") as mock_prep,
-        patch("hermes_workflow.remote_fix_run_flow.check_requirement") as mock_check,
-        patch("hermes_workflow.remote_fix_run_flow.prepare_from_requirement") as mock_prep_req,
         patch("hermes_workflow.remote_fix_run_flow.prepare_explicit_candidate_real_run") as mock_prepare,
         patch("hermes_workflow.remote_fix_run_flow.run_remote_spectre_ocean_adapter") as mock_adapter,
     ):
         mock_doctor.return_value = MagicMock(status="pass", issues=[])
         mock_prep.return_value = _mock_preparation(project_dir)
-        mock_check.return_value = _mock_intake(project_dir)
-        mock_prep_req.return_value = MagicMock(status="pass", issues=[])
         mock_prepare.side_effect = prepare_side_effect
         mock_adapter.side_effect = adapter_side_effect
 
@@ -623,15 +721,11 @@ def test_remote_fix_run_parallel_jobs_one_keeps_child_runs_serial(
     with (
         patch("hermes_workflow.remote_fix_run_flow.run_remote_doctor") as mock_doctor,
         patch("hermes_workflow.remote_fix_run_flow.prepare_remote_project_cache") as mock_prep,
-        patch("hermes_workflow.remote_fix_run_flow.check_requirement") as mock_check,
-        patch("hermes_workflow.remote_fix_run_flow.prepare_from_requirement") as mock_prep_req,
         patch("hermes_workflow.remote_fix_run_flow.prepare_explicit_candidate_real_run") as mock_prepare,
         patch("hermes_workflow.remote_fix_run_flow.run_remote_spectre_ocean_adapter") as mock_adapter,
     ):
         mock_doctor.return_value = MagicMock(status="pass", issues=[])
         mock_prep.return_value = _mock_preparation(project_dir)
-        mock_check.return_value = _mock_intake(project_dir)
-        mock_prep_req.return_value = MagicMock(status="pass", issues=[])
         mock_prepare.side_effect = prepare_side_effect
         mock_adapter.side_effect = adapter_side_effect
 
@@ -688,15 +782,11 @@ def test_remote_fix_run_parallel_child_failure_preserved_and_report_fails(
     with (
         patch("hermes_workflow.remote_fix_run_flow.run_remote_doctor") as mock_doctor,
         patch("hermes_workflow.remote_fix_run_flow.prepare_remote_project_cache") as mock_prep,
-        patch("hermes_workflow.remote_fix_run_flow.check_requirement") as mock_check,
-        patch("hermes_workflow.remote_fix_run_flow.prepare_from_requirement") as mock_prep_req,
         patch("hermes_workflow.remote_fix_run_flow.prepare_explicit_candidate_real_run") as mock_prepare,
         patch("hermes_workflow.remote_fix_run_flow.run_remote_spectre_ocean_adapter") as mock_adapter,
     ):
         mock_doctor.return_value = MagicMock(status="pass", issues=[])
         mock_prep.return_value = _mock_preparation(project_dir)
-        mock_check.return_value = _mock_intake(project_dir)
-        mock_prep_req.return_value = MagicMock(status="pass", issues=[])
         mock_prepare.side_effect = prepare_side_effect
         mock_adapter.side_effect = adapter_side_effect
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
+from tempfile import TemporaryDirectory
 from typing import Any
 
 from hermes_workflow.doctor_readiness import (
@@ -40,7 +41,16 @@ class RemoteDoctorReport:
     resource_summary: dict[str, Any]
     dirty_state: dict[str, Any]
     optimizer_progress_summary: dict[str, Any]
+    workflow_mode: str | None
     license_probe: dict[str, Any] = None
+
+
+_REMOTE_PROGRESS_ARTIFACTS = (
+    Path("reports/optimizer_run_report.json"),
+    Path("reports/optimizer_evaluations.jsonl"),
+    Path("state/optimizer_state.json"),
+    Path("ledger/experiment_ledger.jsonl"),
+)
 
 
 def run_remote_doctor(
@@ -59,6 +69,7 @@ def run_remote_doctor(
     issues: list[str] = []
     structured_issues: list[Diagnostic] = []
     requirement_sections: dict[str, Any] = {}
+    workflow_mode: str | None = None
     transport = {
         "mode": "remote",
         "ssh_profile": ref.ssh_profile,
@@ -86,6 +97,7 @@ def run_remote_doctor(
             structured_issues,
             transport=transport,
             requirement_sections=requirement_sections,
+            workflow_mode=workflow_mode,
             cli_max_evals=cli_max_evals,
         )
 
@@ -123,17 +135,23 @@ def run_remote_doctor(
         issues,
         "opt_requirement",
     )
-    constraints_text = _read_optional_remote_text(
-        ssh, ref.remote_project_dir / "constraints.md"
-    )
+    try:
+        constraints_text = _read_optional_remote_text(
+            ssh, ref.remote_project_dir / "constraints.md"
+        )
+    except Exception as exc:
+        constraints_text = None
+        message = f"failed to read remote constraints.md: {exc}"
+        checks["constraints"] = {"status": "fail", "message": message}
+        issues.append(message)
     if requirement_text is not None:
         req_report = parse_requirement_text(
             requirement_text,
             constraints_text=constraints_text,
-            maestro_input_exists=lambda path: ssh.run(
-                f"test -f {quote_remote_path(path)}"
-            ).return_code
-            == 0,
+            maestro_input_exists=lambda path: _remote_requirement_file_exists(
+                ssh,
+                path,
+            ),
         )
         checks["requirement"] = {
             "status": req_report.status,
@@ -144,6 +162,7 @@ def run_remote_doctor(
         requirement_sections = dict(req_report.sections) if isinstance(
             req_report.sections, dict
         ) else {}
+        workflow_mode = req_report.workflow_mode
         _record_parallel_jobs_warning(
             checks,
             req_report,
@@ -211,6 +230,7 @@ def run_remote_doctor(
         structured_issues,
         transport=transport,
         requirement_sections=requirement_sections,
+        workflow_mode=workflow_mode,
         license_probe_report=license_probe_report,
         cli_max_evals=cli_max_evals,
     )
@@ -384,14 +404,61 @@ def _read_required_remote_text(
         return None
 
 
+def _remote_requirement_file_exists(
+    ssh: Any,
+    remote_path: PurePosixPath | str,
+) -> bool:
+    probe = ssh.run(f"test -f {quote_remote_path(remote_path)}")
+    if probe.return_code == 0:
+        return True
+    if probe.return_code == 1:
+        return False
+    raise RuntimeError(
+        f"remote file probe failed for {remote_path}: "
+        f"exit={probe.return_code}: {probe.stderr.strip()}"
+    )
+
+
 def _read_optional_remote_text(
     ssh: Any,
     remote_path: PurePosixPath,
 ) -> str | None:
-    try:
+    probe = ssh.run(f"test -f {quote_remote_path(remote_path)}")
+    if probe.return_code == 0:
         return ssh.read_text(remote_path)
-    except Exception:
+    if probe.return_code == 1:
         return None
+    raise RuntimeError(
+        f"remote file probe failed for {remote_path}: "
+        f"exit={probe.return_code}: {probe.stderr.strip()}"
+    )
+
+
+def _build_remote_optimizer_progress_summary(
+    ref: RemoteProjectRef,
+    ssh: Any,
+    *,
+    requirement_max_evaluations: int | None,
+) -> tuple[dict[str, Any], list[Diagnostic]]:
+    with TemporaryDirectory(prefix="ic-opt-remote-doctor-") as temp_dir:
+        snapshot_dir = Path(temp_dir)
+        for relative in _REMOTE_PROGRESS_ARTIFACTS:
+            remote_path = ref.remote_project_dir / relative.as_posix()
+            probe = ssh.run(f"test -f {quote_remote_path(remote_path)}")
+            if probe.return_code == 1:
+                continue
+            if probe.return_code != 0:
+                raise RuntimeError(
+                    f"remote progress probe failed for {remote_path}: "
+                    f"exit={probe.return_code}: {probe.stderr.strip()}"
+                )
+            local_path = snapshot_dir / relative
+            local_path.parent.mkdir(parents=True, exist_ok=True)
+            local_path.write_text(ssh.read_text(remote_path), encoding="utf-8")
+        return build_optimizer_progress_summary(
+            snapshot_dir,
+            requirement_max_evaluations=requirement_max_evaluations,
+        )
 
 
 def _write_doctor(
@@ -404,6 +471,7 @@ def _write_doctor(
     *,
     transport: dict[str, Any],
     requirement_sections: dict[str, Any],
+    workflow_mode: str | None,
     cli_max_evals: int | None,
     license_probe_report: LicenseProbeReport | None = None,
 ) -> RemoteDoctorReport:
@@ -423,16 +491,45 @@ def _write_doctor(
             issues.append(f"{diagnostic.code}: {message}")
     dirty_state, dirty_diagnostics = _build_remote_dirty_state(ref, ssh)
     structured_issues.extend(dirty_diagnostics)
-    cache_dir = local_report_path.parent.parent
     requirement_max_evaluations: int | None = None
     if isinstance(optimizer_summary, dict):
         candidate = optimizer_summary.get("max_evaluations")
         if isinstance(candidate, int):
             requirement_max_evaluations = candidate
-    optimizer_progress_summary, progress_diagnostics = build_optimizer_progress_summary(
-        cache_dir,
-        requirement_max_evaluations=requirement_max_evaluations,
-    )
+    try:
+        optimizer_progress_summary, progress_diagnostics = (
+            _build_remote_optimizer_progress_summary(
+                ref,
+                ssh,
+                requirement_max_evaluations=requirement_max_evaluations,
+            )
+        )
+    except Exception as exc:
+        optimizer_progress_summary = {
+            "report_evaluation_count": None,
+            "evaluation_trace_count": 0,
+            "state_current_evaluations": None,
+            "state_recorded_observation_count": None,
+            "ledger_row_count": 0,
+            "failed_evaluation_count": None,
+            "status_counts": None,
+        }
+        progress_diagnostics = [
+            Diagnostic(
+                code="REMOTE_PROGRESS_SNAPSHOT_FAILED",
+                severity=DiagnosticSeverity.ERROR,
+                stage="remote_ssh",
+                component="remote_doctor",
+                message="Unable to materialize remote optimizer progress.",
+                detail=str(exc),
+                likely_cause="Remote optimizer progress artifacts could not be read over SSH.",
+                recommended_action="Restore SSH access and rerun remote doctor.",
+                evidence=[
+                    str(ref.remote_project_dir / relative.as_posix())
+                    for relative in _REMOTE_PROGRESS_ARTIFACTS
+                ],
+            )
+        ]
     for diagnostic in progress_diagnostics:
         structured_issues.append(diagnostic)
         if diagnostic.severity is DiagnosticSeverity.ERROR:
@@ -449,6 +546,7 @@ def _write_doctor(
         "status": status,
         "ssh_profile": ref.ssh_profile,
         "remote_project_dir": str(ref.remote_project_dir),
+        "workflow_mode": workflow_mode,
         "checks": checks,
         "issues": issues,
         "structured_issues": [diagnostic.model_dump() for diagnostic in structured_issues],
@@ -463,13 +561,41 @@ def _write_doctor(
     }
     report_json = json.dumps(payload, indent=2, sort_keys=True) + "\n"
 
-    # Write to remote
-    ssh.mkdir(ref.remote_reports_dir)
-    ssh.write_text(ref.remote_doctor_report, report_json)
-
-    # Write to local cache
+    # Preserve the Controller-side diagnostic before attempting a remote write.
     local_report_path.parent.mkdir(parents=True, exist_ok=True)
     local_report_path.write_text(report_json, encoding="utf-8")
+
+    try:
+        ssh.mkdir(ref.remote_reports_dir)
+        ssh.write_text(ref.remote_doctor_report, report_json)
+    except Exception as exc:
+        message = f"failed to write remote doctor report: {exc}"
+        diagnostic = Diagnostic(
+            code="REMOTE_DOCTOR_REPORT_WRITE_FAILED",
+            severity=DiagnosticSeverity.ERROR,
+            stage="remote_ssh",
+            component="remote_doctor",
+            message="Unable to publish the remote doctor report.",
+            detail=message,
+            likely_cause="The SSH transport failed while writing the report.",
+            recommended_action="Restore SSH write access and rerun remote doctor.",
+            evidence=[str(ref.remote_doctor_report)],
+        )
+        structured_issues.append(diagnostic)
+        checks["remote_doctor_report_write"] = {
+            "status": "fail",
+            "message": message,
+        }
+        issues.append(message)
+        status = "fail"
+        payload["status"] = status
+        payload["checks"] = checks
+        payload["issues"] = issues
+        payload["structured_issues"] = [
+            item.model_dump() for item in structured_issues
+        ]
+        report_json = json.dumps(payload, indent=2, sort_keys=True) + "\n"
+        local_report_path.write_text(report_json, encoding="utf-8")
 
     return RemoteDoctorReport(
         status=status,
@@ -487,6 +613,7 @@ def _write_doctor(
         resource_summary=resource_summary,
         dirty_state=dirty_state,
         optimizer_progress_summary=optimizer_progress_summary,
+        workflow_mode=workflow_mode,
         license_probe=license_probe_dict,
     )
 

@@ -7,10 +7,12 @@ from pathlib import Path, PurePosixPath
 from types import SimpleNamespace
 
 import yaml
+import pytest
 
 from hermes_workflow.approvals import decide_first_real_run
 from hermes_workflow.dry_run import run_dry_run
 from hermes_workflow.execution_adapters.remote_spectre_ocean import (
+    _safe_upload,
     run_remote_multi_testbench_adapter,
     run_remote_spectre_ocean_adapter,
 )
@@ -545,6 +547,63 @@ def test_remote_adapter_spectre_runtime_error_still_writes_local_failure_manifes
     assert "spectre command failed with exception" in (run_dir / "spectre.stdout").read_text(encoding="utf-8")
 
 
+def test_remote_adapter_spectre_runtime_error_publishes_diagnostics_before_failure_marker(
+    tmp_path: Path,
+) -> None:
+    project_dir = create_approved_real_project(tmp_path)
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    runner = RunExceptionFakeRunner("spectre")
+
+    run_remote_spectre_ocean_adapter(
+        project_dir,
+        run_id="real_001",
+        remote_ref=ref,
+        remote_cadence_cshrc=PurePosixPath(
+            "/remote/project/cadence_env.csh"
+        ),
+        runner=runner,
+    )
+
+    remote_run_dir = PurePosixPath("/remote/project/runs/real/real_001")
+    published_files = [
+        PurePosixPath(remote).relative_to(remote_run_dir).as_posix()
+        for _local, remote in runner.uploads
+        if PurePosixPath(remote) != remote_run_dir
+    ]
+    assert published_files == [
+        "spectre.stdout",
+        "spectre.stderr",
+        "result_manifest.json",
+    ]
+
+
+def test_remote_adapter_does_not_publish_failure_marker_with_missing_diagnostic(
+    tmp_path: Path,
+) -> None:
+    project_dir = create_approved_real_project(tmp_path)
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    runner = RunExceptionUploadFailingFakeRunner(
+        fail_on_substring="spectre",
+        fail_upload_on_substring="spectre.stdout",
+    )
+
+    result = run_remote_spectre_ocean_adapter(
+        project_dir,
+        run_id="real_001",
+        remote_ref=ref,
+        remote_cadence_cshrc=PurePosixPath(
+            "/remote/project/cadence_env.csh"
+        ),
+        runner=runner,
+    )
+
+    assert any("failed to upload spectre stdout" in issue for issue in result.issues)
+    assert not any(
+        remote.endswith("result_manifest.json")
+        for _local, remote in runner.uploads
+    )
+
+
 def test_remote_adapter_upload_failure_does_not_prevent_local_manifest(tmp_path: Path) -> None:
     project_dir = create_approved_real_project(tmp_path)
     run_dir = project_dir / "runs" / "real" / "real_001"
@@ -567,6 +626,54 @@ def test_remote_adapter_upload_failure_does_not_prevent_local_manifest(tmp_path:
     manifest = json.loads((run_dir / "result_manifest.json").read_text(encoding="utf-8"))
     assert manifest["status"] == "failed"
     assert any("failed to upload result manifest" in issue for issue in result.issues)
+
+
+def test_remote_success_artifact_upload_failure_is_not_silenced(
+    tmp_path: Path,
+) -> None:
+    local_artifact = tmp_path / "result_manifest.json"
+    local_artifact.write_text("{}\n", encoding="utf-8")
+
+    class BrokenUploadRunner:
+        def upload(self, local_path, remote_path) -> None:
+            raise RuntimeError("scp failed")
+
+    with pytest.raises(RuntimeError, match="failed to upload result manifest"):
+        _safe_upload(
+            BrokenUploadRunner(),
+            local_artifact,
+            PurePosixPath("/remote/project/result_manifest.json"),
+            prefix="result manifest",
+        )
+
+
+def test_remote_adapter_manifest_upload_failure_returns_failed_report(
+    tmp_path: Path,
+) -> None:
+    project_dir = create_approved_real_project(tmp_path)
+    run_dir = project_dir / "runs" / "real" / "real_001"
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    runner = UploadFailingFakeRunner("metric_result_manifest.json")
+
+    result = run_remote_spectre_ocean_adapter(
+        project_dir,
+        run_id="real_001",
+        remote_ref=ref,
+        remote_cadence_cshrc=PurePosixPath(
+            "/remote/project/cadence_env.csh"
+        ),
+        runner=runner,
+    )
+
+    assert result.status == "failed"
+    assert any(
+        "failed to upload metric result manifest" in issue
+        for issue in result.issues
+    )
+    manifest = json.loads(
+        (run_dir / "result_manifest.json").read_text(encoding="utf-8")
+    )
+    assert manifest["status"] == "failed"
 
 
 def test_remote_adapter_download_exception_still_writes_local_manifest(tmp_path: Path) -> None:
@@ -829,12 +936,6 @@ def test_remote_multi_testbench_adapter_runs_each_child(tmp_path: Path) -> None:
     for cmd in ocean_cmds:
         assert "testbenches/" in cmd
         assert "metric_probe.ocn" in cmd
-    aggregate_uploads = [
-        (local, remote) for local, remote in runner.uploads
-        if str(remote).endswith("result_manifest.json")
-        and "/testbenches/" not in str(remote)
-    ]
-    assert len(aggregate_uploads) >= 1
     child_result_uploads = [
         (local, remote) for local, remote in runner.uploads
         if "/testbenches/" in str(remote) and str(remote).endswith("/result_manifest.json")
@@ -1051,8 +1152,10 @@ def test_remote_multi_testbench_adapter_child_failure_reports_issues(tmp_path: P
     assert any("iip3" in issue for issue in result.issues)
 
 
-def test_remote_multi_testbench_adapter_aggregates_upload(tmp_path: Path) -> None:
-    """Verify aggregate result_manifest and metric_result_manifest are uploaded."""
+def test_remote_multi_testbench_adapter_defers_parent_completion_markers(
+    tmp_path: Path,
+) -> None:
+    """Parent manifests stay local until final flow publication verifies dependencies."""
     from tests.test_multi_testbench_aggregation import _create_ready_multi_testbench_project
 
     project_dir = _create_ready_multi_testbench_project(tmp_path)
@@ -1072,17 +1175,20 @@ def test_remote_multi_testbench_adapter_aggregates_upload(tmp_path: Path) -> Non
         runner=runner,
     )
 
+    run_dir = project_dir / "runs" / "real" / "real_001"
+    assert (run_dir / "result_manifest.json").is_file()
+    assert (run_dir / "metrics" / "metric_result_manifest.json").is_file()
+
     remote_run_dir = "/remote/project/runs/real/real_001"
-    result_uploads = [
-        r for _, r in runner.uploads
-        if r == f"{remote_run_dir}/result_manifest.json"
+    assert not [
+        remote
+        for _, remote in runner.uploads
+        if remote
+        in {
+            f"{remote_run_dir}/result_manifest.json",
+            f"{remote_run_dir}/metrics/metric_result_manifest.json",
+        }
     ]
-    assert len(result_uploads) >= 1
-    metric_uploads = [
-        r for _, r in runner.uploads
-        if r == f"{remote_run_dir}/metrics/metric_result_manifest.json"
-    ]
-    assert len(metric_uploads) >= 1
 
 
 def test_remote_adapter_writes_ocean_script_under_project_dir_not_cwd(tmp_path: Path) -> None:
@@ -1642,6 +1748,7 @@ def test_remote_success_result_manifest_has_command_trace(tmp_path: Path) -> Non
     # command is the sanitized shell-joined body (no csh wrapper, no cshrc)
     assert isinstance(spectre_trace["command"], str)
     assert "spectre" in spectre_trace["command"]
+    assert spectre_trace["cwd"] == "/remote/project/runs/real/real_001/netlist"
     # Must not leak cshrc content or raw SSH command
     assert "source" not in spectre_trace["command"]
     assert "ssh" not in spectre_trace["command"]
@@ -1679,6 +1786,7 @@ def test_remote_success_metric_manifest_has_command_trace(tmp_path: Path) -> Non
     assert ocean_trace["timeout_s"] > 0
     assert isinstance(ocean_trace["command"], str)
     assert "ocean" in ocean_trace["command"]
+    assert ocean_trace["cwd"] == "/remote/project"
     # Must not leak cshrc content or raw SSH command
     assert "source" not in ocean_trace["command"]
     assert "ssh" not in ocean_trace["command"]
