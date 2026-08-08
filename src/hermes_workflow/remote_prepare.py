@@ -513,27 +513,97 @@ def _validate_remote_netlist_symlinks(
     escaped_netlist = shlex.quote(str(remote_netlist))
     escaped_root = shlex.quote(str(allowed_root))
     script = (
-        f"root=$(readlink -f {escaped_root})\n"
-        f"net=$(readlink -f {escaped_netlist})\n"
-        f"bad=$(find \"$net\" -type l -exec sh -c '\n"
-        f"  root=\"$1\"; shift\n"
-        f"  for f; do\n"
-        f"    r=$(readlink -f \"$f\") || {{ printf \"%s\\n\" \"$f\"; continue; }}\n"
-        f"    if [ ! -f \"$r\" ]; then printf \"%s\\n\" \"$f\"; continue; fi\n"
-        f"    case \"$r\" in\n"
-        f"      \"$root\") ;;\n"
-        f"      \"$root\"/*) ;;\n"
-        f"      *) printf \"%s\\n\" \"$f\";;\n"
-        f"    esac\n"
-        f"  done\n"
-        f"' _ \"$root\" {{}} +)\n"
-        f"if [ -n \"$bad\" ]; then printf '%s\\n' \"$bad\"; exit 1; fi\n"
+        f"root=$(readlink -e -- {escaped_root})\n"
+        "if [ -z \"$root\" ] || [ ! -d \"$root\" ]; then\n"
+        "  printf 'allowed Maestro root cannot be resolved\\n'\n"
+        "  exit 1\n"
+        "fi\n"
+        f"net=$(readlink -e -- {escaped_netlist})\n"
+        "if [ -z \"$net\" ] || [ ! -d \"$net\" ]; then\n"
+        "  printf 'remote netlist root cannot be resolved\\n'\n"
+        "  exit 1\n"
+        "fi\n"
+        "case \"$net\" in\n"
+        "  \"$root\"|\"$root\"/*) ;;\n"
+        "  *) printf 'netlist root escapes Maestro point root: %s\\n' \"$net\"; exit 1 ;;\n"
+        "esac\n"
+        "validate_path() {\n"
+        "  (\n"
+        "    path=$1\n"
+        "    ancestors=$2\n"
+        "    if [ -L \"$path\" ]; then\n"
+        "      resolved=$(readlink -e -- \"$path\")\n"
+        "      if [ -z \"$resolved\" ]; then\n"
+        "        printf 'symlink target is missing or cyclic: %s\\n' \"$path\"\n"
+        "        exit 1\n"
+        "      fi\n"
+        "      case \"$resolved\" in\n"
+        "        \"$root\"|\"$root\"/*) ;;\n"
+        "        *) printf 'symlink target escapes Maestro point root: %s\\n' \"$path\"; exit 1 ;;\n"
+        "      esac\n"
+        "      if [ -f \"$resolved\" ]; then exit 0; fi\n"
+        "      if [ -d \"$resolved\" ]; then\n"
+        "        validate_dir \"$resolved\" \"$ancestors\" \"$path\"\n"
+        "        exit $?\n"
+        "      fi\n"
+        "      printf 'symlink target is not a regular file or directory: %s\\n' \"$path\"\n"
+        "      exit 1\n"
+        "    fi\n"
+        "    if [ -f \"$path\" ]; then exit 0; fi\n"
+        "    if [ -d \"$path\" ]; then\n"
+        "      validate_dir \"$path\" \"$ancestors\" \"$path\"\n"
+        "      exit $?\n"
+        "    fi\n"
+        "    printf 'netlist entry is not a regular file or directory: %s\\n' \"$path\"\n"
+        "    exit 1\n"
+        "  )\n"
+        "}\n"
+        "validate_dir() {\n"
+        "  (\n"
+        "    directory=$(readlink -e -- \"$1\")\n"
+        "    ancestors=$2\n"
+        "    display_path=$3\n"
+        "    if [ -z \"$directory\" ] || [ ! -r \"$directory\" ] || [ ! -x \"$directory\" ]; then\n"
+        "      printf 'netlist directory cannot be traversed: %s\\n' \"$display_path\"\n"
+        "      exit 1\n"
+        "    fi\n"
+        "    if ! inode=$(stat -Lc '%d:%i' -- \"$directory\"); then\n"
+        "      printf 'netlist directory identity cannot be read: %s\\n' \"$display_path\"\n"
+        "      exit 1\n"
+        "    fi\n"
+        "    case \" $ancestors \" in\n"
+        "      *\" $inode \"*) printf 'symlink directory cycle detected: %s\\n' \"$display_path\"; exit 1 ;;\n"
+        "    esac\n"
+        "    next_ancestors=\"$ancestors $inode\"\n"
+        "    status=0\n"
+        "    for child in \"$directory\"/* \"$directory\"/.[!.]* \"$directory\"/..?*; do\n"
+        "      if [ ! -e \"$child\" ] && [ ! -L \"$child\" ]; then continue; fi\n"
+        "      validate_path \"$child\" \"$next_ancestors\" || status=1\n"
+        "    done\n"
+        "    exit \"$status\"\n"
+        "  )\n"
+        "}\n"
+        "validate_dir \"$net\" '' \"$net\"\n"
     )
-    result = runner.run(script, check=True)
+    result = runner.run(script)
+    details = "\n".join(
+        part.strip()
+        for part in (result.stdout, result.stderr)
+        if part.strip()
+    )
+    if result.return_code == 255:
+        if not details:
+            details = "ssh exited 255"
+        raise RuntimeError(
+            "remote netlist symlink validation transport failed: " + details
+        )
     if result.return_code != 0:
-        details = result.stderr.strip().split("symlink validation failed:\n")
-        issues = [f"  {line}" for line in (details[1] if len(details) > 1 else details[0]).strip().splitlines()]
-        raise RuntimeError("remote netlist symlink validation failed:\n" + "\n".join(issues))
+        if not details:
+            details = f"remote validation command exited {result.return_code}"
+        issues = [f"  {line}" for line in details.splitlines()]
+        raise RuntimeError(
+            "remote netlist symlink validation failed:\n" + "\n".join(issues)
+        )
 
 
 def _download_remote_netlists(cache_dir: Path, sections: dict[str, object], runner: Any) -> None:

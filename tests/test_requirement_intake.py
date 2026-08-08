@@ -5,6 +5,7 @@ import os
 import shutil
 from pathlib import Path
 
+import pytest
 import yaml
 from typer.testing import CliRunner
 
@@ -670,6 +671,32 @@ def test_import_maestro_point_materializes_history_root_symlink(tmp_path: Path) 
     assert copied.read_text(encoding="utf-8") == "maestro history sidecar\n"
 
 
+def test_import_maestro_point_materializes_real_maestro_directory_symlink(
+    tmp_path: Path,
+) -> None:
+    project_dir = tmp_path / "project"
+    history_root = tmp_path / "Interactive.40"
+    point = history_root / "1" / "test_point"
+    shutil.copytree(VALID_MAESTRO_POINT / "netlist", point / "netlist")
+    target = history_root / "psf" / point.name / "netlist" / "ihnl"
+    target.mkdir(parents=True)
+    (target / "models.scs").write_text("include models\n", encoding="utf-8")
+    os.symlink(
+        f"../../../psf/{point.name}/netlist/ihnl",
+        point / "netlist" / "ihnl",
+        target_is_directory=True,
+    )
+
+    report = import_maestro_point_netlist(project_dir, point)
+
+    copied = project_dir / "netlists" / "exported" / "ihnl"
+    assert report.status == "pass", report.issues
+    assert (copied / "models.scs").read_text(encoding="utf-8") == "include models\n"
+    assert copied.is_dir()
+    assert not copied.is_symlink()
+    assert report.materialized_symlink_count == 1
+
+
 def test_import_maestro_point_rejects_unsafe_symlink(tmp_path: Path) -> None:
     project_dir = tmp_path / "project"
     point = _copy_maestro_point(tmp_path)
@@ -684,17 +711,143 @@ def test_import_maestro_point_rejects_unsafe_symlink(tmp_path: Path) -> None:
     assert not (project_dir / "netlists" / "exported").exists()
 
 
-def test_import_maestro_point_rejects_directory_symlink(tmp_path: Path) -> None:
+def test_import_maestro_point_materializes_safe_directory_symlink(
+    tmp_path: Path,
+) -> None:
     project_dir = tmp_path / "project"
     point = _copy_maestro_point(tmp_path)
     target_dir = point / "shared_dir"
     target_dir.mkdir()
+    (target_dir / "models.scs").write_text("include models\n", encoding="utf-8")
+    (target_dir / "empty").mkdir()
+    (target_dir / "shared_model.scs").write_text("shared model\n", encoding="utf-8")
+    os.symlink("shared_model.scs", target_dir / "model_link.scs")
+    os.symlink("../shared_dir", point / "netlist" / "dir_link")
+
+    report = import_maestro_point_netlist(project_dir, point)
+
+    copied = project_dir / "netlists" / "exported" / "dir_link"
+    assert report.status == "pass", report.issues
+    assert copied.is_dir()
+    assert not copied.is_symlink()
+    assert (copied / "models.scs").read_text(encoding="utf-8") == "include models\n"
+    assert (copied / "empty").is_dir()
+    assert (copied / "model_link.scs").read_text(encoding="utf-8") == "shared model\n"
+    assert not (copied / "model_link.scs").is_symlink()
+    assert report.materialized_symlink_count == 2
+
+
+def test_import_maestro_point_materializes_two_directory_aliases(
+    tmp_path: Path,
+) -> None:
+    project_dir = tmp_path / "project"
+    point = _copy_maestro_point(tmp_path)
+    target_dir = point / "shared_dir"
+    target_dir.mkdir()
+    (target_dir / "models.scs").write_text("include models\n", encoding="utf-8")
+    os.symlink("../shared_dir", point / "netlist" / "first_alias")
+    os.symlink("../shared_dir", point / "netlist" / "second_alias")
+
+    report = import_maestro_point_netlist(project_dir, point)
+
+    assert report.status == "pass", report.issues
+    for alias in ("first_alias", "second_alias"):
+        copied = project_dir / "netlists" / "exported" / alias
+        assert (copied / "models.scs").read_text(encoding="utf-8") == "include models\n"
+        assert not copied.is_symlink()
+    assert report.materialized_symlink_count == 2
+
+
+def test_import_maestro_point_rejects_nested_escape_without_replacing_destination(
+    tmp_path: Path,
+) -> None:
+    project_dir = tmp_path / "project"
+    existing = project_dir / "netlists" / "exported"
+    existing.mkdir(parents=True)
+    (existing / "keep.scs").write_text("keep\n", encoding="utf-8")
+    point = _copy_maestro_point(tmp_path)
+    target_dir = point / "shared_dir"
+    target_dir.mkdir()
+    outside = tmp_path / "outside.scs"
+    outside.write_text("escape\n", encoding="utf-8")
+    os.symlink(outside, target_dir / "escape.scs")
     os.symlink("../shared_dir", point / "netlist" / "dir_link")
 
     report = import_maestro_point_netlist(project_dir, point)
 
     assert report.status == "fail"
-    assert any("symlink target is not a regular file" in issue for issue in report.issues)
+    assert report.issues == [
+        "symlink target escapes Maestro point root: dir_link/escape.scs"
+    ]
+    assert (existing / "keep.scs").read_text(encoding="utf-8") == "keep\n"
+
+
+def test_import_maestro_point_rejects_broken_symlink(tmp_path: Path) -> None:
+    project_dir = tmp_path / "project"
+    point = _copy_maestro_point(tmp_path)
+    os.symlink("../missing.scs", point / "netlist" / "broken.scs")
+
+    report = import_maestro_point_netlist(project_dir, point)
+
+    assert report.status == "fail"
+    assert report.issues == ["symlink target is missing: broken.scs"]
+    assert not (project_dir / "netlists" / "exported").exists()
+
+
+def test_import_maestro_point_rejects_directory_symlink_cycle(tmp_path: Path) -> None:
+    project_dir = tmp_path / "project"
+    point = _copy_maestro_point(tmp_path)
+    target_dir = point / "shared_dir"
+    target_dir.mkdir()
+    os.symlink(".", target_dir / "loop")
+    os.symlink("../shared_dir", point / "netlist" / "dir_link")
+
+    report = import_maestro_point_netlist(project_dir, point)
+
+    assert report.status == "fail"
+    assert report.issues == ["symlink cycle detected: dir_link/loop"]
+    assert not (project_dir / "netlists" / "exported").exists()
+
+
+@pytest.mark.parametrize("through_symlink", [False, True])
+def test_import_maestro_point_rejects_fifo(
+    tmp_path: Path,
+    through_symlink: bool,
+) -> None:
+    project_dir = tmp_path / "project"
+    point = _copy_maestro_point(tmp_path)
+    fifo = point / ("shared.pipe" if through_symlink else "netlist/direct.pipe")
+    os.mkfifo(fifo)
+    if through_symlink:
+        os.symlink("../shared.pipe", point / "netlist" / "linked.pipe")
+
+    report = import_maestro_point_netlist(project_dir, point)
+
+    assert report.status == "fail"
+    expected = (
+        "symlink target is not a regular file or directory: linked.pipe"
+        if through_symlink
+        else "netlist entry is not a regular file or directory: direct.pipe"
+    )
+    assert report.issues == [expected]
+    assert not (project_dir / "netlists" / "exported").exists()
+
+
+def test_import_maestro_point_rejects_netlist_root_symlink_escape(
+    tmp_path: Path,
+) -> None:
+    project_dir = tmp_path / "project"
+    point = tmp_path / "point"
+    point.mkdir()
+    outside_netlist = tmp_path / "outside_netlist"
+    shutil.copytree(VALID_MAESTRO_POINT / "netlist", outside_netlist)
+    os.symlink(outside_netlist, point / "netlist", target_is_directory=True)
+
+    report = import_maestro_point_netlist(project_dir, point)
+
+    assert report.status == "fail"
+    assert report.issues == ["symlink target escapes Maestro point root: ."]
+    assert not (project_dir / "netlists" / "exported").exists()
 
 
 def test_prepare_from_requirement_writes_template_from_imported_netlist(tmp_path: Path) -> None:

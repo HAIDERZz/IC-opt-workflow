@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path, PurePosixPath
 
 import shlex
 import shutil
+import subprocess
 
 import pytest
 import yaml
@@ -48,6 +50,49 @@ class FakeRunner:
         )
 
 
+class LocalFilesystemRunner:
+    """Exercise remote shell validation against an isolated local fixture."""
+
+    def __init__(self) -> None:
+        self.downloads: list[tuple[Path, Path]] = []
+
+    def read_text(self, remote_path: PurePosixPath | str) -> str:
+        return Path(remote_path).read_text(encoding="utf-8")
+
+    def run(self, command: str, **kwargs: object) -> RemoteCommandResult:
+        completed = subprocess.run(
+            ["sh", "-c", command],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        return RemoteCommandResult(
+            completed.returncode,
+            completed.stdout,
+            completed.stderr,
+            ["sh", "-c", command],
+        )
+
+    def download_tree(
+        self,
+        remote_path: PurePosixPath | str,
+        local_path: Path,
+        include: str | None = None,
+        exclude: str | None = None,
+        dereference: bool = False,
+    ) -> None:
+        assert include is None
+        assert exclude is None
+        assert dereference is True
+        self.downloads.append((Path(remote_path), local_path))
+        shutil.copytree(
+            Path(remote_path),
+            local_path,
+            symlinks=False,
+            dirs_exist_ok=True,
+        )
+
+
 class MaestroProbeRunner(FakeRunner):
     def __init__(self, return_code: int, stderr: str = "") -> None:
         super().__init__()
@@ -82,7 +127,6 @@ def test_prepare_remote_project_cache_writes_local_controller_project(tmp_path: 
     assert runner.downloads == [
         ("/remote/maestro/point_1/netlist", result.cache_dir / "netlists" / "exported")
     ]
-    assert any("readlink -f" in cmd and "netlist" in cmd for cmd in runner.commands_run)
 
 
 @pytest.mark.parametrize(
@@ -398,8 +442,9 @@ def test_prepare_remote_project_cache_quotes_paths_with_spaces(tmp_path: Path) -
     assert any(shlex.quote("/remote/maestro/my point 1/netlist") in cmd for cmd in runner.commands_run)
 
 
-def test_prepare_remote_project_cache_validates_symlinks_before_download(tmp_path: Path) -> None:
-    """Symlink validation must run on the remote host before download_tree."""
+def test_prepare_remote_project_cache_downloads_netlists_with_dereference(
+    tmp_path: Path,
+) -> None:
     ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
     dereference_values: list[bool] = []
 
@@ -413,7 +458,6 @@ def test_prepare_remote_project_cache_validates_symlinks_before_download(tmp_pat
 
     assert result.status == "pass"
     assert all(v is True for v in dereference_values)
-    assert any("readlink -f" in cmd and "netlist" in cmd for cmd in runner.commands_run)
 
 
 def test_prepare_remote_project_cache_real_maestro_symlink_shape(tmp_path: Path) -> None:
@@ -436,19 +480,210 @@ def test_prepare_remote_project_cache_real_maestro_symlink_shape(tmp_path: Path)
     assert any(shlex.quote("/remote/maestro/point_1/netlist") in cmd for cmd in runner.commands_run)
 
 
-def test_prepare_remote_project_cache_validation_searches_netlist_not_allowed_root(tmp_path: Path) -> None:
-    """Validation must find symlinks under remote_netlist, not under allowed_root."""
-    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
-    runner = FakeRunner()
+def _local_remote_fixture(
+    tmp_path: Path,
+) -> tuple[Path, Path, RemoteProjectRef, LocalFilesystemRunner]:
+    history_root = tmp_path / "Interactive.1"
+    point = history_root / "1" / "test_point"
+    shutil.copytree(
+        Path("tests/fixtures/requirement_intake/valid_maestro_point/netlist"),
+        point / "netlist",
+    )
 
-    result = prepare_remote_project_cache(ref, runner=runner, cache_root=tmp_path)
+    remote_project = tmp_path / "remote_project"
+    remote_project.mkdir()
+    (remote_project / "opt_requirement.md").write_text(
+        VALID_REQUIREMENT.replace("/remote/maestro/point_1", point.as_posix()),
+        encoding="utf-8",
+    )
+    ref = RemoteProjectRef(
+        "local-fixture",
+        PurePosixPath(remote_project.as_posix()),
+    )
+    return history_root, point, ref, LocalFilesystemRunner()
 
-    assert result.status == "pass"
-    netlist_quoted = shlex.quote("/remote/maestro/point_1/netlist")
-    # The find command must target the netlist path
-    assert any(netlist_quoted in cmd and "find" in cmd for cmd in runner.commands_run)
-    # The readlink -f must resolve the netlist path
-    assert any(f"readlink -f {netlist_quoted}" in cmd for cmd in runner.commands_run)
+
+def test_prepare_remote_project_cache_materializes_safe_file_and_directory_symlinks(
+    tmp_path: Path,
+) -> None:
+    history_root, point, ref, runner = _local_remote_fixture(tmp_path)
+    remote_directory = history_root / "psf" / point.name / "netlist" / "ihnl"
+    remote_directory.mkdir(parents=True)
+    (remote_directory / "models.scs").write_text("include models\n", encoding="utf-8")
+    (point / "netlist" / "ihnl").symlink_to(
+        f"../../../psf/{point.name}/netlist/ihnl",
+        target_is_directory=True,
+    )
+    shared_log = history_root / "exprOutputs.log.1"
+    shared_log.write_text("maestro history sidecar\n", encoding="utf-8")
+    (point / "netlist" / "exprOutputs.log").symlink_to(
+        "../../../exprOutputs.log.1",
+    )
+
+    result = prepare_remote_project_cache(
+        ref,
+        runner=runner,
+        cache_root=tmp_path / "controller_cache",
+    )
+
+    exported = result.cache_dir / "netlists" / "exported"
+    materialized = exported / "ihnl"
+    assert result.status == "pass", result.issues
+    assert materialized.is_dir()
+    assert not materialized.is_symlink()
+    assert (materialized / "models.scs").read_text(encoding="utf-8") == "include models\n"
+    assert (exported / "exprOutputs.log").read_text(encoding="utf-8") == (
+        "maestro history sidecar\n"
+    )
+    assert not (exported / "exprOutputs.log").is_symlink()
+
+
+def test_prepare_remote_project_cache_ignores_unreachable_symlink_under_allowed_root(
+    tmp_path: Path,
+) -> None:
+    history_root, _point, ref, runner = _local_remote_fixture(tmp_path)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "unrelated.txt").write_text("not in netlist\n", encoding="utf-8")
+    (history_root / "unreachable").symlink_to(outside, target_is_directory=True)
+
+    result = prepare_remote_project_cache(
+        ref,
+        runner=runner,
+        cache_root=tmp_path / "controller_cache",
+    )
+
+    assert result.status == "pass", result.issues
+    assert len(runner.downloads) == 1
+
+
+def test_prepare_remote_project_cache_rejects_real_escaping_directory_symlink(
+    tmp_path: Path,
+) -> None:
+    _history_root, point, ref, runner = _local_remote_fixture(tmp_path)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "external.scs").write_text("external\n", encoding="utf-8")
+    (point / "netlist" / "escape").symlink_to(
+        outside,
+        target_is_directory=True,
+    )
+
+    result = prepare_remote_project_cache(
+        ref,
+        runner=runner,
+        cache_root=tmp_path / "controller_cache",
+    )
+
+    assert result.status == "fail"
+    assert any("symlink target escapes Maestro point root" in issue for issue in result.issues)
+    assert runner.downloads == []
+
+
+def test_prepare_remote_project_cache_rejects_nested_escaping_symlink(
+    tmp_path: Path,
+) -> None:
+    history_root, point, ref, runner = _local_remote_fixture(tmp_path)
+    linked_directory = history_root / "psf" / "ihnl"
+    linked_directory.mkdir(parents=True)
+    outside = tmp_path / "outside.scs"
+    outside.write_text("external\n", encoding="utf-8")
+    (linked_directory / "nested_escape.scs").symlink_to(outside)
+    (point / "netlist" / "ihnl").symlink_to(
+        linked_directory,
+        target_is_directory=True,
+    )
+
+    result = prepare_remote_project_cache(
+        ref,
+        runner=runner,
+        cache_root=tmp_path / "controller_cache",
+    )
+
+    assert result.status == "fail"
+    assert any("symlink target escapes Maestro point root" in issue for issue in result.issues)
+    assert runner.downloads == []
+
+
+def test_prepare_remote_project_cache_rejects_broken_symlink(
+    tmp_path: Path,
+) -> None:
+    _history_root, point, ref, runner = _local_remote_fixture(tmp_path)
+    (point / "netlist" / "broken.scs").symlink_to("missing.scs")
+
+    result = prepare_remote_project_cache(
+        ref,
+        runner=runner,
+        cache_root=tmp_path / "controller_cache",
+    )
+
+    assert result.status == "fail"
+    assert any("symlink target is missing or cyclic" in issue for issue in result.issues)
+    assert runner.downloads == []
+
+
+def test_prepare_remote_project_cache_rejects_directory_symlink_cycle(
+    tmp_path: Path,
+) -> None:
+    _history_root, point, ref, runner = _local_remote_fixture(tmp_path)
+    (point / "netlist" / "loop").symlink_to(".", target_is_directory=True)
+
+    result = prepare_remote_project_cache(
+        ref,
+        runner=runner,
+        cache_root=tmp_path / "controller_cache",
+    )
+
+    assert result.status == "fail"
+    assert any("symlink directory cycle detected" in issue for issue in result.issues)
+    assert runner.downloads == []
+
+
+@pytest.mark.parametrize("linked", [False, True], ids=["direct", "symlink"])
+def test_prepare_remote_project_cache_rejects_fifo(
+    tmp_path: Path,
+    linked: bool,
+) -> None:
+    history_root, point, ref, runner = _local_remote_fixture(tmp_path)
+    fifo = (
+        history_root / "shared.pipe"
+        if linked
+        else point / "netlist" / "shared.pipe"
+    )
+    os.mkfifo(fifo)
+    if linked:
+        (point / "netlist" / "pipe_link").symlink_to(fifo)
+
+    result = prepare_remote_project_cache(
+        ref,
+        runner=runner,
+        cache_root=tmp_path / "controller_cache",
+    )
+
+    assert result.status == "fail"
+    assert any("not a regular file or directory" in issue for issue in result.issues)
+    assert runner.downloads == []
+
+
+def test_prepare_remote_project_cache_rejects_root_prefix_trick_with_real_paths(
+    tmp_path: Path,
+) -> None:
+    history_root, point, ref, runner = _local_remote_fixture(tmp_path)
+    prefix_sibling = history_root.with_name(f"{history_root.name}_evil")
+    prefix_sibling.mkdir()
+    target = prefix_sibling / "external.scs"
+    target.write_text("external\n", encoding="utf-8")
+    (point / "netlist" / "prefix_escape.scs").symlink_to(target)
+
+    result = prepare_remote_project_cache(
+        ref,
+        runner=runner,
+        cache_root=tmp_path / "controller_cache",
+    )
+
+    assert result.status == "fail"
+    assert any("symlink target escapes Maestro point root" in issue for issue in result.issues)
+    assert runner.downloads == []
 
 
 def test_prepare_remote_project_cache_boundary_rejects_prefix_trick(tmp_path: Path) -> None:
@@ -520,6 +755,34 @@ def test_prepare_remote_project_cache_rejects_nonregular_symlink_target(tmp_path
     assert result.status == "fail"
     assert any("symlink" in issue.lower() for issue in result.issues)
     assert len(runner.downloads) == 0
+
+
+def test_prepare_remote_project_cache_reports_symlink_validation_transport_failure(
+    tmp_path: Path,
+) -> None:
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+
+    class TransportFailureRunner(FakeRunner):
+        def run(self, command: str, **kwargs: object) -> RemoteCommandResult:
+            self.commands_run.append(command)
+            if command.startswith("root=$(readlink"):
+                return RemoteCommandResult(
+                    255,
+                    "",
+                    "ssh transport timed out",
+                    ["ssh", "lab", command],
+                )
+            return super().run(command, **kwargs)
+
+    runner = TransportFailureRunner()
+
+    result = prepare_remote_project_cache(ref, runner=runner, cache_root=tmp_path)
+
+    assert result.status == "fail"
+    assert result.issues == [
+        "remote netlist symlink validation transport failed: ssh transport timed out"
+    ]
+    assert runner.downloads == []
 
 
 # ---------------------------------------------------------------------------

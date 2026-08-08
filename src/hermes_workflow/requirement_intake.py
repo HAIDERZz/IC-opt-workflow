@@ -130,6 +130,14 @@ class MaestroPointImportReport:
 
 
 @dataclass(frozen=True)
+class _ImportCollection:
+    files: list[tuple[Path, Path]]
+    directories: list[Path]
+    materialized_symlink_count: int
+    issues: list[str]
+
+
+@dataclass(frozen=True)
 class RequirementPreparationReport:
     status: str
     issues: list[str]
@@ -326,12 +334,18 @@ def import_maestro_point_netlist(
     if not (netlist_root / "input.scs").is_file():
         issues.append(f"maestro_point_root/netlist/input.scs is missing: {netlist_root / 'input.scs'}")
 
-    entries: list[tuple[Path, Path, bool]] = []
+    collection = _ImportCollection(
+        files=[],
+        directories=[],
+        materialized_symlink_count=0,
+        issues=[],
+    )
     if not issues:
-        entries, issues = _collect_import_entries(
+        collection = _collect_import_entries(
             _maestro_history_root(source_root),
             netlist_root,
         )
+        issues = collection.issues
 
     if issues:
         issues = _prefix_import_issues(issues, testbench_id)
@@ -355,15 +369,15 @@ def import_maestro_point_netlist(
     if staging.exists():
         shutil.rmtree(staging)
     staging.mkdir(parents=True)
-    copied_count = 0
-    materialized_count = 0
-    for source, relative, was_symlink in entries:
+    for relative in sorted(
+        collection.directories,
+        key=lambda value: (len(value.parts), value.as_posix()),
+    ):
+        (staging / relative).mkdir(parents=True, exist_ok=True)
+    for source, relative in collection.files:
         target = staging / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, target)
-        copied_count += 1
-        if was_symlink:
-            materialized_count += 1
 
     if destination.exists():
         shutil.rmtree(destination)
@@ -374,8 +388,8 @@ def import_maestro_point_netlist(
         status="pass",
         issues=[],
         maestro_point_root=source_root.as_posix(),
-        copied_file_count=copied_count,
-        materialized_symlink_count=materialized_count,
+        copied_file_count=len(collection.files),
+        materialized_symlink_count=collection.materialized_symlink_count,
         input_scs_sha256=input_hash,
     )
     _write_import_report(report_path, report)
@@ -1107,31 +1121,152 @@ def _maestro_history_root(maestro_point_root: Path) -> Path:
 def _collect_import_entries(
     allowed_root: Path,
     netlist_root: Path,
-) -> tuple[list[tuple[Path, Path, bool]], list[str]]:
-    entries: list[tuple[Path, Path, bool]] = []
+) -> _ImportCollection:
+    files: list[tuple[Path, Path]] = []
+    directories: list[Path] = []
     issues: list[str] = []
-    resolved_root = allowed_root.resolve()
-    for path in sorted(netlist_root.rglob("*")):
-        relative = path.relative_to(netlist_root)
-        if path.is_dir() and not path.is_symlink():
-            continue
+    destinations: dict[Path, str] = {}
+    materialized_symlink_count = 0
+
+    try:
+        resolved_root = allowed_root.resolve(strict=True)
+    except (OSError, RuntimeError):
+        return _ImportCollection(
+            files=[],
+            directories=[],
+            materialized_symlink_count=0,
+            issues=[f"Maestro point root cannot be resolved: {allowed_root}"],
+        )
+
+    try:
+        resolved_netlist_root = netlist_root.resolve(strict=True)
+    except (OSError, RuntimeError):
+        return _ImportCollection(
+            files=[],
+            directories=[],
+            materialized_symlink_count=0,
+            issues=[f"maestro_point_root/netlist cannot be resolved: {netlist_root}"],
+        )
+
+    try:
+        resolved_netlist_root.relative_to(resolved_root)
+    except ValueError:
+        return _ImportCollection(
+            files=[],
+            directories=[],
+            materialized_symlink_count=0,
+            issues=["symlink target escapes Maestro point root: ."],
+        )
+
+    def display(relative: Path) -> str:
+        return relative.as_posix() if relative.parts else "."
+
+    def claim(relative: Path, kind: str) -> bool:
+        existing = destinations.get(relative)
+        if existing is not None:
+            issues.append(f"duplicate import destination: {display(relative)}")
+            return False
+        destinations[relative] = kind
+        return True
+
+    def walk_directory(
+        directory: Path,
+        relative: Path,
+        active_directories: tuple[tuple[int, int], ...],
+        *,
+        claim_directory: bool,
+    ) -> None:
+        try:
+            stat_result = directory.stat()
+        except OSError:
+            issues.append(f"netlist directory cannot be traversed: {display(relative)}")
+            return
+        identity = (stat_result.st_dev, stat_result.st_ino)
+        if identity in active_directories:
+            issues.append(f"symlink cycle detected: {display(relative)}")
+            return
+        if claim_directory:
+            if not claim(relative, "directory"):
+                return
+            directories.append(relative)
+        try:
+            children = sorted(directory.iterdir(), key=lambda path: path.name)
+        except OSError:
+            issues.append(f"netlist directory cannot be traversed: {display(relative)}")
+            return
+        next_active = (*active_directories, identity)
+        for child in children:
+            walk_node(child, relative / child.name, next_active)
+
+    def walk_node(
+        path: Path,
+        relative: Path,
+        active_directories: tuple[tuple[int, int], ...],
+    ) -> None:
+        nonlocal materialized_symlink_count
         if path.is_symlink():
-            resolved = path.resolve(strict=False)
+            try:
+                resolved = path.resolve(strict=True)
+            except RuntimeError:
+                issues.append(f"symlink cycle detected: {display(relative)}")
+                return
+            except OSError:
+                issues.append(f"symlink target is missing: {display(relative)}")
+                return
             try:
                 resolved.relative_to(resolved_root)
             except ValueError:
-                issues.append(f"symlink target escapes Maestro point root: {relative}")
-                continue
-            if not resolved.is_file():
-                issues.append(f"symlink target is not a regular file: {relative}")
-                continue
-            entries.append((resolved, relative, True))
-            continue
+                issues.append(
+                    f"symlink target escapes Maestro point root: {display(relative)}"
+                )
+                return
+            if resolved.is_file():
+                if claim(relative, "file"):
+                    files.append((resolved, relative))
+                    materialized_symlink_count += 1
+                return
+            if resolved.is_dir():
+                materialized_symlink_count += 1
+                walk_directory(
+                    resolved,
+                    relative,
+                    active_directories,
+                    claim_directory=True,
+                )
+                return
+            issues.append(
+                "symlink target is not a regular file or directory: "
+                f"{display(relative)}"
+            )
+            return
         if path.is_file():
-            entries.append((path, relative, False))
-            continue
-        issues.append(f"netlist entry is not a regular file: {relative}")
-    return entries, issues
+            if claim(relative, "file"):
+                files.append((path, relative))
+            return
+        if path.is_dir():
+            walk_directory(
+                path,
+                relative,
+                active_directories,
+                claim_directory=True,
+            )
+            return
+        issues.append(
+            f"netlist entry is not a regular file or directory: {display(relative)}"
+        )
+
+    walk_directory(
+        resolved_netlist_root,
+        Path(),
+        (),
+        claim_directory=False,
+    )
+    return _ImportCollection(
+        files=files,
+        directories=directories,
+        materialized_symlink_count=materialized_symlink_count,
+        issues=issues,
+    )
 
 
 def _write_requirement_report(
