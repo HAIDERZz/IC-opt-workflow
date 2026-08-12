@@ -130,11 +130,12 @@ each file; there is no automated check for this today.
 
 The three version sources (`VERSION`, `pyproject.toml`, and
 `src/hermes_workflow/__init__.py`) must agree; the two `test` lines above only
-check `VERSION` against each of the other two. There is currently no
-committed regression test asserting all three programmatically -- adding one
-is a code change and is out of scope for this checklist edit; track it as a
-follow-up decision rather than assuming the manual command above is a
-permanent substitute.
+check `VERSION` against each of the other two. `tests/test_version_consistency.py`
+now asserts all three agree programmatically (plus a semantic-version format
+check on `VERSION`), so this is no longer only a manual, non-regression-tested
+step. Keep running the manual `test` commands above during release sign-off;
+you can also run `./.venv/bin/pytest -q tests/test_version_consistency.py` to
+auto-verify the same invariant.
 
 Packaged template `config/*.yaml` files must be current Mixer starter resources,
 not legacy inverter starter resources.
