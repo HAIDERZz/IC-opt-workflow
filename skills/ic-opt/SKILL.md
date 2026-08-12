@@ -59,16 +59,31 @@ The only CLI value that changes optimizer budget after an existing optimizer run
 is:
 
 ```bash
-ic-opt PROJECT_DIR --real --continue N
+./.venv/bin/ic-opt PROJECT_DIR --real --continue N
 ```
 
-`--continue N` extends the same optimizer project. It does not reread a changed
-`opt_requirement.md` and is not history warm-start. It preserves the generated
+`--continue N` extends the same optimizer project. It re-validates the current
+requirement but does not re-materialize a changed `opt_requirement.md` into
+this run's execution config, and it is not history warm-start. It preserves the generated
 project backend: OpenBox continues OpenBox history and native TuRBO continues
 native TuRBO history. Never switch backend during continuation. A Remote
 continuation attempt must rerun Remote Doctor once against the current host,
 using the same SSH runner and Cadence environment, before frozen preparation,
 history synchronization, or backend execution.
+
+`--continue N` can stop before it starts extending the run. Three failure gates
+are already implemented and are not silent:
+
+- **Remote attempt lock held (remote-only)**: `state/remote_attempt.lock` is
+  an exclusive per-project lease (`RemoteAttemptLockedError`). Locks are
+  deliberately never stolen automatically; inspect the lock's owner metadata
+  and remove the lock directory by hand before retrying.
+- **No optimizer history**: continuation fails with `cannot continue without
+  optimizer history: <path> is missing or empty` when the backend's evaluation
+  history file is absent or empty.
+- **Prior history acceptance rejected**: continuation re-runs acceptance on the
+  existing history before extending it and fails with `prior optimizer history
+  acceptance rejected: ...` if that check does not return `accepted`.
 
 `--ssh-profile PROFILE` selects an OpenSSH profile for remote execution. It is
 not an optimizer or resource override.
@@ -104,20 +119,24 @@ Typical shape:
 
 ## Commands
 
+`ic-opt` is not installed on PATH. Run it from the tool repository root as
+`./.venv/bin/ic-opt` (created by the venv install steps in `README.md`), or
+`source .venv/bin/activate` first and drop the prefix.
+
 Local:
 
 ```bash
-ic-opt PROJECT_DIR --doctor
-ic-opt PROJECT_DIR --real
-ic-opt PROJECT_DIR --real --continue N
+./.venv/bin/ic-opt PROJECT_DIR --doctor
+./.venv/bin/ic-opt PROJECT_DIR --real
+./.venv/bin/ic-opt PROJECT_DIR --real --continue N
 ```
 
 Remote:
 
 ```bash
-ic-opt --ssh-profile PROFILE PROJECT_DIR --doctor
-ic-opt --ssh-profile PROFILE PROJECT_DIR --real
-ic-opt --ssh-profile PROFILE PROJECT_DIR --real --continue N
+./.venv/bin/ic-opt --ssh-profile PROFILE PROJECT_DIR --doctor
+./.venv/bin/ic-opt --ssh-profile PROFILE PROJECT_DIR --real
+./.venv/bin/ic-opt --ssh-profile PROFILE PROJECT_DIR --real --continue N
 ```
 
 Use `--cadence-cshrc PATH` only when the project does not already provide the
@@ -127,7 +146,12 @@ Cadence setup path.
 orchestration checks and stops before real Spectre/OCEAN candidate execution. Do
 not use it for continuation, fix-run, or remote mode unless the current docs say
 that support has been restored. Invalid combinations fail before workflow or
-Remote execution; do not retry them as if the flag had been accepted.
+Remote execution; do not retry them as if the flag had been accepted. After a
+`--dry-orchestration` run, check `reports/optimizer_flow_run_report.json` for
+`stopped_before` (`run-openbox-real` or `run-native-turbo-real`); the CLI also
+prints `stopped before: ...`. The run still produces
+`execution_package/OPTIMIZER_EXECUTION_TASK.md` and
+`optimizer_execution_manifest.json`.
 
 ## Run Procedure
 
@@ -135,9 +159,13 @@ For a real project:
 
 1. Read `opt_requirement.md` and identify the mode, testbench/corner shape,
    optimizer backend, and expected artifacts.
-2. Run doctor first when validating an environment:
-   `ic-opt PROJECT_DIR --doctor` or
-   `ic-opt --ssh-profile PROFILE PROJECT_DIR --doctor`.
+2. `--doctor` is a standalone environment check:
+   `./.venv/bin/ic-opt PROJECT_DIR --doctor` or
+   `./.venv/bin/ic-opt --ssh-profile PROFILE PROJECT_DIR --doctor`. `--real`
+   already runs doctor internally before real execution (local optimize,
+   remote optimize, and fix-run when a license check is required), so a
+   standalone doctor pass is not a mandatory prerequisite step; use it when you
+   want an environment check without starting a run.
 3. Inspect `reports/ic_opt_doctor_report.json` and
    `reports/license_probe_report.json` when present.
 4. Run the selected real command.
@@ -147,11 +175,28 @@ For a real project:
 
 Do not treat a zero exit code as workflow acceptance.
 
+### Remote Artifact Locations
+
+Remote runs write reports to two places. The authoritative copy is on the
+remote host at `PROJECT_DIR/reports/...` (and `runs/`, `ledger/`, `state/`).
+The Controller also keeps a local cache under
+`~/.ic-opt/remote_runs/<ssh_profile>/<sha256[:16] of profile+remote path>/`,
+which holds the same report tree plus the frozen snapshot used for the run.
+The CLI prints both after a remote run or doctor pass, for example `local
+report: ...` followed by `remote report: ...`; read those two printed paths
+directly instead of guessing the cache digest.
+
 ## History Warm Start
 
 Use `History Warm Start` only for a new optimize project that references
-previous same-circuit project directories. Do not use it for fix-run and do not
-combine it with `--continue N`.
+previous same-circuit project directories. `history_warm_start.enabled: true`
+on a `fix_run` project fails requirement/project validation outright ("only
+supported for optimize workflow"); it is a hard rejection, not a style
+preference. Do not combine it with `--continue N` either: continuation
+re-validates the current requirement but does not re-materialize requirement
+changes into this run's execution config, so a warm-start section added there
+has no effect on a continuation run (this is a product-semantics mismatch, not a
+separate validation error).
 
 Runtime contract:
 
@@ -165,9 +210,11 @@ Runtime contract:
   `out_of_current_space`
 
 History application is an OpenBox backend feature. An enabled History Warm Start
-with native TuRBO is rejected during requirement/project validation; it is not
-silently ignored. If previous-project history must guide a new project, recommend
-OpenBox. To extend the same native TuRBO project, use `--continue N`.
+is rejected during requirement/project validation for any resolved backend
+other than OpenBox — that includes native TuRBO and `random_baseline`, not just
+native TuRBO — and it is not silently ignored. If previous-project history must
+guide a new project, recommend OpenBox. To extend the same native TuRBO
+project, use `--continue N`.
 
 After the run, inspect:
 
@@ -187,6 +234,10 @@ Distinguish:
   single-objective cases, or `initial_configurations_from_history` for
   constrained IC cases
 - `not_applied_reason`: why compatible history did not affect the advisor
+- `warm_start_strategy`: the requirement's `warm_start_strategy` value, echoed
+  back (the only supported value is `topk`)
+- `enabled`, `audit`, `audit_markdown`: presence/pointer fields alongside the
+  counters above
 
 ## Fix-Run
 
@@ -202,18 +253,42 @@ In fix-run:
 - `threads_per_run` is Spectre `+mt` per child
 - fixed points are processed serially in this release
 - no optimizer state or optimizer decision report should be created
+- a `Process Corners` section must not set `objective_policy` or
+  `constraint_policy`; fix-run rejects those fields at requirement intake and
+  always executes every declared corner (intake internally forces
+  `nominal`/`nominal` bookkeeping values, it does not aggregate or select)
 
-Inspect:
-
-```text
-reports/fix_run_report.json
-runs/real/real_001/testbenches/<tb>/corners/<corner>/result_manifest.json
-runs/real/real_001/testbenches/<tb>/corners/<corner>/metrics/metric_result_manifest.json
-runs/real/real_001/testbenches/<tb>/corners/<corner>/metrics/waveform_export_manifest.json
-runs/real/real_001/testbenches/<tb>/corners/<corner>/metrics/waveforms/<name>.csv
-```
+Inspect `reports/fix_run_report.json` first. Each entry in its `points[]` array
+carries `run_id` plus the authoritative artifact paths for that fixed point:
+`scalar_metric_manifest_paths`, `waveform_export_manifest_paths`, and
+`csv_artifact_paths`. Read those path lists instead of assuming a directory
+shape — the on-disk layout depends on the project (testbenches × corners,
+testbenches only, corners only, or neither), and the primary
+`opt_requirement.fix_run.md` template itself uses the corners-only layout
+(`runs/real/<run_id>/corners/<corner>/...`, no `testbenches/` segment), while
+`opt_requirement.fix_run.metrics_only.md` has neither and flattens to
+`runs/real/<run_id>/metrics/...`. `<run_id>` starts at `real_001` by default
+and increments per fixed point (`real_002`, `real_003`, ...); do not assume
+every point landed under `real_001`.
 
 ## Optimization Reports And Raw Data
+
+`reports/optimizer_flow_run_report.json` is the workflow's final success
+marker (a passing status is only published after the run's parent/child
+manifests are verified). Do not treat a zero exit code as a substitute for
+reading it. Alongside it, the flow also writes:
+
+```text
+reports/optimizer_flow_run_report.json
+reports/optimizer_run_acceptance_report.json
+reports/optimizer_completion_report.json
+reports/optimizer_finalize_report.json
+```
+
+`supervisor_instruction.json` at the project root is the approval-gate record
+(`decision` and `reason` fields). It is written by the approve step before the
+real backend starts; if a run fails at `approve`, this file is the first place
+to check.
 
 After optimize/finalize, inspect the HTML report first for orientation:
 
@@ -227,6 +302,8 @@ Then inspect machine-readable data before giving engineering advice:
 reports/optimizer_insight_report.json
 reports/optimizer_insight_report.md
 reports/optimizer_run_report.json
+reports/native_turbo_optimizer_report.json
+reports/optimizer_decision_report.json
 reports/optimizer_decision_report.md
 reports/history_warm_start_audit.json
 reports/history_warm_start_audit.md
@@ -237,10 +314,13 @@ runs/**/result_manifest.json
 runs/**/metric_result_manifest.json
 ```
 
-Some files are backend-specific:
+Some files are backend-specific. Only one pair — run report plus evaluations
+log — is written per project, matching the requirement's `algorithm`:
 
-- OpenBox normally writes `reports/optimizer_evaluations.jsonl`.
-- Native TuRBO normally writes `reports/native_turbo_optimizer_evaluations.jsonl`.
+- OpenBox normally writes `reports/optimizer_run_report.json` and
+  `reports/optimizer_evaluations.jsonl`.
+- Native TuRBO normally writes `reports/native_turbo_optimizer_report.json`
+  and `reports/native_turbo_optimizer_evaluations.jsonl`.
 - OpenBox-specific advanced sections, history application, surrogate
   visualization, and parameter importance may be missing or `not_available` for
   TuRBO.
@@ -266,8 +346,10 @@ For multi-testbench projects:
 - inspect per-testbench child manifests and parent aggregate manifests
 - explain failures by testbench when possible
 
-The validated Mixer multi-testbench templates route CG/NF/BW, IIP3, and P1dB to
-their owning testbenches. Do not collapse them into one testbench.
+The validated Mixer multi-testbench templates route `BW`/`MAX_GAIN`/`NF_3G` to
+testbench `cg_nf`, `IIP3` to testbench `iip3`, and `P1DB` to testbench `p1db`.
+Do not collapse them into one testbench; do not grep the templates for "CG" —
+the metric name is `MAX_GAIN`, not `CG`.
 
 For multi-corner projects:
 
@@ -281,6 +363,11 @@ Production choices:
 
 - `algorithm: openbox`, `strategy: openbox_gp_eic`
 - `algorithm: openbox`, `strategy: openbox_prf_eic`
+- `algorithm: openbox`, `strategy: openbox_auto` (the default OpenBox
+  resolves to when `strategy` is omitted; used explicitly by the sanitized
+  `opt_requirement.multi_testbench.md` and
+  `opt_requirement.history_warm_start.md` templates — do not treat
+  `openbox_auto` in a requirement as an invalid value)
 - `algorithm: turbo`, `strategy: turbo_trust_region`
 
 Prefer `openbox_prf_eic` for coarse integer grids, categorical-like choices, or

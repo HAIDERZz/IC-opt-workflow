@@ -23,6 +23,7 @@ optimization step.
 - `docs/OPTIMIZER_ALGORITHM_MODES.md`: OpenBox and TuRBO strategy selection.
 - `docs/PROCESS_CORNER_OPTIMIZATION_FLOW_CN.md`: process-corner aggregation.
 - `docs/TROUBLESHOOTING_CN.md`: failure diagnosis.
+- `docs/ROLE_MODEL_AND_TERMINOLOGY.md`: product role and terminology.
 - `examples/spectre_maestro_project/OPT_REQUIREMENT_README.md`: requirement
   section contract and template selection.
 - `examples/spectre_maestro_project/*.md`: real validated sanitized
@@ -37,10 +38,15 @@ PROJECT_DIR/
 └── context/
 ```
 
-Only `opt_requirement.md` is required. `constraints.md` and `context/` are for
-human guidance and supporting notes. Generated directories such as `config/`,
-`netlists/`, `runs/`, `reports/`, `ledger/`, and `state/` are created by the
-workflow.
+Only `opt_requirement.md` is required. `constraints.md` is read by requirement
+intake, hashed, and synced to the remote cache for remote runs. `context/` has
+no code that reads it in this release — it is a pure human-reading convention
+and remote prepare does not sync it. Generated directories and files such as
+`config/`, `netlists/`, `runs/`, `reports/`, `ledger/`, `state/`,
+`execution_package/`, and the project-root `supervisor_instruction.json` are
+created by the workflow — `execution_package/` and
+`supervisor_instruction.json` are the approval-gate evidence written before a
+real backend starts.
 
 ## Requirement Contract
 
@@ -62,6 +68,8 @@ Optimization values stay in `opt_requirement.md`:
 - `algorithm`, `strategy`, `initialization`, and `random_seed`
 - `output_format: psfxl`
 - retention policy, license probe, and Process Corners
+- `Approval Checklist` — a required section for optimize projects, not only
+  for fix-run
 
 For each Maestro/ADE testbench, the point root is the result point directory
 itself, not `input.scs` and not `psf/`. It must contain `netlist/input.scs`.
@@ -93,7 +101,7 @@ The product CLI keeps one value-changing continuation entry for existing
 optimizer runs:
 
 ```bash
-ic-opt PROJECT_DIR --real --continue N
+./.venv/bin/ic-opt PROJECT_DIR --real --continue N
 ```
 
 All other values stay inherited from `opt_requirement.md` and generated config.
@@ -104,6 +112,20 @@ For Remote continuation, the product reruns Remote Doctor once for the current
 attempt before frozen-snapshot restore, history synchronization, or backend
 dispatch; do not bypass that gate with a cached doctor result from an earlier
 attempt.
+
+Remote continuation has three more implemented gates besides the Remote Doctor
+rerun, and any one of them can stop `--continue N` before it extends the run:
+
+- **Remote attempt lock**: `state/remote_attempt.lock` gives one Controller
+  attempt exclusive ownership. Locks are deliberately never stolen
+  automatically (`RemoteAttemptLockedError`); check the lock's owner metadata
+  and remove the lock directory manually before retrying.
+- **Missing optimizer history**: fails with `cannot continue without optimizer
+  history: <path> is missing or empty` when the resolved backend's evaluation
+  history file is absent or empty.
+- **Rejected prior acceptance**: before extending history, continuation
+  re-checks the existing run's acceptance status and fails with `prior
+  optimizer history acceptance rejected: ...` if it is not `accepted`.
 
 ## Requirement Modes
 
@@ -125,12 +147,18 @@ attempt.
 
 If `opt_requirement.md` contains `## History Warm Start`, treat it as a new
 optimize-project warm-start from previous same-circuit projects. It renders to
-`config/history_warm_start.yaml`. Do not recommend it for fix-run, and do not
-combine it with `--continue N`; continuation only extends an existing optimizer
-project and does not reread a changed requirement.
+`config/history_warm_start.yaml`. `history_warm_start.enabled: true` on a
+`fix_run` project is a hard requirement/project validation failure ("only
+supported for optimize workflow"), not just a recommendation against it. Do
+not combine it with `--continue N` either: continuation re-validates the
+current requirement, but does not re-materialize requirement changes into
+this run's execution config, so a warm-start section added (or changed)
+there has no effect on a continuation run.
 
-Enabled History Warm Start is OpenBox-only and is rejected for native TuRBO.
-For native TuRBO, use `--continue N`; do not claim warm-start data was consumed.
+Enabled History Warm Start is rejected during validation for any resolved
+backend other than OpenBox — native TuRBO and `random_baseline` alike, not
+native TuRBO only. For native TuRBO, use `--continue N`; do not claim
+warm-start data was consumed.
 
 Use `examples/spectre_maestro_project/opt_requirement.history_warm_start.md`
 as the checked example when the user asks for a new same-circuit history run.
@@ -160,7 +188,9 @@ Do not say history was applied just because the config exists. Check
 `accepted_observation_count`, `applied_observation_count`, `applied_to_advisor`,
 `application_mode`, and `not_applied_reason`. Unconstrained single-objective
 projects may use `transfer_learning_history`; constrained IC projects use
-`initial_configurations_from_history`.
+`initial_configurations_from_history`. The payload also echoes
+`warm_start_strategy` (the only supported value is `topk`) alongside `enabled`,
+`audit`, and `audit_markdown` pointer fields.
 
 ## Optimizer Insight Report
 
@@ -175,12 +205,14 @@ reports/optimizer_insight_report.html
 
 Use the HTML report for orientation, but do not base detailed engineering
 recommendations on the HTML alone. Inspect the dense artifacts when answering
-trade-off, history, or next-range questions. Some backend-specific JSONL files
-are only present for the backend that ran:
+trade-off, history, or next-range questions. The run report and evaluations
+log are backend-specific: only one main report `.json` and one evaluations
+`.jsonl` pair is present, matching the resolved backend:
 
 ```text
 reports/optimizer_insight_report.json
 reports/optimizer_run_report.json
+reports/native_turbo_optimizer_report.json
 reports/history_warm_start_audit.json
 reports/optimizer_evaluations.jsonl
 reports/native_turbo_optimizer_evaluations.jsonl
@@ -216,27 +248,56 @@ next-requirement choice.
 
 ## Product Commands
 
+`ic-opt` is not on PATH. Run it from the tool repository root as
+`./.venv/bin/ic-opt`, or `source .venv/bin/activate` first. Requires Python
+3.11+.
+
 Local:
 
 ```bash
-ic-opt PROJECT_DIR --doctor
-ic-opt PROJECT_DIR --real
-ic-opt PROJECT_DIR --real --continue N
+./.venv/bin/ic-opt PROJECT_DIR --doctor
+./.venv/bin/ic-opt PROJECT_DIR --real
+./.venv/bin/ic-opt PROJECT_DIR --real --continue N
 ```
 
 Remote:
 
 ```bash
-ic-opt --ssh-profile PROFILE PROJECT_DIR --doctor
-ic-opt --ssh-profile PROFILE PROJECT_DIR --real
-ic-opt --ssh-profile PROFILE PROJECT_DIR --real --continue N
+./.venv/bin/ic-opt --ssh-profile PROFILE PROJECT_DIR --doctor
+./.venv/bin/ic-opt --ssh-profile PROFILE PROJECT_DIR --real
+./.venv/bin/ic-opt --ssh-profile PROFILE PROJECT_DIR --real --continue N
 ```
 
 `--ssh-profile PROFILE` selects the remote execution profile. It is not an
 optimizer or resource override.
 
 Use `--cadence-cshrc PATH` only when the project does not already provide the
-Cadence setup path.
+Cadence setup path. Cadence setup is looked up as `--cadence-cshrc` when given,
+otherwise `<REMOTE_PROJECT_DIR>/cadence_env.csh` on the remote host.
+
+`./.venv/bin/ic-opt PROJECT_DIR --real --dry-orchestration` is a local
+optimize-only first-run gate: it stops before real Spectre/OCEAN candidate
+execution and reports `stopped_before` (`run-openbox-real` or
+`run-native-turbo-real`) in `reports/optimizer_flow_run_report.json`. It does
+not support continuation, fix-run, or remote mode.
+
+### Remote Artifact Locations
+
+Remote runs keep the authoritative report/run tree on the remote host at
+`PROJECT_DIR/reports/...` (also `runs/`, `ledger/`, `state/`). The Controller
+mirrors the same tree into a local cache at
+`~/.ic-opt/remote_runs/<ssh_profile>/<sha256[:16] of profile+remote path>/`,
+which also holds the frozen snapshot used for the run. The CLI prints both
+paths after a remote run or doctor pass (`local report: ...` then `remote
+report: ...`); read those printed paths instead of recomputing the digest.
+
+### Monitoring A Long-Running Optimizer Run
+
+The product CLI has no progress subcommand. While a run is in flight, read
+`state/optimizer_state.json` and `state/best_candidate.json` directly, or use
+the developer CLI's `hermes-workflow optimizer-status` command as an accepted
+exception to "use product CLI instead of low-level developer commands" —
+it is a read-only status query, not a workflow-changing action.
 
 ## Agent Behavior
 
@@ -273,6 +334,11 @@ Production strategy choices:
 
 - `algorithm: openbox`, `strategy: openbox_gp_eic`
 - `algorithm: openbox`, `strategy: openbox_prf_eic`
+- `algorithm: openbox`, `strategy: openbox_auto` — this is the default an
+  OpenBox project resolves to when `strategy` is omitted, and it is used
+  explicitly by the sanitized `opt_requirement.multi_testbench.md` and
+  `opt_requirement.history_warm_start.md` templates. Do not treat
+  `openbox_auto` in a requirement as an invalid or unrecognized value.
 - `algorithm: turbo`, `strategy: turbo_trust_region`
 
 TuRBO is a fit when legal variable steps are fine enough that snapping a
@@ -284,33 +350,49 @@ duplicate-heavy snapped spaces.
 
 ## Fix-Run Artifact Checklist
 
-For fix-run workflows, inspect:
-
-```text
-reports/fix_run_report.json
-runs/real/real_001/testbenches/<tb>/corners/<corner>/result_manifest.json
-runs/real/real_001/testbenches/<tb>/corners/<corner>/metrics/metric_result_manifest.json
-runs/real/real_001/testbenches/<tb>/corners/<corner>/metrics/waveform_export_manifest.json
-runs/real/real_001/testbenches/<tb>/corners/<corner>/metrics/waveforms/<name>.csv
-```
+For fix-run workflows, inspect `reports/fix_run_report.json` first. Its
+`points[]` array is the authoritative source of artifact paths for each fixed
+point — `run_id`, `scalar_metric_manifest_paths`, `waveform_export_manifest_paths`,
+and `csv_artifact_paths` — because the on-disk layout depends on the project
+shape (testbenches × corners, testbenches only, corners only, or neither) and
+`<run_id>` increments per fixed point starting at `real_001` (`real_002`,
+`real_003`, ...), it does not stay fixed at `real_001`.
 
 Confirm:
 
 - `workflow_mode` is `fix_run`
 - expected testbench/corner child count matches the requirement
-- `parallel_jobs` and `threads_per_run` were inherited from the requirement
 - waveform exports were written for every successful child
 - all failures appear in `child_issues`
 - optimizer state and optimizer decision reports were not created
 
+`FixRunReport` does not carry `parallel_jobs` or `threads_per_run` fields, so
+do not ask to "confirm they were inherited" from the report alone:
+`threads_per_run` can be read from a child's
+`result_manifest.json.command_trace` (the Spectre `+mt=<n>` flag);
+`parallel_jobs` is not recorded in any run artifact and can only be compared
+against the requirement's `Spectre Settings.parallel_jobs` or the rendered
+`config/spectre.yaml`.
+
 ## Optimization Artifact Checklist
+
+`reports/optimizer_flow_run_report.json` is the final success marker for an
+optimizer workflow run — a passing status is only published after parent/child
+manifests are verified. Do not treat a zero exit code as a substitute for
+reading it.
 
 For optimizer workflows, inspect:
 
 ```text
+reports/optimizer_flow_run_report.json
+reports/optimizer_run_acceptance_report.json
+reports/optimizer_completion_report.json
+reports/optimizer_finalize_report.json
 reports/ic_opt_doctor_report.json
 reports/license_probe_report.json
 reports/optimizer_run_report.json
+reports/native_turbo_optimizer_report.json
+reports/optimizer_decision_report.json
 reports/optimizer_decision_report.md
 reports/optimizer_insight_report.json
 reports/optimizer_insight_report.md
@@ -323,6 +405,10 @@ ledger/experiment_ledger.jsonl
 runs/**/result_manifest.json
 runs/**/metric_result_manifest.json
 ```
+
+`supervisor_instruction.json` at the project root is the approval-gate record
+(`decision` and `reason` fields), written before the real backend starts; check
+it first if a run fails at the `approve` step.
 
 For multi-testbench or multi-corner projects, inspect the parent aggregate
 manifest. Confirm requirement values reached artifacts and execution:

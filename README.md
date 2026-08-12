@@ -24,10 +24,15 @@ git clone https://github.com/HAIDERZz/IC-opt-workflow.git
 cd IC-opt-workflow
 ```
 
+IC Auto Opt requires Python 3.11 or newer for the interpreter used to create
+the virtual environment (`pyproject.toml` declares `requires-python = ">=3.11"`,
+and the source uses 3.11-only syntax). EDA servers often ship an older default
+`python3`; use the site's `python3.11` (or newer) command if so.
+
 Create the Python environment from the repository root:
 
 ```bash
-python3 -m venv .venv
+python3 -m venv .venv   # use python3.11 (or newer) here if the site python3 is older
 ./.venv/bin/python -m pip install --upgrade pip setuptools wheel
 ./.venv/bin/python -m pip install -r requirements-product.txt
 ```
@@ -37,11 +42,19 @@ Check the entrypoints:
 ```bash
 ./.venv/bin/ic-opt --help
 ./.venv/bin/hermes-workflow --help
+./.venv/bin/hermes-workflow --version
 ```
 
-Optional advanced report dependencies are separate:
+`hermes-workflow --version` confirms the installed package version matches the
+checkout; `ic-opt` has no separate `--version` flag.
+
+Optional advanced report dependencies are separate. Install `swig` first,
+then the rest of the file: pip does not guarantee installing
+`requirements-advanced.txt` entries in file order, and building `pyrfr` from
+source can fail if `swig` is not already on `PATH`.
 
 ```bash
+./.venv/bin/python -m pip install swig==4.4.1
 ./.venv/bin/python -m pip install -r requirements-advanced.txt
 ```
 
@@ -71,6 +84,10 @@ mode. A Remote-owned path is never checked through the Controller filesystem;
 it is accessed through the configured SSH transport or explicitly materialized
 under the Controller cache. A same-named path that happens to exist on both
 machines is not part of the remote-mode contract.
+
+See `CONTEXT.md` for the full remote-mode terminology glossary (Controller,
+Remote Host, Controller Cache, Remote-owned Path, Remote Attempt Lock,
+Continuation, Remote History Manifest, and related terms).
 
 ## SSH Profile For Remote Mode
 
@@ -108,6 +125,14 @@ published only after the Remote Host has verified the SHA-256 content and
 project-relative references of all expected parent and child manifests. A
 failure-status flow report is published independently, so an incomplete run can
 retain failure evidence without being presented as successful.
+
+A Remote project allows only one active Controller attempt at a time. Before
+preparation, IC Auto Opt takes a token-owned lock at
+`state/remote_attempt.lock` on the Remote Host; a concurrent Controller
+attempt against the same project is rejected. If a prior attempt was
+interrupted and left a stale lock, the rejection message points at an
+`owner.json` next to the lock directory — inspect it before manually removing
+the lock.
 
 Remote command shape:
 
@@ -195,9 +220,12 @@ PROJECT_DIR/
 ```
 
 Only `opt_requirement.md` is required. Use `constraints.md` for human guidance
-and `context/` for notes, screenshots, or previous reports. Generated
-directories such as `config/`, `netlists/`, `runs/`, `reports/`, `ledger/`, and
-`state/` are created by the workflow.
+and `context/` for notes, screenshots, or previous reports; `context/` is a
+purely human reference directory that the workflow never reads. Generated
+directories such as `config/`, `netlists/`, `runs/`, `reports/`, `ledger/`,
+`state/`, `execution_package/` (the approval manifest gating the first real
+run), and `candidate_requests/` (per-candidate optimizer suggestion payloads)
+are created by the workflow.
 
 For each testbench, first run one known-good point in Maestro/ADE. The
 `maestro_point_root` in `opt_requirement.md` is the Maestro result point
@@ -219,6 +247,10 @@ For example:
 ```text
 /home/username/simulation/Virtuoso_Bridge_test/MixerCS_PSS_IIP3/maestro/results/maestro/Interactive.28/1/Mixer_CS_IIP3
 ```
+
+`Virtuoso_Bridge_test` and `MixerCS_PSS_IIP3` are illustrative placeholder
+names reused across this repository's docs, examples, and templates; they do
+not reference a specific design.
 
 Use the actual `Interactive.N` directory and final testbench directory produced
 by the Maestro run.
@@ -264,11 +296,18 @@ Optimization requirements define:
 - `output_format: psfxl`
 - license probe, retention, and artifact policy
 - Process Corners and multi-corner policies, when needed
+- an Approval Checklist with `metric_formulas_user_approved`,
+  `maestro_source_user_approved`, `variable_bounds_user_approved`, and
+  `spectre_resource_settings_user_approved` all explicitly `true`; intake
+  fails if any field is missing or not `true`
 
 Production strategy choices:
 
 - `algorithm: openbox`, `strategy: openbox_gp_eic`
 - `algorithm: openbox`, `strategy: openbox_prf_eic`
+- `algorithm: openbox`, `strategy: openbox_auto` (explicit OpenBox
+  compatibility/auto-selection strategy, used by the multi-testbench and
+  history-warm-start templates)
 - `algorithm: turbo`, `strategy: turbo_trust_region`
 
 `random_baseline` is for diagnostics, not production optimization.
@@ -323,33 +362,74 @@ Fixed points are processed serially in this release.
 
 ## Read Results
 
-Optimization evidence:
+`reports/optimizer_flow_run_report.json` is the overall pass/fail success
+marker for a completed optimizer run (local or Remote). Check its status
+before treating any other optimizer report as authoritative.
+
+Optimization evidence, common to both backends:
 
 ```text
 reports/ic_opt_doctor_report.json
 reports/license_probe_report.json
-reports/optimizer_run_report.json
+reports/optimizer_flow_run_report.json
+reports/optimizer_completion_report.json
+reports/optimizer_run_acceptance_report.json
+reports/optimizer_finalize_report.json
+reports/optimizer_effectiveness_audit.json
 reports/optimizer_decision_report.md
 reports/optimizer_insight_report.json
 reports/optimizer_insight_report.md
 reports/optimizer_insight_report.html
-reports/history_warm_start_audit.json
-reports/history_warm_start_audit.md
-reports/optimizer_evaluations.jsonl
-reports/native_turbo_optimizer_evaluations.jsonl
+reports/optimizer_final_summary.json
+reports/optimizer_final_summary.md
+reports/requirement_intake_report.json
 ledger/experiment_ledger.jsonl
 runs/**/result_manifest.json
 runs/**/metric_result_manifest.json
 ```
 
-Fix-run evidence:
+Backend-specific run report and evaluation trace (only one pair is written per
+project, matching the requirement's `algorithm`):
+
+```text
+# algorithm: openbox (openbox_gp_eic, openbox_prf_eic, openbox_auto)
+reports/optimizer_run_report.json
+reports/optimizer_evaluations.jsonl
+
+# algorithm: turbo (turbo_trust_region, native TuRBO)
+reports/native_turbo_optimizer_report.json
+reports/native_turbo_optimizer_evaluations.jsonl
+```
+
+Conditional evidence:
+
+```text
+reports/history_warm_start_audit.json                  (History Warm Start enabled only)
+reports/history_warm_start_audit.md                     (History Warm Start enabled only)
+reports/openbox_advanced_visualization_manifest.json     (OpenBox advanced visualization only)
+reports/multi_testbench_aggregation_report.json          (multi-testbench projects only)
+```
+
+Fix-run evidence. The child-run path depends on the project's
+testbench/corner shape; all four shapes below still contain
+`result_manifest.json`, and `metrics/` holds `metric_result_manifest.json`
+and, when waveforms were requested, `waveform_export_manifest.json` plus
+`metrics/waveforms/<name>.csv`:
 
 ```text
 reports/fix_run_report.json
+
+# multi-testbench, per-testbench corners
 runs/real/real_001/testbenches/<tb>/corners/<corner>/result_manifest.json
-runs/real/real_001/testbenches/<tb>/corners/<corner>/metrics/metric_result_manifest.json
-runs/real/real_001/testbenches/<tb>/corners/<corner>/metrics/waveform_export_manifest.json
-runs/real/real_001/testbenches/<tb>/corners/<corner>/metrics/waveforms/<name>.csv
+
+# multi-testbench, no corners
+runs/real/real_001/testbenches/<tb>/result_manifest.json
+
+# single testbench, multiple corners
+runs/real/real_001/corners/<corner>/result_manifest.json
+
+# single testbench, no corners
+runs/real/real_001/result_manifest.json
 ```
 
 `reports/optimizer_insight_report.html` is the first reader-facing optimization

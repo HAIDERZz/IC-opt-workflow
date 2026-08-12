@@ -1,43 +1,61 @@
 # IC Auto Opt Workflow v0.1.10
 
-Maintenance baseline: 2026-08-12
+**Final release commit (release repository `ic-auto-opt-workflow-v0.1`, `main`):
+`9fde562` "fix: harden real optimization workflows".** The `v0.1.10` git tag and
+the GitHub Release both point at `9fde562`. Everything in this document
+describes what a user gets by installing the released package or checking
+out `main` at `9fde562` -- there is no separate unreleased layer.
 
-v0.1.10 keeps the existing package version while hardening the real local and
-Remote workflows. The maintenance work is intentionally compatibility-focused:
-it does not change optimizer algorithms or the package version, but it now
-rejects requirement fields that previously looked valid while having no real
-effect.
+Timeline: 2026-08-07, `0.1.9 -> 0.1.10` version bump and initial publish
+(release repo `43472c0`). 2026-08-08, a same-day follow-up fix landed
+(release repo `4d6929c`, netlist symlink hardening). 2026-08-08..12, a
+real-world correctness audit (tracked in
+`docs/audits/2026-08-10-real-world-correctness-audit-and-repair-ledger-cn.md`)
+produced a larger hardening batch; per user approval this was committed as
+release repo `9fde562` and **v0.1.10 was re-released at the same version
+number** to point at it (tag and GitHub Release both moved from `43472c0` to
+`9fde562`). There is no `0.1.10.1`/`0.1.10-post` -- the package version stays
+`0.1.10` for this whole commit chain; only the git ref advanced.
+
+Commit-hash note: this file cites the **release repository**'s hashes
+(`43472c0` -> `4d6929c` -> `9fde562`). The development repository
+(`ic-auto-opt-workflow`) carries the same three changes under different
+hashes because its history diverges (`019a519` -> `e75e4b1`, plus the
+hardening batch that became `9fde562` was developed as ~140 modified/new
+files on top of dev-repo `e75e4b1`). Do not use the development-repo hashes
+(`019a519`/`e75e4b1`/`b4127f8`) as release anchors; the release repository is
+the anchor of record.
+
+--------------------------------------------------------------------------
 
 ## Controller/Remote Filesystem Boundary
 
 - Requirement checks for Remote projects resolve Remote-owned Maestro paths
   over SSH instead of probing the Controller filesystem.
+- Safe file and directory symlinks inside a Maestro point root are
+  materialized; broken, cyclic, special-file, and escaping links fail closed
+  (release repo `4d6929c`).
 - Remote candidate trees are replaced from clean staging directories, so old
-  run files cannot be merged into a new candidate.
-- Safe file and directory symlinks inside a Maestro point root are materialized;
-  broken, cyclic, special-file, and escaping links fail closed.
+  run files cannot be merged into a new candidate. This is a hardening-batch
+  change (release repo `9fde562`): the `43472c0`/`4d6929c` `upload_tree()`
+  was `mkdir -p` followed by `tar -xf` into the existing remote directory,
+  which merges new content with whatever was already there rather than
+  replacing it; the clean-staging-plus-atomic-swap behavior described here
+  did not exist before `9fde562`.
 - Remote report publication, artifact inventory, checksums, and retention keep
   Controller paths and Remote paths explicitly separated.
 
-## Result Credibility
-
-- Fix-run `Metrics` is parsed and rendered instead of being silently dropped.
-- Fix-run without `--real` no longer writes an empty successful report.
-- Corner model/variable overrides must change the rendered deck; a misspelled
-  or unmatched override fails before simulation.
-- Multi-testbench corners use each testbench's own source corner.
-- A new Remote attempt invalidates both optimizer and fix-run active success
-  markers before preflight.
-
 ## Remote Environment and Transfer Reliability
 
+- Staged, atomic Controller<->Remote file transfer (write/upload via a
+  temporary remote path followed by `mv -f`) and Remote doctor's per-tool
+  dirty-state probing.
 - Workflow scripts run through explicit Remote `/bin/sh`, independent of the
   account login shell.
 - SSH probe results distinguish present, absent, transport failure, and command
   failure.
 - A token-owned Remote attempt lock prevents concurrent Controllers from
-  mutating the same project.
-- Tree/file transfer uses deadlines, staging, and atomic publication.
+  mutating the same project (`src/hermes_workflow/remote_attempt_lock.py`).
 - Remote doctor checks Controller transfer tools, Remote POSIX/GNU tools, and
   Spectre/OCEAN independently.
 - Remote preparation snapshots are retained with bounded garbage collection.
@@ -50,16 +68,57 @@ effect.
 - Fix-run and multi-testbench aggregate manifests use the actual current UTC
   execution time instead of hard-coded 2026 provenance values.
 
+## Upgrade Impact
+
+An `opt_requirement.md` that passed intake/doctor under an older 0.1.x
+release can start failing under this release's tightened contract. Before
+rerunning an older project, check for:
+
+- Unknown section fields or spelling mistakes anywhere in the requirement
+  (previously ignored, now fail closed).
+- An optimize-mode `starting_run_id` that has no effect (now rejected as
+  inert instead of silently accepted).
+- `History Warm Start: enabled: true` combined with a native TuRBO backend
+  (`algorithm: turbo`); this combination is now rejected during
+  intake/validation instead of silently ignoring the warm-start config.
+- `--dry-orchestration` used outside a local first-run optimize flow; other
+  combinations (continuation, fix-run, Remote) now fail before execution
+  instead of being accepted and behaving unexpectedly.
+
+## Result Credibility
+
+- Fix-run `Metrics` is parsed and rendered instead of being silently dropped.
+- Fix-run without `--real` no longer writes an empty successful report.
+- Corner model/variable overrides must change the rendered deck; a misspelled
+  or unmatched override fails before simulation.
+- Multi-testbench corners use each testbench's own source corner.
+- A new Remote attempt invalidates both optimizer and fix-run active success
+  markers before preflight.
+
 ## CLI and Optimizer Capability Contract
 
 - `--dry-orchestration` is accepted only for a local first-run optimize flow;
   unsupported combinations fail before real or Remote execution.
-- `continue-openbox-real` now requires and forwards
-  `--additional-evals N`.
+- `hermes-workflow continue-openbox-real` now requires and forwards
+  `--additional-evals N`. This is a `hermes-workflow` developer subcommand, not
+  a `ic-opt` product-CLI subcommand.
 - Local and Remote `ic-opt --real --continue N` preserve the configured backend.
   Native TuRBO continuation validates cumulative history, reconstructs the
   active trust region from traces, appends only the requested evaluations, and
-  preserves run/evaluation/batch numbering.
+  preserves run/evaluation/batch numbering. This reconstruction path --
+  including the `decide_continuation_real_run` supervisor-instruction rebuild
+  in `src/hermes_workflow/approvals.py` -- is part of the `9fde562` hardening
+  batch; a Remote native TuRBO continuation run against the earlier
+  `43472c0`/`4d6929c` commits alone fails for lack of a reconstructed
+  supervisor instruction (this comparison applied to the 2026-08-07 initial
+  publish; it is historical background, not a caveat about the current
+  release). A real Remote acceptance run verified continuation end-to-end on
+  2026-08-11/12 against the released code (`9fde562`):
+  `ic-opt <project> --real --continue 20 --ssh-profile <user>@<host>` extended
+  a native TuRBO project from 100 to 120 cumulative evaluations (1080 child
+  runs, 1200 metric manifests), with a 2400-line SHA-256 checksum inventory
+  confirming the prior 100-evaluation history was preserved byte-for-byte and
+  exactly 400 new checksum lines were added.
 - Legacy sequential Native histories are normalized as single-point batches;
   partial or incoherent batch metadata fails closed. Related Native reports are
   published transactionally so a failed continuation cannot leave mixed
@@ -73,9 +132,9 @@ effect.
   reject fix-run or warm-start/continuation combinations before writing files.
 - Enabled History Warm Start is explicitly OpenBox-only; native TuRBO projects
   are rejected during intake/validation instead of silently ignoring history.
-- `check-toolchain-env` defaults to the environment containing the invoked
-  `hermes-workflow`; portable task packages no longer embed a developer `/tmp`
-  virtualenv path.
+- `hermes-workflow check-toolchain-env` defaults to the environment containing
+  the invoked `hermes-workflow`; portable task packages no longer embed a
+  developer `/tmp` virtualenv path.
 
 ## Requirement and Scientific-Semantics Contract
 
@@ -100,7 +159,12 @@ effect.
   is a safe absolute path, must identify exactly one include, and must be a
   readable regular file on the machine that runs Spectre (Remote host for
   Remote flows). Each testbench uses its own source corner, and nominal
-  aggregation requires an explicit `id: nominal` corner.
+  aggregation requires an explicit `id: nominal` corner. A `fix_run` project's
+  `Process Corners` section rejects an explicitly written `objective_policy`
+  or `constraint_policy` during intake ("aggregation policies are not
+  supported for fix_run workflow"); when both fields are omitted, intake
+  fills `nominal`/`nominal` internally to satisfy schema validation only --
+  fix-run has no optimizer-style aggregation to apply a policy to.
 - Fixed OpenBox presets cannot be silently changed by contradictory advanced
   settings. Optimizer batch/parallel limits and the TuRBO minimum budget are
   enforced during requirement intake as well as project validation.
@@ -114,15 +178,22 @@ effect.
   and public optimizer entry points reject fix-run projects before optimizer
   execution. Local entry points fail before doctor/preparation; Remote
   continuation validates its frozen snapshot first, then fails before backend
-  dispatch.
+  dispatch. A continuation (local or Remote) re-validates the current
+  requirement but does not re-materialize requirement changes into that run's
+  execution config -- a warm-start section added or changed after the first
+  run has no effect on a continuation.
 - The packaged matrix now contains 11 parse/render-validated requirements,
   including GP-EIC, native TuRBO, multi-corner warm start, metrics-only fix-run,
   and multi-testbench Metrics+Waveform fix-run.
 
 ## Compatibility and Known Boundaries
 
-- Existing native TuRBO reports that predate the explicit `backend` field remain
-  valid when they use the native-specific report and JSONL paths.
+- Native TuRBO writes and reads `reports/native_turbo_optimizer_report.json`
+  and `reports/native_turbo_optimizer_evaluations.jsonl` today, not only for
+  reports that predate the explicit `backend` field; the internal
+  `LEGACY_NATIVE_*` constant names describe file-path origin, not current
+  status. Reports without an explicit `backend` field also remain valid
+  readers of the same native-specific report and JSONL paths.
 - Native TuRBO trace reconstruction cannot reproduce unrecorded library RNG
   state bit-for-bit; reports state `restore_mode: trace_reconstructed`.
 - `required_signals` remains provenance and history-compatibility metadata; it
@@ -132,38 +203,23 @@ effect.
   current direct-SSH product scope. Remote execution in this release remains
   attached to the Controller process.
 
-## Final Acceptance
+## Status
 
-- The release checkout passed its software acceptance with `1757 passed`,
-  Ruff clean, `git diff --check` clean, version `0.1.10`, all 11 requirement
-  templates validated, and wheel metadata/content plus isolated CLI smoke
-  checks passing.
-- The isolated real Remote Native TuRBO project continued from the existing
-  100 evaluations by exactly 20 without rerunning initialization. The final
-  result contains 120 parent runs, 1080 child runs, 1200 metric manifests, and
-  2400 checksum entries; all 2400 Remote checksums passed.
-- The first 100 history rows and their 2000 artifact checksums remained
-  unchanged. The final flow passed with Native backend, Remote transport,
-  reconstructed trust-region state, accepted artifacts, successful
-  finalization, and no active attempt lock.
-- Real continuation exposed one release-blocking defect: a frozen Controller
-  cache did not contain `supervisor_instruction.json`. Continuation now
-  regenerates a fail-closed instruction from the execution manifest and
-  current validated config before the real optimizer gate. Its focused tests
-  pass (`87 passed`); this small correction did not trigger another full suite.
-
-## Deferred Work
-
-- Slurm/LSF job IDs, scheduler submission, and detach/reattach remain future
-  production capabilities, not incomplete behavior in the direct-SSH flow.
-- Log wording, additional diagnostics, reject-reason propagation, optimizer
-  state naming clarification, extreme-concurrency hardening, and broader fault
-  matrices are deferred. They do not change the accepted v0.1.10 results.
-- Local continuation does not reconstruct an externally deleted approval file;
-  it remains fail-closed and is deferred separately from the validated Remote
-  continuation path.
+- **Software acceptance: PASS.** Wheel build and isolated-venv smoke test
+  passed against this release
+  (`dist/ic_auto_opt_workflow-0.1.10-py3-none-any.whl`).
+- **Real Remote Native TuRBO continuation acceptance: PASS.** Verified
+  2026-08-11/12 against the released code (`9fde562`):
+  `ic-opt <project> --real --continue 20 --ssh-profile <user>@<host>` extended
+  a native TuRBO project from 100 to 120 cumulative evaluations; see "CLI and
+  Optimizer Capability Contract" above for the full evidence summary.
 
 See
 `docs/audits/2026-08-10-real-world-correctness-audit-and-repair-ledger-cn.md`
-for root causes, red/green evidence, real Remote acceptance evidence, remaining
-TODOs, and scope decisions.
+for root causes, red/green evidence, and remaining TODOs/scope decisions from
+the audit that produced this release's hardening batch.
+
+Versioning going forward: any further **code** change ships as `0.1.11` or
+later -- `0.1.10` is closed at `9fde562`. A pure documentation correction (no
+code change) may be committed straight to `main` without a version bump or
+re-release.

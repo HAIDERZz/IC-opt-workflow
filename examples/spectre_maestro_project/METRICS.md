@@ -22,11 +22,11 @@ fix-run accepts Metrics, Waveform Exports, or both.
 - `testbench` is omitted for a top-level single-testbench Maestro Source. It is
   required when `Maestro Source.testbenches` is used and must equal one of its
   declared IDs.
-- `result` is optional. When present, the OCEAN replay runs
-  `selectResult('<result>')` before evaluating `ocean_expression`. Requirement
-  validation rejects unsafe result identifiers before simulation. It is
-  normally omitted when the expression already contains an explicit `?result`
-  selector.
+- `result` is optional. When present, the OCEAN replay emits
+  `selectResult('<result>)` (SKILL reference-symbol form, no closing quote)
+  before evaluating `ocean_expression`. Requirement validation rejects unsafe
+  result identifiers before simulation. It is normally omitted when the
+  expression already contains an explicit `?result` selector.
 - `ocean_expression` is copied exactly into the OCEAN replay script. IC Auto
   Opt does not rewrite an ADE/Maestro-approved formula.
 - `required_signals` is optional provenance and history-compatibility metadata.
@@ -37,7 +37,10 @@ fix-run accepts Metrics, Waveform Exports, or both.
 Scalar metric nil and non-finite policies are fixed to `fail`; they are not
 user-overridable requirement fields. A metric definition that changes
 `result`, `required_signals`, unit, formula, or testbench route is a different
-metric definition for History Warm Start compatibility.
+metric definition for History Warm Start compatibility. The internally
+recorded Maestro formula provenance is also part of that compatibility
+signature even though it is not a requirement input field, so the list above
+is not the complete signature.
 
 ## Constraint Units
 

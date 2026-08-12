@@ -21,6 +21,11 @@ separate workflow mode. Continuation also has no separate requirement template:
 ic-opt <project> --real --continue N
 ```
 
+This file is copied into the rendered project, so every `ic-opt` command shown
+below is the bare command name; run it as `./.venv/bin/ic-opt` from the tool
+checkout root, or activate that virtual environment first, so `ic-opt`
+resolves on `PATH`.
+
 Continuation extends the generated project backend and does not reread a
 changed `opt_requirement.md`. History Warm Start creates a new optimize project
 and is a different capability.
@@ -37,9 +42,9 @@ Cartesian product.
 | `opt_requirement.openbox_gp_eic.md` | complete OpenBox GP-EIC settings |
 | `opt_requirement.turbo.md` | complete native TuRBO trust-region settings |
 | `opt_requirement.multi_corner.md` | one testbench; multiple process corners |
-| `opt_requirement.multi_testbench.md` | multiple testbenches; source/nominal corner |
+| `opt_requirement.multi_testbench.md` | multiple testbenches; source/nominal corner (`openbox_auto` compatibility strategy; new production requirements should use `openbox_prf_eic`/`openbox_gp_eic`) |
 | `opt_requirement.multi_tb_corner.md` | multiple testbenches and process corners |
-| `opt_requirement.history_warm_start.md` | multi-testbench OpenBox history warm start |
+| `opt_requirement.history_warm_start.md` | multi-testbench OpenBox history warm start (`openbox_auto` compatibility strategy; new production requirements should use `openbox_prf_eic`/`openbox_gp_eic`) |
 | `opt_requirement.history_warm_start.multi_corner.md` | single-testbench, multi-corner OpenBox history warm start |
 | `opt_requirement.fix_run.md` | waveform-only; one testbench; 15 corners; one fixed point |
 | `opt_requirement.fix_run.metrics_only.md` | metrics-only; one testbench; multiple fixed points |
@@ -288,8 +293,9 @@ Single-testbench scalar metric:
 ```
 
 Multi-testbench metrics add `testbench: cg_nf`. `result` is optional and emits
-`selectResult('pnoise')` before the formula. It is normally omitted when the
-formula already contains `?result`. `required_signals` is provenance and
+`selectResult('pnoise)` (SKILL reference-symbol form, no closing quote)
+before the formula. It is normally omitted when the formula already contains
+`?result`. `required_signals` is provenance and
 History Warm Start compatibility metadata; the workflow does not inspect PSF
 to prove those names exist. Formula errors, nil, waveform objects, and
 non-finite scalar values fail the metric.
@@ -313,9 +319,10 @@ no implicit conversion between dB, dBm, Hz, seconds, farads, or any other
 units.
 
 The optional project-root `constraints.md` is separate human/supervisor
-guidance. Its presence and hash are recorded, but its prose is not translated
-into machine Constraints. Every enforced threshold must therefore appear in
-the `## Constraints` YAML block above.
+guidance. Its presence and hash are recorded as the requirement intake
+report's `constraints_md_present` and `constraints_md_sha256` fields, but its
+prose is not translated into machine Constraints. Every enforced threshold
+must therefore appear in the `## Constraints` YAML block above.
 
 ## Objective
 
@@ -351,7 +358,9 @@ keep_failed_runs: true
 keep_successful_runs: true
 ```
 
-`threads_per_run` maps to Spectre `+mt`. In optimize, `parallel_jobs` is
+`engine` and `preset` select the Spectre invocation; `preset` is one of `cx`,
+`ax`, `mx`, `lx`, or `vx` (a closed set, like every other field in this
+document). `threads_per_run` maps to Spectre `+mt`. In optimize, `parallel_jobs` is
 candidate-level process concurrency. In fix-run, it is testbench/corner child
 concurrency inside one fixed point; fixed points remain serial. The supported
 output format is `psfxl`.
@@ -388,6 +397,11 @@ templates whose validated source run used OpenBox automatic model selection.
 Do not omit strategy in a new production requirement. `random_baseline` is for
 diagnostic plumbing checks, not production optimization.
 
+Omitting `strategy` does not fail closed at the schema level: it is an
+optional field, and omission falls through to a backend default strategy
+resolution. This is a deliberately retained compatibility path for legacy
+requirements, not a recommended way to write a new one.
+
 `initialization` is `sobol`, `latin_hypercube`, or `random`.
 `max_evaluations`, `batch_size`, and `optimizer_cpu_threads` are positive
 integers; `random_seed` is the reproducibility seed; `failure_penalty` is a
@@ -420,6 +434,11 @@ turbo:
   snap_to_step: true
   duplicate_handling: resample
 ```
+
+`snap_to_step` and `duplicate_handling` are not tunable fields: schema
+currently accepts only the literal values shown above (`true` and
+`resample`), the same way nil/non-finite policy is a fixed literal rather
+than a choice.
 
 Use the complete GP-EIC and TuRBO templates rather than changing only the
 algorithm name in another file.
@@ -481,6 +500,13 @@ OCEAN contract metadata. Old objective and Constraint values are not reused;
 raw historical Metrics are evaluated under the current requirement. Points
 outside the current variable space are recorded as `out_of_current_space`.
 
+Metric name matching for this compatibility check is case-sensitive and
+exact. A source project that defines a metric as `P1dB` and a current project
+that defines the same metric as `P1DB` are treated as incompatible metric
+definitions, and the corresponding history points are dropped rather than
+matched. Use the same metric name casing across a source and current project
+pair before relying on warm start.
+
 Inspect `reports/history_warm_start_audit.json`,
 `reports/history_warm_start_audit.md`, and `openbox.history_warm_start` in
 `reports/optimizer_run_report.json` before claiming history was applied.
@@ -502,12 +528,20 @@ name.
 ## Check the Requirement
 
 ```bash
+ic-opt <project> --doctor
 hermes-workflow check-requirement <project>
 hermes-workflow prepare-from-requirement <project>
 hermes-workflow validate <project>
 hermes-workflow check-project-ready <project>
 ```
 
-Do not treat parsing alone as engineering acceptance. For production, inspect
-the rendered configs/netlists and the real local or remote result manifests and
-reports for the selected topology, corner matrix, output contract, and backend.
+`ic-opt <project> --doctor` is the backend-aware Product Doctor gate: it
+resolves the requirement's actual strategy/backend and checks the Controller
+optimizer runtime (Native TuRBO, OpenBox, or random-baseline dependencies) and
+Remote toolchain readiness that applies to it. The four `hermes-workflow`
+commands only validate the requirement/config parsing layer -- section
+presence, YAML shape, unit and bounds checks, and rendered config content --
+and are not a substitute for the doctor gate. Do not treat parsing alone as
+engineering acceptance. For production, inspect the rendered configs/netlists
+and the real local or remote result manifests and reports for the selected
+topology, corner matrix, output contract, and backend.

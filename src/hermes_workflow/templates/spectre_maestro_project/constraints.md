@@ -4,7 +4,9 @@ This file is optional supervisor-agent guidance. It is not converted directly
 into Spectre settings, OCEAN formulas, optimizer bounds, hard constraints, or
 process corners.
 
-Put machine-critical execution fields in `opt_requirement.md`.
+Put machine-critical execution fields in the `## Constraints` YAML block of
+`opt_requirement.md`. Every enforced threshold must appear there; this file's
+prose is never translated into a machine Constraint.
 
 Example guidance:
 
