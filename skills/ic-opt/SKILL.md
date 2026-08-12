@@ -63,7 +63,12 @@ ic-opt PROJECT_DIR --real --continue N
 ```
 
 `--continue N` extends the same optimizer project. It does not reread a changed
-`opt_requirement.md` and is not history warm-start.
+`opt_requirement.md` and is not history warm-start. It preserves the generated
+project backend: OpenBox continues OpenBox history and native TuRBO continues
+native TuRBO history. Never switch backend during continuation. A Remote
+continuation attempt must rerun Remote Doctor once against the current host,
+using the same SSH runner and Cadence environment, before frozen preparation,
+history synchronization, or backend execution.
 
 `--ssh-profile PROFILE` selects an OpenSSH profile for remote execution. It is
 not an optimizer or resource override.
@@ -75,11 +80,16 @@ Read `opt_requirement.md` before running. Use these templates and expectations:
 | User goal | Template | Mode |
 | --- | --- | --- |
 | Single testbench, source-point corner optimization | `opt_requirement.md` | `optimize` |
+| Explicit OpenBox GP-EIC optimization | `opt_requirement.openbox_gp_eic.md` | `optimize` |
+| Explicit native TuRBO optimization | `opt_requirement.turbo.md` | `optimize` |
 | Single testbench, multiple process corners | `opt_requirement.multi_corner.md` | `optimize` |
 | Multiple testbenches, source-point corner | `opt_requirement.multi_testbench.md` | `optimize` |
 | Multiple testbenches and multiple process corners | `opt_requirement.multi_tb_corner.md` | `optimize` |
 | New same-circuit run using previous project history | `opt_requirement.history_warm_start.md` | `optimize` + `History Warm Start` |
+| History warm start over multiple process corners | `opt_requirement.history_warm_start.multi_corner.md` | `optimize` + `History Warm Start` |
 | User-specified fixed points and waveform CSV export | `opt_requirement.fix_run.md` | `fix_run` |
+| User-specified fixed points with scalar metrics only | `opt_requirement.fix_run.metrics_only.md` | `fix_run` |
+| Multi-testbench fixed points with metrics and waveforms | `opt_requirement.fix_run.multi_testbench.metrics_waveform.md` | `fix_run` |
 
 If `Workflow` is absent, treat the file as an optimization requirement for
 backward compatibility.
@@ -116,7 +126,8 @@ Cadence setup path.
 `--dry-orchestration` is a local optimize-only first-run gate. It runs offline
 orchestration checks and stops before real Spectre/OCEAN candidate execution. Do
 not use it for continuation, fix-run, or remote mode unless the current docs say
-that support has been restored.
+that support has been restored. Invalid combinations fail before workflow or
+Remote execution; do not retry them as if the flag had been accepted.
 
 ## Run Procedure
 
@@ -153,9 +164,10 @@ Runtime contract:
 - old points outside the current variable space are rejected as
   `out_of_current_space`
 
-History application is an OpenBox backend feature. Native TuRBO does not consume
-history warm-start observations for candidate suggestion. If previous-project
-history must guide new candidates, recommend OpenBox.
+History application is an OpenBox backend feature. An enabled History Warm Start
+with native TuRBO is rejected during requirement/project validation; it is not
+silently ignored. If previous-project history must guide a new project, recommend
+OpenBox. To extend the same native TuRBO project, use `--continue N`.
 
 After the run, inspect:
 

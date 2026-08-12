@@ -1,4 +1,4 @@
-# IC Auto Opt Workflow v0.1.9 使用说明
+# IC Auto Opt Workflow v0.1.10 使用说明
 
 IC Auto Opt 用 `opt_requirement.md` 描述一次真实 Spectre/OCEAN 工作流。当前
 release 支持两种模式：
@@ -148,6 +148,13 @@ Spectre/OCEAN candidate 之前停住。当前 release 中只把它作为本地 o
 优化器 CPU 限制、算法、策略、初始化、工艺角、输出格式、metric 公式、固定点和
 waveform export 都来自 `opt_requirement.md`。
 
+续跑沿用已经生成的项目 backend。OpenBox 历史只能由 OpenBox 续跑，native TuRBO
+历史只能由 native TuRBO 续跑。Native TuRBO 会从累计 trace 重建活动 trust region，
+不会重新执行初始设计；旧 artifact 没有保存底层 RNG 状态，因此不承诺与一个从未
+中断的进程逐 bit 相同。每次 Remote continuation 都会先在当前远端主机上重新执行
+Doctor；只有环境、工具、Requirement 和 dirty-state 检查通过，才会恢复 frozen
+snapshot、同步历史并启动后端。
+
 ## 项目目录
 
 推荐结构：
@@ -190,17 +197,21 @@ testbench 名称。
 
 ```text
 examples/spectre_maestro_project/opt_requirement.md
+examples/spectre_maestro_project/opt_requirement.openbox_gp_eic.md
+examples/spectre_maestro_project/opt_requirement.turbo.md
 examples/spectre_maestro_project/opt_requirement.multi_corner.md
 examples/spectre_maestro_project/opt_requirement.multi_testbench.md
 examples/spectre_maestro_project/opt_requirement.multi_tb_corner.md
 examples/spectre_maestro_project/opt_requirement.history_warm_start.md
+examples/spectre_maestro_project/opt_requirement.history_warm_start.multi_corner.md
 examples/spectre_maestro_project/opt_requirement.fix_run.md
+examples/spectre_maestro_project/opt_requirement.fix_run.metrics_only.md
+examples/spectre_maestro_project/opt_requirement.fix_run.multi_testbench.metrics_waveform.md
 ```
 
-multi-testbench 模板以真实跑通的 Mixer 多 testbench requirement 为结构基准，保留
-CG/NF/BW、IIP3、P1dB 指标到各自 testbench 的路由。history 模板以第二轮同电路
-history 验证 requirement 为结构基准。fix-run 模板以真实跑通的 15-corner Mixer
-requirement 为结构基准。
+显式 GP-EIC/TuRBO 模板用于锁定 optimizer；multi-testbench 模板展示完整 measurement
+route；history 模板覆盖 source-point 和 multi-corner OpenBox warm start；三份 fix-run
+模板分别覆盖 waveform-only、metrics-only 和 multi-testbench Metrics+Waveform。
 
 使用时，把模板复制为项目根目录的 `opt_requirement.md`，替换 Maestro point root、
 旧项目路径、固定参数点、corner 变量、waveform export 和电路相关公式。
@@ -248,6 +259,10 @@ warm_start_strategy: topk
 这个 section 会渲染为 `config/history_warm_start.yaml`。它和 `--continue N` 不是
 同一个用途。History warm-start 只支持 optimize，不支持 fix-run，也不能和
 `--continue` 一起使用。
+
+启用的 History Warm Start 只支持 OpenBox。若项目选择 native TuRBO，requirement
+intake 和项目校验会明确拒绝该组合，而不是运行时静默忽略。Native TuRBO 的同项目
+追加预算使用 `--continue N`。
 
 第一版规则是严格的：新旧项目变量名必须完全一致，不做变量名映射，也不接受旧项目
 多出来的变量。变量范围可以变化；旧点如果超出当前变量空间，会在 audit 里统计为

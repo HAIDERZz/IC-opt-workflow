@@ -7,6 +7,7 @@ from pathlib import Path, PurePosixPath
 from types import SimpleNamespace
 from typing import Any, Callable
 
+from hermes_workflow.approvals import decide_continuation_real_run
 from hermes_workflow.execution_adapters.remote_spectre_ocean import (
     run_remote_multi_testbench_adapter,
     run_remote_spectre_ocean_adapter,
@@ -17,6 +18,7 @@ from hermes_workflow.optimizer_acceptance import check_optimizer_run
 from hermes_workflow.optimizer_artifacts import (
     EVALUATIONS_RELATIVE,
     LEGACY_NATIVE_EVALUATIONS_RELATIVE,
+    load_optimizer_artifacts,
 )
 from hermes_workflow.optimizer_completion import summarize_optimizer_run
 from hermes_workflow.optimizer_decision import generate_optimizer_decision_report
@@ -24,11 +26,23 @@ from hermes_workflow.optimizer_finalize import finalize_optimizer_run
 from hermes_workflow.optimizer_flow import (
     OptimizerFlowReport,
     OptimizerFlowServices,
+    _backend_from_project_strategy,
     optimize_project,
 )
 from hermes_workflow.optimizer_insights import generate_optimizer_insight_report
+from hermes_workflow.optimizer_trace_science import (
+    DUPLICATE_SKIPPED,
+    duplicate_skipped_trace_issues,
+)
 from hermes_workflow.package import build_execution_package, sha256_file
 from hermes_workflow.remote_doctor import run_remote_doctor
+from hermes_workflow.remote_history_manifests import (
+    materialize_remote_history_manifests,
+)
+from hermes_workflow.remote_attempt_lock import (
+    RemoteAttemptLease,
+    acquire_remote_attempt_lock,
+)
 from hermes_workflow.remote_prepare import prepare_remote_project_cache
 from hermes_workflow.remote_project import RemoteProjectRef
 from hermes_workflow.real_run import RUN_ID_RE
@@ -36,78 +50,48 @@ from hermes_workflow.requirement_intake import (
     RequirementIntakeReport,
     RequirementPreparationReport,
 )
-from hermes_workflow.remote_ssh import RemoteSshRunner, quote_remote_path
+from hermes_workflow.remote_ssh import (
+    RemoteSshRunner,
+    quote_remote_path,
+    require_boolean_probe,
+)
 from hermes_workflow.run_retention import apply_remote_run_retention
-from hermes_workflow.validate import assert_valid_project
+from hermes_workflow.retention_evidence import (
+    load_retention_evidence,
+    materialize_combined_supplementary_artifacts,
+)
+from hermes_workflow.validate import assert_valid_project, require_optimize_bundle
 
 
-def _wrap_with_remote_retention(
-    inner_adapter: Callable[..., Any],
+def _make_remote_retention_callback(
     *,
-    local_project: Path,
     ref: RemoteProjectRef,
     runner: Any,
-) -> Callable[..., Any]:
-    """Wrap an inner remote adapter so retention runs once after it returns.
+) -> Callable[[Path, str, str | None, bool], list[str]]:
+    """Build Remote retention that consumes the finalized observation status."""
 
-    Retention is applied per ``run_id`` based on the inner adapter's result
-    status (or any raised exception). On exception, retention still runs and
-    the original exception is re-raised. Retention failures are appended to
-    the result's ``issues`` list when the inner adapter returned successfully.
-    """
-
-    def wrapped(local_project_arg: Path, *args: Any, **kwargs: Any) -> Any:
-        run_id = kwargs.get("run_id")
-        if run_id is None and args:
-            run_id = args[0]
-        adapter_exc: BaseException | None = None
-        result: Any = None
-        try:
-            result = inner_adapter(local_project_arg, *args, **kwargs)
-        except BaseException as exc:  # noqa: BLE001 — must still run retention.
-            adapter_exc = exc
-
-        run_succeeded = (
-            adapter_exc is None
-            and getattr(result, "status", None) == "succeeded"
-        )
-        candidate_id: str | None = None
-        if result is not None:
-            cand = getattr(result, "candidate_id", None)
-            if isinstance(cand, str):
-                candidate_id = cand
-
+    def apply(
+        controller_cache: Path,
+        run_id: str,
+        candidate_id: str | None,
+        run_succeeded: bool,
+    ) -> list[str]:
         try:
             decision = apply_remote_run_retention(
-                local_project,
+                controller_cache,
                 remote_ref=ref,
                 runner=runner,
-                run_id=str(run_id) if run_id is not None else "",
+                run_id=run_id,
                 candidate_id=candidate_id,
                 run_succeeded=run_succeeded,
             )
-        except Exception as exc:  # noqa: BLE001 — surface but do not crash.
-            if adapter_exc is None and result is not None:
-                issues = getattr(result, "issues", None)
-                if isinstance(issues, list):
-                    issues.append(f"remote run retention raised: {exc}")
-            decision = None
+        except Exception as exc:  # noqa: BLE001 — preserve finalized observation.
+            return [f"remote run retention raised: {exc}"]
+        if decision.remote_action == "failed":
+            return list(decision.issues) or ["remote run retention failed"]
+        return []
 
-        if (
-            decision is not None
-            and decision.remote_action == "failed"
-            and adapter_exc is None
-            and result is not None
-        ):
-            issues = getattr(result, "issues", None)
-            if isinstance(issues, list):
-                issues.extend(decision.issues)
-
-        if adapter_exc is not None:
-            raise adapter_exc
-        return result
-
-    return wrapped
+    return apply
 
 
 def _remote_product_doctor_already_passed(
@@ -155,6 +139,12 @@ def optimize_remote_project(
     )
     if doctor.status != "pass":
         raise ValueError("remote doctor failed: " + "; ".join(doctor.issues))
+    doctor_mode = getattr(doctor, "workflow_mode", "optimize")
+    if doctor_mode != "optimize":
+        raise ValueError(
+            "remote optimize requires workflow mode 'optimize'; "
+            f"got {doctor_mode!r}"
+        )
     prepared = prepare_remote_project_cache(
         ref,
         runner=ssh,
@@ -174,8 +164,10 @@ def optimize_remote_project(
             f"expected 'optimize', got {prepared_mode!r}"
         )
 
-    def selected_adapter(local_project: Path, run_id: str, cadence_cshrc: Path) -> object:
-        bundle = assert_valid_project(local_project)
+    retention_callback = _make_remote_retention_callback(ref=ref, runner=ssh)
+
+    def selected_adapter(controller_cache: Path, run_id: str, cadence_cshrc: Path) -> object:
+        bundle = assert_valid_project(controller_cache)
         if (
             bundle.testbenches is not None
             or getattr(bundle, "process_corners", None) is not None
@@ -184,28 +176,20 @@ def optimize_remote_project(
         else:
             inner = run_remote_spectre_ocean_adapter
 
-        def call_inner(local_project_arg: Path, *args: object, **kwargs: object) -> object:
-            return inner(
-                local_project_arg,
-                run_id=kwargs.get("run_id", run_id),
-                remote_ref=ref,
-                remote_cadence_cshrc=remote_cadence_cshrc,
-                runner=ssh,
-            )
-
-        wrapped = _wrap_with_remote_retention(
-            call_inner,
-            local_project=local_project,
-            ref=ref,
+        return inner(
+            controller_cache,
+            run_id=run_id,
+            remote_ref=ref,
+            remote_cadence_cshrc=remote_cadence_cshrc,
             runner=ssh,
         )
-        return wrapped(local_project, run_id=run_id, cadence_cshrc=cadence_cshrc)
 
     def remote_openbox(project_dir: Path, **kwargs: object):
         return run_openbox_real_optimization(
             project_dir,
             adapter=selected_adapter,
             transport_mode="remote",
+            retention_callback=retention_callback,
             **kwargs,
         )
 
@@ -214,6 +198,7 @@ def optimize_remote_project(
             project_dir,
             adapter=selected_adapter,
             transport_mode="remote",
+            retention_callback=retention_callback,
             **kwargs,
         )
 
@@ -268,6 +253,8 @@ def continue_remote_project(
     strategy: str | None = None,
     cache_root: Path | None = None,
     runner: Any | None = None,
+    doctor_report: Any | None = None,
+    attempt_started: bool = False,
 ) -> OptimizerFlowReport:
     if additional_evals < 1:
         raise ValueError("additional_evals must be >= 1")
@@ -276,7 +263,24 @@ def continue_remote_project(
             "--continue continuation uses requirement strategy; remove --strategy"
         )
     ssh = runner or RemoteSshRunner(ref.ssh_profile)
-    _archive_remote_flow_report(ref, ssh)
+    if not attempt_started:
+        _archive_remote_flow_report(ref, ssh)
+    doctor = doctor_report
+    if doctor is None:
+        doctor = run_remote_doctor(
+            ref,
+            runner=ssh,
+            cadence_cshrc=remote_cadence_cshrc,
+            cache_root=cache_root,
+        )
+    if doctor.status != "pass":
+        raise ValueError("remote doctor failed: " + "; ".join(doctor.issues))
+    doctor_mode = getattr(doctor, "workflow_mode", "optimize")
+    if doctor_mode != "optimize":
+        raise ValueError(
+            "remote continuation requires workflow mode 'optimize'; "
+            f"got {doctor_mode!r}"
+        )
     prepared = prepare_remote_project_cache(
         ref,
         runner=ssh,
@@ -288,43 +292,67 @@ def continue_remote_project(
     _sync_remote_history_to_cache(ref, prepared.cache_dir, ssh)
 
     project_root = prepared.cache_dir
-    evaluations_path = project_root / "reports" / "optimizer_evaluations.jsonl"
+    config_dir = project_root / "config"
+    if (config_dir / "workflow.yaml").exists() or (
+        config_dir / "fixed_points.yaml"
+    ).exists():
+        validated = assert_valid_project(project_root)
+        if validated.optimizer is None:
+            raise ValueError("continuation requires an optimize workflow")
+    backend = _backend_from_project_strategy(
+        project_root,
+        backend="openbox",
+        strategy=None,
+    )
+    evaluations_path = _continuation_history_path(project_root, backend=backend)
     if not evaluations_path.is_file() or evaluations_path.stat().st_size == 0:
         raise ValueError(
             "cannot continue without optimizer history: "
             f"{evaluations_path} is missing or empty"
         )
+    supplementary_artifact_root = materialize_remote_history_manifests(
+        ref,
+        project_root,
+        evaluations_path,
+        ssh,
+    )
+    prior_acceptance = check_optimizer_run(
+        project_root,
+        expected_backend=backend,
+        supplementary_artifact_root=supplementary_artifact_root,
+    )
+    if prior_acceptance.status != "accepted":
+        detail = "; ".join(prior_acceptance.issues) or "status is not accepted"
+        raise RuntimeError(
+            "prior optimizer history acceptance rejected: " + detail
+        )
     _ensure_execution_manifest(project_root)
+    decide_continuation_real_run(project_root)
+    retention_callback = _make_remote_retention_callback(ref=ref, runner=ssh)
+
+    def selected_adapter(
+        controller_cache: Path,
+        run_id: str,
+        cadence_cshrc: Path,
+    ) -> object:
+        bundle = assert_valid_project(controller_cache)
+        if (
+            bundle.testbenches is not None
+            or getattr(bundle, "process_corners", None) is not None
+        ):
+            inner = run_remote_multi_testbench_adapter
+        else:
+            inner = run_remote_spectre_ocean_adapter
+
+        return inner(
+            controller_cache,
+            run_id=run_id,
+            remote_ref=ref,
+            remote_cadence_cshrc=remote_cadence_cshrc,
+            runner=ssh,
+        )
 
     def remote_openbox(project_dir: Path, **kwargs: object) -> object:
-        bundle = assert_valid_project(project_dir)
-
-        def selected_adapter(local_project: Path, run_id: str, cadence_cshrc: Path) -> object:
-            if (
-                bundle.testbenches is not None
-                or getattr(bundle, "process_corners", None) is not None
-            ):
-                inner = run_remote_multi_testbench_adapter
-            else:
-                inner = run_remote_spectre_ocean_adapter
-
-            def call_inner(local_project_arg: Path, *args: object, **kwargs: object) -> object:
-                return inner(
-                    local_project_arg,
-                    run_id=kwargs.get("run_id", run_id),
-                    remote_ref=ref,
-                    remote_cadence_cshrc=remote_cadence_cshrc,
-                    runner=ssh,
-                )
-
-            wrapped = _wrap_with_remote_retention(
-                call_inner,
-                local_project=local_project,
-                ref=ref,
-                runner=ssh,
-            )
-            return wrapped(local_project, run_id=run_id, cadence_cshrc=cadence_cshrc)
-
         return run_openbox_real_optimization(
             project_dir,
             max_evals=None,
@@ -339,15 +367,79 @@ def continue_remote_project(
             acq_type=None,
             acq_optimizer_type=None,
             initial_trials=None,
+            retention_callback=retention_callback,
+        )
+
+    def remote_native_turbo(project_dir: Path, **_kwargs: object) -> object:
+        return run_batch_native_turbo_optimization(
+            project_dir,
+            max_evals=None,
+            additional_evals=additional_evals,
+            continue_from_existing=True,
+            cadence_cshrc=Path(remote_cadence_cshrc.as_posix()),
+            adapter=selected_adapter,
+            parallel_jobs=parallel_jobs,
+            transport_mode="remote",
+            run_offset_floor=_remote_real_run_offset_floor(ref, ssh),
+            retention_callback=retention_callback,
+        )
+
+    optimizer_fn = (
+        remote_native_turbo if backend == "native_turbo" else remote_openbox
+    )
+    run_step_name = (
+        "run-native-turbo-real"
+        if backend == "native_turbo"
+        else "run-openbox-real"
+    )
+
+    def current_supplementary_root(project_dir: Path) -> Path | None:
+        artifact_issues: list[str] = []
+        current_artifacts = load_optimizer_artifacts(
+            project_dir,
+            artifact_issues,
+            expected_backend=backend,
+        )
+        if artifact_issues:
+            raise RuntimeError(
+                "cannot resolve current optimizer artifacts: "
+                + "; ".join(artifact_issues)
+            )
+        run_ids = {
+            value
+            for row in current_artifacts.traces
+            if isinstance((value := row.get("run_id")), str)
+            and RUN_ID_RE.fullmatch(value) is not None
+        }
+        return materialize_combined_supplementary_artifacts(
+            project_dir,
+            prior_verified_root=supplementary_artifact_root,
+            run_ids=run_ids,
+        )
+
+    def check_with_history(project_dir: Path, **kwargs: object) -> object:
+        return check_optimizer_run(
+            project_dir,
+            supplementary_artifact_root=current_supplementary_root(project_dir),
+            **kwargs,
+        )
+
+    def finalize_with_history(project_dir: Path, **kwargs: object) -> object:
+        return finalize_optimizer_run(
+            project_dir,
+            supplementary_artifact_root=current_supplementary_root(project_dir),
+            **kwargs,
         )
 
     try:
         report = _run_continuation_closeout(
             project_root,
-            openbox_fn=remote_openbox,
-            check_fn=check_optimizer_run,
+            optimizer_fn=optimizer_fn,
+            backend=backend,
+            run_step_name=run_step_name,
+            check_fn=check_with_history,
             summarize_fn=summarize_optimizer_run,
-            finalize_fn=finalize_optimizer_run,
+            finalize_fn=finalize_with_history,
             insight_fn=generate_optimizer_insight_report,
             decision_fn=generate_optimizer_decision_report,
             additional_evals=additional_evals,
@@ -370,6 +462,53 @@ def continue_remote_project(
     return report
 
 
+def _continuation_history_path(project_root: Path, *, backend: str) -> Path:
+    neutral = project_root / EVALUATIONS_RELATIVE
+    legacy_native = project_root / LEGACY_NATIVE_EVALUATIONS_RELATIVE
+    if not neutral.exists() and not legacy_native.exists():
+        return legacy_native if backend == "native_turbo" else neutral
+    issues: list[str] = []
+    artifacts = load_optimizer_artifacts(
+        project_root,
+        issues,
+        expected_backend=backend,
+    )
+    if issues:
+        raise ValueError(
+            f"cannot select {backend} continuation history: " + "; ".join(issues)
+        )
+    return project_root / artifacts.evaluations_relative
+
+
+def _remote_real_run_offset_floor(ref: RemoteProjectRef, ssh: Any) -> int:
+    """Return the greatest remote ``real_NNN`` suffix, including orphan runs."""
+    real_root = ref.remote_project_dir / "runs" / "real"
+    quoted_root = quote_remote_path(real_root)
+    result = ssh.run(
+        f"real_root={quoted_root}\n"
+        'if test -d "$real_root"; then\n'
+        '  for run_dir in "$real_root"/real_*; do\n'
+        '    test -d "$run_dir" || continue\n'
+        "    printf '%s\\n' \"${run_dir##*/}\"\n"
+        "  done\n"
+        "fi"
+    )
+    if result.return_code != 0:
+        detail = result.stderr.strip() or f"return code {result.return_code}"
+        raise RuntimeError(f"remote real-run inventory probe failed: {detail}")
+    floor = 0
+    for raw_name in result.stdout.splitlines():
+        run_name = raw_name.strip()
+        if not run_name:
+            continue
+        if not RUN_ID_RE.fullmatch(run_name):
+            raise RuntimeError(
+                f"remote real-run inventory contains invalid run ID: {run_name!r}"
+            )
+        floor = max(floor, int(run_name.removeprefix("real_")))
+    return floor
+
+
 def _sync_remote_history_to_cache(
     ref: RemoteProjectRef,
     cache_dir: Path,
@@ -380,14 +519,14 @@ def _sync_remote_history_to_cache(
         local_dir = cache_dir / subdir
         remote_dir = ref.remote_project_dir / subdir
         probe = ssh.run(f"test -d {quote_remote_path(remote_dir)}")
-        if probe.return_code not in {0, 1}:
-            raise RuntimeError(
-                f"Failed to probe remote history subdir '{subdir}': "
-                f"exit={probe.return_code}: {probe.stderr.strip()}"
-            )
+        exists = require_boolean_probe(
+            probe,
+            profile=getattr(ssh, "profile", ref.ssh_profile),
+            description=f"remote history subdir probe for {remote_dir}",
+        )
         if local_dir.exists():
             shutil.rmtree(local_dir)
-        if probe.return_code == 0:
+        if exists:
             local_dir.mkdir(parents=True, exist_ok=True)
             try:
                 ssh.download_tree(remote_dir, local_dir)
@@ -399,12 +538,37 @@ def _sync_remote_history_to_cache(
 
 def _archive_remote_flow_report(ref: RemoteProjectRef, ssh: Any) -> None:
     """Remove a stale pass marker from the active path without discarding it."""
+    _archive_remote_active_report(
+        ref,
+        ssh,
+        current_relative=_REPORT_RELATIVE,
+        previous_name="optimizer_flow_run_report.previous.json",
+    )
+
+
+def _archive_remote_fix_run_report(ref: RemoteProjectRef, ssh: Any) -> None:
+    """Remove a stale fix-run marker from the active path without discarding it."""
+    _archive_remote_active_report(
+        ref,
+        ssh,
+        current_relative=_FIX_RUN_REPORT_RELATIVE,
+        previous_name="fix_run_report.previous.json",
+    )
+
+
+def _archive_remote_active_report(
+    ref: RemoteProjectRef,
+    ssh: Any,
+    *,
+    current_relative: Path,
+    previous_name: str,
+) -> None:
     run = getattr(ssh, "run", None)
     if not callable(run):
         # Lightweight service doubles may replace every remote operation.
         return
-    current = ref.remote_project_dir / _REPORT_RELATIVE
-    previous = current.with_name("optimizer_flow_run_report.previous.json")
+    current = ref.remote_project_dir / current_relative
+    previous = current.with_name(previous_name)
     run(
         f"if test -f {quote_remote_path(current)}; then mv -f -- "
         f"{quote_remote_path(current)} {quote_remote_path(previous)}; fi",
@@ -416,10 +580,17 @@ def begin_remote_optimizer_attempt(
     ref: RemoteProjectRef,
     *,
     runner: Any | None = None,
-) -> None:
+) -> RemoteAttemptLease:
     """Invalidate any previous active optimizer result before real preflight."""
     ssh = runner or RemoteSshRunner(ref.ssh_profile)
-    _archive_remote_flow_report(ref, ssh)
+    lease = acquire_remote_attempt_lock(ref, runner=ssh)
+    try:
+        _archive_remote_flow_report(ref, ssh)
+        _archive_remote_fix_run_report(ref, ssh)
+    except Exception:
+        lease.release()
+        raise
+    return lease
 
 
 def _mark_local_flow_report_failed(
@@ -741,6 +912,7 @@ def _expected_remote_runs(cache_dir: Path) -> _ExpectedRemoteRuns | None:
         return None
     history_run_ids: set[str] = set()
     retained_run_ids: set[str] = set()
+    failure_penalty: float | None = None
     rows = evaluations_path.read_text(encoding="utf-8").splitlines()
     if not any(row.strip() for row in rows):
         raise RuntimeError("optimizer evaluation history is empty")
@@ -761,6 +933,29 @@ def _expected_remote_runs(cache_dir: Path) -> _ExpectedRemoteRuns | None:
             )
         history_run_ids.add(run_id)
 
+        if payload.get("status") == DUPLICATE_SKIPPED:
+            if failure_penalty is None:
+                bundle = require_optimize_bundle(
+                    assert_valid_project(cache_dir),
+                    operation="remote optimizer publication",
+                )
+                if bundle.optimizer is None:  # pragma: no cover - contract narrows.
+                    raise RuntimeError(
+                        "remote optimizer publication lacks optimizer config"
+                    )
+                failure_penalty = bundle.optimizer.optimizer.failure_penalty
+            duplicate_issues = duplicate_skipped_trace_issues(
+                payload,
+                failure_penalty=failure_penalty,
+                label=f"history line {line_number} {run_id}",
+            )
+            if duplicate_issues:
+                raise RuntimeError(
+                    "optimizer evaluation duplicate trace is invalid: "
+                    + "; ".join(duplicate_issues)
+                )
+            continue
+
         decision_path = cache_dir / "state" / "run_retention" / f"{run_id}.json"
         remote_action: object = None
         if decision_path.is_file():
@@ -777,6 +972,16 @@ def _expected_remote_runs(cache_dir: Path) -> _ExpectedRemoteRuns | None:
             remote_action = decision.get("remote_action")
         if remote_action not in {"deleted", "missing"}:
             retained_run_ids.add(run_id)
+            continue
+        evidence = load_retention_evidence(cache_dir, run_id=run_id)
+        if decision.get("evidence_status") != "preserved":
+            raise RuntimeError(
+                f"deleted run retention evidence status is invalid for {run_id}"
+            )
+        if decision.get("evidence_digest") != evidence.digest:
+            raise RuntimeError(
+                f"deleted run retention evidence digest mismatch for {run_id}"
+            )
     return _ExpectedRemoteRuns(history_run_ids, retained_run_ids)
 
 
@@ -843,7 +1048,7 @@ def _sync_parent_run_manifests_to_remote(
             if _artifact_run_id(relative) in historical_run_ids
         },
     )
-    if expected_runs is None and not run_dirs and not prior_inventory.checksums:
+    if not run_dirs and not prior_inventory.checksums:
         return
 
     parent_runs: list[tuple[Path, PurePosixPath]] = []
@@ -1250,17 +1455,21 @@ def _ensure_execution_manifest(project_dir: Path) -> None:
 
 
 _REPORT_RELATIVE = Path("reports/optimizer_flow_run_report.json")
+_FIX_RUN_REPORT_RELATIVE = Path("reports/fix_run_report.json")
 
 
 def run_continuation_closeout(
     project_root: Path,
     *,
-    openbox_fn: Callable[..., Any],
-    check_fn: Callable[[Path], Any],
-    summarize_fn: Callable[[Path], Any],
-    finalize_fn: Callable[[Path], Any],
-    insight_fn: Callable[[Path], Any],
-    decision_fn: Callable[[Path], Any],
+    optimizer_fn: Callable[..., Any] | None = None,
+    backend: str = "openbox",
+    run_step_name: str | None = None,
+    openbox_fn: Callable[..., Any] | None = None,
+    check_fn: Callable[..., Any],
+    summarize_fn: Callable[..., Any],
+    finalize_fn: Callable[..., Any],
+    insight_fn: Callable[..., Any],
+    decision_fn: Callable[..., Any],
     additional_evals: int,
     batch_size: int | None,
     parallel_jobs: int | None,
@@ -1270,8 +1479,17 @@ def run_continuation_closeout(
     Exposed so non-remote entrypoints (e.g. local continuation) can reuse the
     exact closeout sequence without depending on the leading underscore symbol.
     """
+    prior_acceptance = check_fn(project_root, expected_backend=backend)
+    prior_issue = _expect_status(prior_acceptance, "accepted")
+    if prior_issue is not None:
+        raise RuntimeError(
+            "prior optimizer history acceptance rejected: " + prior_issue
+        )
     return _run_continuation_closeout(
         project_root,
+        optimizer_fn=optimizer_fn,
+        backend=backend,
+        run_step_name=run_step_name,
         openbox_fn=openbox_fn,
         check_fn=check_fn,
         summarize_fn=summarize_fn,
@@ -1287,17 +1505,26 @@ def run_continuation_closeout(
 def _run_continuation_closeout(
     project_root: Path,
     *,
-    openbox_fn: Callable[..., Any],
-    check_fn: Callable[[Path], Any],
-    summarize_fn: Callable[[Path], Any],
-    finalize_fn: Callable[[Path], Any],
-    insight_fn: Callable[[Path], Any],
-    decision_fn: Callable[[Path], Any],
+    optimizer_fn: Callable[..., Any] | None = None,
+    backend: str = "openbox",
+    run_step_name: str | None = None,
+    openbox_fn: Callable[..., Any] | None = None,
+    check_fn: Callable[..., Any],
+    summarize_fn: Callable[..., Any],
+    finalize_fn: Callable[..., Any],
+    insight_fn: Callable[..., Any],
+    decision_fn: Callable[..., Any],
     additional_evals: int,
     batch_size: int | None,
     parallel_jobs: int | None,
 ) -> OptimizerFlowReport:
-    """Run openbox continuation + closeout services, mirroring optimize_project structure."""
+    """Run backend-neutral continuation and the standard closeout sequence."""
+    selected_optimizer = optimizer_fn or openbox_fn
+    if selected_optimizer is None:
+        raise ValueError("optimizer_fn is required")
+    selected_step_name = run_step_name or (
+        "run-openbox-real" if backend == "openbox" else f"run-{backend}-real"
+    )
     steps: list[_FlowStep] = []
     issues: list[str] = []
     warnings: list[str] = []
@@ -1307,38 +1534,38 @@ def _run_continuation_closeout(
     try:
         _run_step(
             steps,
-            "run-openbox-real",
-            lambda: openbox_fn(project_root),
+            selected_step_name,
+            lambda: selected_optimizer(project_root),
             _expect_success,
         )
         _run_step(
             steps,
             "check-optimizer-run",
-            lambda: check_fn(project_root),
+            lambda: check_fn(project_root, expected_backend=backend),
             lambda result: _expect_status(result, "accepted"),
         )
         _run_step(
             steps,
             "summarize-optimizer-run",
-            lambda: summarize_fn(project_root),
+            lambda: summarize_fn(project_root, expected_backend=backend),
             lambda result: _expect_status(result, "pass"),
         )
         _run_step(
             steps,
             "finalize-optimizer-run",
-            lambda: finalize_fn(project_root),
+            lambda: finalize_fn(project_root, expected_backend=backend),
             lambda result: _expect_status(result, "pass"),
         )
         _run_step(
             steps,
             "visualize-optimizer-run",
-            lambda: insight_fn(project_root),
+            lambda: insight_fn(project_root, expected_backend=backend),
             lambda result: _expect_status(result, "pass"),
         )
         decision = _run_step(
             steps,
             "decide-optimizer-run",
-            lambda: decision_fn(project_root),
+            lambda: decision_fn(project_root, expected_backend=backend),
             lambda result: _expect_status(result, "pass"),
         )
         recommended_run_id = _string_attr(decision, "recommended_run_id")
@@ -1348,6 +1575,7 @@ def _run_continuation_closeout(
         report = _flow_report(
             project_root,
             status="fail",
+            backend=backend,
             max_evals=additional_evals,
             batch_size=batch_size,
             parallel_jobs=parallel_jobs,
@@ -1362,6 +1590,7 @@ def _run_continuation_closeout(
     report = _flow_report(
         project_root,
         status="pass",
+        backend=backend,
         max_evals=additional_evals,
         batch_size=batch_size,
         parallel_jobs=parallel_jobs,
@@ -1438,6 +1667,7 @@ def _flow_report(
     project_root: Path,
     *,
     status: str,
+    backend: str,
     max_evals: int,
     batch_size: int | None,
     parallel_jobs: int | None,
@@ -1451,7 +1681,7 @@ def _flow_report(
     return OptimizerFlowReport(
         status=status,
         project_dir=str(project_root),
-        backend="openbox",
+        backend=backend,
         real=True,
         dry_orchestration=False,
         max_evals=max_evals,

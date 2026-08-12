@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import threading
 import time
+from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -55,7 +56,6 @@ def _write_remote_waveform_exports(project_dir: Path) -> None:
                 "exports": [
                     {
                         "name": "nf_pnoise",
-                        "testbench": "cg_nf",
                         "expression": 'getData("NF" ?result "pnoise")',
                         "output_format": "csv",
                         "nil_policy": "fail",
@@ -94,6 +94,75 @@ def _create_remote_fix_run_project(
     if parallel_jobs is not None and parallel_jobs != 4:
         _set_remote_spectre_parallel_jobs(project_dir, parallel_jobs)
     return project_dir
+
+
+def _parse_audit_timestamp(value: str) -> datetime:
+    """Parse the product's canonical second-resolution UTC timestamp."""
+    assert value.endswith("Z")
+    parsed = datetime.fromisoformat(value.removesuffix("Z") + "+00:00")
+    assert parsed.tzinfo is not None
+    assert parsed.utcoffset() == UTC.utcoffset(None)
+    return parsed
+
+
+def test_remote_fix_run_records_real_execution_time_in_audit_provenance(
+    tmp_path: Path,
+) -> None:
+    """The public remote flow must use the same live UTC provenance contract."""
+    from hermes_workflow.remote_fix_run_flow import run_remote_fix_run_project
+
+    project_dir = _create_remote_fix_run_project(
+        tmp_path,
+        name="remote_fix_run_timestamp",
+    )
+    remote_ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    runner = MagicMock()
+    started_at_utc = datetime.now(UTC).replace(microsecond=0)
+
+    with (
+        patch(
+            "hermes_workflow.remote_fix_run_flow.run_remote_doctor",
+            return_value=MagicMock(status="pass", issues=[]),
+        ),
+        patch(
+            "hermes_workflow.remote_fix_run_flow.prepare_remote_project_cache",
+            return_value=_mock_preparation(project_dir),
+        ),
+        patch(
+            "hermes_workflow.remote_fix_run_flow.prepare_explicit_candidate_real_run"
+        ),
+        patch(
+            "hermes_workflow.remote_fix_run_flow.run_remote_spectre_ocean_adapter",
+            return_value=_mock_adapter_result(project_dir),
+        ),
+        patch(
+            "hermes_workflow.remote_fix_run_flow._apply_fix_run_retention",
+            return_value=[],
+        ),
+        patch("hermes_workflow.remote_fix_run_flow._sync_report_to_remote"),
+    ):
+        run_remote_fix_run_project(
+            remote_ref,
+            remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
+            real=True,
+            runner=runner,
+            attempt_started=True,
+        )
+
+    completed_at_utc = datetime.now(UTC).replace(microsecond=0)
+    manifest = json.loads(
+        (
+            project_dir / "execution_package" / "execution_manifest.json"
+        ).read_text(encoding="utf-8")
+    )
+    instruction = json.loads(
+        (project_dir / "supervisor_instruction.json").read_text(encoding="utf-8")
+    )
+
+    manifest_timestamp = _parse_audit_timestamp(manifest["created_at_utc"])
+    instruction_timestamp = _parse_audit_timestamp(instruction["created_at_utc"])
+    assert started_at_utc <= manifest_timestamp <= completed_at_utc
+    assert manifest_timestamp <= instruction_timestamp <= completed_at_utc
 
 
 def _mock_intake(project_dir: Path) -> SimpleNamespace:
@@ -217,6 +286,15 @@ def test_remote_fix_run_reuses_frozen_remote_preparation_snapshot(
         patch(
             "hermes_workflow.remote_fix_run_flow.prepare_remote_project_cache"
         ) as mock_prepare,
+        patch("hermes_workflow.remote_fix_run_flow.build_execution_package"),
+        patch("hermes_workflow.remote_fix_run_flow.decide_fix_run_real_run"),
+        patch(
+            "hermes_workflow.remote_fix_run_flow.prepare_explicit_candidate_real_run"
+        ),
+        patch(
+            "hermes_workflow.remote_fix_run_flow.run_remote_spectre_ocean_adapter",
+            return_value=_mock_adapter_result(project_dir),
+        ),
     ):
         mock_doctor.return_value = MagicMock(status="pass", issues=[])
         mock_prepare.return_value = _mock_preparation(project_dir)
@@ -226,13 +304,207 @@ def test_remote_fix_run_reuses_frozen_remote_preparation_snapshot(
             remote_cadence_cshrc=PurePosixPath(
                 "/remote/project/cadence_env.csh"
             ),
-            real=False,
+            real=True,
             runner=mock_runner,
         )
 
     assert report.status == "pass"
     mock_prepare.assert_called_once()
     assert mock_prepare.call_args.kwargs["persist_snapshot"] is True
+
+
+def test_remote_fix_run_rejects_non_real_execution_before_remote_io() -> None:
+    from hermes_workflow.remote_fix_run_flow import run_remote_fix_run_project
+
+    class NoRemoteIo:
+        def run(self, *_args: object, **_kwargs: object) -> object:
+            raise AssertionError("remote I/O must not start for real=False")
+
+    with pytest.raises(ValueError, match="remote fix-run requires real execution"):
+        run_remote_fix_run_project(
+            RemoteProjectRef("lab", PurePosixPath("/remote/project")),
+            remote_cadence_cshrc=PurePosixPath(
+                "/remote/project/cadence_env.csh"
+            ),
+            real=False,
+            runner=NoRemoteIo(),
+        )
+
+
+def test_remote_fix_run_applies_retention_to_remote_and_controller_cache(
+    tmp_path: Path,
+) -> None:
+    from hermes_workflow.remote_fix_run_flow import run_remote_fix_run_project
+
+    project_dir = _create_remote_fix_run_project(tmp_path)
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    runner = MagicMock()
+    with (
+        patch(
+            "hermes_workflow.remote_fix_run_flow.run_remote_doctor",
+            return_value=MagicMock(status="pass", issues=[]),
+        ),
+        patch(
+            "hermes_workflow.remote_fix_run_flow.prepare_remote_project_cache",
+            return_value=_mock_preparation(project_dir),
+        ),
+        patch("hermes_workflow.remote_fix_run_flow.build_execution_package"),
+        patch("hermes_workflow.remote_fix_run_flow.decide_fix_run_real_run"),
+        patch("hermes_workflow.remote_fix_run_flow.prepare_explicit_candidate_real_run"),
+        patch(
+            "hermes_workflow.remote_fix_run_flow.run_remote_spectre_ocean_adapter",
+            return_value=_mock_adapter_result(project_dir),
+        ),
+        patch("hermes_workflow.remote_fix_run_flow.apply_remote_run_retention") as remote_retention,
+        patch("hermes_workflow.remote_fix_run_flow.apply_local_run_retention") as local_retention,
+    ):
+        remote_retention.return_value = SimpleNamespace(
+            remote_action="kept", issues=[]
+        )
+        local_retention.return_value = SimpleNamespace(local_action="kept", issues=[])
+
+        report = run_remote_fix_run_project(
+            ref,
+            remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
+            real=True,
+            runner=runner,
+        )
+
+    assert report.status == "pass"
+    expected = {
+        "run_id": "real_001",
+        "candidate_id": _fixed_point_candidate_id(project_dir),
+        "run_succeeded": True,
+        "preserve_evidence": False,
+    }
+    remote_retention.assert_called_once_with(
+        project_dir,
+        remote_ref=ref,
+        runner=runner,
+        **expected,
+    )
+    local_retention.assert_called_once_with(project_dir, **expected)
+
+
+def test_remote_multi_child_fix_run_deletes_without_optimizer_parent_evidence(
+    tmp_path: Path,
+) -> None:
+    from hermes_workflow.remote_fix_run_flow import _apply_fix_run_retention
+
+    project_dir = _create_remote_fix_run_project(tmp_path)
+    spectre_path = project_dir / "config/spectre.yaml"
+    spectre = _read_yaml(spectre_path)
+    spectre["spectre"]["keep_successful_runs"] = False
+    _write_yaml(spectre_path, spectre)
+    run_dir = project_dir / "runs/real/real_001"
+    child = run_dir / "testbenches/tb_aux/corners/tt"
+    child.mkdir(parents=True)
+    (child / "child_result.json").write_text("{}\n", encoding="utf-8")
+
+    class Runner:
+        profile = "lab"
+
+        def __init__(self) -> None:
+            self.commands: list[str] = []
+
+        def run(self, command: str, **_kwargs: object) -> SimpleNamespace:
+            self.commands.append(command)
+            return SimpleNamespace(return_code=0, stdout="", stderr="")
+
+        def upload_tree(self, *_args: object, **_kwargs: object) -> None:
+            raise AssertionError("fix-run retention must not publish optimizer evidence")
+
+    runner = Runner()
+    issues = _apply_fix_run_retention(
+        project_dir,
+        remote_ref=RemoteProjectRef("lab", PurePosixPath("/remote/project")),
+        runner=runner,
+        run_id="real_001",
+        candidate_id="fixed_001",
+        run_succeeded=True,
+    )
+
+    assert issues == []
+    assert not run_dir.exists()
+    assert any(command.startswith("rm -rf --") for command in runner.commands)
+    assert not (project_dir / "state/run_retention_evidence").exists()
+
+
+def test_remote_prepare_collision_never_deletes_prior_controller_or_remote_run(
+    tmp_path: Path,
+) -> None:
+    from hermes_workflow.remote_fix_run_flow import run_remote_fix_run_project
+
+    project_dir = _create_remote_fix_run_project(tmp_path)
+    old_run = project_dir / "runs/real/real_001"
+    old_run.mkdir(parents=True)
+    sentinel = old_run / "prior-success.bin"
+    sentinel.write_bytes(b"prior successful attempt")
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    runner = MagicMock()
+    with (
+        patch(
+            "hermes_workflow.remote_fix_run_flow.run_remote_doctor",
+            return_value=MagicMock(status="pass", issues=[]),
+        ),
+        patch(
+            "hermes_workflow.remote_fix_run_flow.prepare_remote_project_cache",
+            return_value=_mock_preparation(project_dir),
+        ),
+        patch("hermes_workflow.remote_fix_run_flow.build_execution_package"),
+        patch("hermes_workflow.remote_fix_run_flow.decide_fix_run_real_run"),
+        patch(
+            "hermes_workflow.remote_fix_run_flow.prepare_explicit_candidate_real_run",
+            side_effect=FileExistsError("real_001 already exists"),
+        ),
+        patch(
+            "hermes_workflow.remote_fix_run_flow._apply_fix_run_retention"
+        ) as retention,
+        patch("hermes_workflow.remote_fix_run_flow._sync_report_to_remote"),
+    ):
+        report = run_remote_fix_run_project(
+            ref,
+            remote_cadence_cshrc=PurePosixPath("/remote/cadence_env.csh"),
+            runner=runner,
+        )
+
+    assert report.status == "fail"
+    retention.assert_not_called()
+    assert sentinel.read_bytes() == b"prior successful attempt"
+    assert not (project_dir / "state/run_retention/real_001.json").exists()
+    assert not (project_dir / "state/run_retention_evidence/real_001").exists()
+
+
+def test_remote_fix_run_archives_stale_pass_before_doctor(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from hermes_workflow.remote_fix_run_flow import run_remote_fix_run_project
+
+    commands: list[str] = []
+
+    class RecordingRunner:
+        def run(self, command: str, **kwargs) -> SimpleNamespace:
+            commands.append(command)
+            return SimpleNamespace(return_code=0, stdout="", stderr="")
+
+    monkeypatch.setattr(
+        "hermes_workflow.remote_fix_run_flow.run_remote_doctor",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            RuntimeError("doctor transport failed")
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="doctor transport failed"):
+        run_remote_fix_run_project(
+            RemoteProjectRef("lab", PurePosixPath("/remote/project")),
+            remote_cadence_cshrc=PurePosixPath(
+                "/remote/project/cadence_env.csh"
+            ),
+            runner=RecordingRunner(),
+        )
+
+    assert len(commands) == 1
+    assert "fix_run_report.previous.json" in commands[0]
 
 
 def test_remote_fix_run_fails_when_report_upload_fails(tmp_path: Path) -> None:
@@ -252,6 +524,15 @@ def test_remote_fix_run_fails_when_report_upload_fails(tmp_path: Path) -> None:
         patch(
             "hermes_workflow.remote_fix_run_flow.prepare_remote_project_cache"
         ) as mock_prepare,
+        patch("hermes_workflow.remote_fix_run_flow.build_execution_package"),
+        patch("hermes_workflow.remote_fix_run_flow.decide_fix_run_real_run"),
+        patch(
+            "hermes_workflow.remote_fix_run_flow.prepare_explicit_candidate_real_run"
+        ),
+        patch(
+            "hermes_workflow.remote_fix_run_flow.run_remote_spectre_ocean_adapter",
+            return_value=_mock_adapter_result(project_dir),
+        ),
     ):
         mock_doctor.return_value = MagicMock(status="pass", issues=[])
         mock_prepare.return_value = _mock_preparation(project_dir)
@@ -262,7 +543,7 @@ def test_remote_fix_run_fails_when_report_upload_fails(tmp_path: Path) -> None:
                 remote_cadence_cshrc=PurePosixPath(
                     "/remote/project/cadence_env.csh"
                 ),
-                real=False,
+                real=True,
                 runner=mock_runner,
             )
 
@@ -282,6 +563,9 @@ def test_remote_fix_run_publishes_pass_report_after_run_artifacts(
     report_path.parent.mkdir(parents=True)
     report_path.write_text('{"status": "pass"}\n', encoding="utf-8")
     (cache_dir / "runs" / "real" / "real_001").mkdir(parents=True)
+    retention_dir = cache_dir / "state" / "run_retention"
+    retention_dir.mkdir(parents=True)
+    (retention_dir / "real_001.json").write_text("{}\n", encoding="utf-8")
     ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
     calls: list[str] = []
 
@@ -296,6 +580,7 @@ def test_remote_fix_run_publishes_pass_report_after_run_artifacts(
 
     assert calls == [
         "tree:/remote/project/runs",
+        "tree:/remote/project/state/run_retention",
         "file:/remote/project/reports/fix_run_report.json",
     ]
 

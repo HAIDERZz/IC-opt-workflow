@@ -338,6 +338,11 @@ def _write_fix_run_workflow(
             ],
         },
     )
+    metrics_path = project_dir / "config" / "metrics.yaml"
+    metrics = yaml.safe_load(metrics_path.read_text(encoding="utf-8"))
+    metrics["constraints"] = []
+    metrics["objective"] = None
+    write_yaml(metrics_path, metrics)
     (project_dir / "config" / "optimizer.yaml").unlink(missing_ok=True)
 
 

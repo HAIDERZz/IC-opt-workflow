@@ -10,7 +10,10 @@ import subprocess
 import pytest
 import yaml
 
-from hermes_workflow.remote_prepare import prepare_remote_project_cache
+from hermes_workflow.remote_prepare import (
+    _prune_remote_preparation_snapshots,
+    prepare_remote_project_cache,
+)
 from hermes_workflow.remote_project import RemoteProjectRef
 from hermes_workflow.remote_ssh import RemoteCommandResult
 
@@ -18,6 +21,22 @@ from hermes_workflow.remote_ssh import RemoteCommandResult
 VALID_REQUIREMENT = (Path("tests/fixtures/requirement_intake/valid_project/opt_requirement.md")
     .read_text(encoding="utf-8")
     .replace("__MAESTRO_POINT_ROOT__", "/remote/maestro/point_1"))
+MODEL_FILE_PATH = "/remote/pdk/models/device.scs"
+MODEL_FILE_REQUIREMENT = VALID_REQUIREMENT.replace(
+    "## Spectre Settings\n",
+    f"""## Process Corners
+
+```yaml
+objective_policy: worst_case
+constraint_policy: all_corners
+corners:
+  - id: external_model
+    model_file: {MODEL_FILE_PATH}
+```
+
+## Spectre Settings
+""",
+)
 
 
 class FakeRunner:
@@ -111,6 +130,52 @@ class MaestroProbeRunner(FakeRunner):
         return super().run(command, **kwargs)
 
 
+class ModelFileProbeRunner(FakeRunner):
+    def __init__(self, return_code: int, stderr: str = "") -> None:
+        super().__init__()
+        self.return_code = return_code
+        self.stderr = stderr
+
+    def read_text(self, remote_path: PurePosixPath | str) -> str:
+        if str(remote_path) == "/remote/project/opt_requirement.md":
+            return MODEL_FILE_REQUIREMENT
+        return super().read_text(remote_path)
+
+    def run(self, command: str, **kwargs: object) -> RemoteCommandResult:
+        expected = f"test -f {MODEL_FILE_PATH} && test -r {MODEL_FILE_PATH}"
+        if command == expected:
+            self.commands_run.append(command)
+            return RemoteCommandResult(
+                self.return_code,
+                "",
+                self.stderr,
+                ["ssh", "lab", command],
+            )
+        return super().run(command, **kwargs)
+
+    def download_tree(
+        self,
+        remote_path: PurePosixPath | str,
+        local_path: Path,
+        include: str | None = None,
+        exclude: str | None = None,
+        dereference: bool = False,
+    ) -> None:
+        super().download_tree(
+            remote_path,
+            local_path,
+            include=include,
+            exclude=exclude,
+            dereference=dereference,
+        )
+        input_path = local_path / "input.scs"
+        input_path.write_text(
+            'include "/remote/pdk/models/base.scs" section=base\n'
+            + input_path.read_text(encoding="utf-8"),
+            encoding="utf-8",
+        )
+
+
 def test_prepare_remote_project_cache_writes_local_controller_project(tmp_path: Path) -> None:
     ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
     runner = FakeRunner()
@@ -165,6 +230,47 @@ def test_prepare_remote_project_cache_maestro_probe_raises_transport_error(
             runner=MaestroProbeRunner(255, "ssh transport timed out"),
             cache_root=tmp_path,
         )
+
+
+@pytest.mark.parametrize(
+    ("return_code", "expected_status", "transport_error"),
+    [
+        (0, "pass", False),
+        (1, "fail", False),
+        (255, None, True),
+    ],
+)
+def test_prepare_remote_project_cache_model_file_probe_uses_remote_readability(
+    tmp_path: Path,
+    return_code: int,
+    expected_status: str | None,
+    transport_error: bool,
+) -> None:
+    runner = ModelFileProbeRunner(
+        return_code,
+        "ssh transport timed out" if transport_error else "",
+    )
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    expected_command = f"test -f {MODEL_FILE_PATH} && test -r {MODEL_FILE_PATH}"
+    assert not Path(MODEL_FILE_PATH).exists()
+
+    if transport_error:
+        with pytest.raises(RuntimeError, match="ssh transport timed out"):
+            prepare_remote_project_cache(ref, runner=runner, cache_root=tmp_path)
+    else:
+        result = prepare_remote_project_cache(
+            ref,
+            runner=runner,
+            cache_root=tmp_path,
+        )
+        assert result.status == expected_status
+        if return_code == 1:
+            assert any(
+                "Process Corners.model_file is missing or unreadable" in issue
+                for issue in result.issues
+            )
+
+    assert runner.commands_run.count(expected_command) == 1
 
 
 def test_prepare_remote_project_cache_replaces_stale_snapshot_files(
@@ -288,15 +394,17 @@ def test_prepare_remote_project_cache_persists_and_restores_frozen_snapshot(
     ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
     snapshot_store = tmp_path / "remote_snapshot_store"
 
-    class SnapshotRunner(FakeRunner):
+    class SnapshotRunner(ModelFileProbeRunner):
         def __init__(self) -> None:
-            super().__init__()
+            super().__init__(0)
             self.live_reads_enabled = True
             self.snapshot_downloaded = False
 
         def read_text(self, remote_path: PurePosixPath | str) -> str:
             if not self.live_reads_enabled:
                 raise AssertionError("frozen restore must not read live requirement files")
+            if str(remote_path) == "/remote/project/opt_requirement.md":
+                return MODEL_FILE_REQUIREMENT
             return super().read_text(remote_path)
 
         def run(self, command: str, **kwargs: object):
@@ -353,6 +461,7 @@ def test_prepare_remote_project_cache_persists_and_restores_frozen_snapshot(
             )
 
     runner = SnapshotRunner()
+    assert not Path(MODEL_FILE_PATH).exists()
     initial = prepare_remote_project_cache(
         ref,
         runner=runner,
@@ -374,6 +483,8 @@ def test_prepare_remote_project_cache_persists_and_restores_frozen_snapshot(
 
     assert restored.status == "pass"
     assert runner.snapshot_downloaded is True
+    model_probe = f"test -f {MODEL_FILE_PATH} && test -r {MODEL_FILE_PATH}"
+    assert runner.commands_run.count(model_probe) == 2
     assert (restored.cache_dir / "config" / "optimizer.yaml").is_file()
     assert (restored.cache_dir / "netlists" / "templates" / "template.scs").is_file()
 
@@ -389,6 +500,41 @@ def test_prepare_remote_project_cache_persists_and_restores_frozen_snapshot(
             cache_root=tmp_path / "cache",
             frozen_snapshot=True,
         )
+
+
+def test_remote_preparation_snapshot_cleanup_is_bounded_and_keeps_current(
+    tmp_path: Path,
+) -> None:
+    remote_project = tmp_path / "remote project"
+    store = remote_project / "state" / "remote_preparation_snapshots"
+    store.mkdir(parents=True)
+    names = [
+        "20260810T010000000000Z-a",
+        "20260810T020000000000Z-b",
+        "20260810T030000000000Z-c",
+        "20260810T040000000000Z-d",
+        "20260810T050000000000Z-e",
+    ]
+    for name in names:
+        snapshot = store / name
+        snapshot.mkdir()
+        (snapshot / ".complete").write_text("ok\n", encoding="utf-8")
+    canonical = remote_project / "state" / "remote_preparation_snapshot"
+    canonical.symlink_to(Path("remote_preparation_snapshots") / names[1])
+    ref = RemoteProjectRef(
+        "local",
+        PurePosixPath(remote_project.as_posix()),
+    )
+
+    _prune_remote_preparation_snapshots(
+        ref,
+        LocalFilesystemRunner(),
+        keep=3,
+    )
+
+    retained = sorted(path.name for path in store.iterdir())
+    assert retained == [names[1], names[3], names[4]]
+    assert canonical.resolve(strict=True) == (store / names[1]).resolve()
 
 
 def test_prepare_remote_project_cache_fails_closed_without_frozen_snapshot(
@@ -869,7 +1015,6 @@ points:
 schema_version: "1.0"
 exports:
   - name: nf_pnoise
-    testbench: cg_nf
     expression: 'getData("NF" ?result "pnoise")'
     output_format: csv
     nil_policy: fail

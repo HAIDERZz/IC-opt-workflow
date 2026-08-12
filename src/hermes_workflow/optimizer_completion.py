@@ -35,13 +35,21 @@ class OptimizerCompletionReport:
     report_path: Path | None = None
 
 
-def summarize_optimizer_run(project_dir: str | Path) -> OptimizerCompletionReport:
+def summarize_optimizer_run(
+    project_dir: str | Path,
+    *,
+    expected_backend: str | None = None,
+) -> OptimizerCompletionReport:
     project_root = Path(project_dir)
     issues: list[str] = []
     warnings: list[str] = []
 
     acceptance_report = _load_json(project_root / ACCEPTANCE_REPORT_RELATIVE, issues)
-    artifacts = load_optimizer_artifacts(project_root, issues)
+    artifacts = load_optimizer_artifacts(
+        project_root,
+        issues,
+        expected_backend=expected_backend,
+    )
     native_report = artifacts.report
     traces = artifacts.traces
 
@@ -50,20 +58,23 @@ def summarize_optimizer_run(project_dir: str | Path) -> OptimizerCompletionRepor
 
     evaluation_count = _int_value(native_report.get("evaluation_count")) or len(traces)
     status_counts = dict(Counter(_string_value(row.get("status")) for row in traces))
-    best_observed = _dict_value(native_report.get("best_candidate"))
-    if best_observed is None:
-        best_observed = _dict_value(acceptance_report.get("best_candidate"))
+    best_observed = (
+        _dict_value(acceptance_report.get("best_candidate"))
+        if acceptance_report.get("status") == "accepted"
+        else None
+    )
+    valid_unique_coverage_count = _count_valid_unique_candidates(traces)
 
     search_space = _summarize_search_space(
         project_root=project_root,
-        evaluation_count=evaluation_count,
+        valid_unique_coverage_count=valid_unique_coverage_count,
         warnings=warnings,
     )
     improvement = _summarize_improvement(traces, evaluation_count=evaluation_count)
     decision, confidence, global_optimum_claim, reasons = _decide_completion(
         issues=issues,
         status_counts=status_counts,
-        evaluation_count=evaluation_count,
+        valid_unique_coverage_count=valid_unique_coverage_count,
         search_space=search_space,
         improvement=improvement,
     )
@@ -71,6 +82,7 @@ def summarize_optimizer_run(project_dir: str | Path) -> OptimizerCompletionRepor
         decision=decision,
         status_counts=status_counts,
         evaluation_count=evaluation_count,
+        valid_unique_coverage_count=valid_unique_coverage_count,
         search_space=search_space,
         improvement=improvement,
     )
@@ -118,10 +130,33 @@ def _load_json(path: Path, issues: list[str]) -> dict[str, Any]:
     return payload
 
 
+_VALID_COVERAGE_STATUSES = {"feasible", "constraint_failed"}
+
+
+def _count_valid_unique_candidates(traces: list[dict[str, Any]]) -> int:
+    """Count credibly evaluated, unique parameter combinations.
+
+    A trace counts toward search-space coverage only if its status is
+    feasible or constraint_failed and its parameters are a non-empty dict.
+    Traces with identical parameters count once. Skipped duplicates and
+    simulation/metric/record failures never represent an independently
+    evaluated combination, so they are excluded.
+    """
+    seen: set[str] = set()
+    for row in traces:
+        if _string_value(row.get("status")) not in _VALID_COVERAGE_STATUSES:
+            continue
+        parameters = row.get("parameters")
+        if not isinstance(parameters, dict) or not parameters:
+            continue
+        seen.add(json.dumps(parameters, sort_keys=True, default=str))
+    return len(seen)
+
+
 def _summarize_search_space(
     *,
     project_root: Path,
-    evaluation_count: int,
+    valid_unique_coverage_count: int,
     warnings: list[str],
 ) -> dict[str, Any]:
     estimate = _estimate_discrete_search_space(
@@ -129,12 +164,16 @@ def _summarize_search_space(
         warnings,
     )
     evaluated_fraction = (
-        min(1.0, evaluation_count / estimate) if estimate and estimate > 0 else None
+        min(1.0, valid_unique_coverage_count / estimate)
+        if estimate and estimate > 0
+        else None
     )
     return {
         "estimated_discrete_combinations": estimate,
         "evaluated_fraction": evaluated_fraction,
-        "exhaustive_trace": estimate is not None and estimate == evaluation_count,
+        "exhaustive_trace": (
+            estimate is not None and estimate == valid_unique_coverage_count
+        ),
     }
 
 
@@ -249,7 +288,7 @@ def _decide_completion(
     *,
     issues: list[str],
     status_counts: dict[str, int],
-    evaluation_count: int,
+    valid_unique_coverage_count: int,
     search_space: dict[str, Any],
     improvement: dict[str, Any],
 ) -> tuple[str, str, bool, list[str]]:
@@ -270,7 +309,7 @@ def _decide_completion(
         )
 
     estimated = _int_or_none(search_space.get("estimated_discrete_combinations"))
-    if estimated is not None and estimated == evaluation_count:
+    if estimated is not None and estimated == valid_unique_coverage_count:
         return (
             "accept_best_observed",
             "high",
@@ -278,7 +317,7 @@ def _decide_completion(
             ["evaluated trace covers the full finite search space"],
         )
 
-    if estimated is not None and estimated <= evaluation_count * 3:
+    if estimated is not None and estimated <= valid_unique_coverage_count * 3:
         return (
             "switch_to_exhaustive_sweep",
             "medium",
@@ -307,6 +346,7 @@ def _summarize_continuation(
     decision: str,
     status_counts: dict[str, int],
     evaluation_count: int,
+    valid_unique_coverage_count: int,
     search_space: dict[str, Any],
     improvement: dict[str, Any],
 ) -> dict[str, Any]:
@@ -316,7 +356,7 @@ def _summarize_continuation(
     recommended = decision == "continue_more_evals"
     estimated = _int_or_none(search_space.get("estimated_discrete_combinations"))
     remaining = (
-        max(0, estimated - evaluation_count)
+        max(0, estimated - valid_unique_coverage_count)
         if estimated is not None
         else None
     )

@@ -3,6 +3,13 @@
 Use this template when one optimizer candidate is evaluated by one Maestro/ADE
 testbench at the source point corner.
 
+## Workflow
+
+```yaml
+schema_version: "1.0"
+mode: optimize
+```
+
 ## Project
 
 ```yaml

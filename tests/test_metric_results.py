@@ -346,6 +346,18 @@ def test_check_metric_results_accepts_valid_manifest(tmp_path: Path) -> None:
             "metric {metric} value_text looks like a waveform object",
         ),
         (
+            lambda payload: payload["metrics"][0].update(
+                {"value": 2.0, "value_text": "1.0"}
+            ),
+            "metric {metric} value/value_text mismatch",
+        ),
+        (
+            lambda payload: payload["metrics"][0].update(
+                {"value": 1.0, "value_text": "2.0"}
+            ),
+            "metric {metric} value/value_text mismatch",
+        ),
+        (
             lambda payload: payload.update({"psf_dir": "../psf"}),
             "metric artifact path is unsafe: ../psf",
         ),

@@ -174,7 +174,14 @@ Remote:
 ```
 
 `--continue N` only adds budget to an existing optimizer project. It does not
-reread a changed `opt_requirement.md`.
+reread a changed `opt_requirement.md`. Continuation keeps the backend already
+declared by the generated project config: OpenBox resumes OpenBox history and
+native TuRBO resumes native TuRBO history. Native TuRBO reconstructs its active
+trust-region state from the accepted trace; because older artifacts do not
+contain library RNG state, this is a trace-equivalent continuation rather than
+a claim of bit-for-bit equivalence to one uninterrupted process. Every Remote
+continuation attempt reruns Remote Doctor against the current host environment
+before restoring the frozen snapshot, syncing history, or starting a backend.
 
 ## Project Directory
 
@@ -222,19 +229,24 @@ Start from one of these examples:
 
 ```text
 examples/spectre_maestro_project/opt_requirement.md
+examples/spectre_maestro_project/opt_requirement.openbox_gp_eic.md
+examples/spectre_maestro_project/opt_requirement.turbo.md
 examples/spectre_maestro_project/opt_requirement.multi_corner.md
 examples/spectre_maestro_project/opt_requirement.multi_testbench.md
 examples/spectre_maestro_project/opt_requirement.multi_tb_corner.md
 examples/spectre_maestro_project/opt_requirement.history_warm_start.md
+examples/spectre_maestro_project/opt_requirement.history_warm_start.multi_corner.md
 examples/spectre_maestro_project/opt_requirement.fix_run.md
+examples/spectre_maestro_project/opt_requirement.fix_run.metrics_only.md
+examples/spectre_maestro_project/opt_requirement.fix_run.multi_testbench.metrics_waveform.md
 ```
 
-The multi-testbench templates are based on real validated Mixer requirements
-with CG/NF/BW, IIP3, and P1dB metrics routed to their owning testbenches. The
-history warm-start template is based on a verified second-round same-circuit
-Mixer run. The fix-run template is based on the real validated 15-corner Mixer
-requirement. Replace project-specific paths, previous-project paths, fixed
-points, corner values, and circuit-specific expressions with your reviewed
+The explicit GP-EIC and TuRBO templates expose both supported optimizer
+families. Multi-testbench templates route every metric/export to its owning
+testbench. History warm-start examples cover source-point and multi-corner
+OpenBox runs. Fix-run examples cover waveform-only, metrics-only, and combined
+multi-testbench measurements. Replace all project-specific paths, history
+sources, fixed points, corner values, and circuit expressions with reviewed
 values.
 
 ## Optimize Mode
@@ -278,8 +290,10 @@ warm_start_strategy: topk
 
 The section renders to `config/history_warm_start.yaml`. History warm-start is
 optimize-only, cannot be combined with `--continue`, and is not supported for
-fix-run. In this release, OpenBox can apply history warm-start; native TuRBO
-does not consume it for candidate suggestions.
+fix-run. It is an OpenBox-only capability. An enabled History Warm Start with a
+native TuRBO backend is rejected during requirement intake/project validation;
+it is never silently ignored. Use `--continue N` to extend an existing native
+TuRBO project.
 
 Current and previous projects must use the exact same variable names. Old
 objective and constraint values are not reused; old raw metrics are re-evaluated
@@ -369,7 +383,7 @@ reporting success.
 
 ## Current Release
 
-Version `0.1.9` includes:
+Version `0.1.10` includes:
 
 - local and remote optimize workflows
 - local and remote fix-run workflows
@@ -386,5 +400,8 @@ Version `0.1.9` includes:
 - sanitized Spectre/OCEAN command trace artifacts
 - optimizer CPU thread-limit runtime audit
 - release examples and agent skill guidance synchronized with the current CLI
+- isolated Controller/Remote filesystem handling and atomic Remote transfer
+- native TuRBO local/Remote continuation with trace-reconstructed state
+- fail-early CLI mode contracts and portable toolchain defaults
 
-See `RELEASE_NOTES_v0.1.9.md`.
+See `RELEASE_NOTES_v0.1.10.md`.

@@ -30,9 +30,16 @@ class OptimizerStatusSummary:
     warnings: list[str] = field(default_factory=list)
 
 
-def summarize_optimizer_status(project_dir: str | Path) -> OptimizerStatusSummary:
+def summarize_optimizer_status(
+    project_dir: str | Path,
+    *,
+    expected_backend: str | None = None,
+) -> OptimizerStatusSummary:
     project_root = Path(project_dir)
-    finalize = finalize_optimizer_run(project_root)
+    finalize = finalize_optimizer_run(
+        project_root,
+        expected_backend=expected_backend,
+    )
     completion = _load_completion(project_root / COMPLETION_RELATIVE)
     continuation = _dict_value(completion.get("continuation"))
 

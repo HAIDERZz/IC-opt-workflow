@@ -19,9 +19,13 @@ from hermes_workflow.openbox_backend import (
     _build_openbox_advisor,
     _build_openbox_space,
     _create_advisor,
+    _next_run_offset,
+    _trace_from_observation,
+    OpenBoxPreparedSuggestion,
     run_openbox_fake_optimization,
     run_openbox_real_optimization,
 )
+from hermes_workflow.native_turbo import NativeTurboObservation
 from hermes_workflow.optimizer_artifacts import EVALUATIONS_RELATIVE, REPORT_RELATIVE
 from hermes_workflow.history_warm_start import HISTORY_WARM_START_AUDIT_RELATIVE
 from hermes_workflow.package import build_execution_package
@@ -45,6 +49,45 @@ from tests.test_multi_testbench_aggregation import (
 # ---------------------------------------------------------------------------
 
 
+def test_openbox_trace_preserves_real_failure_without_diagnostic_metric_link(
+    tmp_path: Path,
+) -> None:
+    project_dir = create_generic_project(tmp_path, name="openbox_trace")
+    bundle = assert_valid_project(project_dir)
+    candidate = OpenBoxPreparedSuggestion(
+        config={"width": 1.0},
+        values={"width": 1.0},
+        raw_x=[1.0],
+        parameters={"width": "1.0"},
+        candidate_id="candidate_000001",
+        run_id="real_001",
+        batch_id="batch_001",
+        batch_slot=1,
+        batch_size=1,
+        replacement_issues=[],
+    )
+    observation = NativeTurboObservation(
+        status="real_check_failed",
+        result_manifest="runs/real/real_001/result_manifest.json",
+        metric_result_manifest=None,
+        issues=["aggregate child execution failed"],
+    )
+
+    trace = _trace_from_observation(
+        contract_metrics=bundle.metrics,
+        contract_optimizer=bundle.optimizer,
+        candidate=candidate,
+        observation=observation,
+        evaluation_index=1,
+        parallel_jobs=1,
+        threads_per_run=10,
+    )
+
+    assert trace.status == "real_check_failed"
+    assert trace.result_manifest == "runs/real/real_001/result_manifest.json"
+    assert trace.metric_result_manifest is None
+
+
 def _read_yaml(path: Path) -> dict:
     return yaml.safe_load(path.read_text(encoding="utf-8"))
 
@@ -58,6 +101,19 @@ def _set_optimizer_value(project_dir: Path, key: str, value) -> None:
     path = project_dir / "config" / "optimizer.yaml"
     payload = _read_yaml(path)
     payload["optimizer"][key] = value
+    _write_yaml(path, payload)
+
+
+def _select_openbox_backend(project_dir: Path) -> None:
+    path = project_dir / "config" / "optimizer.yaml"
+    payload = _read_yaml(path)
+    payload["optimizer"].update(
+        {
+            "algorithm": "openbox",
+            "strategy": "openbox_auto",
+            "turbo": None,
+        }
+    )
     _write_yaml(path, payload)
 
 
@@ -480,6 +536,32 @@ def test_openbox_fake_runner_writes_backend_neutral_artifacts(
     assert rows[0]["batch_id"] == "batch_001"
 
 
+def test_openbox_fake_runner_rejects_fix_run_before_writing(tmp_path: Path) -> None:
+    project_dir = create_generic_project(
+        tmp_path,
+        name="fix_run_project",
+        workflow_mode="fix_run",
+    )
+    before = {
+        path.relative_to(project_dir).as_posix(): path.read_bytes()
+        for path in project_dir.rglob("*")
+        if path.is_file()
+    }
+
+    with pytest.raises(
+        ValueError,
+        match="OpenBox fake optimization requires optimize workflow",
+    ):
+        run_openbox_fake_optimization(project_dir, batch_size=None)
+
+    after = {
+        path.relative_to(project_dir).as_posix(): path.read_bytes()
+        for path in project_dir.rglob("*")
+        if path.is_file()
+    }
+    assert after == before
+
+
 def test_openbox_fake_runner_applies_optimizer_cpu_thread_limit(
     tmp_path: Path,
     monkeypatch,
@@ -650,6 +732,128 @@ def test_openbox_fake_continuation_warm_starts_and_writes_cumulative_artifacts(
         "VAR_INT": "3",
         "VAR_WIDTH": "0.3u",
     }
+
+
+def test_openbox_real_continuation_rejects_duplicate_history_before_adapter(
+    tmp_path: Path,
+) -> None:
+    project_dir = create_approved_real_project(tmp_path)
+    run_openbox_fake_optimization(
+        project_dir,
+        max_evals=2,
+        batch_size=2,
+        advisor_factory=lambda _space, _seed: FakeAdvisor(project_dir),
+    )
+    report_path = project_dir / REPORT_RELATIVE
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    report["execution_mode"] = "real"
+    report_path.write_text(json.dumps(report) + "\n", encoding="utf-8")
+    evaluations_path = project_dir / EVALUATIONS_RELATIVE
+    rows = [
+        json.loads(line)
+        for line in evaluations_path.read_text(encoding="utf-8").splitlines()
+    ]
+    for row in rows:
+        row["run_id"] = row["run_id"].replace("fake_", "real_")
+    rows[1]["evaluation_index"] = 1
+    rows[1]["run_id"] = "real_001"
+    evaluations_path.write_text(
+        "".join(json.dumps(row) + "\n" for row in rows),
+        encoding="utf-8",
+    )
+    adapter_calls: list[str] = []
+
+    def forbidden_adapter(*_args: object, **_kwargs: object) -> object:
+        adapter_calls.append("adapter")
+        raise AssertionError("adapter must not run")
+
+    with pytest.raises(ValueError, match="continuation trace identity.*duplicate"):
+        run_openbox_real_optimization(
+            project_dir,
+            additional_evals=1,
+            continue_from_existing=True,
+            batch_size=1,
+            parallel_jobs=1,
+            adapter=forbidden_adapter,
+            advisor_factory=lambda _space, _seed: ContinuationAdvisor(project_dir),
+        )
+
+    assert adapter_calls == []
+
+
+def test_openbox_fake_continuation_allows_orphan_run_id_gap(
+    tmp_path: Path,
+) -> None:
+    project_dir = create_approved_real_project(tmp_path)
+    run_openbox_fake_optimization(
+        project_dir,
+        max_evals=2,
+        batch_size=2,
+        advisor_factory=lambda _space, _seed: FakeAdvisor(project_dir),
+    )
+    evaluations_path = project_dir / EVALUATIONS_RELATIVE
+    rows = [
+        json.loads(line)
+        for line in evaluations_path.read_text(encoding="utf-8").splitlines()
+    ]
+    rows[1]["run_id"] = "fake_003"
+    evaluations_path.write_text(
+        "".join(json.dumps(row) + "\n" for row in rows),
+        encoding="utf-8",
+    )
+
+    run_openbox_fake_optimization(
+        project_dir,
+        additional_evals=1,
+        batch_size=1,
+        continue_from_existing=True,
+        advisor_factory=lambda _space, _seed: ContinuationAdvisor(project_dir),
+    )
+
+    continued_rows = [
+        json.loads(line)
+        for line in evaluations_path.read_text(encoding="utf-8").splitlines()
+    ]
+    assert continued_rows[-1]["evaluation_index"] == 3
+    assert continued_rows[-1]["run_id"] == "fake_004"
+
+
+def test_openbox_fake_continuation_rejects_real_run_identity_before_advisor(
+    tmp_path: Path,
+) -> None:
+    project_dir = create_approved_real_project(tmp_path)
+    run_openbox_fake_optimization(
+        project_dir,
+        max_evals=2,
+        batch_size=2,
+        advisor_factory=lambda _space, _seed: FakeAdvisor(project_dir),
+    )
+    evaluations_path = project_dir / EVALUATIONS_RELATIVE
+    rows = [
+        json.loads(line)
+        for line in evaluations_path.read_text(encoding="utf-8").splitlines()
+    ]
+    rows[0]["run_id"] = "real_001"
+    evaluations_path.write_text(
+        "".join(json.dumps(row) + "\n" for row in rows),
+        encoding="utf-8",
+    )
+    advisor_calls: list[str] = []
+
+    def forbidden_advisor(*_args: object, **_kwargs: object) -> object:
+        advisor_calls.append("advisor")
+        raise AssertionError("advisor must not be constructed")
+
+    with pytest.raises(ValueError, match="numbered fake_ identity"):
+        run_openbox_fake_optimization(
+            project_dir,
+            additional_evals=1,
+            batch_size=1,
+            continue_from_existing=True,
+            advisor_factory=forbidden_advisor,
+        )
+
+    assert advisor_calls == []
 
 
 def test_openbox_fake_continuation_stops_after_partial_unique_batch(
@@ -896,11 +1100,9 @@ def test_openbox_fake_continuation_resolves_requirement_strategy_openbox_prf_eic
     )
 
 
-def test_openbox_fake_continuation_preserves_nested_openbox_settings(
+def test_openbox_fake_run_rejects_nested_settings_conflicting_with_named_preset(
     tmp_path: Path,
 ) -> None:
-    """Continuation preserves nested ``optimizer.openbox`` overrides from
-    requirement/config; the CLI-side strategy detail args remain `None`."""
     project_dir = create_approved_real_project(tmp_path)
     _set_optimizer_yaml_openbox_strategy(
         project_dir,
@@ -912,25 +1114,16 @@ def test_openbox_fake_continuation_preserves_nested_openbox_settings(
             "initial_trials": 5,
         },
     )
-    run_openbox_fake_optimization(
-        project_dir,
-        max_evals=2,
-        batch_size=2,
-        advisor_factory=lambda _space, _seed: FakeAdvisor(project_dir),
-    )
-    run_openbox_fake_optimization(
-        project_dir,
-        additional_evals=2,
-        batch_size=2,
-        continue_from_existing=True,
-        advisor_factory=lambda _space, _seed: ContinuationAdvisor(project_dir),
-    )
-    report = json.loads((project_dir / REPORT_RELATIVE).read_text(encoding="utf-8"))
-    resolved = report["openbox"]["resolved_strategy"]
-    assert resolved["surrogate_type"] == "prf"
-    assert resolved["acq_type"] == "eic"
-    assert resolved["acq_optimizer_type"] == "local_random"
-    assert resolved["initial_trials"] == 5
+    with pytest.raises(
+        ValueError,
+        match="openbox_gp_eic.*surrogate_type=gp.*got prf",
+    ):
+        run_openbox_fake_optimization(
+            project_dir,
+            max_evals=2,
+            batch_size=2,
+            advisor_factory=lambda _space, _seed: FakeAdvisor(project_dir),
+        )
 
 
 def test_openbox_fake_runner_requires_openbox_when_no_advisor_is_injected(
@@ -1032,6 +1225,51 @@ def test_run_openbox_real_optimization_uses_existing_real_candidate_path(
     assert rows[0]["metric_result_manifest"]
     assert first_candidate["requested_source"] == "openbox_optimizer"
     assert first_candidate["metadata"]["optimizer"] == "openbox"
+
+
+def test_next_run_offset_uses_highest_existing_valid_suffix_not_first_gap(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "runs/real"
+    for name in ("real_001", "real_003", "real_bad", "real_0004", "fake_099"):
+        (root / name).mkdir(parents=True)
+
+    assert _next_run_offset(tmp_path, "real", prior_traces=[]) == 3
+
+
+def test_fresh_openbox_batch_skips_orphan_gap_before_retained_run(
+    tmp_path: Path,
+) -> None:
+    project_dir = create_approved_real_project(tmp_path)
+    (project_dir / "runs/real/real_003").mkdir(parents=True)
+    adapter_run_ids: list[str] = []
+
+    def adapter(project_dir: Path, *, run_id: str, cadence_cshrc: Path | None) -> None:
+        from tests.real_run_smoke_helpers import (
+            write_fake_metric_result_manifest,
+            write_fake_result_manifest,
+        )
+
+        adapter_run_ids.append(run_id)
+        write_fake_result_manifest(project_dir, run_id=run_id)
+        write_fake_metric_result_manifest(project_dir, run_id=run_id)
+
+    result = run_openbox_real_optimization(
+        project_dir,
+        max_evals=2,
+        batch_size=2,
+        parallel_jobs=2,
+        advisor_factory=lambda _space, _seed: FakeAdvisor(project_dir),
+        adapter=adapter,
+    )
+
+    assert result.evaluation_count == 2
+    assert sorted(adapter_run_ids) == ["real_004", "real_005"]
+    rows = [
+        json.loads(line)
+        for line in (project_dir / EVALUATIONS_RELATIVE).read_text().splitlines()
+    ]
+    assert [row["run_id"] for row in rows] == ["real_004", "real_005"]
 
 
 def test_run_openbox_real_continuation_allows_completed_prior_state(
@@ -1232,7 +1470,7 @@ def test_run_openbox_real_optimization_applies_config_strategy_preset(
     }
 
 
-def test_run_openbox_fake_optimization_prefers_explicit_overrides_over_strategy_preset(
+def test_run_openbox_fake_optimization_customizes_openbox_auto(
     tmp_path: Path,
 ) -> None:
     project_dir = create_approved_real_project(tmp_path)
@@ -1242,14 +1480,15 @@ def test_run_openbox_fake_optimization_prefers_explicit_overrides_over_strategy_
         max_evals=2,
         batch_size=2,
         advisor_factory=lambda _space, _seed: FakeAdvisor(project_dir),
-        strategy="openbox_gp_eic",
+        strategy="openbox_auto",
         surrogate_type="prf",
+        acq_type="eic",
         acq_optimizer_type="local_random",
         initial_trials=5,
     )
 
     report = json.loads((project_dir / REPORT_RELATIVE).read_text(encoding="utf-8"))
-    assert report["openbox"]["requested_strategy"] == "openbox_gp_eic"
+    assert report["openbox"]["requested_strategy"] == "openbox_auto"
     assert report["openbox"]["resolved_strategy"] == {
         "surrogate_type": "prf",
         "acq_type": "eic",
@@ -1433,7 +1672,7 @@ def test_continue_openbox_real_cli_uses_additional_evals(
         initial_trials: int | None,
     ) -> object:
         assert max_evals is None
-        assert additional_evals is None
+        assert additional_evals == 4
         assert continue_from_existing is True
         assert batch_size is None
         assert parallel_jobs is None
@@ -1453,12 +1692,20 @@ def test_continue_openbox_real_cli_uses_additional_evals(
             },
         )()
 
+    def accepted_history(path: Path, *, expected_backend: str) -> object:
+        assert path == project_dir
+        assert expected_backend == "openbox"
+        return SimpleNamespace(status="accepted", issues=[])
+
+    monkeypatch.setattr(cli_module, "check_optimizer_run", accepted_history)
     monkeypatch.setattr(cli_module, "run_openbox_real_optimization", fake_runner)
     result = CliRunner().invoke(
         app,
             [
                 "continue-openbox-real",
                 str(project_dir),
+                "--additional-evals",
+                "4",
                 "--strategy",
                 "openbox_gp_eic",
             "--surrogate-type",
@@ -1507,12 +1754,12 @@ def test_continue_openbox_real_cli_uses_safe_defaults_and_repairs_package(
         initial_trials: int | None,
     ) -> object:
         assert max_evals is None
-        assert additional_evals is None
+        assert additional_evals == 8
         assert continue_from_existing is True
         assert strategy is None
-        assert surrogate_type == "prf"
-        assert acq_type == "eic"
-        assert acq_optimizer_type == "local_random"
+        assert surrogate_type is None
+        assert acq_type is None
+        assert acq_optimizer_type is None
         assert initial_trials is None
         return type(
             "Result",
@@ -1524,6 +1771,12 @@ def test_continue_openbox_real_cli_uses_safe_defaults_and_repairs_package(
             },
         )()
 
+    def accepted_history(path: Path, *, expected_backend: str) -> object:
+        assert path == project_dir
+        assert expected_backend == "openbox"
+        return SimpleNamespace(status="accepted", issues=[])
+
+    monkeypatch.setattr(cli_module, "check_optimizer_run", accepted_history)
     monkeypatch.setattr(
         cli_module,
         "build_execution_package",
@@ -1535,12 +1788,90 @@ def test_continue_openbox_real_cli_uses_safe_defaults_and_repairs_package(
         [
             "continue-openbox-real",
             str(project_dir),
+            "--additional-evals",
+            "8",
         ],
     )
 
     assert result.exit_code == 0, result.output
     assert build_calls == [project_dir]
     assert "openbox real continuation completed: 108 cumulative evaluations" in result.output
+
+
+def test_continue_openbox_real_cli_rejects_poisoned_history_before_side_effects(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    import hermes_workflow.cli as cli_module
+    from tests.real_run_smoke_helpers import (
+        write_fake_metric_result_manifest,
+        write_fake_result_manifest,
+    )
+
+    project_dir = create_approved_real_project(tmp_path)
+
+    def adapter(
+        project_dir: Path,
+        *,
+        run_id: str,
+        cadence_cshrc: Path | None,
+    ) -> None:
+        assert cadence_cshrc is None
+        write_fake_result_manifest(project_dir, run_id=run_id)
+        write_fake_metric_result_manifest(project_dir, run_id=run_id)
+
+    run_openbox_real_optimization(
+        project_dir,
+        max_evals=1,
+        batch_size=1,
+        parallel_jobs=1,
+        advisor_factory=lambda _space, _seed: FakeAdvisor(project_dir),
+        adapter=adapter,
+    )
+    evaluations_path = project_dir / EVALUATIONS_RELATIVE
+    rows = [
+        json.loads(line)
+        for line in evaluations_path.read_text(encoding="utf-8").splitlines()
+    ]
+    rows[0]["objective"] = -999.0
+    evaluations_path.write_text(
+        "".join(json.dumps(row) + "\n" for row in rows),
+        encoding="utf-8",
+    )
+
+    ensure_calls: list[Path] = []
+    optimizer_calls: list[Path] = []
+
+    def forbidden_ensure(path: Path) -> None:
+        ensure_calls.append(path)
+        raise AssertionError("execution manifest repair must not run")
+
+    def forbidden_optimizer(path: Path, **_kwargs: object) -> object:
+        optimizer_calls.append(path)
+        raise AssertionError("optimizer must not run")
+
+    monkeypatch.setattr(cli_module, "_ensure_base_execution_manifest", forbidden_ensure)
+    monkeypatch.setattr(
+        cli_module,
+        "run_openbox_real_optimization",
+        forbidden_optimizer,
+    )
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "continue-openbox-real",
+            str(project_dir),
+            "--additional-evals",
+            "1",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "prior optimizer history acceptance rejected" in result.output
+    assert "objective mismatch" in result.output
+    assert ensure_calls == []
+    assert optimizer_calls == []
 
 
 def test_openbox_fake_random_baseline_reports_non_model_based_strategy(
@@ -1712,6 +2043,7 @@ def test_openbox_real_uses_requirement_parallel_jobs_for_candidate_workers(
             max_workers,
             adapter=None,
             allow_optimizer_continuation=False,
+            retention_callback=None,
         ):
             captured["max_workers"] = max_workers
             raise _CapturedMaxWorkers
@@ -1887,6 +2219,67 @@ def test_openbox_batch_evaluator_keeps_run_dir_when_keep_successful_runs_true(
     )
     assert decision["local_action"] == "kept"
     assert decision["run_status"] == "successful"
+
+
+def test_openbox_retention_callback_receives_final_record_failure_status(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import shutil
+
+    from hermes_workflow.native_turbo import NativeTurboBatchCandidate
+    from hermes_workflow.openbox_backend import (
+        make_openbox_real_candidate_batch_evaluator,
+    )
+    from tests.real_run_smoke_helpers import (
+        write_fake_metric_result_manifest,
+        write_fake_result_manifest,
+    )
+
+    project_dir = _create_approved_real_project_with_keep_flags(
+        tmp_path, keep_failed_runs=True, keep_successful_runs=True
+    )
+    shutil.rmtree(project_dir / "runs")
+    int_name, width_name = variable_names(project_dir)
+    classifications: list[bool] = []
+
+    def adapter(project: Path, *, run_id: str, cadence_cshrc: Path | None) -> None:
+        write_fake_result_manifest(project, run_id=run_id)
+        write_fake_metric_result_manifest(project, run_id=run_id)
+
+    monkeypatch.setattr(
+        "hermes_workflow.openbox_backend.record_real_result",
+        lambda _project, *, run_id: SimpleNamespace(
+            status=SimpleNamespace(value="fail"),
+            issues=[f"failed to record {run_id}"],
+        ),
+    )
+    candidate = NativeTurboBatchCandidate(
+        evaluation_index=1,
+        run_id="real_001",
+        candidate_id="candidate_000001",
+        batch_id="batch_001",
+        batch_slot=0,
+        batch_size=1,
+        selection_phase="initialization",
+        raw_x=[4.0, 0.5],
+        parameters={int_name: "4", width_name: "0.5u"},
+        replacement_issues=[],
+    )
+    evaluator = make_openbox_real_candidate_batch_evaluator(
+        project_dir,
+        cadence_cshrc=None,
+        max_workers=1,
+        adapter=adapter,
+        retention_callback=lambda _project, _run, _candidate, succeeded: (
+            classifications.append(succeeded) or []
+        ),
+    )
+
+    observations = evaluator([candidate])
+
+    assert observations[0].status == "record_failed"
+    assert classifications == [False]
 
 
 def _make_split_openbox_traces(project_dir: Path):
@@ -2473,6 +2866,7 @@ def test_run_openbox_real_rejects_warm_start_combined_with_continuation(
     tmp_path: Path,
 ) -> None:
     project_dir = create_generic_project(tmp_path, name="current_project")
+    _select_openbox_backend(project_dir)
     _write_warm_start_config(
         project_dir,
         enabled=True,
@@ -2494,7 +2888,10 @@ def test_run_openbox_real_warm_start_runs_audit_without_real_openbox(
         "_load_openbox",
         lambda: (_ for _ in ()).throw(AssertionError("real OpenBox must not load")),
     )
-    project_dir = create_approved_real_project(tmp_path)
+    project_dir = _create_openbox_project(
+        tmp_path,
+        mutate_config=_select_openbox_backend,
+    )
     _write_warm_start_config(
         project_dir,
         enabled=True,
@@ -2521,7 +2918,10 @@ def test_run_openbox_real_no_config_and_disabled_warm_start_preserve_behavior(
     _runs, adapter = _fake_manifest_adapter()
 
     # No warm-start config: existing behavior, no warm-start audit artifact.
-    project_dir = create_approved_real_project(tmp_path)
+    project_dir = _create_openbox_project(
+        tmp_path,
+        mutate_config=_select_openbox_backend,
+    )
     result = run_openbox_real_optimization(
         project_dir,
         max_evals=1,
@@ -2534,7 +2934,10 @@ def test_run_openbox_real_no_config_and_disabled_warm_start_preserve_behavior(
     assert not (project_dir / HISTORY_WARM_START_AUDIT_RELATIVE).exists()
 
     # enabled: false: same as no-config (no warm-start audit artifact).
-    disabled_dir = create_approved_real_project(tmp_path / "disabled_case")
+    disabled_dir = _create_openbox_project(
+        tmp_path / "disabled_case",
+        mutate_config=_select_openbox_backend,
+    )
     _write_warm_start_config(
         disabled_dir,
         enabled=False,
@@ -2602,7 +3005,10 @@ def _run_real_with_warm_start(
 def test_optimizer_report_includes_history_warm_start_when_enabled(
     tmp_path: Path,
 ) -> None:
-    project_dir = create_approved_real_project(tmp_path)
+    project_dir = _create_openbox_project(
+        tmp_path,
+        mutate_config=_select_openbox_backend,
+    )
     source_dir = create_approved_real_project(tmp_path / "source")
     _write_history_evaluations(source_dir, [_history_evaluations_row(source_dir)])
     _write_warm_start_config(
@@ -2627,7 +3033,10 @@ def test_optimizer_report_includes_history_warm_start_when_enabled(
 def test_optimizer_report_omits_history_warm_start_when_no_config(
     tmp_path: Path,
 ) -> None:
-    project_dir = create_approved_real_project(tmp_path)
+    project_dir = _create_openbox_project(
+        tmp_path,
+        mutate_config=_select_openbox_backend,
+    )
 
     payload = _run_real_with_warm_start(project_dir)
 
@@ -2637,7 +3046,10 @@ def test_optimizer_report_omits_history_warm_start_when_no_config(
 def test_optimizer_report_omits_history_warm_start_when_disabled(
     tmp_path: Path,
 ) -> None:
-    project_dir = create_approved_real_project(tmp_path)
+    project_dir = _create_openbox_project(
+        tmp_path,
+        mutate_config=_select_openbox_backend,
+    )
     _write_warm_start_config(
         project_dir,
         enabled=False,
@@ -2650,7 +3062,10 @@ def test_optimizer_report_omits_history_warm_start_when_disabled(
 
 
 def test_optimizer_report_history_warm_start_zero_accepted(tmp_path: Path) -> None:
-    project_dir = create_approved_real_project(tmp_path)
+    project_dir = _create_openbox_project(
+        tmp_path,
+        mutate_config=_select_openbox_backend,
+    )
     # Valid project source with no optimizer evaluations file -> source rejected
     # as missing_optimizer_evaluations -> zero accepted observations.
     source_dir = create_generic_project(tmp_path, name="warm_start_source")
@@ -2673,7 +3088,10 @@ def test_partial_and_final_report_share_history_warm_start_payload(
 ) -> None:
     import hermes_workflow.openbox_backend as module
 
-    project_dir = create_approved_real_project(tmp_path)
+    project_dir = _create_openbox_project(
+        tmp_path,
+        mutate_config=_select_openbox_backend,
+    )
     source_dir = create_approved_real_project(tmp_path / "source")
     _write_history_evaluations(source_dir, [_history_evaluations_row(source_dir)])
     _write_warm_start_config(

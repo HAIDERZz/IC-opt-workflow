@@ -12,6 +12,13 @@ concurrency only.
 Monte Carlo is intentionally deferred from this flow. Use it after optimization
 as follow-up validation on the chosen candidate.
 
+## Workflow
+
+```yaml
+schema_version: "1.0"
+mode: optimize
+```
+
 
 ## Project
 

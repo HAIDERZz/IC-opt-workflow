@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import shutil
+import subprocess
 from pathlib import Path, PurePosixPath
 from types import SimpleNamespace
 
@@ -37,6 +39,164 @@ def _set_optimizer_strategy(project_dir: Path, strategy: str, algorithm: str) ->
     payload["optimizer"]["algorithm"] = algorithm
     payload["optimizer"]["strategy"] = strategy
     _write_yaml(optimizer_path, payload)
+
+
+def _passed_remote_doctor_report() -> SimpleNamespace:
+    """Represent a doctor report produced earlier in the same attempt."""
+    return SimpleNamespace(
+        status="pass",
+        workflow_mode="optimize",
+        issues=[],
+    )
+
+
+def test_continuation_closeout_propagates_native_backend_to_every_consumer(
+    tmp_path: Path,
+) -> None:
+    from hermes_workflow.remote_optimizer_flow import run_continuation_closeout
+
+    project_dir = tmp_path / "project"
+    calls: list[tuple[str, str | None]] = []
+
+    def optimizer(project: Path) -> SimpleNamespace:
+        assert project == project_dir
+        calls.append(("optimizer", None))
+        return SimpleNamespace(status="completed")
+
+    def consumer(
+        name: str,
+        status: str,
+    ):
+        def invoke(
+            project: Path,
+            *,
+            expected_backend: str | None = None,
+        ) -> SimpleNamespace:
+            assert project == project_dir
+            calls.append((name, expected_backend))
+            if name == "decision":
+                return SimpleNamespace(
+                    status=status,
+                    recommended_run_id="real_007",
+                    recommended_action="accept_best_observed_or_continue",
+                )
+            return SimpleNamespace(status=status)
+
+        return invoke
+
+    report = run_continuation_closeout(
+        project_dir,
+        optimizer_fn=optimizer,
+        backend="native_turbo",
+        run_step_name="run-native-turbo-real",
+        check_fn=consumer("check", "accepted"),
+        summarize_fn=consumer("summarize", "pass"),
+        finalize_fn=consumer("finalize", "pass"),
+        insight_fn=consumer("insight", "pass"),
+        decision_fn=consumer("decision", "pass"),
+        additional_evals=2,
+        batch_size=1,
+        parallel_jobs=1,
+    )
+
+    assert report.status == "pass"
+    assert report.backend == "native_turbo"
+    assert calls == [
+        ("check", "native_turbo"),
+        ("optimizer", None),
+        ("check", "native_turbo"),
+        ("summarize", "native_turbo"),
+        ("finalize", "native_turbo"),
+        ("insight", "native_turbo"),
+        ("decision", "native_turbo"),
+    ]
+
+
+def test_native_continuation_history_gate_ignores_stale_neutral_openbox(
+    tmp_path: Path,
+) -> None:
+    from hermes_workflow.optimizer_artifacts import (
+        EVALUATIONS_RELATIVE,
+        LEGACY_NATIVE_EVALUATIONS_RELATIVE,
+        LEGACY_NATIVE_REPORT_RELATIVE,
+        REPORT_RELATIVE,
+    )
+    from hermes_workflow.remote_optimizer_flow import _continuation_history_path
+
+    reports = tmp_path / "reports"
+    reports.mkdir()
+    (tmp_path / REPORT_RELATIVE).write_text(
+        '{"backend": "openbox", "status": "completed"}\n',
+        encoding="utf-8",
+    )
+    (tmp_path / EVALUATIONS_RELATIVE).write_text(
+        '{"evaluation_index": 99}\n',
+        encoding="utf-8",
+    )
+    (tmp_path / LEGACY_NATIVE_REPORT_RELATIVE).write_text(
+        '{"backend": "native_turbo", "status": "completed"}\n',
+        encoding="utf-8",
+    )
+    (tmp_path / LEGACY_NATIVE_EVALUATIONS_RELATIVE).write_text(
+        '{"evaluation_index": 1}\n',
+        encoding="utf-8",
+    )
+
+    history = _continuation_history_path(tmp_path, backend="native_turbo")
+
+    assert history == tmp_path / LEGACY_NATIVE_EVALUATIONS_RELATIVE
+
+
+def test_remote_continuation_rejects_fix_run_before_backend_dispatch(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from hermes_workflow.remote_optimizer_flow import continue_remote_project
+
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir()
+    config_dir = cache_dir / "config"
+    config_dir.mkdir()
+    (config_dir / "fixed_points.yaml").write_text("fixed_points: []\n")
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.prepare_remote_project_cache",
+        lambda *args, **kwargs: SimpleNamespace(
+            status="pass",
+            cache_dir=cache_dir,
+            issues=[],
+        ),
+    )
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow._sync_remote_history_to_cache",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.assert_valid_project",
+        lambda *args, **kwargs: SimpleNamespace(optimizer=None),
+    )
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow._backend_from_project_strategy",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("fix-run must be rejected before backend dispatch")
+        ),
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="continuation requires an optimize workflow",
+    ):
+        continue_remote_project(
+            ref,
+            additional_evals=1,
+            remote_cadence_cshrc=PurePosixPath("/remote/cadence_env.csh"),
+            batch_size=None,
+            parallel_jobs=None,
+            cache_root=tmp_path,
+            runner=object(),
+            doctor_report=_passed_remote_doctor_report(),
+            attempt_started=True,
+        )
 
 
 def test_optimize_remote_project_runs_doctor_prepare_openbox_and_sync(tmp_path: Path, monkeypatch) -> None:
@@ -227,6 +387,42 @@ def test_optimize_remote_project_rejects_doctor_prepare_mode_race(
         )
 
 
+def test_optimize_remote_project_rejects_fix_run_before_prepare(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.prepare_remote_project_cache",
+        lambda *args, **kwargs: pytest.fail(
+            "fix-run requirement must not be prepared by remote optimize"
+        ),
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="remote optimize requires workflow mode 'optimize'",
+    ):
+        optimize_remote_project(
+            ref,
+            real=True,
+            max_evals=None,
+            batch_size=None,
+            parallel_jobs=None,
+            remote_cadence_cshrc=PurePosixPath(
+                "/remote/project/cadence_env.csh"
+            ),
+            cache_root=tmp_path,
+            runner=object(),
+            doctor_report=SimpleNamespace(
+                status="pass",
+                workflow_mode="fix_run",
+                issues=[],
+            ),
+            attempt_started=True,
+        )
+
+
 def test_optimize_remote_project_routes_turbo_strategy_through_remote_adapter(
     tmp_path: Path,
     monkeypatch,
@@ -327,8 +523,22 @@ def _seed_optimizer_history(cache_dir: Path) -> None:
     """Create a non-empty optimizer_evaluations.jsonl so the no-history check passes."""
     reports = cache_dir / "reports"
     reports.mkdir(parents=True, exist_ok=True)
+    (reports / "optimizer_run_report.json").write_text(
+        '{"backend": "openbox", "status": "completed"}\n',
+        encoding="utf-8",
+    )
     (reports / "optimizer_evaluations.jsonl").write_text(
         '{"evaluation_index": 1}\n', encoding="utf-8"
+    )
+
+
+def _stub_history_manifest_materialization(
+    cache_dir: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.materialize_remote_history_manifests",
+        lambda *args, **kwargs: cache_dir / ".remote_history_manifests",
     )
 
 
@@ -366,6 +576,7 @@ def _setup_continue_mocks(
         "hermes_workflow.remote_optimizer_flow._sync_remote_history_to_cache",
         lambda *args, **kwargs: calls.append("sync_history"),
     )
+    _stub_history_manifest_materialization(cache_dir, monkeypatch)
     monkeypatch.setattr(
         "hermes_workflow.remote_optimizer_flow._sync_cache_reports_to_remote",
         lambda *args, **kwargs: calls.append("sync_reports"),
@@ -522,6 +733,7 @@ def test_continue_remote_project_does_not_call_first_run_optimize_project(
         parallel_jobs=2,
         cache_root=tmp_path,
         runner=object(),
+        doctor_report=_passed_remote_doctor_report(),
     )
 
     assert result.status == "pass"
@@ -540,6 +752,638 @@ def test_continue_remote_project_does_not_call_first_run_optimize_project(
     assert calls[-1] == "sync_reports"
 
 
+def test_remote_continuation_materializes_prior_manifests_without_polluting_runs(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from hermes_workflow.package import sha256_file
+    from hermes_workflow.remote_optimizer_flow import continue_remote_project
+
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    cache_dir = tmp_path / "cache"
+    reports_dir = cache_dir / "reports"
+    reports_dir.mkdir(parents=True)
+    (cache_dir / "execution_package").mkdir()
+    (cache_dir / "execution_package" / "execution_manifest.json").write_text(
+        "{}\n",
+        encoding="utf-8",
+    )
+    prior_result_relative = PurePosixPath(
+        "runs/real/real_001/result_manifest.json"
+    )
+    prior_metric_relative = PurePosixPath(
+        "runs/real/real_001/metrics/metric_result_manifest.json"
+    )
+    prior_row = {
+        "evaluation_index": 1,
+        "run_id": "real_001",
+        "status": "feasible",
+        "result_manifest": prior_result_relative.as_posix(),
+        "metric_result_manifest": prior_metric_relative.as_posix(),
+    }
+    (reports_dir / "optimizer_run_report.json").write_text(
+        json.dumps(
+            {
+                "backend": "openbox",
+                "evaluation_count": 1,
+                "execution_mode": "real",
+                "status": "completed",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (reports_dir / "optimizer_evaluations.jsonl").write_text(
+        json.dumps(prior_row) + "\n",
+        encoding="utf-8",
+    )
+    (reports_dir / "optimizer_run_acceptance_report.json").write_text(
+        json.dumps(
+            {
+                "status": "accepted",
+                "evaluation_count": 1,
+                "result_manifest_count": 1,
+                "metric_manifest_count": 1,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    remote_source = tmp_path / "remote-source"
+    for relative, payload in (
+        (
+            prior_result_relative,
+            {
+                "run_id": "real_001",
+                "status": "succeeded",
+                "metric_result_manifest": prior_metric_relative.as_posix(),
+            },
+        ),
+        (prior_metric_relative, {"run_id": "real_001", "status": "succeeded"}),
+    ):
+        path = remote_source.joinpath(*relative.parts)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+    (reports_dir / "remote_run_artifacts.sha256").write_text(
+        "".join(
+            f"{sha256_file(remote_source.joinpath(*relative.parts))}  "
+            f"{relative.as_posix()}\n"
+            for relative in (prior_result_relative, prior_metric_relative)
+        ),
+        encoding="utf-8",
+    )
+
+    events: list[str] = []
+
+    class Runner:
+        profile = "lab"
+
+        def run(self, command: str, **kwargs: object) -> SimpleNamespace:
+            events.append(f"remote-check:{command}")
+            return SimpleNamespace(return_code=0, stdout="", stderr="")
+
+        def download_files(
+            self,
+            _remote_root: PurePosixPath,
+            paths: tuple[PurePosixPath, ...],
+            local_root: Path,
+        ) -> None:
+            events.append("download-prior-manifests")
+            for relative in paths:
+                source = remote_source.joinpath(*relative.parts)
+                target = local_root.joinpath(*relative.parts)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(source.read_bytes())
+
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.prepare_remote_project_cache",
+        lambda *a, **k: SimpleNamespace(
+            status="pass",
+            cache_dir=cache_dir,
+            issues=[],
+        ),
+    )
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow._sync_remote_history_to_cache",
+        lambda *a, **k: None,
+    )
+
+    def optimizer(project_dir: Path, **_kwargs: object) -> SimpleNamespace:
+        from hermes_workflow.retention_evidence import preserve_retention_evidence
+
+        events.append("optimizer")
+        assert project_dir == cache_dir
+        assert not (cache_dir / prior_result_relative).exists()
+        assert (
+            cache_dir / ".remote_history_manifests" / prior_result_relative
+        ).is_file()
+        new_result = cache_dir / "runs/real/real_002/result_manifest.json"
+        new_result.parent.mkdir(parents=True)
+        new_result.write_text(
+            json.dumps({"run_id": "real_002", "status": "failed"}) + "\n",
+            encoding="utf-8",
+        )
+        evidence = preserve_retention_evidence(
+            cache_dir,
+            run_id="real_002",
+            candidate_id=None,
+        )
+        decision = cache_dir / "state/run_retention/real_002.json"
+        decision.parent.mkdir(parents=True, exist_ok=True)
+        decision.write_text(
+            json.dumps(
+                {
+                    "run_id": "real_002",
+                    "local_action": "deleted",
+                    "remote_action": "deleted",
+                    "evidence_status": "preserved",
+                    "evidence_digest": evidence.digest,
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        shutil.rmtree(new_result.parent)
+        (reports_dir / "optimizer_evaluations.jsonl").write_text(
+            json.dumps(prior_row)
+            + "\n"
+            + json.dumps(
+                {
+                    "evaluation_index": 2,
+                    "run_id": "real_002",
+                    "status": "real_check_failed",
+                    "result_manifest": (
+                        "runs/real/real_002/result_manifest.json"
+                    ),
+                    "metric_result_manifest": None,
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        (reports_dir / "optimizer_run_report.json").write_text(
+            json.dumps(
+                {
+                    "backend": "openbox",
+                    "evaluation_count": 2,
+                    "execution_mode": "real",
+                    "status": "completed",
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        return SimpleNamespace(status="completed", evaluation_count=2)
+
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.run_openbox_real_optimization",
+        optimizer,
+    )
+    seen_supplementary: list[tuple[str, Path | None]] = []
+
+    def acceptance(
+        _project: Path,
+        *,
+        expected_backend: str | None = None,
+        supplementary_artifact_root: Path | None = None,
+    ) -> SimpleNamespace:
+        assert expected_backend == "openbox"
+        seen_supplementary.append(("check", supplementary_artifact_root))
+        return SimpleNamespace(status="accepted")
+
+    def finalize(
+        _project: Path,
+        *,
+        expected_backend: str | None = None,
+        supplementary_artifact_root: Path | None = None,
+    ) -> SimpleNamespace:
+        assert expected_backend == "openbox"
+        seen_supplementary.append(("finalize", supplementary_artifact_root))
+        return SimpleNamespace(status="pass")
+
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.check_optimizer_run",
+        acceptance,
+    )
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.summarize_optimizer_run",
+        lambda *a, **k: SimpleNamespace(status="pass"),
+    )
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.finalize_optimizer_run",
+        finalize,
+    )
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.generate_optimizer_insight_report",
+        lambda *a, **k: SimpleNamespace(status="pass"),
+    )
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.generate_optimizer_decision_report",
+        lambda *a, **k: SimpleNamespace(
+            status="pass",
+            recommended_run_id="real_002",
+            recommended_action="stop_for_user_review",
+        ),
+    )
+
+    def publish(_ref: object, project_dir: Path, _ssh: object) -> None:
+        events.append("publish")
+        assert {
+            path.name
+            for path in (project_dir / "runs" / "real").iterdir()
+            if path.is_dir()
+        } == set()
+
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow._sync_cache_reports_to_remote",
+        publish,
+    )
+
+    report = continue_remote_project(
+        ref,
+        additional_evals=1,
+        remote_cadence_cshrc=PurePosixPath("/remote/cadence_env.csh"),
+        batch_size=1,
+        parallel_jobs=1,
+        cache_root=tmp_path,
+        runner=Runner(),
+        doctor_report=_passed_remote_doctor_report(),
+        attempt_started=True,
+    )
+
+    supplementary_root = cache_dir / ".remote_history_manifests"
+    combined_root = cache_dir / ".optimizer_supplementary_manifests"
+    assert report.status == "pass"
+    assert events.index("download-prior-manifests") < events.index("optimizer")
+    assert seen_supplementary == [
+        ("check", supplementary_root),
+        ("check", combined_root),
+        ("finalize", combined_root),
+    ]
+    assert (combined_root / prior_result_relative).is_file()
+    assert (
+        combined_root / "runs/real/real_002/result_manifest.json"
+    ).is_file()
+
+
+def test_openbox_remote_continuation_rejects_duplicate_accepted_history_before_optimizer(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from hermes_workflow.package import sha256_file
+    from hermes_workflow.remote_optimizer_flow import continue_remote_project
+
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    cache_dir = tmp_path / "cache"
+    reports_dir = cache_dir / "reports"
+    reports_dir.mkdir(parents=True)
+    execution_package = cache_dir / "execution_package"
+    execution_package.mkdir()
+    (execution_package / "execution_manifest.json").write_text(
+        "{}\n",
+        encoding="utf-8",
+    )
+    result_relative = PurePosixPath(
+        "runs/real/real_001/result_manifest.json"
+    )
+    metric_relative = PurePosixPath(
+        "runs/real/real_001/metrics/metric_result_manifest.json"
+    )
+    duplicate_row = {
+        "evaluation_index": 1,
+        "run_id": "real_001",
+        "status": "feasible",
+        "result_manifest": result_relative.as_posix(),
+        "metric_result_manifest": metric_relative.as_posix(),
+    }
+    (reports_dir / "optimizer_run_report.json").write_text(
+        json.dumps(
+            {
+                "backend": "openbox",
+                "evaluation_count": 2,
+                "execution_mode": "real",
+                "status": "completed",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (reports_dir / "optimizer_evaluations.jsonl").write_text(
+        json.dumps(duplicate_row)
+        + "\n"
+        + json.dumps(duplicate_row)
+        + "\n",
+        encoding="utf-8",
+    )
+    (reports_dir / "optimizer_run_acceptance_report.json").write_text(
+        json.dumps(
+            {
+                "status": "accepted",
+                "evaluation_count": 2,
+                "result_manifest_count": 2,
+                "metric_manifest_count": 2,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    remote_source = tmp_path / "remote-source"
+    for relative, payload in (
+        (
+            result_relative,
+            {
+                "run_id": "real_001",
+                "status": "succeeded",
+                "metric_result_manifest": metric_relative.as_posix(),
+            },
+        ),
+        (metric_relative, {"run_id": "real_001", "status": "succeeded"}),
+    ):
+        path = remote_source.joinpath(*relative.parts)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+    (reports_dir / "remote_run_artifacts.sha256").write_text(
+        "".join(
+            f"{sha256_file(remote_source.joinpath(*relative.parts))}  "
+            f"{relative.as_posix()}\n"
+            for relative in (result_relative, metric_relative)
+        ),
+        encoding="utf-8",
+    )
+    optimizer_calls: list[str] = []
+
+    class Runner:
+        profile = "lab"
+
+        def run(self, _command: str, **_kwargs: object) -> SimpleNamespace:
+            return SimpleNamespace(return_code=0, stdout="", stderr="")
+
+        def download_files(
+            self,
+            _remote_root: PurePosixPath,
+            paths: tuple[PurePosixPath, ...],
+            local_root: Path,
+        ) -> None:
+            for relative in paths:
+                source = remote_source.joinpath(*relative.parts)
+                target = local_root.joinpath(*relative.parts)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(source.read_bytes())
+
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.prepare_remote_project_cache",
+        lambda *a, **k: SimpleNamespace(
+            status="pass",
+            cache_dir=cache_dir,
+            issues=[],
+        ),
+    )
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow._sync_remote_history_to_cache",
+        lambda *a, **k: None,
+    )
+
+    def forbidden_optimizer(*_args: object, **_kwargs: object) -> object:
+        optimizer_calls.append("optimizer")
+        raise AssertionError("optimizer must not run")
+
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.run_openbox_real_optimization",
+        forbidden_optimizer,
+    )
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow._sync_failure_evidence_to_remote",
+        lambda *a, **k: None,
+    )
+
+    with pytest.raises(RuntimeError, match="duplicate run_id"):
+        continue_remote_project(
+            ref,
+            additional_evals=1,
+            remote_cadence_cshrc=PurePosixPath("/remote/cadence_env.csh"),
+            batch_size=1,
+            parallel_jobs=1,
+            cache_root=tmp_path,
+            runner=Runner(),
+            doctor_report=_passed_remote_doctor_report(),
+            attempt_started=True,
+        )
+
+    assert optimizer_calls == []
+
+
+@pytest.mark.parametrize(
+    (
+        "result_status",
+        "result_run_id",
+        "candidate_id",
+        "expected_rejection",
+    ),
+    [
+        ("failed", "real_001", "candidate_000001", "result failure"),
+        (
+            "succeeded",
+            "real_999",
+            "candidate_000001",
+            "result manifest run_id mismatch",
+        ),
+        (
+            "succeeded",
+            "real_001",
+            "candidate_999999",
+            "result manifest candidate_id mismatch",
+        ),
+    ],
+)
+def test_remote_continuation_rechecks_persistent_remote_history_before_optimizer(
+    tmp_path: Path,
+    monkeypatch,
+    result_status: str,
+    result_run_id: str,
+    candidate_id: str,
+    expected_rejection: str,
+) -> None:
+    """Exercise real sync, bundle materialization, and prior acceptance together."""
+    from hermes_workflow.package import sha256_file
+    from hermes_workflow.remote_optimizer_flow import continue_remote_project
+
+    remote_project = tmp_path / "remote-fs" / "project"
+    controller_cache = create_generic_project(
+        tmp_path / "controller-fs",
+        name="cache",
+    )
+    _set_optimizer_strategy(controller_cache, "openbox_auto", "openbox")
+    remote_reports = remote_project / "reports"
+    remote_reports.mkdir(parents=True)
+    remote_execution = remote_project / "execution_package"
+    remote_execution.mkdir()
+    (remote_execution / "execution_manifest.json").write_text(
+        "{}\n",
+        encoding="utf-8",
+    )
+    result_relative = PurePosixPath(
+        "runs/real/real_001/result_manifest.json"
+    )
+    metric_relative = PurePosixPath(
+        "runs/real/real_001/metrics/metric_result_manifest.json"
+    )
+    history_row = {
+        "evaluation_index": 1,
+        "run_id": "real_001",
+        "status": "feasible",
+        "result_manifest": result_relative.as_posix(),
+        "metric_result_manifest": metric_relative.as_posix(),
+    }
+    (remote_reports / "optimizer_run_report.json").write_text(
+        json.dumps(
+            {
+                "backend": "openbox",
+                "evaluation_count": 1,
+                "execution_mode": "real",
+                "issues": [],
+                "status": "completed",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (remote_reports / "optimizer_evaluations.jsonl").write_text(
+        json.dumps(history_row) + "\n",
+        encoding="utf-8",
+    )
+    (remote_reports / "optimizer_run_acceptance_report.json").write_text(
+        json.dumps(
+            {
+                "status": "accepted",
+                "evaluation_count": 1,
+                "result_manifest_count": 1,
+                "metric_manifest_count": 1,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    result_path = remote_project.joinpath(*result_relative.parts)
+    result_path.parent.mkdir(parents=True)
+    result_path.write_text(
+        json.dumps(
+            {
+                "candidate_id": candidate_id,
+                "run_id": result_run_id,
+                "status": result_status,
+                "metric_result_manifest": metric_relative.as_posix(),
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    metric_path = remote_project.joinpath(*metric_relative.parts)
+    metric_path.parent.mkdir(parents=True)
+    metric_path.write_text(
+        json.dumps(
+            {
+                "candidate_id": candidate_id,
+                "run_id": "real_001",
+                "status": "succeeded",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (remote_reports / "remote_run_artifacts.sha256").write_text(
+        "".join(
+            f"{sha256_file(remote_project.joinpath(*relative.parts))}  "
+            f"{relative.as_posix()}\n"
+            for relative in (result_relative, metric_relative)
+        ),
+        encoding="utf-8",
+    )
+
+    class PersistentDualFsRunner:
+        profile = "lab"
+        transfer_timeout_s = 30
+
+        def run(self, command: str, **_kwargs: object) -> SimpleNamespace:
+            completed = subprocess.run(
+                ["/bin/sh", "-c", command],
+                capture_output=True,
+                check=False,
+                text=True,
+            )
+            return SimpleNamespace(
+                return_code=completed.returncode,
+                stdout=completed.stdout,
+                stderr=completed.stderr,
+            )
+
+        def download_tree(
+            self,
+            remote_dir: PurePosixPath,
+            local_dir: Path,
+        ) -> None:
+            shutil.copytree(Path(remote_dir.as_posix()), local_dir, dirs_exist_ok=True)
+
+        def download_files(
+            self,
+            remote_root: PurePosixPath,
+            paths: tuple[PurePosixPath, ...],
+            local_root: Path,
+        ) -> None:
+            for relative in paths:
+                source = Path(remote_root.as_posix()).joinpath(*relative.parts)
+                target = local_root.joinpath(*relative.parts)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source, target)
+
+    controller_cache.mkdir(parents=True, exist_ok=True)
+    ref = RemoteProjectRef("lab", PurePosixPath(remote_project.as_posix()))
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.prepare_remote_project_cache",
+        lambda *a, **k: SimpleNamespace(
+            status="pass",
+            cache_dir=controller_cache,
+            issues=[],
+        ),
+    )
+    optimizer_calls: list[str] = []
+
+    def forbidden_optimizer(*_args: object, **_kwargs: object) -> object:
+        optimizer_calls.append("optimizer")
+        raise AssertionError("optimizer must not run")
+
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.run_openbox_real_optimization",
+        forbidden_optimizer,
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match=(
+            "prior optimizer history acceptance rejected:.*"
+            + expected_rejection
+        ),
+    ):
+        continue_remote_project(
+            ref,
+            additional_evals=1,
+            remote_cadence_cshrc=PurePosixPath("/remote/cadence_env.csh"),
+            batch_size=1,
+            parallel_jobs=1,
+            cache_root=tmp_path,
+            runner=PersistentDualFsRunner(),
+            doctor_report=_passed_remote_doctor_report(),
+            attempt_started=True,
+        )
+
+    assert optimizer_calls == []
+    assert not controller_cache.joinpath(*result_relative.parts).exists()
+    assert (
+        controller_cache
+        / ".remote_history_manifests"
+        / result_relative
+    ).is_file()
+
+
 def test_continue_remote_project_calls_openbox_with_continuation_params(
     tmp_path: Path, monkeypatch
 ) -> None:
@@ -550,6 +1394,7 @@ def test_continue_remote_project_calls_openbox_with_continuation_params(
     (cache_dir / "execution_package").mkdir()
     ((cache_dir / "execution_package") / "execution_manifest.json").write_text("{}")
     _seed_optimizer_history(cache_dir)
+    _stub_history_manifest_materialization(cache_dir, monkeypatch)
 
     captured_kwargs: dict = {}
 
@@ -628,6 +1473,7 @@ def test_continue_remote_project_calls_openbox_with_continuation_params(
         parallel_jobs=2,
         cache_root=tmp_path,
         runner=object(),
+        doctor_report=_passed_remote_doctor_report(),
     )
 
     assert captured_kwargs["additional_evals"] == 4
@@ -637,6 +1483,208 @@ def test_continue_remote_project_calls_openbox_with_continuation_params(
     assert captured_kwargs["parallel_jobs"] == 2
     assert captured_kwargs["strategy"] is None
     assert "adapter" in captured_kwargs
+    assert callable(captured_kwargs["retention_callback"])
+
+
+def test_continue_remote_turbo_uses_legacy_history_remote_transport_and_orphan_floor(
+    tmp_path: Path, monkeypatch
+) -> None:
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir(parents=True)
+    (cache_dir / "execution_package").mkdir()
+    (cache_dir / "execution_package" / "execution_manifest.json").write_text("{}")
+    reports_dir = cache_dir / "reports"
+    reports_dir.mkdir()
+    (reports_dir / "native_turbo_optimizer_report.json").write_text(
+        '{"backend": "native_turbo", "status": "completed"}\n',
+        encoding="utf-8",
+    )
+    (reports_dir / "native_turbo_optimizer_evaluations.jsonl").write_text(
+        '{"evaluation_index": 1, "run_id": "real_001"}\n',
+        encoding="utf-8",
+    )
+    _stub_history_manifest_materialization(cache_dir, monkeypatch)
+    captured: dict[str, object] = {}
+
+    class Runner:
+        profile = "lab"
+
+        def run(self, command: str, **_kwargs: object) -> SimpleNamespace:
+            captured["inventory_command"] = command
+            return SimpleNamespace(
+                return_code=0,
+                stdout="real_003\nreal_019\n",
+                stderr="",
+            )
+
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.prepare_remote_project_cache",
+        lambda *a, **k: SimpleNamespace(
+            status="pass", cache_dir=cache_dir, issues=[]
+        ),
+    )
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow._sync_remote_history_to_cache",
+        lambda *a, **k: None,
+    )
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow._sync_cache_reports_to_remote",
+        lambda *a, **k: None,
+    )
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow._backend_from_project_strategy",
+        lambda *_args, **_kwargs: "native_turbo",
+        raising=False,
+    )
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.check_optimizer_run",
+        lambda *a, **k: SimpleNamespace(status="accepted"),
+    )
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.assert_valid_project",
+        lambda *a, **k: SimpleNamespace(testbenches=None, process_corners=None),
+    )
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.run_openbox_real_optimization",
+        lambda *a, **k: (_ for _ in ()).throw(
+            AssertionError("OpenBox must not run for a TuRBO continuation")
+        ),
+    )
+
+    def capture_native(project: Path, **kwargs: object) -> SimpleNamespace:
+        captured["native_project"] = project
+        captured["native_kwargs"] = kwargs
+        return SimpleNamespace(evaluation_count=3)
+
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.run_batch_native_turbo_optimization",
+        capture_native,
+    )
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.check_optimizer_run",
+        lambda *a, **k: SimpleNamespace(status="accepted"),
+    )
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.summarize_optimizer_run",
+        lambda *a, **k: SimpleNamespace(status="pass"),
+    )
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.finalize_optimizer_run",
+        lambda *a, **k: SimpleNamespace(status="pass"),
+    )
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.generate_optimizer_insight_report",
+        lambda *a, **k: SimpleNamespace(status="pass"),
+    )
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.generate_optimizer_decision_report",
+        lambda *a, **k: SimpleNamespace(
+            status="pass",
+            recommended_run_id="real_020",
+            recommended_action="stop_for_user_review",
+        ),
+    )
+
+    from hermes_workflow.remote_optimizer_flow import continue_remote_project
+
+    result = continue_remote_project(
+        ref,
+        additional_evals=2,
+        remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
+        batch_size=2,
+        parallel_jobs=2,
+        cache_root=tmp_path,
+        runner=Runner(),
+        doctor_report=_passed_remote_doctor_report(),
+        attempt_started=True,
+    )
+
+    assert result.status == "pass"
+    assert result.backend == "native_turbo"
+    assert [step.name for step in result.steps][0] == "run-native-turbo-real"
+    assert captured["native_project"] == cache_dir
+    native_kwargs = captured["native_kwargs"]
+    assert native_kwargs["additional_evals"] == 2
+    assert native_kwargs["continue_from_existing"] is True
+    assert native_kwargs["transport_mode"] == "remote"
+    assert native_kwargs["run_offset_floor"] == 19
+    assert callable(native_kwargs["retention_callback"])
+    assert "runs/real" in str(captured["inventory_command"])
+
+
+def test_remote_turbo_run_inventory_transport_failure_is_not_directory_missing(
+    tmp_path: Path, monkeypatch
+) -> None:
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir()
+    (cache_dir / "execution_package").mkdir()
+    (cache_dir / "execution_package" / "execution_manifest.json").write_text("{}")
+    reports_dir = cache_dir / "reports"
+    reports_dir.mkdir()
+    (reports_dir / "native_turbo_optimizer_report.json").write_text(
+        '{"backend": "native_turbo", "status": "completed"}\n',
+        encoding="utf-8",
+    )
+    (reports_dir / "native_turbo_optimizer_evaluations.jsonl").write_text(
+        '{"evaluation_index": 1, "run_id": "real_001"}\n',
+        encoding="utf-8",
+    )
+    _stub_history_manifest_materialization(cache_dir, monkeypatch)
+
+    class Runner:
+        profile = "lab"
+
+        def run(self, _command: str, **_kwargs: object) -> SimpleNamespace:
+            return SimpleNamespace(
+                return_code=255,
+                stdout="",
+                stderr="connection reset",
+            )
+
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.prepare_remote_project_cache",
+        lambda *a, **k: SimpleNamespace(
+            status="pass", cache_dir=cache_dir, issues=[]
+        ),
+    )
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow._sync_remote_history_to_cache",
+        lambda *a, **k: None,
+    )
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow._sync_failure_evidence_to_remote",
+        lambda *a, **k: None,
+    )
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow._backend_from_project_strategy",
+        lambda *_args, **_kwargs: "native_turbo",
+        raising=False,
+    )
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.check_optimizer_run",
+        lambda *a, **k: SimpleNamespace(status="accepted"),
+    )
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.assert_valid_project",
+        lambda *a, **k: SimpleNamespace(testbenches=None, process_corners=None),
+    )
+
+    from hermes_workflow.remote_optimizer_flow import continue_remote_project
+
+    with pytest.raises(ValueError, match="remote real-run inventory probe failed"):
+        continue_remote_project(
+            ref,
+            additional_evals=2,
+            remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
+            batch_size=None,
+            parallel_jobs=None,
+            cache_root=tmp_path,
+            runner=Runner(),
+            doctor_report=_passed_remote_doctor_report(),
+            attempt_started=True,
+        )
 
 
 def test_continue_remote_project_fails_when_no_optimizer_history(
@@ -670,6 +1718,7 @@ def test_continue_remote_project_fails_when_no_optimizer_history(
             parallel_jobs=None,
             cache_root=tmp_path,
             runner=object(),
+            doctor_report=_passed_remote_doctor_report(),
         )
 
 
@@ -703,6 +1752,7 @@ def test_continue_remote_project_ensures_manifest_when_missing(
         parallel_jobs=None,
         cache_root=tmp_path,
         runner=object(),
+        doctor_report=_passed_remote_doctor_report(),
     )
 
     assert result.status == "pass"
@@ -720,6 +1770,7 @@ def test_continue_remote_project_resource_inheritance_no_explicit_override(
     (cache_dir / "execution_package").mkdir()
     ((cache_dir / "execution_package") / "execution_manifest.json").write_text("{}")
     _seed_optimizer_history(cache_dir)
+    _stub_history_manifest_materialization(cache_dir, monkeypatch)
 
     captured_kwargs: dict = {}
 
@@ -795,6 +1846,7 @@ def test_continue_remote_project_resource_inheritance_no_explicit_override(
         parallel_jobs=None,
         cache_root=tmp_path,
         runner=object(),
+        doctor_report=_passed_remote_doctor_report(),
     )
 
     assert captured_kwargs["batch_size"] is None
@@ -830,6 +1882,7 @@ def test_continue_remote_project_writes_flow_report(tmp_path: Path, monkeypatch)
         parallel_jobs=2,
         cache_root=tmp_path,
         runner=object(),
+        doctor_report=_passed_remote_doctor_report(),
     )
 
     assert result.report_path is not None
@@ -865,6 +1918,7 @@ def test_continue_remote_project_syncs_history_and_runs_additional_evals(tmp_pat
         parallel_jobs=2,
         cache_root=tmp_path,
         runner=object(),
+        doctor_report=_passed_remote_doctor_report(),
     )
 
     assert result.status == "pass"
@@ -873,6 +1927,66 @@ def test_continue_remote_project_syncs_history_and_runs_additional_evals(tmp_pat
     assert calls[0] == "sync_history"
     assert "run_openbox" in calls
     assert calls[-1] == "sync_reports"
+
+
+def test_continue_remote_project_writes_supervisor_instruction_before_optimizer(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """Remote continuation rebuilds its controller cache from the frozen
+    snapshot, which never contains the real-run supervisor instruction, so the
+    continuation flow must re-decide it into the cache before the optimizer
+    step consumes it via the real-run approval gate."""
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir(parents=True)
+    (cache_dir / "execution_package").mkdir()
+    ((cache_dir / "execution_package") / "execution_manifest.json").write_text("{}")
+    _seed_optimizer_history(cache_dir)
+
+    calls: list[str] = []
+    _setup_continue_mocks(cache_dir, calls, monkeypatch)
+
+    seen: dict[str, object] = {}
+    openbox_result = SimpleNamespace(
+        evaluation_count=6,
+        report_path=cache_dir / "reports" / "openbox_report.json",
+        evaluations_path=cache_dir / "reports" / "evaluations.jsonl",
+    )
+
+    def capture_instruction_then_run(*args, **kwargs):
+        instruction_path = cache_dir / "supervisor_instruction.json"
+        seen["exists_at_optimizer"] = instruction_path.exists()
+        if instruction_path.exists():
+            seen["payload"] = json.loads(
+                instruction_path.read_text(encoding="utf-8")
+            )
+        calls.append("run_openbox")
+        return openbox_result
+
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.run_openbox_real_optimization",
+        capture_instruction_then_run,
+    )
+
+    from hermes_workflow.remote_optimizer_flow import continue_remote_project
+
+    result = continue_remote_project(
+        ref,
+        additional_evals=4,
+        remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
+        batch_size=2,
+        parallel_jobs=2,
+        cache_root=tmp_path,
+        runner=object(),
+        doctor_report=_passed_remote_doctor_report(),
+    )
+
+    assert result.status == "pass"
+    assert seen["exists_at_optimizer"] is True
+    payload = seen["payload"]
+    assert isinstance(payload, dict)
+    assert "decision" in payload
+    assert "approved_config_hashes" in payload
 
 
 def test_continue_remote_project_does_not_pass_strategy_detail_overrides(
@@ -886,6 +2000,7 @@ def test_continue_remote_project_does_not_pass_strategy_detail_overrides(
     (cache_dir / "execution_package").mkdir()
     ((cache_dir / "execution_package") / "execution_manifest.json").write_text("{}")
     _seed_optimizer_history(cache_dir)
+    _stub_history_manifest_materialization(cache_dir, monkeypatch)
 
     captured_kwargs: dict = {}
 
@@ -961,6 +2076,7 @@ def test_continue_remote_project_does_not_pass_strategy_detail_overrides(
         parallel_jobs=None,
         cache_root=tmp_path,
         runner=object(),
+        doctor_report=_passed_remote_doctor_report(),
     )
 
     assert captured_kwargs["max_evals"] is None
@@ -997,6 +2113,7 @@ def test_optimize_remote_project_routes_multi_testbench_to_multi_adapter(
     # (the routing decision happens inside the adapter passed by remote_openbox).
     def fake_openbox(*args, **kwargs):
         assert kwargs["transport_mode"] == "remote"
+        assert callable(kwargs["retention_callback"])
         adapter = kwargs.get("adapter")
         if adapter is not None:
             adapter(cache_dir, run_id="test_run", cadence_cshrc=Path("test"))
@@ -1218,7 +2335,10 @@ def test_sync_remote_history_to_cache_preserves_local_history_on_probe_failure(
         def run(self, command: str):
             return SimpleNamespace(return_code=255, stderr="connection reset")
 
-    with pytest.raises(RuntimeError, match="Failed to probe remote history"):
+    with pytest.raises(
+        RuntimeError,
+        match="remote history subdir probe.*SSH passwordless login failed",
+    ):
         _sync_remote_history_to_cache(ref, cache_dir, BrokenProbeRunner())
 
     assert stale.is_file()
@@ -1818,6 +2938,53 @@ def test_sync_cache_to_remote_without_runs_or_history_skips_inventory(
     assert not (cache_dir / "reports" / "remote_run_artifacts.sha256").exists()
 
 
+def test_sync_cache_to_remote_skips_duplicate_candidate_without_run_directory(
+    tmp_path: Path,
+) -> None:
+    from hermes_workflow.remote_optimizer_flow import (
+        _sync_cache_reports_to_remote,
+    )
+
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    cache_dir = create_generic_project(tmp_path, name="cache")
+    reports_dir = cache_dir / "reports"
+    flow_report = reports_dir / "optimizer_flow_run_report.json"
+    flow_report.write_text('{"status": "pass"}\n', encoding="utf-8")
+    (reports_dir / "native_turbo_optimizer_evaluations.jsonl").write_text(
+        json.dumps(
+            {
+                "evaluation_index": 1,
+                "run_id": "real_001",
+                "status": "duplicate_candidate_skipped",
+                "result_manifest": None,
+                "metric_result_manifest": None,
+                "metrics": None,
+                "fom": None,
+                "objective": 1_000_000.0,
+                "constraint_penalty": 0.0,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    uploaded: list[str] = []
+
+    class RecordingRunner:
+        def run(self, command: str, **kwargs) -> SimpleNamespace:
+            return SimpleNamespace(return_code=0, stdout="", stderr="")
+
+        def upload_tree(self, local_path, remote_path, **kwargs) -> None:
+            uploaded.append(str(remote_path))
+
+        def upload(self, local_path, remote_path) -> None:
+            uploaded.append(str(remote_path))
+
+    _sync_cache_reports_to_remote(ref, cache_dir, RecordingRunner())
+
+    assert str(ref.remote_project_dir / "reports" / flow_report.name) in uploaded
+    assert not (reports_dir / "remote_run_artifacts.sha256").exists()
+
+
 def test_sync_cache_to_remote_rejects_history_run_missing_without_retention(
     tmp_path: Path,
 ) -> None:
@@ -1899,9 +3066,12 @@ def test_sync_cache_to_remote_rejects_native_history_run_missing_without_retenti
 def test_sync_cache_to_remote_accepts_history_run_deleted_by_retention(
     tmp_path: Path,
 ) -> None:
+    import shutil
+
     from hermes_workflow.remote_optimizer_flow import (
         _sync_cache_reports_to_remote,
     )
+    from hermes_workflow.retention_evidence import preserve_retention_evidence
 
     ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
     cache_dir = tmp_path / "cache"
@@ -1921,6 +3091,25 @@ def test_sync_cache_to_remote_accepts_history_run_deleted_by_retention(
         + "\n",
         encoding="utf-8",
     )
+    result = cache_dir / "runs/real/real_001/result_manifest.json"
+    result.parent.mkdir(parents=True, exist_ok=True)
+    result.write_text(
+        json.dumps(
+            {
+                "run_id": "real_001",
+                "candidate_id": "candidate_000001",
+                "status": "failed",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    evidence = preserve_retention_evidence(
+        cache_dir,
+        run_id="real_001",
+        candidate_id="candidate_000001",
+    )
+    shutil.rmtree(cache_dir / "runs/real/real_001")
     retention = cache_dir / "state" / "run_retention" / "real_001.json"
     retention.parent.mkdir(parents=True)
     retention.write_text(
@@ -1929,6 +3118,8 @@ def test_sync_cache_to_remote_accepts_history_run_deleted_by_retention(
                 "run_id": "real_001",
                 "local_action": "deleted",
                 "remote_action": "deleted",
+                "evidence_status": "preserved",
+                "evidence_digest": evidence.digest,
             }
         )
         + "\n",
@@ -1949,6 +3140,8 @@ def test_sync_cache_to_remote_accepts_history_run_deleted_by_retention(
     _sync_cache_reports_to_remote(ref, cache_dir, RecordingRunner())
 
     assert str(ref.remote_project_dir / "reports" / flow_report.name) in uploaded
+    assert str(ref.remote_project_dir / "state") in uploaded
+    assert not any("/runs/real/real_001" in path for path in uploaded)
 
 
 def test_sync_cache_to_remote_merges_prior_inventory_for_continuation(
@@ -2047,6 +3240,30 @@ def test_archive_remote_flow_report_invalidates_stale_pass_marker() -> None:
             True,
         )
     ]
+
+
+def test_begin_remote_attempt_invalidates_optimize_and_fix_run_markers() -> None:
+    from hermes_workflow.remote_optimizer_flow import begin_remote_optimizer_attempt
+
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    commands: list[str] = []
+
+    class RecordingRunner:
+        def run(self, command: str, **kwargs) -> SimpleNamespace:
+            commands.append(command)
+            return SimpleNamespace(return_code=0, stdout="", stderr="")
+
+    lease = begin_remote_optimizer_attempt(ref, runner=RecordingRunner())
+
+    assert len(commands) == 3
+    assert "remote_attempt.lock" in commands[0]
+    assert "optimizer_flow_run_report.previous.json" in commands[1]
+    assert "fix_run_report.previous.json" in commands[2]
+
+    lease.release()
+
+    assert len(commands) == 4
+    assert "rm -rf -- /remote/project/state/remote_attempt.lock" in commands[3]
 
 
 def test_failure_evidence_sync_bypasses_incomplete_run_barrier(
@@ -2378,6 +3595,7 @@ def test_continue_remote_project_syncs_failure_report_before_reraising(
             parallel_jobs=2,
             cache_root=tmp_path,
             runner=object(),
+            doctor_report=_passed_remote_doctor_report(),
         )
 
     assert calls[-1] == "sync_reports"
@@ -2429,6 +3647,7 @@ def test_continue_remote_project_publishes_fail_report_when_final_sync_fails(
             parallel_jobs=2,
             cache_root=tmp_path,
             runner=object(),
+            doctor_report=_passed_remote_doctor_report(),
         )
 
     assert published[0]["status"] == "fail"
@@ -2571,10 +3790,226 @@ def test_continue_remote_project_archives_stale_pass_before_prepare(
             parallel_jobs=2,
             cache_root=tmp_path,
             runner=RecordingRunner(),
+            doctor_report=_passed_remote_doctor_report(),
         )
 
     assert len(commands) == 1
     assert "optimizer_flow_run_report.previous.json" in commands[0]
+
+
+def test_continue_remote_project_runs_doctor_before_frozen_prepare(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A direct continuation call must revalidate the live Remote Host first."""
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    remote_cshrc = PurePosixPath("/remote/project/cadence_env.csh")
+    remote_runner = object()
+    events: list[str] = []
+
+    def fake_doctor(*args: object, **kwargs: object) -> SimpleNamespace:
+        assert args == (ref,)
+        assert kwargs == {
+            "runner": remote_runner,
+            "cadence_cshrc": remote_cshrc,
+            "cache_root": tmp_path,
+        }
+        events.append("doctor")
+        return SimpleNamespace(
+            status="pass",
+            workflow_mode="optimize",
+            issues=[],
+        )
+
+    def stop_at_prepare(*args: object, **kwargs: object) -> object:
+        events.append("frozen_prepare")
+        raise RuntimeError("stop after ordering probe")
+
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.run_remote_doctor",
+        fake_doctor,
+    )
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.prepare_remote_project_cache",
+        stop_at_prepare,
+    )
+
+    from hermes_workflow.remote_optimizer_flow import continue_remote_project
+
+    with pytest.raises(RuntimeError, match="stop after ordering probe"):
+        continue_remote_project(
+            ref,
+            additional_evals=4,
+            remote_cadence_cshrc=remote_cshrc,
+            batch_size=2,
+            parallel_jobs=2,
+            cache_root=tmp_path,
+            runner=remote_runner,
+            attempt_started=True,
+        )
+
+    assert events == ["doctor", "frozen_prepare"]
+
+
+def test_continue_remote_project_doctor_failure_stops_before_prepare(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    calls: list[str] = []
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.run_remote_doctor",
+        lambda *args, **kwargs: (
+            calls.append("doctor"),
+            SimpleNamespace(
+                status="fail",
+                workflow_mode="optimize",
+                issues=["remote environment changed"],
+            ),
+        )[-1],
+    )
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.prepare_remote_project_cache",
+        lambda *args, **kwargs: pytest.fail(
+            "frozen prepare must not run after doctor failure"
+        ),
+    )
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow._sync_remote_history_to_cache",
+        lambda *args, **kwargs: pytest.fail(
+            "history sync must not run after doctor failure"
+        ),
+    )
+
+    from hermes_workflow.remote_optimizer_flow import continue_remote_project
+
+    with pytest.raises(
+        ValueError,
+        match="remote doctor failed: remote environment changed",
+    ):
+        continue_remote_project(
+            ref,
+            additional_evals=4,
+            remote_cadence_cshrc=PurePosixPath(
+                "/remote/project/cadence_env.csh"
+            ),
+            batch_size=2,
+            parallel_jobs=2,
+            cache_root=tmp_path,
+            runner=object(),
+            attempt_started=True,
+        )
+
+    assert calls == ["doctor"]
+
+
+def test_continue_remote_project_doctor_exception_stops_before_prepare(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.run_remote_doctor",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            RuntimeError("ssh reset during continuation doctor")
+        ),
+    )
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.prepare_remote_project_cache",
+        lambda *args, **kwargs: pytest.fail(
+            "frozen prepare must not run after a doctor exception"
+        ),
+    )
+
+    from hermes_workflow.remote_optimizer_flow import continue_remote_project
+
+    with pytest.raises(
+        RuntimeError,
+        match="ssh reset during continuation doctor",
+    ):
+        continue_remote_project(
+            RemoteProjectRef("lab", PurePosixPath("/remote/project")),
+            additional_evals=4,
+            remote_cadence_cshrc=PurePosixPath(
+                "/remote/project/cadence_env.csh"
+            ),
+            batch_size=None,
+            parallel_jobs=None,
+            cache_root=tmp_path,
+            runner=object(),
+            attempt_started=True,
+        )
+
+
+def test_continue_remote_project_reuses_same_attempt_doctor_report_once(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    doctor_report = _passed_remote_doctor_report()
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.run_remote_doctor",
+        lambda *args, **kwargs: pytest.fail(
+            "the same continuation attempt must not run doctor twice"
+        ),
+    )
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.prepare_remote_project_cache",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            RuntimeError("doctor report accepted")
+        ),
+    )
+
+    from hermes_workflow.remote_optimizer_flow import continue_remote_project
+
+    with pytest.raises(RuntimeError, match="doctor report accepted"):
+        continue_remote_project(
+            RemoteProjectRef("lab", PurePosixPath("/remote/project")),
+            additional_evals=4,
+            remote_cadence_cshrc=PurePosixPath(
+                "/remote/project/cadence_env.csh"
+            ),
+            batch_size=None,
+            parallel_jobs=None,
+            cache_root=tmp_path,
+            runner=object(),
+            doctor_report=doctor_report,
+            attempt_started=True,
+        )
+
+
+def test_continue_remote_project_rejects_non_optimize_doctor_mode(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.prepare_remote_project_cache",
+        lambda *args, **kwargs: pytest.fail(
+            "frozen prepare must not run for a fix-run requirement"
+        ),
+    )
+
+    from hermes_workflow.remote_optimizer_flow import continue_remote_project
+
+    with pytest.raises(
+        ValueError,
+        match="remote continuation requires workflow mode 'optimize'",
+    ):
+        continue_remote_project(
+            RemoteProjectRef("lab", PurePosixPath("/remote/project")),
+            additional_evals=4,
+            remote_cadence_cshrc=PurePosixPath(
+                "/remote/project/cadence_env.csh"
+            ),
+            batch_size=None,
+            parallel_jobs=None,
+            cache_root=tmp_path,
+            runner=object(),
+            doctor_report=SimpleNamespace(
+                status="pass",
+                workflow_mode="fix_run",
+                issues=[],
+            ),
+            attempt_started=True,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -2599,6 +4034,14 @@ class _RemoteRetentionFakeRunner:
         self.commands: list[str] = []
         self._missing_remote = missing_remote
 
+    def upload_tree(
+        self,
+        _local_dir: Path,
+        _remote_dir: PurePosixPath,
+        **_kwargs: object,
+    ) -> None:
+        return None
+
     def run(self, command: str, **kwargs: object):
         from hermes_workflow.remote_ssh import RemoteCommandResult
 
@@ -2619,6 +4062,56 @@ def _adapter_run_result(
         metric_result_manifest_path=Path("/tmp/metrics.json"),
         issues=[],
     )
+
+
+def _exercise_remote_candidate_and_final_retention(
+    project_dir: Path,
+    backend_kwargs: dict[str, object],
+) -> SimpleNamespace:
+    adapter = backend_kwargs["adapter"]
+    result = adapter(project_dir, run_id="real_001", cadence_cshrc=Path("x"))
+    run_dir = project_dir / "runs/real/real_001"
+    metric_relative = (
+        "runs/real/real_001/metrics/metric_result_manifest.json"
+    )
+    metric_path = project_dir / metric_relative
+    metric_path.parent.mkdir(parents=True, exist_ok=True)
+    metric_path.write_text(
+        json.dumps({
+            "schema_version": "1.0",
+            "run_id": "real_001",
+            "candidate_id": "candidate_000001",
+            "status": "succeeded" if result.status == "succeeded" else "failed",
+        }) + "\n",
+        encoding="utf-8",
+    )
+    (run_dir / "result_manifest.json").write_text(
+        json.dumps({
+            "schema_version": "1.0",
+            "run_id": "real_001",
+            "candidate_id": "candidate_000001",
+            "status": result.status,
+            "metric_result_manifest": metric_relative,
+        }) + "\n",
+        encoding="utf-8",
+    )
+    from hermes_workflow.run_retention import apply_local_run_retention
+
+    apply_local_run_retention(
+        project_dir,
+        run_id="real_001",
+        candidate_id="candidate_000001",
+        run_succeeded=result.status == "succeeded",
+    )
+    callback = backend_kwargs["retention_callback"]
+    issues = callback(
+        project_dir,
+        "real_001",
+        "candidate_000001",
+        result.status == "succeeded",
+    )
+    assert issues == []
+    return result
 
 
 def test_remote_adapter_wrapper_deletes_remote_run_dir_when_keep_successful_runs_false_single_tb(
@@ -2655,10 +4148,9 @@ def test_remote_adapter_wrapper_deletes_remote_run_dir_when_keep_successful_runs
         fake_single,
     )
 
-    captured_adapter: list[object] = []
-
     def fake_native_turbo(project_dir, **kwargs):
-        captured_adapter.append(kwargs["adapter"])
+        result = _exercise_remote_candidate_and_final_retention(project_dir, kwargs)
+        assert result.status == "succeeded"
         return SimpleNamespace(report_path=Path("/tmp/x"))
 
     monkeypatch.setattr(
@@ -2668,12 +4160,7 @@ def test_remote_adapter_wrapper_deletes_remote_run_dir_when_keep_successful_runs
 
     def fake_optimize_project(project_dir, **kwargs):
         services = kwargs["services"]
-        # Exercise the wrapper: this records adapter as a closure.
         services.run_batch_native_turbo_optimization(project_dir)
-        wrapper = captured_adapter[0]
-        # Call wrapper with run_id=real_001 to trigger retention.
-        result = wrapper(project_dir, run_id="real_001", cadence_cshrc=Path("x"))
-        assert result.status == "succeeded"
         return SimpleNamespace(status="pass", recommended_run_id="real_001")
 
     monkeypatch.setattr(
@@ -2703,6 +4190,85 @@ def test_remote_adapter_wrapper_deletes_remote_run_dir_when_keep_successful_runs
     assert decision["remote_action"] == "deleted"
     assert decision["run_status"] == "successful"
     assert decision["remote_run_dir"] == "/remote/project/runs/real/real_001"
+
+
+def test_remote_retention_callback_uses_final_record_failure_status(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from hermes_workflow.remote_optimizer_flow import optimize_remote_project
+
+    ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
+    cache_dir = tmp_path / "cache" / "project"
+    _create_remote_optimizer_project(cache_dir.parent, name=cache_dir.name)
+    _set_keep_flags_for_retention_remote(
+        cache_dir,
+        keep_failed_runs=True,
+        keep_successful_runs=False,
+    )
+    runner = _RemoteRetentionFakeRunner()
+
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.run_remote_doctor",
+        lambda *a, **k: SimpleNamespace(status="pass", issues=[]),
+    )
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.prepare_remote_project_cache",
+        lambda *a, **k: SimpleNamespace(
+            status="pass",
+            cache_dir=cache_dir,
+            issues=[],
+        ),
+    )
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow._sync_cache_reports_to_remote",
+        lambda *a, **k: None,
+    )
+
+    def fake_native_turbo(project_dir: Path, **kwargs: object) -> object:
+        callback = kwargs["retention_callback"]
+        issues = callback(
+            project_dir,
+            "real_001",
+            "candidate_000001",
+            False,
+        )
+        assert issues == []
+        return SimpleNamespace(report_path=Path("/tmp/x"))
+
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.run_batch_native_turbo_optimization",
+        fake_native_turbo,
+    )
+
+    def fake_optimize_project(project_dir: Path, **kwargs: object) -> object:
+        kwargs["services"].run_batch_native_turbo_optimization(project_dir)
+        return SimpleNamespace(status="pass", recommended_run_id="real_001")
+
+    monkeypatch.setattr(
+        "hermes_workflow.remote_optimizer_flow.optimize_project",
+        fake_optimize_project,
+    )
+
+    optimize_remote_project(
+        ref,
+        real=True,
+        max_evals=1,
+        batch_size=1,
+        parallel_jobs=1,
+        remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
+        cache_root=tmp_path,
+        runner=runner,
+    )
+
+    assert not [command for command in runner.commands if command.startswith("rm -rf")]
+    decision = json.loads(
+        (cache_dir / "state" / "run_retention" / "real_001.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert decision["run_status"] == "failed"
+    assert decision["remote_action"] == "kept"
 
 
 def test_remote_adapter_wrapper_deletes_remote_run_dir_when_keep_successful_runs_false_multi_tb(
@@ -2751,10 +4317,9 @@ def test_remote_adapter_wrapper_deletes_remote_run_dir_when_keep_successful_runs
         ),
     )
 
-    captured_adapter: list[object] = []
-
     def fake_native_turbo(project_dir, **kwargs):
-        captured_adapter.append(kwargs["adapter"])
+        result = _exercise_remote_candidate_and_final_retention(project_dir, kwargs)
+        assert result.status == "succeeded"
         return SimpleNamespace(report_path=Path("/tmp/x"))
 
     monkeypatch.setattr(
@@ -2765,9 +4330,6 @@ def test_remote_adapter_wrapper_deletes_remote_run_dir_when_keep_successful_runs
     def fake_optimize_project(project_dir, **kwargs):
         services = kwargs["services"]
         services.run_batch_native_turbo_optimization(project_dir)
-        wrapper = captured_adapter[0]
-        result = wrapper(project_dir, run_id="real_001", cadence_cshrc=Path("x"))
-        assert result.status == "succeeded"
         return SimpleNamespace(status="pass", recommended_run_id="real_001")
 
     monkeypatch.setattr(
@@ -2827,10 +4389,8 @@ def test_remote_adapter_wrapper_keeps_remote_run_dir_when_keep_successful_runs_t
         ),
     )
 
-    captured_adapter: list[object] = []
-
     def fake_native_turbo(project_dir, **kwargs):
-        captured_adapter.append(kwargs["adapter"])
+        _exercise_remote_candidate_and_final_retention(project_dir, kwargs)
         return SimpleNamespace(report_path=Path("/tmp/x"))
 
     monkeypatch.setattr(
@@ -2841,8 +4401,6 @@ def test_remote_adapter_wrapper_keeps_remote_run_dir_when_keep_successful_runs_t
     def fake_optimize_project(project_dir, **kwargs):
         services = kwargs["services"]
         services.run_batch_native_turbo_optimization(project_dir)
-        wrapper = captured_adapter[0]
-        wrapper(project_dir, run_id="real_001", cadence_cshrc=Path("x"))
         return SimpleNamespace(status="pass", recommended_run_id="real_001")
 
     monkeypatch.setattr(
@@ -2905,10 +4463,9 @@ def test_remote_adapter_wrapper_deletes_remote_run_dir_when_keep_failed_runs_fal
         ),
     )
 
-    captured_adapter: list[object] = []
-
     def fake_native_turbo(project_dir, **kwargs):
-        captured_adapter.append(kwargs["adapter"])
+        result = _exercise_remote_candidate_and_final_retention(project_dir, kwargs)
+        assert result.status == "failed"
         return SimpleNamespace(report_path=Path("/tmp/x"))
 
     monkeypatch.setattr(
@@ -2919,8 +4476,6 @@ def test_remote_adapter_wrapper_deletes_remote_run_dir_when_keep_failed_runs_fal
     def fake_optimize_project(project_dir, **kwargs):
         services = kwargs["services"]
         services.run_batch_native_turbo_optimization(project_dir)
-        wrapper = captured_adapter[0]
-        wrapper(project_dir, run_id="real_001", cadence_cshrc=Path("x"))
         return SimpleNamespace(status="pass", recommended_run_id="real_001")
 
     monkeypatch.setattr(
@@ -2984,10 +4539,8 @@ def test_remote_adapter_wrapper_remote_command_has_no_glob_and_is_under_remote_p
         ),
     )
 
-    captured_adapter: list[object] = []
-
     def fake_native_turbo(project_dir, **kwargs):
-        captured_adapter.append(kwargs["adapter"])
+        _exercise_remote_candidate_and_final_retention(project_dir, kwargs)
         return SimpleNamespace(report_path=Path("/tmp/x"))
 
     monkeypatch.setattr(
@@ -2998,8 +4551,6 @@ def test_remote_adapter_wrapper_remote_command_has_no_glob_and_is_under_remote_p
     def fake_optimize_project(project_dir, **kwargs):
         services = kwargs["services"]
         services.run_batch_native_turbo_optimization(project_dir)
-        wrapper = captured_adapter[0]
-        wrapper(project_dir, run_id="real_001", cadence_cshrc=Path("x"))
         return SimpleNamespace(status="pass", recommended_run_id="real_001")
 
     monkeypatch.setattr(

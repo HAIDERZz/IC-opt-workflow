@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import shlex
+import shutil
 from pathlib import Path, PurePosixPath
 from types import SimpleNamespace
 
@@ -218,7 +219,15 @@ class FakeRunner:
         self.uploads: list[tuple[Path, str]] = []
         self.downloads: list[tuple[str, Path]] = []
 
-    def upload_tree(self, local_path, remote_path, include=None, exclude=None) -> None:
+    def upload_tree(
+        self,
+        local_path,
+        remote_path,
+        include=None,
+        exclude=None,
+        *,
+        replace: bool = False,
+    ) -> None:
         self.uploads.append((Path(local_path), str(remote_path)))
 
     def download_tree(self, remote_path, local_path, include=None, exclude=None) -> None:
@@ -254,6 +263,57 @@ class FakeRunner:
 
     def upload(self, local_path, remote_path) -> None:
         self.uploads.append((Path(local_path), str(remote_path)))
+
+
+class PersistentRemoteRunner(FakeRunner):
+    """Filesystem-backed Remote boundary that preserves old run artifacts."""
+
+    def __init__(self, remote_root: Path) -> None:
+        super().__init__()
+        self.remote_root = remote_root
+
+    def _path(self, remote_path: PurePosixPath | str) -> Path:
+        remote = PurePosixPath(remote_path)
+        relative = remote.relative_to(PurePosixPath("/remote/project"))
+        return self.remote_root.joinpath(*relative.parts)
+
+    def upload_tree(
+        self,
+        local_path,
+        remote_path,
+        include=None,
+        exclude=None,
+        *,
+        replace: bool = False,
+    ) -> None:
+        self.uploads.append((Path(local_path), str(remote_path)))
+        target = self._path(remote_path)
+        if replace and target.exists():
+            shutil.rmtree(target)
+        shutil.copytree(local_path, target, dirs_exist_ok=True)
+
+    def download_tree(self, remote_path, local_path, include=None, exclude=None) -> None:
+        self.downloads.append((str(remote_path), Path(local_path)))
+        source = self._path(remote_path)
+        if str(remote_path).endswith("/psf"):
+            source.mkdir(parents=True, exist_ok=True)
+            (source / "spectre.out").write_text("new spectre output", encoding="utf-8")
+        if not source.is_dir():
+            raise RuntimeError(f"remote directory is missing: {remote_path}")
+        shutil.copytree(source, local_path, dirs_exist_ok=True)
+
+    def download(self, remote_path: str, local_path: Path) -> None:
+        source = self._path(remote_path)
+        if not source.is_file():
+            raise RuntimeError(f"remote file is missing: {remote_path}")
+        local_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, local_path)
+
+    def upload(self, local_path, remote_path) -> None:
+        self.uploads.append((Path(local_path), str(remote_path)))
+        target = self._path(remote_path)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(local_path, target)
 
 
 class FailingFakeRunner(FakeRunner):
@@ -351,6 +411,37 @@ def test_remote_adapter_runs_spectre_and_ocean_remotely(tmp_path: Path) -> None:
     manifest = json.loads((run_dir / "result_manifest.json").read_text(encoding="utf-8"))
     assert manifest["status"] == "succeeded"
     assert "spectre command completed" in manifest.get("notes", "")
+
+
+def test_remote_adapter_rejects_metric_left_by_previous_fresh_run(
+    tmp_path: Path,
+) -> None:
+    project_dir = create_approved_real_project(tmp_path)
+    run_dir = project_dir / "runs" / "real" / "real_001"
+    request = json.loads(
+        (run_dir / "metric_extraction_request.json").read_text(encoding="utf-8")
+    )
+    remote_root = tmp_path / "persistent_remote_project"
+    stale_metrics = remote_root / "runs" / "real" / "real_001" / "metrics"
+    stale_metrics.mkdir(parents=True)
+    stale_metrics.joinpath("ocean_scalars.tsv").write_text(
+        _ocean_scalars_tsv(request).replace("1e-12", "9.99e99"),
+        encoding="utf-8",
+    )
+    runner = PersistentRemoteRunner(remote_root)
+
+    result = run_remote_spectre_ocean_adapter(
+        project_dir,
+        run_id="real_001",
+        remote_ref=RemoteProjectRef("lab", PurePosixPath("/remote/project")),
+        remote_cadence_cshrc=PurePosixPath("/remote/project/cadence_env.csh"),
+        runner=runner,
+    )
+
+    assert result.status == "failed"
+    assert any(
+        "ocean scalar output is missing" in issue for issue in result.issues
+    ), result.issues
 
 
 def test_remote_adapter_applies_request_timeout_to_remote_commands(tmp_path: Path) -> None:
@@ -1935,7 +2026,15 @@ def test_remote_upload_failure_still_writes_command_trace(tmp_path: Path) -> Non
     ref = RemoteProjectRef("lab", PurePosixPath("/remote/project"))
 
     class UploadFailRunner(FakeRunner):
-        def upload_tree(self, local_path, remote_path, include=None, exclude=None):
+        def upload_tree(
+            self,
+            local_path,
+            remote_path,
+            include=None,
+            exclude=None,
+            *,
+            replace: bool = False,
+        ):
             raise RuntimeError("upload failed")
 
     runner = UploadFailRunner()

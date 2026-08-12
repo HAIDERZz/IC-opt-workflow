@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
 
-DEFAULT_OPENBOX_EXECUTION_VENV = Path("/tmp/ic_auto_opt_openbox_spike/.venv")
+DEFAULT_OPENBOX_EXECUTION_VENV: Path | None = None
 DEFAULT_CADENCE_CSHRC = Path("~/.ic-opt/cadence_env.csh")
 
 
@@ -38,13 +39,13 @@ print(json.dumps({
 
 def check_toolchain_environment(
     *,
-    openbox_venv: Path = DEFAULT_OPENBOX_EXECUTION_VENV,
+    openbox_venv: Path | None = DEFAULT_OPENBOX_EXECUTION_VENV,
     cadence_cshrc: Path = DEFAULT_CADENCE_CSHRC,
     report_path: Path | None = None,
     probe_runner: ProbeRunner | None = None,
     timeout_s: int = 30,
 ) -> dict:
-    openbox_venv = Path(openbox_venv).expanduser()
+    openbox_venv = resolve_openbox_execution_venv(openbox_venv)
     cadence_cshrc = Path(cadence_cshrc).expanduser()
     python_path = openbox_venv / "bin" / "python"
     hermes_script = openbox_venv / "bin" / "hermes-workflow"
@@ -113,6 +114,13 @@ def check_toolchain_environment(
         report_path.parent.mkdir(parents=True, exist_ok=True)
         report_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
     return report
+
+
+def resolve_openbox_execution_venv(openbox_venv: Path | None) -> Path:
+    """Resolve an explicit venv or the environment running Hermes itself."""
+    if openbox_venv is None:
+        return Path(sys.prefix)
+    return Path(openbox_venv).expanduser()
 
 
 def _add_path_check(

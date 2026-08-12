@@ -8,7 +8,11 @@ import yaml
 from pydantic import ValidationError
 
 from hermes_workflow.schemas import MetricsConfig, SpectreConfig
-from hermes_workflow.validate import assert_valid_project, validate_project_files
+from hermes_workflow.validate import (
+    assert_valid_project,
+    evaluate_objective,
+    validate_project_files,
+)
 from tests.project_factory import create_generic_project
 
 
@@ -84,6 +88,22 @@ def test_objective_expression_rejects_unknown_function_calls(tmp_path: Path) -> 
     )
 
 
+def test_objective_expression_rejects_bare_function_name(tmp_path: Path) -> None:
+    project_dir = copy_fixture_project(tmp_path)
+    metrics_path = project_dir / "config" / "metrics.yaml"
+    payload = read_yaml(metrics_path)
+    payload["objective"]["expression"] = "ln"
+    write_yaml(metrics_path, payload)
+
+    report = validate_project_files(project_dir)
+
+    assert report.ok is False
+    assert any(
+        "objective function ln must be called" in issue.message
+        for issue in report.issues
+    )
+
+
 def test_objective_expression_rejects_unknown_metric_names(tmp_path: Path) -> None:
     project_dir = copy_fixture_project(tmp_path)
     metrics_path = project_dir / "config" / "metrics.yaml"
@@ -130,6 +150,64 @@ def test_objective_expression_rejects_non_finite_literals(tmp_path: Path) -> Non
         "objective numeric literals must be finite" in issue.message
         for issue in report.issues
     )
+
+
+def test_objective_expression_rejects_integer_literal_outside_float_range(
+    tmp_path: Path,
+) -> None:
+    project_dir = copy_fixture_project(tmp_path)
+    metrics_path = project_dir / "config" / "metrics.yaml"
+    payload = read_yaml(metrics_path)
+    payload["objective"]["expression"] = "1" + ("0" * 400)
+    write_yaml(metrics_path, payload)
+
+    report = validate_project_files(project_dir)
+
+    assert report.ok is False
+    assert any(
+        "objective numeric literals must be finite" in issue.message
+        for issue in report.issues
+    )
+
+
+@pytest.mark.parametrize(
+    "expression",
+    ["ln(-1)", "(-1) ** 0.5", "1 / 0", "1e308 * 1e308"],
+)
+def test_objective_expression_rejects_invalid_constant_result(
+    tmp_path: Path,
+    expression: str,
+) -> None:
+    project_dir = copy_fixture_project(tmp_path)
+    metrics_path = project_dir / "config" / "metrics.yaml"
+    payload = read_yaml(metrics_path)
+    payload["objective"]["expression"] = expression
+    write_yaml(metrics_path, payload)
+
+    report = validate_project_files(project_dir)
+
+    assert report.ok is False
+    assert any(
+        "objective constant expression is invalid" in issue.message
+        for issue in report.issues
+    )
+
+
+@pytest.mark.parametrize(
+    ("expression", "metrics"),
+    [
+        ("ln(metric)", {"metric": -1.0}),
+        ("metric ** 0.5", {"metric": -1.0}),
+        ("1 / metric", {"metric": 0.0}),
+        ("metric + 1", {"metric": None}),
+    ],
+)
+def test_evaluate_objective_normalizes_domain_and_type_errors(
+    expression: str,
+    metrics: dict[str, float | None],
+) -> None:
+    with pytest.raises(ValueError):
+        evaluate_objective(expression, metrics)  # type: ignore[arg-type]
 
 
 def test_netlist_paths_must_stay_under_expected_directories(tmp_path: Path) -> None:
@@ -341,7 +419,6 @@ def _make_fix_run_project(tmp_path: Path) -> Path:
         "exports": [
             {
                 "name": "nf_pnoise",
-                "testbench": "cg_nf",
                 "expression": 'getData("NF" ?result "pnoise")',
                 "output_format": "csv",
                 "nil_policy": "fail",
@@ -350,6 +427,37 @@ def _make_fix_run_project(tmp_path: Path) -> Path:
     }
     write_yaml(project_dir / "config" / "waveform_exports.yaml", waveform_payload)
     return project_dir
+
+
+def _add_two_testbenches(project_dir: Path) -> None:
+    write_yaml(
+        project_dir / "config" / "testbenches.yaml",
+        {
+            "schema_version": "1.0",
+            "testbenches": [
+                {
+                    "id": "cg_nf",
+                    "maestro_point_root": "/remote/cg_nf",
+                    "virtuoso_library": "test_lib",
+                    "cell": "Mixer",
+                    "design_view": "schematic",
+                    "maestro_view": "maestro",
+                    "test_name": "CG_NF",
+                    "corner": "tt",
+                },
+                {
+                    "id": "iip3",
+                    "maestro_point_root": "/remote/iip3",
+                    "virtuoso_library": "test_lib",
+                    "cell": "Mixer",
+                    "design_view": "schematic",
+                    "maestro_view": "maestro",
+                    "test_name": "IIP3",
+                    "corner": "tt",
+                },
+            ],
+        },
+    )
 
 
 def test_validate_optimizer_project_still_requires_metrics_yaml(tmp_path: Path) -> None:
@@ -422,14 +530,497 @@ def test_validate_fix_run_project_accepts_metrics_only(tmp_path: Path) -> None:
     # Restore metrics.yaml from the optimizer fixture
     optimizer_fixture = FIXTURE_PROJECT / "config" / "metrics.yaml"
     shutil.copy2(optimizer_fixture, project_dir / "config" / "metrics.yaml")
+    metrics_path = project_dir / "config" / "metrics.yaml"
+    metrics = read_yaml(metrics_path)
+    metrics["constraints"] = []
+    metrics["objective"] = None
+    write_yaml(metrics_path, metrics)
 
     report = validate_project_files(project_dir)
 
     assert report.ok is True, report.format()
 
 
+def test_validate_single_testbench_rejects_metric_route(tmp_path: Path) -> None:
+    project_dir = _make_fix_run_project(tmp_path)
+    (project_dir / "config" / "waveform_exports.yaml").unlink()
+    shutil.copy2(
+        FIXTURE_PROJECT / "config" / "metrics.yaml",
+        project_dir / "config" / "metrics.yaml",
+    )
+    metrics_path = project_dir / "config" / "metrics.yaml"
+    metrics = read_yaml(metrics_path)
+    metrics["constraints"] = []
+    metrics["objective"] = None
+    metrics["metrics"][0]["testbench"] = "ignored_route"
+    write_yaml(metrics_path, metrics)
+
+    report = validate_project_files(project_dir)
+
+    assert report.ok is False
+    assert any(
+        issue.path == "metrics[0].testbench"
+        and "must not declare testbench for a single-testbench project"
+        in issue.message
+        for issue in report.issues
+    )
+
+
+@pytest.mark.parametrize("route", [None, "typo"])
+def test_validate_multi_testbench_requires_valid_waveform_route(
+    tmp_path: Path,
+    route: str | None,
+) -> None:
+    project_dir = _make_fix_run_project(tmp_path)
+    _add_two_testbenches(project_dir)
+    waveform_path = project_dir / "config" / "waveform_exports.yaml"
+    payload = read_yaml(waveform_path)
+    if route is None:
+        payload["exports"][0].pop("testbench", None)
+    else:
+        payload["exports"][0]["testbench"] = route
+    write_yaml(waveform_path, payload)
+
+    report = validate_project_files(project_dir)
+
+    assert report.ok is False
+    assert any(
+        issue.path == "exports[0].testbench"
+        and (
+            "must declare testbench" in issue.message
+            or "references unknown testbench typo" in issue.message
+        )
+        for issue in report.issues
+    )
+
+
+def test_validate_multi_testbench_requires_measurement_for_each_testbench(
+    tmp_path: Path,
+) -> None:
+    project_dir = _make_fix_run_project(tmp_path)
+    _add_two_testbenches(project_dir)
+    waveform_path = project_dir / "config" / "waveform_exports.yaml"
+    payload = read_yaml(waveform_path)
+    payload["exports"][0]["testbench"] = "cg_nf"
+    write_yaml(waveform_path, payload)
+
+    report = validate_project_files(project_dir)
+
+    assert report.ok is False
+    assert any(
+        issue.file == "config/testbenches.yaml"
+        and issue.path == "testbenches[1].id"
+        and "testbench iip3 must have at least one routed metric or waveform export"
+        in issue.message
+        for issue in report.issues
+    )
+
+
+def test_validate_multi_testbench_combines_metric_and_waveform_routes(
+    tmp_path: Path,
+) -> None:
+    project_dir = _make_fix_run_project(tmp_path)
+    _add_two_testbenches(project_dir)
+    waveform_path = project_dir / "config" / "waveform_exports.yaml"
+    waveforms = read_yaml(waveform_path)
+    waveforms["exports"][0]["testbench"] = "cg_nf"
+    write_yaml(waveform_path, waveforms)
+
+    metrics_path = project_dir / "config" / "metrics.yaml"
+    metrics = read_yaml(FIXTURE_PROJECT / "config" / "metrics.yaml")
+    metrics["metrics"] = [metrics["metrics"][0]]
+    metrics["metrics"][0]["testbench"] = "iip3"
+    metrics["constraints"] = []
+    metrics["objective"] = None
+    write_yaml(metrics_path, metrics)
+
+    report = validate_project_files(project_dir)
+
+    assert report.ok is True, report.format()
+
+
+@pytest.mark.parametrize(
+    ("parameter", "value", "expected"),
+    [
+        ("FN", "99", "outside approved bounds"),
+        ("FN", "2.5", "must be an integer"),
+        ("WN", "0.35u", "is not aligned to approved step"),
+        ("WN", "0.3n", "unit suffix"),
+    ],
+)
+def test_validate_fixed_points_against_variable_contract(
+    tmp_path: Path,
+    parameter: str,
+    value: str,
+    expected: str,
+) -> None:
+    project_dir = _make_fix_run_project(tmp_path)
+    fixed_path = project_dir / "config" / "fixed_points.yaml"
+    payload = read_yaml(fixed_path)
+    payload["points"][0]["parameters"][parameter] = value
+    write_yaml(fixed_path, payload)
+
+    report = validate_project_files(project_dir)
+
+    assert report.ok is False
+    assert any(
+        issue.path == "points[0].parameters" and expected in issue.message
+        for issue in report.issues
+    )
+
+
+def test_validate_fixed_point_requires_complete_parameter_set(tmp_path: Path) -> None:
+    project_dir = _make_fix_run_project(tmp_path)
+    fixed_path = project_dir / "config" / "fixed_points.yaml"
+    payload = read_yaml(fixed_path)
+    payload["points"][0]["parameters"].pop("FN")
+    write_yaml(fixed_path, payload)
+
+    report = validate_project_files(project_dir)
+
+    assert report.ok is False
+    assert any(
+        issue.path == "points[0].parameters"
+        and "candidate parameters must match variables.yaml" in issue.message
+        for issue in report.issues
+    )
+
+
+def test_validate_fix_run_rejects_run_id_range_overflow(tmp_path: Path) -> None:
+    project_dir = _make_fix_run_project(tmp_path)
+    workflow_path = project_dir / "config" / "workflow.yaml"
+    workflow = read_yaml(workflow_path)
+    workflow["starting_run_id"] = "real_999"
+    write_yaml(workflow_path, workflow)
+    fixed_path = project_dir / "config" / "fixed_points.yaml"
+    fixed = read_yaml(fixed_path)
+    fixed["points"].append(
+        {"candidate_id": "user_point_002", "parameters": fixed["points"][0]["parameters"]}
+    )
+    write_yaml(fixed_path, fixed)
+
+    report = validate_project_files(project_dir)
+
+    assert report.ok is False
+    assert any("would exceed real_999" in issue.message for issue in report.issues)
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("80e-12 Hz", "unit 'Hz' does not match metric unit 's'"),
+        ("80e-12", "finite numeric threshold followed by unit 's'"),
+        ("NaN s", "finite numeric threshold followed by unit 's'"),
+    ],
+)
+def test_validate_constraint_value_and_unit(
+    tmp_path: Path,
+    value: str,
+    expected: str,
+) -> None:
+    project_dir = copy_fixture_project(tmp_path)
+    metrics_path = project_dir / "config" / "metrics.yaml"
+    metrics = read_yaml(metrics_path)
+    metrics["constraints"][0]["value"] = value
+    write_yaml(metrics_path, metrics)
+
+    report = validate_project_files(project_dir)
+
+    assert report.ok is False
+    assert any(
+        issue.path == "constraints[0].value"
+        and expected in issue.message
+        for issue in report.issues
+    )
+
+
+def test_validate_metric_result_selector_is_safe_identifier(tmp_path: Path) -> None:
+    project_dir = copy_fixture_project(tmp_path)
+    metrics_path = project_dir / "config" / "metrics.yaml"
+    metrics = read_yaml(metrics_path)
+    metrics["metrics"][0]["ocean"]["result"] = 'tran);system("touch /tmp/x")'
+    write_yaml(metrics_path, metrics)
+
+    report = validate_project_files(project_dir)
+
+    assert report.ok is False
+    assert any(
+        issue.path == "metrics.0.ocean.result"
+        and "ocean.result must match" in issue.message
+        for issue in report.issues
+    )
+
+
+def test_validate_fix_run_rejects_unused_objective_and_constraints(tmp_path: Path) -> None:
+    project_dir = _make_fix_run_project(tmp_path)
+    (project_dir / "config" / "waveform_exports.yaml").unlink()
+    shutil.copy2(
+        FIXTURE_PROJECT / "config" / "metrics.yaml",
+        project_dir / "config" / "metrics.yaml",
+    )
+
+    report = validate_project_files(project_dir)
+
+    assert report.ok is False
+    assert any("objective is not supported for fix_run" in issue.message for issue in report.issues)
+    assert any("constraints are not supported for fix_run" in issue.message for issue in report.issues)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [("objective_policy", "worst_case"), ("constraint_policy", "all_corners")],
+)
+def test_validate_fix_run_rejects_unused_corner_aggregation_policy(
+    tmp_path: Path,
+    field: str,
+    value: str,
+) -> None:
+    project_dir = _make_fix_run_project(tmp_path)
+    payload = {
+        "schema_version": "1.0",
+        "objective_policy": "nominal",
+        "constraint_policy": "nominal",
+        "corners": [{"id": "nominal"}],
+    }
+    payload[field] = value
+    write_yaml(project_dir / "config" / "process_corners.yaml", payload)
+
+    report = validate_project_files(project_dir)
+
+    assert report.ok is False
+    assert any(
+        issue.path == field
+        and f"{field} must be nominal for fix_run workflow" in issue.message
+        for issue in report.issues
+    )
+
+
+def test_nominal_corner_policy_requires_explicit_nominal_corner_id(
+    tmp_path: Path,
+) -> None:
+    project_dir = copy_fixture_project(tmp_path)
+    write_yaml(
+        project_dir / "config" / "process_corners.yaml",
+        {
+            "schema_version": "1.0",
+            "objective_policy": "nominal",
+            "constraint_policy": "all_corners",
+            "corners": [{"id": "tt"}, {"id": "ss"}],
+        },
+    )
+
+    report = validate_project_files(project_dir)
+
+    assert report.ok is False
+    assert any(
+        "nominal policy requires a corner with id 'nominal'" in issue.message
+        for issue in report.issues
+    )
+
+
+def test_validate_project_files_uses_injected_model_file_checker(
+    tmp_path: Path,
+) -> None:
+    project_dir = copy_fixture_project(tmp_path)
+    remote_model = "/remote/pdk/models/device.scs"
+    write_yaml(
+        project_dir / "config" / "process_corners.yaml",
+        {
+            "schema_version": "1.0",
+            "objective_policy": "worst_case",
+            "constraint_policy": "all_corners",
+            "corners": [{"id": "external_model", "model_file": remote_model}],
+        },
+    )
+    checked: list[str] = []
+
+    structural_report = validate_project_files(project_dir)
+    local_report = validate_project_files(
+        project_dir,
+        model_file_is_readable=lambda path: Path(path).is_file(),
+    )
+    remote_report = validate_project_files(
+        project_dir,
+        model_file_is_readable=lambda path: checked.append(path) is None,
+    )
+
+    assert structural_report.ok is True, structural_report.format()
+    assert local_report.ok is False
+    assert any(
+        issue.path == "corners[0].model_file"
+        and "missing or unreadable" in issue.message
+        for issue in local_report.issues
+    )
+    assert remote_report.ok is True, remote_report.format()
+    assert checked == [remote_model]
+
+
+def test_validate_fix_run_loads_workflow_and_fixed_points_into_bundle(
+    tmp_path: Path,
+) -> None:
+    project_dir = _make_fix_run_project(tmp_path)
+
+    bundle = assert_valid_project(project_dir)
+
+    assert bundle.workflow is not None
+    assert bundle.workflow.mode == "fix_run"
+    assert bundle.fixed_points is not None
+    assert bundle.fixed_points.points[0].candidate_id == "user_point_001"
+
+
+def test_validate_fix_run_requires_workflow_yaml(tmp_path: Path) -> None:
+    project_dir = _make_fix_run_project(tmp_path)
+    (project_dir / "config" / "workflow.yaml").unlink()
+
+    report = validate_project_files(project_dir)
+
+    assert report.ok is False
+    assert any(
+        issue.file == "config/workflow.yaml"
+        and issue.message == "workflow.yaml is required when fixed_points.yaml is present"
+        for issue in report.issues
+    )
+
+
+def test_validate_workflow_rejects_unknown_mode(tmp_path: Path) -> None:
+    project_dir = _make_fix_run_project(tmp_path)
+    workflow_path = project_dir / "config" / "workflow.yaml"
+    workflow = read_yaml(workflow_path)
+    workflow["mode"] = "characterize"
+    write_yaml(workflow_path, workflow)
+
+    report = validate_project_files(project_dir)
+
+    assert report.ok is False
+    assert any(
+        issue.file == "config/workflow.yaml"
+        and issue.path == "mode"
+        and "Input should be 'optimize' or 'fix_run'" in issue.message
+        for issue in report.issues
+    )
+
+
+def test_validate_workflow_rejects_invalid_yaml(tmp_path: Path) -> None:
+    project_dir = _make_fix_run_project(tmp_path)
+    (project_dir / "config" / "workflow.yaml").write_text(
+        "schema_version: '1.0'\nmode: [\n",
+        encoding="utf-8",
+    )
+
+    report = validate_project_files(project_dir)
+
+    assert report.ok is False
+    assert any(
+        issue.file == "config/workflow.yaml"
+        and issue.message.startswith("invalid YAML:")
+        for issue in report.issues
+    )
+
+
+def test_validate_optimize_rejects_fixed_points_yaml(tmp_path: Path) -> None:
+    project_dir = copy_fixture_project(tmp_path)
+    variables = read_yaml(project_dir / "config" / "variables.yaml")
+    parameters = {var["name"]: str(var["lower"]) for var in variables["variables"]}
+    write_yaml(
+        project_dir / "config" / "fixed_points.yaml",
+        {
+            "schema_version": "1.0",
+            "points": [
+                {"candidate_id": "unexpected_point", "parameters": parameters}
+            ],
+        },
+    )
+
+    report = validate_project_files(project_dir)
+
+    assert report.ok is False
+    assert any(
+        issue.file == "config/fixed_points.yaml"
+        and issue.message == "fixed_points.yaml is not supported for optimize workflow"
+        for issue in report.issues
+    )
+
+
+def test_validate_optimize_rejects_waveform_exports_yaml(tmp_path: Path) -> None:
+    project_dir = copy_fixture_project(tmp_path)
+    write_yaml(
+        project_dir / "config" / "waveform_exports.yaml",
+        {
+            "schema_version": "1.0",
+            "exports": [
+                {
+                    "name": "unexpected_export",
+                    "testbench": "cg_nf",
+                    "expression": 'getData("NF" ?result "pnoise")',
+                    "output_format": "csv",
+                    "nil_policy": "fail",
+                }
+            ],
+        },
+    )
+
+    report = validate_project_files(project_dir)
+
+    assert report.ok is False
+    assert any(
+        issue.file == "config/waveform_exports.yaml"
+        and issue.message
+        == "waveform_exports.yaml is not supported for optimize workflow"
+        for issue in report.issues
+    )
+
+
+def test_validate_fix_run_rejects_optimizer_yaml(tmp_path: Path) -> None:
+    project_dir = _make_fix_run_project(tmp_path)
+    shutil.copy2(
+        FIXTURE_PROJECT / "config" / "optimizer.yaml",
+        project_dir / "config" / "optimizer.yaml",
+    )
+
+    report = validate_project_files(project_dir)
+
+    assert report.ok is False
+    assert any(
+        issue.file == "config/optimizer.yaml"
+        and issue.message == "optimizer.yaml is not supported for fix_run workflow"
+        for issue in report.issues
+    )
+
+
+def test_validate_fix_run_rejects_disabled_history_warm_start_yaml(
+    tmp_path: Path,
+) -> None:
+    project_dir = _make_fix_run_project(tmp_path)
+    write_yaml(
+        project_dir / "config" / "history_warm_start.yaml",
+        {
+            "schema_version": "1.0",
+            "history_warm_start": {"enabled": False, "sources": []},
+        },
+    )
+
+    report = validate_project_files(project_dir)
+
+    assert report.ok is False
+    assert any(
+        issue.file == "config/history_warm_start.yaml"
+        and issue.message
+        == "history_warm_start.yaml is not supported for fix_run workflow"
+        for issue in report.issues
+    )
+
+
 def test_assert_valid_project_loads_history_warm_start(tmp_path: Path) -> None:
     project_dir = create_generic_project(tmp_path)
+    optimizer_path = project_dir / "config" / "optimizer.yaml"
+    optimizer = read_yaml(optimizer_path)
+    optimizer["optimizer"].update(
+        {
+            "algorithm": "openbox",
+            "strategy": "openbox_auto",
+        }
+    )
+    write_yaml(optimizer_path, optimizer)
     write_yaml(
         project_dir / "config" / "history_warm_start.yaml",
         {
@@ -452,6 +1043,105 @@ def test_assert_valid_project_loads_history_warm_start(tmp_path: Path) -> None:
     assert settings.sources[0].label == "round1"
     assert settings.max_observations == 200
     assert settings.warm_start_strategy == "topk"
+
+
+def test_assert_valid_project_rejects_enabled_history_warm_start_for_turbo(
+    tmp_path: Path,
+) -> None:
+    project_dir = create_generic_project(tmp_path)
+    optimizer_path = project_dir / "config" / "optimizer.yaml"
+    optimizer = read_yaml(optimizer_path)
+    optimizer["optimizer"].update(
+        {
+            "algorithm": "turbo",
+            "strategy": "turbo_trust_region",
+            "openbox": None,
+            "turbo": {
+                "snap_to_step": True,
+                "duplicate_handling": "resample",
+            },
+        }
+    )
+    write_yaml(optimizer_path, optimizer)
+    write_yaml(
+        project_dir / "config" / "history_warm_start.yaml",
+        {
+            "schema_version": "1.0",
+            "history_warm_start": {
+                "enabled": True,
+                "sources": [{"path": "/tmp/old_project"}],
+            },
+        },
+    )
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            "history_warm_start.enabled=true requires the OpenBox optimizer "
+            "backend; resolved backend is native_turbo"
+        ),
+    ):
+        assert_valid_project(project_dir)
+
+
+def test_assert_valid_project_allows_disabled_history_warm_start_for_turbo(
+    tmp_path: Path,
+) -> None:
+    project_dir = create_generic_project(tmp_path)
+    optimizer_path = project_dir / "config" / "optimizer.yaml"
+    optimizer = read_yaml(optimizer_path)
+    optimizer["optimizer"].update(
+        {
+            "algorithm": "turbo",
+            "strategy": "turbo_trust_region",
+            "openbox": None,
+            "turbo": {
+                "snap_to_step": True,
+                "duplicate_handling": "resample",
+            },
+        }
+    )
+    write_yaml(optimizer_path, optimizer)
+    write_yaml(
+        project_dir / "config" / "history_warm_start.yaml",
+        {
+            "schema_version": "1.0",
+            "history_warm_start": {
+                "enabled": False,
+                "sources": [],
+            },
+        },
+    )
+
+    bundle = assert_valid_project(project_dir)
+
+    assert bundle.history_warm_start is not None
+    assert bundle.history_warm_start.history_warm_start.enabled is False
+
+
+def test_assert_valid_project_rejects_enabled_history_warm_start_for_fix_run(
+    tmp_path: Path,
+) -> None:
+    project_dir = create_generic_project(tmp_path, workflow_mode="fix_run")
+    write_yaml(
+        project_dir / "config" / "history_warm_start.yaml",
+        {
+            "schema_version": "1.0",
+            "history_warm_start": {
+                "enabled": True,
+                "sources": [{"path": "/tmp/old_project"}],
+            },
+        },
+    )
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            "history_warm_start.enabled=true is only supported for "
+            "optimize workflow"
+        ),
+    ):
+        assert_valid_project(project_dir)
 
 
 def test_assert_valid_project_without_history_warm_start_is_none(

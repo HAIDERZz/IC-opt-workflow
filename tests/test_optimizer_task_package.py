@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 
+import pytest
 import yaml
 from typer.testing import CliRunner
 
@@ -60,6 +61,15 @@ def _set_optimizer_settings(
         settings["algorithm"] = algorithm
     if strategy is not None:
         settings["strategy"] = strategy
+    _write_yaml(optimizer_path, payload)
+
+
+def _set_implicit_optimizer_algorithm(project_dir: Path, algorithm: str) -> None:
+    optimizer_path = project_dir / "config" / "optimizer.yaml"
+    payload = _read_yaml(optimizer_path)
+    settings = payload["optimizer"]
+    settings["algorithm"] = algorithm
+    settings.pop("strategy", None)
     _write_yaml(optimizer_path, payload)
 
 
@@ -165,10 +175,19 @@ def test_build_optimizer_execution_task_package_writes_task_and_manifest(
     assert "ledger/experiment_ledger.jsonl" in required_artifacts
     assert "reports/optimizer_finalize_report.json" in required_artifacts
     assert manifest_payload["audit_commands"] == [
-        ["hermes-workflow", "check-optimizer-run", str(project_dir.resolve())],
-        ["hermes-workflow", "summarize-optimizer-run", str(project_dir.resolve())],
-        ["hermes-workflow", "finalize-optimizer-run", str(project_dir.resolve())],
-        ["hermes-workflow", "optimizer-status", str(project_dir.resolve())],
+        [
+            "hermes-workflow",
+            command_name,
+            str(project_dir.resolve()),
+            "--expected-backend",
+            "native_turbo",
+        ]
+        for command_name in (
+            "check-optimizer-run",
+            "summarize-optimizer-run",
+            "finalize-optimizer-run",
+            "optimizer-status",
+        )
     ]
 
 
@@ -176,6 +195,7 @@ def test_build_optimizer_execution_task_package_writes_openbox_backend(
     tmp_path: Path,
 ) -> None:
     project_dir = _create_optimizer_project(tmp_path)
+    _set_implicit_optimizer_algorithm(project_dir, "openbox")
     optimizer = _optimizer_settings(project_dir)
     spectre = _spectre_settings(project_dir)
 
@@ -222,56 +242,47 @@ def test_build_optimizer_execution_task_package_writes_openbox_backend(
     assert "reports/optimizer_finalize_report.json" in required_artifacts
 
 
-def test_build_optimizer_execution_task_package_uses_config_turbo_strategy_backend(
+def test_build_optimizer_execution_task_package_rejects_backend_mismatch_with_turbo(
     tmp_path: Path,
 ) -> None:
     project_dir = _create_optimizer_project(tmp_path)
     _set_optimizer_settings(project_dir, algorithm="turbo", strategy="turbo_trust_region")
 
-    package = build_optimizer_execution_task_package(
-        project_dir,
-        cadence_cshrc=CADENCE_CSHRC,
-        optimizer_backend="openbox",
-        created_at_utc="2026-06-04T00:00:00Z",
-    )
-
-    manifest_payload = json.loads(package.manifest_path.read_text(encoding="utf-8"))
-
-    assert manifest_payload["backend"] == "native_turbo"
-    assert manifest_payload["strategy"] == "turbo_trust_region"
-    assert manifest_payload["command"][:3] == [
-        "hermes-workflow",
-        "run-native-turbo",
-        str(project_dir.resolve()),
-    ]
+    with pytest.raises(
+        ValueError,
+        match="optimizer_backend openbox does not match project backend native_turbo",
+    ):
+        build_optimizer_execution_task_package(
+            project_dir,
+            cadence_cshrc=CADENCE_CSHRC,
+            optimizer_backend="openbox",
+            created_at_utc="2026-06-04T00:00:00Z",
+        )
 
 
-def test_build_optimizer_execution_task_package_uses_config_openbox_strategy(
+def test_build_optimizer_execution_task_package_rejects_backend_mismatch_with_openbox(
     tmp_path: Path,
 ) -> None:
     project_dir = _create_optimizer_project(tmp_path)
     _set_optimizer_settings(project_dir, algorithm="openbox", strategy="openbox_prf_eic")
 
-    package = build_optimizer_execution_task_package(
-        project_dir,
-        cadence_cshrc=CADENCE_CSHRC,
-        optimizer_backend="native_turbo",
-        created_at_utc="2026-06-04T00:00:00Z",
-    )
-
-    manifest_payload = json.loads(package.manifest_path.read_text(encoding="utf-8"))
-
-    assert manifest_payload["backend"] == "openbox"
-    assert manifest_payload["strategy"] == "openbox_prf_eic"
-    assert "--strategy" in manifest_payload["command"]
-    strategy_index = manifest_payload["command"].index("--strategy")
-    assert manifest_payload["command"][strategy_index + 1] == "openbox_prf_eic"
+    with pytest.raises(
+        ValueError,
+        match="optimizer_backend native_turbo does not match project backend openbox",
+    ):
+        build_optimizer_execution_task_package(
+            project_dir,
+            cadence_cshrc=CADENCE_CSHRC,
+            optimizer_backend="native_turbo",
+            created_at_utc="2026-06-04T00:00:00Z",
+        )
 
 
 def test_build_optimizer_execution_task_package_writes_openbox_continuation(
     tmp_path: Path,
 ) -> None:
     project_dir = _create_optimizer_project(tmp_path)
+    _set_implicit_optimizer_algorithm(project_dir, "openbox")
     optimizer = _optimizer_settings(project_dir)
 
     package = build_optimizer_execution_task_package(
@@ -279,6 +290,7 @@ def test_build_optimizer_execution_task_package_writes_openbox_continuation(
         cadence_cshrc=CADENCE_CSHRC,
         optimizer_backend="openbox",
         continuation=True,
+        additional_evals=12,
         created_at_utc="2026-06-05T00:00:00Z",
     )
 
@@ -287,10 +299,10 @@ def test_build_optimizer_execution_task_package_writes_openbox_continuation(
 
     assert "continue-openbox-real" in task_text
     assert "run-openbox-real" not in task_text
-    assert "--additional-evals" not in task_text
+    assert "--additional-evals 12" in task_text
     assert "existing accepted optimizer traces" in task_text
     assert "check-toolchain-env" in task_text
-    assert "/tmp/ic_auto_opt_openbox_spike/.venv" in task_text
+    assert "/tmp/ic_auto_opt_openbox_spike/.venv" not in task_text
     assert "finalize-optimizer-run" in task_text
     assert "non-sandbox" in task_text
     assert "reports/optimizer_run_acceptance_report.json" in task_text
@@ -299,13 +311,11 @@ def test_build_optimizer_execution_task_package_writes_openbox_continuation(
     assert "reports/optimizer_insight_report.md" in task_text
     assert manifest_payload["backend"] == "openbox"
     assert manifest_payload["continuation"] is True
-    assert manifest_payload["additional_evals"] is None
+    assert manifest_payload["additional_evals"] == 12
     assert manifest_payload["max_evals"] == optimizer["max_evaluations"]
     assert manifest_payload["toolchain_check_command"] == [
         "hermes-workflow",
         "check-toolchain-env",
-        "--openbox-venv",
-        "/tmp/ic_auto_opt_openbox_spike/.venv",
         "--cadence-cshrc",
         str(CADENCE_CSHRC.resolve()),
     ]
@@ -313,6 +323,8 @@ def test_build_optimizer_execution_task_package_writes_openbox_continuation(
         "hermes-workflow",
         "continue-openbox-real",
         str(project_dir.resolve()),
+        "--additional-evals",
+        "12",
         "--cadence-cshrc",
         str(CADENCE_CSHRC.resolve()),
     ]
@@ -321,15 +333,171 @@ def test_build_optimizer_execution_task_package_writes_openbox_continuation(
         "hermes-workflow",
         "finalize-optimizer-run",
         str(project_dir.resolve()),
+        "--expected-backend",
+        "openbox",
     ] in manifest_payload["audit_commands"]
     assert [
         "hermes-workflow",
         "optimizer-status",
         str(project_dir.resolve()),
+        "--expected-backend",
+        "openbox",
     ] in manifest_payload["audit_commands"]
     assert "reports/optimizer_finalize_report.json" in manifest_payload[
         "required_returned_artifacts"
     ]
+
+
+def test_build_optimizer_execution_task_package_writes_native_continuation(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_optimizer_project(tmp_path)
+
+    package = build_optimizer_execution_task_package(
+        project_dir,
+        cadence_cshrc=CADENCE_CSHRC,
+        optimizer_backend="native_turbo",
+        continuation=True,
+        additional_evals=4,
+    )
+
+    assert package.payload["backend"] == "native_turbo"
+    assert package.payload["continuation"] is True
+    assert package.payload["additional_evals"] == 4
+    assert package.payload["command"] == [
+        "ic-opt",
+        str(project_dir.resolve()),
+        "--real",
+        "--continue",
+        "4",
+        "--cadence-cshrc",
+        str(CADENCE_CSHRC.resolve()),
+    ]
+    task_text = package.task_path.read_text(encoding="utf-8")
+    assert "ic-opt" in task_text
+    assert "--continue 4" in task_text
+
+
+def test_optimizer_task_continuation_rejects_enabled_history_before_writing(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_optimizer_project(tmp_path)
+    _set_optimizer_settings(
+        project_dir,
+        algorithm="openbox",
+        strategy="openbox_auto",
+    )
+    _write_yaml(
+        project_dir / "config" / "history_warm_start.yaml",
+        {
+            "schema_version": "1.0",
+            "history_warm_start": {
+                "enabled": True,
+                "sources": [{"path": "/previous/project"}],
+            },
+        },
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="history warm-start cannot be combined with continuation",
+    ):
+        build_optimizer_execution_task_package(
+            project_dir,
+            cadence_cshrc=CADENCE_CSHRC,
+            optimizer_backend="openbox",
+            continuation=True,
+            additional_evals=3,
+        )
+
+    assert not (
+        project_dir / "execution_package" / "OPTIMIZER_EXECUTION_TASK.md"
+    ).exists()
+
+
+def test_optimizer_task_package_rejects_fix_run_before_writing(
+    tmp_path: Path,
+) -> None:
+    project_dir = create_generic_project(tmp_path, workflow_mode="fix_run")
+
+    with pytest.raises(
+        ValueError,
+        match="optimizer task package requires an optimize workflow",
+    ):
+        build_optimizer_execution_task_package(
+            project_dir,
+            cadence_cshrc=CADENCE_CSHRC,
+        )
+
+    assert not (
+        project_dir / "execution_package" / "OPTIMIZER_EXECUTION_TASK.md"
+    ).exists()
+    assert not (
+        project_dir
+        / "execution_package"
+        / "optimizer_execution_manifest.json"
+    ).exists()
+    assert not (
+        project_dir
+        / "execution_package"
+        / "optimizer_execution_manifest.json"
+    ).exists()
+
+
+def test_optimizer_task_continuation_requires_additional_evaluations(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_optimizer_project(tmp_path)
+    _set_implicit_optimizer_algorithm(project_dir, "openbox")
+
+    with pytest.raises(ValueError, match="additional_evals is required"):
+        build_optimizer_execution_task_package(
+            project_dir,
+            cadence_cshrc=CADENCE_CSHRC,
+            optimizer_backend="openbox",
+            continuation=True,
+        )
+
+
+def test_optimizer_task_explicit_openbox_venv_is_preserved(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_optimizer_project(tmp_path)
+    _set_implicit_optimizer_algorithm(project_dir, "openbox")
+    execution_venv = tmp_path / "portable-openbox-venv"
+
+    package = build_optimizer_execution_task_package(
+        project_dir,
+        cadence_cshrc=CADENCE_CSHRC,
+        optimizer_backend="openbox",
+        openbox_venv=execution_venv,
+    )
+
+    resolved_venv = str(execution_venv.resolve())
+    assert package.payload["openbox_venv"] == resolved_venv
+    assert package.payload["toolchain_check_command"] == [
+        "hermes-workflow",
+        "check-toolchain-env",
+        "--openbox-venv",
+        resolved_venv,
+        "--cadence-cshrc",
+        str(CADENCE_CSHRC.resolve()),
+    ]
+    assert resolved_venv in package.task_path.read_text(encoding="utf-8")
+
+
+def test_optimizer_task_rejects_openbox_venv_for_native_backend(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_optimizer_project(tmp_path)
+
+    with pytest.raises(ValueError, match="openbox_venv is only valid"):
+        build_optimizer_execution_task_package(
+            project_dir,
+            cadence_cshrc=CADENCE_CSHRC,
+            optimizer_backend="native_turbo",
+            openbox_venv=tmp_path / "unused-venv",
+        )
 
 
 def test_package_optimizer_task_cli_writes_task_and_manifest(tmp_path: Path) -> None:
@@ -357,6 +525,7 @@ def test_package_optimizer_task_cli_writes_task_and_manifest(tmp_path: Path) -> 
 
 def test_package_optimizer_task_cli_writes_openbox_manifest(tmp_path: Path) -> None:
     project_dir = _create_optimizer_project(tmp_path)
+    _set_implicit_optimizer_algorithm(project_dir, "openbox")
 
     result = runner.invoke(
         app,
@@ -385,10 +554,126 @@ def test_package_optimizer_task_cli_writes_openbox_manifest(tmp_path: Path) -> N
     ]
 
 
+def test_package_optimizer_task_cli_uses_implicit_openbox_backend_for_fresh_run(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_optimizer_project(tmp_path)
+    _set_implicit_optimizer_algorithm(project_dir, "openbox")
+
+    result = runner.invoke(
+        app,
+        [
+            "package-optimizer-task",
+            str(project_dir),
+            "--cadence-cshrc",
+            str(CADENCE_CSHRC),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    manifest_payload = json.loads(
+        (
+            project_dir
+            / "execution_package"
+            / "optimizer_execution_manifest.json"
+        ).read_text(encoding="utf-8")
+    )
+    assert manifest_payload["backend"] == "openbox"
+    assert manifest_payload["strategy"] is None
+    assert manifest_payload["command"][1] == "run-openbox-real"
+    assert [
+        "hermes-workflow",
+        "check-optimizer-run",
+        str(project_dir.resolve()),
+        "--expected-backend",
+        "openbox",
+    ] in manifest_payload["audit_commands"]
+
+
+def test_package_optimizer_task_cli_uses_implicit_openbox_backend_for_continuation(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_optimizer_project(tmp_path)
+    _set_implicit_optimizer_algorithm(project_dir, "openbox")
+
+    result = runner.invoke(
+        app,
+        [
+            "package-optimizer-task",
+            str(project_dir),
+            "--continuation",
+            "--additional-evals",
+            "6",
+            "--cadence-cshrc",
+            str(CADENCE_CSHRC),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    manifest_payload = json.loads(
+        (
+            project_dir
+            / "execution_package"
+            / "optimizer_execution_manifest.json"
+        ).read_text(encoding="utf-8")
+    )
+    assert manifest_payload["backend"] == "openbox"
+    assert manifest_payload["strategy"] is None
+    assert manifest_payload["command"] == [
+        "hermes-workflow",
+        "continue-openbox-real",
+        str(project_dir.resolve()),
+        "--additional-evals",
+        "6",
+        "--cadence-cshrc",
+        str(CADENCE_CSHRC.resolve()),
+    ]
+    assert "reports/optimizer_run_report.json" in manifest_payload[
+        "required_returned_artifacts"
+    ]
+
+
+def test_package_optimizer_task_cli_uses_openbox_for_implicit_random_baseline(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_optimizer_project(tmp_path)
+    _set_implicit_optimizer_algorithm(project_dir, "random")
+
+    result = runner.invoke(
+        app,
+        [
+            "package-optimizer-task",
+            str(project_dir),
+            "--cadence-cshrc",
+            str(CADENCE_CSHRC),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    manifest_payload = json.loads(
+        (
+            project_dir
+            / "execution_package"
+            / "optimizer_execution_manifest.json"
+        ).read_text(encoding="utf-8")
+    )
+    assert manifest_payload["backend"] == "openbox"
+    assert manifest_payload["strategy"] is None
+    assert manifest_payload["command"][1] == "run-openbox-real"
+    assert [
+        "hermes-workflow",
+        "optimizer-status",
+        str(project_dir.resolve()),
+        "--expected-backend",
+        "openbox",
+    ] in manifest_payload["audit_commands"]
+
+
 def test_package_optimizer_task_cli_writes_openbox_continuation_manifest(
     tmp_path: Path,
 ) -> None:
     project_dir = _create_optimizer_project(tmp_path)
+    _set_implicit_optimizer_algorithm(project_dir, "openbox")
 
     result = runner.invoke(
         app,
@@ -398,6 +683,8 @@ def test_package_optimizer_task_cli_writes_openbox_continuation_manifest(
             "--backend",
             "openbox",
             "--continuation",
+            "--additional-evals",
+            "7",
             "--cadence-cshrc",
             str(CADENCE_CSHRC),
         ],
@@ -407,8 +694,73 @@ def test_package_optimizer_task_cli_writes_openbox_continuation_manifest(
     manifest_path = project_dir / "execution_package" / "optimizer_execution_manifest.json"
     manifest_payload = json.loads(manifest_path.read_text(encoding="utf-8"))
     assert manifest_payload["continuation"] is True
-    assert manifest_payload["additional_evals"] is None
+    assert manifest_payload["additional_evals"] == 7
     assert manifest_payload["command"][1] == "continue-openbox-real"
+    assert manifest_payload["command"][3:5] == ["--additional-evals", "7"]
+
+
+def test_package_optimizer_task_cli_rejects_backend_mismatch_for_continuation(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_optimizer_project(tmp_path)
+    _set_implicit_optimizer_algorithm(project_dir, "openbox")
+
+    result = runner.invoke(
+        app,
+        [
+            "package-optimizer-task",
+            str(project_dir),
+            "--backend",
+            "native-turbo",
+            "--continuation",
+            "--additional-evals",
+            "7",
+            "--cadence-cshrc",
+            str(CADENCE_CSHRC),
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert (
+        "optimizer_backend native_turbo does not match project backend openbox"
+        in result.output
+    )
+    assert not (
+        project_dir / "execution_package" / "optimizer_execution_manifest.json"
+    ).exists()
+
+
+def test_package_optimizer_task_cli_writes_native_continuation_manifest(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_optimizer_project(tmp_path)
+
+    result = runner.invoke(
+        app,
+        [
+            "package-optimizer-task",
+            str(project_dir),
+            "--continuation",
+            "--additional-evals",
+            "5",
+            "--cadence-cshrc",
+            str(CADENCE_CSHRC),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    manifest_path = (
+        project_dir / "execution_package" / "optimizer_execution_manifest.json"
+    )
+    manifest_payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert manifest_payload["backend"] == "native_turbo"
+    assert manifest_payload["command"][:5] == [
+        "ic-opt",
+        str(project_dir.resolve()),
+        "--real",
+        "--continue",
+        "5",
+    ]
 
 
 def test_optimizer_task_package_uses_absolute_shell_safe_command(
@@ -471,6 +823,7 @@ def test_optimizer_execution_task_keeps_openbox_fallback_in_required_behavior(
     tmp_path: Path,
 ) -> None:
     project_dir = _create_optimizer_project(tmp_path)
+    _set_implicit_optimizer_algorithm(project_dir, "openbox")
 
     package = build_optimizer_execution_task_package(
         project_dir,
@@ -492,6 +845,7 @@ def test_build_openbox_task_package_includes_optimizer_strategy(
     tmp_path: Path,
 ) -> None:
     project_dir = _create_optimizer_project(tmp_path)
+    _set_implicit_optimizer_algorithm(project_dir, "openbox")
 
     package = build_optimizer_execution_task_package(
         project_dir,

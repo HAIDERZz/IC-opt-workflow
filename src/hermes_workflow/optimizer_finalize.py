@@ -32,12 +32,21 @@ class OptimizerFinalizeReport:
     report_path: Path | None = None
 
 
-def finalize_optimizer_run(project_dir: str | Path) -> OptimizerFinalizeReport:
+def finalize_optimizer_run(
+    project_dir: str | Path,
+    *,
+    expected_backend: str | None = None,
+    supplementary_artifact_root: str | Path | None = None,
+) -> OptimizerFinalizeReport:
     project_root = Path(project_dir)
     issues: list[str] = []
     warnings: list[str] = []
 
-    acceptance = check_optimizer_run(project_root)
+    acceptance = check_optimizer_run(
+        project_root,
+        expected_backend=expected_backend,
+        supplementary_artifact_root=supplementary_artifact_root,
+    )
     warnings.extend(acceptance.warnings)
     if acceptance.status != "accepted":
         issues.append("optimizer run acceptance rejected")
@@ -59,7 +68,10 @@ def finalize_optimizer_run(project_dir: str | Path) -> OptimizerFinalizeReport:
             ),
         )
 
-    completion = summarize_optimizer_run(project_root)
+    completion = summarize_optimizer_run(
+        project_root,
+        expected_backend=expected_backend,
+    )
     warnings.extend(completion.warnings)
     if completion.status != "pass":
         issues.append("optimizer completion summary failed")
@@ -81,7 +93,10 @@ def finalize_optimizer_run(project_dir: str | Path) -> OptimizerFinalizeReport:
             ),
         )
 
-    insight = generate_optimizer_insight_report(project_root)
+    insight = generate_optimizer_insight_report(
+        project_root,
+        expected_backend=expected_backend,
+    )
     warnings.extend(insight.warnings)
     if insight.status != "pass":
         issues.append("optimizer insight report failed")

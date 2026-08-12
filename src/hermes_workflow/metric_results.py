@@ -137,11 +137,11 @@ class WaveformExportRequestEntry(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: str
-    testbench: str
+    testbench: str | None = None
     expression: str
     expression_sha256: str
     output_format: Literal["csv"]
-    nil_policy: Literal["fail", "skip"]
+    nil_policy: Literal["fail"]
     csv_output_file: str
 
 
@@ -634,6 +634,7 @@ def _validate_metric_entries(
         if numeric_value is None or not math.isfinite(numeric_value):
             scalar_ok = False
             issues.append(f"metric {name} value is not finite")
+        value_text_number: float | None = None
         if result_metric.value_text is None or result_metric.value_text in (
             FINITE_TEXT_FAILURES
         ):
@@ -642,6 +643,28 @@ def _validate_metric_entries(
         elif "srrWave" in result_metric.value_text:
             scalar_ok = False
             issues.append(f"metric {name} value_text looks like a waveform object")
+        else:
+            try:
+                value_text_number = float(result_metric.value_text.strip())
+            except ValueError:
+                value_text_number = None
+            if value_text_number is None or not math.isfinite(value_text_number):
+                scalar_ok = False
+                issues.append(f"metric {name} value_text is not a finite scalar")
+        if (
+            numeric_value is not None
+            and math.isfinite(numeric_value)
+            and value_text_number is not None
+            and math.isfinite(value_text_number)
+            and not math.isclose(
+                numeric_value,
+                value_text_number,
+                rel_tol=1e-12,
+                abs_tol=1e-15,
+            )
+        ):
+            scalar_ok = False
+            issues.append(f"metric {name} value/value_text mismatch")
         metrics[name] = CheckedMetricResult(
             status=result_metric.status,
             value=numeric_value,

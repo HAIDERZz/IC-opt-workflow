@@ -4,6 +4,13 @@ Use this reference when one optimizer candidate needs metrics from more than
 one Maestro/ADE testbench. Each `maestro_point_root` must point to a
 single-point Maestro/ADE result directory that contains `netlist/input.scs`.
 
+## Workflow
+
+```yaml
+schema_version: "1.0"
+mode: optimize
+```
+
 ## Project
 
 ```yaml
@@ -143,6 +150,7 @@ keep_successful_runs: true
 
 ```yaml
 algorithm: openbox
+strategy: openbox_auto
 initialization: sobol
 max_evaluations: 80
 batch_size: 10

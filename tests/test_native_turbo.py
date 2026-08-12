@@ -507,6 +507,32 @@ def test_non_finite_metric_returns_failure_penalty() -> None:
     assert result.issues == ["metric delay non_finite"]
 
 
+def test_objective_domain_error_returns_failure_penalty() -> None:
+    metrics_config = _metrics_config().model_copy(
+        update={
+            "objective": ObjectiveSpec(
+                direction=ObjectiveDirection.MINIMIZE,
+                expression="ln(gain - 30)",
+            )
+        }
+    )
+
+    result = evaluate_candidate_objective(
+        metrics_config,
+        _optimizer_config(),
+        {"delay": 50.0, "gain": 20.0},
+    )
+
+    assert result.status == "metric_failed"
+    assert result.objective == 1000.0
+    assert result.fom is None
+    assert result.constraints_passed is False
+    assert result.issues == [
+        "objective expression evaluation failed: "
+        "objective function ln argument must be positive"
+    ]
+
+
 def test_constraint_violation_returns_penalty_plus_normalized_score() -> None:
     result = evaluate_candidate_objective(
         _metrics_config(),
@@ -777,6 +803,517 @@ def test_run_batch_native_turbo_optimization_uses_optimizer_batch_size(
     assert result.report_path == project_dir / "reports/native_turbo_optimizer_report.json"
 
 
+def _write_native_continuation_history(
+    project_dir: Path,
+    *,
+    count: int = 5,
+) -> list[NativeTurboEvaluationTrace]:
+    int_name, width_name = _variable_names(project_dir)
+    gain_name, power_name = _metric_names(project_dir)
+    traces = [
+        NativeTurboEvaluationTrace(
+            evaluation_index=index,
+            run_id=f"real_{index:03d}",
+            selection_phase=(
+                "initialization" if index <= 4 else "turbo_trust_region"
+            ),
+            raw_x=[float(index), 0.1],
+            parameters={
+                int_name: str(index),
+                width_name: "0.1u",
+            },
+            status="feasible",
+            objective=float(10 - index),
+            fom=float(10 - index),
+            constraint_penalty=0.0,
+            metrics={gain_name: 1.0, power_name: 1.0e-4},
+            result_manifest=f"runs/real/real_{index:03d}/result_manifest.json",
+            metric_result_manifest=(
+                f"runs/real/real_{index:03d}/metric_result_manifest.json"
+            ),
+            issues=[],
+            batch_id=(
+                "batch_001"
+                if index <= 2
+                else "batch_002"
+                if index <= 4
+                else "batch_003"
+            ),
+            batch_slot=1 if index % 2 else 2,
+            batch_size=1 if index == 5 else 2,
+        )
+        for index in range(1, count + 1)
+    ]
+    evaluations_path = project_dir / "reports/native_turbo_optimizer_evaluations.jsonl"
+    evaluations_path.parent.mkdir(parents=True, exist_ok=True)
+    evaluations_path.write_text(
+        "".join(json.dumps(trace.__dict__, sort_keys=True) + "\n" for trace in traces),
+        encoding="utf-8",
+    )
+    (project_dir / "reports/native_turbo_optimizer_report.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "1.0",
+                "status": "completed",
+                "backend": "native_turbo",
+                "transport_mode": "remote",
+                "evaluation_count": count,
+                "evaluations": "reports/native_turbo_optimizer_evaluations.jsonl",
+            },
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return traces
+
+
+def test_batch_native_turbo_continuation_adds_only_requested_evaluations_and_keeps_ids(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_native_project(tmp_path, batch_size=2, parallel_jobs=2)
+    prior_traces = _write_native_continuation_history(project_dir)
+    (project_dir / "runs/real/real_012").mkdir(parents=True)
+    seen_candidates: list[NativeTurboBatchCandidate] = []
+    factory_history: list[list[NativeTurboEvaluationTrace]] = []
+
+    class ContinuationTurbo:
+        def __init__(self, **kwargs) -> None:
+            self.f_batch = kwargs["f_batch"]
+            self.max_evals = kwargs["max_evals"]
+            factory_history.append(kwargs["prior_traces"])
+
+        def optimize(self) -> None:
+            self.f_batch(
+                [[1.0, 0.2], [2.0, 0.2]],
+                selection_phase="turbo_trust_region",
+            )
+
+    def batch_evaluator(candidates) -> list[NativeTurboObservation]:
+        seen_candidates.extend(candidates)
+        return [
+            NativeTurboObservation(metrics=_passing_metric_values(project_dir))
+            for _candidate in candidates
+        ]
+
+    result = run_batch_native_turbo_optimization(
+        project_dir,
+        additional_evals=2,
+        continue_from_existing=True,
+        run_offset_floor=9,
+        batch_evaluator=batch_evaluator,
+        batch_turbo_factory=ContinuationTurbo,
+        transport_mode="remote",
+    )
+
+    assert factory_history == [prior_traces]
+    assert len(seen_candidates) == 2
+    assert [candidate.evaluation_index for candidate in seen_candidates] == [6, 7]
+    assert [candidate.candidate_id for candidate in seen_candidates] == [
+        "candidate_000013",
+        "candidate_000014",
+    ]
+    assert [candidate.run_id for candidate in seen_candidates] == [
+        "real_013",
+        "real_014",
+    ]
+    assert {candidate.batch_id for candidate in seen_candidates} == {"batch_013"}
+    assert result.evaluation_count == 7
+    assert result.continued_from_evaluations == 5
+    assert result.additional_evaluations == 2
+    assert result.restore_mode == "trace_reconstructed"
+    report = json.loads(result.report_path.read_text(encoding="utf-8"))
+    assert report["backend"] == "native_turbo"
+    assert report["transport_mode"] == "remote"
+    assert report["continuation"] == {
+        "additional_evaluations": 2,
+        "continued_from_evaluations": 5,
+        "restore_mode": "trace_reconstructed",
+    }
+
+
+def test_batch_native_turbo_continuation_rejects_max_evals_combination(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_native_project(tmp_path)
+    _write_native_continuation_history(project_dir)
+
+    with pytest.raises(ValueError, match="mutually exclusive"):
+        run_batch_native_turbo_optimization(
+            project_dir,
+            max_evals=8,
+            additional_evals=3,
+            continue_from_existing=True,
+            batch_evaluator=lambda _candidates: [],
+            batch_turbo_factory=_FakeBatchTurbo,
+        )
+
+
+def test_batch_native_turbo_continuation_accepts_legacy_report_without_backend(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_native_project(tmp_path, batch_size=1, parallel_jobs=1)
+    _write_native_continuation_history(project_dir)
+    report_path = project_dir / "reports/native_turbo_optimizer_report.json"
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    report.pop("backend")
+    report.pop("transport_mode")
+    report_path.write_text(json.dumps(report) + "\n", encoding="utf-8")
+
+    class ContinuationTurbo:
+        def __init__(self, **kwargs) -> None:
+            self.f_batch = kwargs["f_batch"]
+
+        def optimize(self) -> None:
+            self.f_batch(
+                [[1.0, 0.2]],
+                selection_phase="turbo_trust_region",
+            )
+
+    result = run_batch_native_turbo_optimization(
+        project_dir,
+        additional_evals=1,
+        continue_from_existing=True,
+        batch_evaluator=lambda candidates: [
+            NativeTurboObservation(metrics=_passing_metric_values(project_dir))
+            for _candidate in candidates
+        ],
+        batch_turbo_factory=ContinuationTurbo,
+    )
+
+    assert result.evaluation_count == 6
+    updated = json.loads(report_path.read_text(encoding="utf-8"))
+    assert updated["backend"] == "native_turbo"
+
+
+def test_batch_native_turbo_continuation_runs_default_trust_region_factory(
+    tmp_path: Path,
+) -> None:
+    pytest.importorskip("torch")
+    pytest.importorskip("gpytorch")
+    project_dir = _create_native_project(tmp_path, batch_size=1, parallel_jobs=1)
+    _write_native_continuation_history(project_dir)
+    evaluated: list[NativeTurboBatchCandidate] = []
+
+    def batch_evaluator(
+        candidates: list[NativeTurboBatchCandidate],
+    ) -> list[NativeTurboObservation]:
+        evaluated.extend(candidates)
+        return [
+            NativeTurboObservation(metrics=_passing_metric_values(project_dir))
+            for _candidate in candidates
+        ]
+
+    result = run_batch_native_turbo_optimization(
+        project_dir,
+        additional_evals=1,
+        continue_from_existing=True,
+        batch_evaluator=batch_evaluator,
+        parallel_jobs=1,
+    )
+
+    assert result.evaluation_count == 6
+    assert len(evaluated) == 1
+    assert evaluated[0].evaluation_index == 6
+    assert evaluated[0].selection_phase == "turbo_trust_region"
+
+
+def test_batch_native_turbo_continuation_rejects_inconsistent_history_without_overwrite(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_native_project(tmp_path)
+    _write_native_continuation_history(project_dir)
+    report_path = project_dir / "reports/native_turbo_optimizer_report.json"
+    old_report = report_path.read_text(encoding="utf-8")
+    report = json.loads(old_report)
+    report["evaluation_count"] = 99
+    report_path.write_text(json.dumps(report) + "\n", encoding="utf-8")
+    corrupt_report = report_path.read_text(encoding="utf-8")
+
+    with pytest.raises(ValueError, match="evaluation_count"):
+        run_batch_native_turbo_optimization(
+            project_dir,
+            additional_evals=1,
+            continue_from_existing=True,
+            batch_evaluator=lambda _candidates: [],
+            batch_turbo_factory=_FakeBatchTurbo,
+        )
+
+    assert report_path.read_text(encoding="utf-8") == corrupt_report
+
+
+def test_batch_native_turbo_continuation_rejects_run_id_regression_before_evaluator(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_native_project(tmp_path)
+    _write_native_continuation_history(project_dir)
+    evaluations_path = project_dir / "reports/native_turbo_optimizer_evaluations.jsonl"
+    rows = [json.loads(line) for line in evaluations_path.read_text().splitlines()]
+    rows[-2]["run_id"], rows[-1]["run_id"] = (
+        rows[-1]["run_id"],
+        rows[-2]["run_id"],
+    )
+    evaluations_path.write_text(
+        "".join(json.dumps(row) + "\n" for row in rows),
+        encoding="utf-8",
+    )
+    evaluator_calls: list[str] = []
+
+    def forbidden_evaluator(_candidates: object) -> list[NativeTurboObservation]:
+        evaluator_calls.append("evaluator")
+        raise AssertionError("evaluator must not run")
+
+    class ContinuationTurbo:
+        def __init__(self, **kwargs: object) -> None:
+            self.f_batch = kwargs["f_batch"]
+
+        def optimize(self) -> None:
+            self.f_batch(
+                [[1.0, 0.2]],
+                selection_phase="turbo_trust_region",
+            )
+
+    with pytest.raises(ValueError, match="run_id sequence is not strictly increasing"):
+        run_batch_native_turbo_optimization(
+            project_dir,
+            additional_evals=1,
+            continue_from_existing=True,
+            batch_evaluator=forbidden_evaluator,
+            batch_turbo_factory=ContinuationTurbo,
+        )
+
+    assert evaluator_calls == []
+
+
+def test_batch_native_turbo_continuation_allows_orphan_run_id_gap(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_native_project(tmp_path)
+    _write_native_continuation_history(project_dir)
+    evaluations_path = project_dir / "reports/native_turbo_optimizer_evaluations.jsonl"
+    rows = [json.loads(line) for line in evaluations_path.read_text().splitlines()]
+    rows[-1]["run_id"] = "real_006"
+    evaluations_path.write_text(
+        "".join(json.dumps(row) + "\n" for row in rows),
+        encoding="utf-8",
+    )
+    seen_candidates: list[NativeTurboBatchCandidate] = []
+
+    def evaluator(
+        candidates: list[NativeTurboBatchCandidate],
+    ) -> list[NativeTurboObservation]:
+        seen_candidates.extend(candidates)
+        return [
+            NativeTurboObservation(metrics=_passing_metric_values(project_dir))
+            for _candidate in candidates
+        ]
+
+    class ContinuationTurbo:
+        def __init__(self, **kwargs: object) -> None:
+            self.f_batch = kwargs["f_batch"]
+
+        def optimize(self) -> None:
+            self.f_batch(
+                [[1.0, 0.2]],
+                selection_phase="turbo_trust_region",
+            )
+
+    run_batch_native_turbo_optimization(
+        project_dir,
+        additional_evals=1,
+        continue_from_existing=True,
+        batch_evaluator=evaluator,
+        batch_turbo_factory=ContinuationTurbo,
+    )
+
+    assert [candidate.run_id for candidate in seen_candidates] == ["real_007"]
+    assert [candidate.candidate_id for candidate in seen_candidates] == [
+        "candidate_000007"
+    ]
+
+
+@pytest.mark.parametrize(
+    ("invalid_case", "expected_issue"),
+    [
+        ("raw_x_dimension", "raw_x dimension mismatch"),
+        ("parameter_names", "parameters mismatch"),
+        ("quantized_values", "raw_x/parameters mismatch"),
+    ],
+)
+def test_batch_native_turbo_continuation_rejects_variable_semantic_drift(
+    tmp_path: Path,
+    invalid_case: str,
+    expected_issue: str,
+) -> None:
+    project_dir = _create_native_project(tmp_path)
+    _write_native_continuation_history(project_dir)
+    evaluations_path = project_dir / "reports/native_turbo_optimizer_evaluations.jsonl"
+    rows = [json.loads(line) for line in evaluations_path.read_text().splitlines()]
+    if invalid_case == "raw_x_dimension":
+        rows[0]["raw_x"] = [1.0]
+    elif invalid_case == "parameter_names":
+        width_name = _variable_names(project_dir)[1]
+        rows[0]["parameters"]["UNKNOWN"] = rows[0]["parameters"].pop(width_name)
+    elif invalid_case == "quantized_values":
+        width_name = _variable_names(project_dir)[1]
+        rows[0]["parameters"][width_name] = "0.2u"
+    else:  # pragma: no cover - parameter table is closed above
+        raise AssertionError(invalid_case)
+    evaluations_path.write_text(
+        "".join(json.dumps(row) + "\n" for row in rows),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match=expected_issue):
+        run_batch_native_turbo_optimization(
+            project_dir,
+            additional_evals=1,
+            continue_from_existing=True,
+            batch_evaluator=lambda _candidates: [],
+            batch_turbo_factory=_FakeBatchTurbo,
+        )
+
+
+def test_batch_native_turbo_continuation_rejects_unknown_history_phase(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_native_project(tmp_path)
+    _write_native_continuation_history(project_dir)
+    evaluations_path = project_dir / "reports/native_turbo_optimizer_evaluations.jsonl"
+    rows = [json.loads(line) for line in evaluations_path.read_text().splitlines()]
+    rows[-1]["selection_phase"] = "unknown_phase"
+    evaluations_path.write_text(
+        "".join(json.dumps(row) + "\n" for row in rows),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="selection_phase"):
+        run_batch_native_turbo_optimization(
+            project_dir,
+            additional_evals=1,
+            continue_from_existing=True,
+            batch_evaluator=lambda _candidates: [],
+            batch_turbo_factory=_FakeBatchTurbo,
+        )
+
+
+def test_batch_native_turbo_continuation_normalizes_legacy_sequential_history(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_native_project(tmp_path, batch_size=1, parallel_jobs=1)
+    _write_native_continuation_history(project_dir)
+    evaluations_path = project_dir / "reports/native_turbo_optimizer_evaluations.jsonl"
+    rows = [json.loads(line) for line in evaluations_path.read_text().splitlines()]
+    for row in rows:
+        row.pop("batch_id")
+        row.pop("batch_slot")
+        row.pop("batch_size")
+    evaluations_path.write_text(
+        "".join(json.dumps(row) + "\n" for row in rows),
+        encoding="utf-8",
+    )
+    captured_history: list[NativeTurboEvaluationTrace] = []
+
+    class ContinuationTurbo:
+        def __init__(self, **kwargs) -> None:
+            captured_history.extend(kwargs["prior_traces"])
+            self.f_batch = kwargs["f_batch"]
+
+        def optimize(self) -> None:
+            self.f_batch([[1.0, 0.2]], selection_phase="turbo_trust_region")
+
+    result = run_batch_native_turbo_optimization(
+        project_dir,
+        additional_evals=1,
+        continue_from_existing=True,
+        batch_evaluator=lambda candidates: [
+            NativeTurboObservation(metrics=_passing_metric_values(project_dir))
+            for _candidate in candidates
+        ],
+        batch_turbo_factory=ContinuationTurbo,
+    )
+
+    assert [trace.batch_id for trace in captured_history] == [
+        "batch_001",
+        "batch_002",
+        "batch_003",
+        "batch_004",
+        "batch_005",
+    ]
+    assert all(trace.batch_slot == 1 for trace in captured_history)
+    assert all(trace.batch_size == 1 for trace in captured_history)
+    assert result.traces[-1].batch_id == "batch_006"
+
+
+def test_batch_native_turbo_continuation_rejects_partial_batch_metadata(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_native_project(tmp_path)
+    _write_native_continuation_history(project_dir)
+    evaluations_path = project_dir / "reports/native_turbo_optimizer_evaluations.jsonl"
+    rows = [json.loads(line) for line in evaluations_path.read_text().splitlines()]
+    rows[0]["batch_id"] = None
+    evaluations_path.write_text(
+        "".join(json.dumps(row) + "\n" for row in rows),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="batch metadata.*all present or all absent"):
+        run_batch_native_turbo_optimization(
+            project_dir,
+            additional_evals=1,
+            continue_from_existing=True,
+            batch_evaluator=lambda _candidates: [],
+            batch_turbo_factory=_FakeBatchTurbo,
+        )
+
+
+@pytest.mark.parametrize(
+    ("mutate_rows", "expected_issue"),
+    [
+        (
+            lambda rows: rows[1].update(selection_phase="turbo_trust_region"),
+            "mixes selection_phase",
+        ),
+        (
+            lambda rows: rows[1].update(batch_slot=1),
+            "batch slots must be complete and unique",
+        ),
+        (
+            lambda rows: rows[0].update(batch_size=3),
+            "mixes batch_size",
+        ),
+        (
+            lambda rows: rows[4].update(batch_id="batch_001"),
+            "batch_id must be strictly increasing",
+        ),
+    ],
+)
+def test_batch_native_turbo_continuation_rejects_incoherent_batch_history(
+    tmp_path: Path,
+    mutate_rows,
+    expected_issue: str,
+) -> None:
+    project_dir = _create_native_project(tmp_path)
+    _write_native_continuation_history(project_dir)
+    evaluations_path = project_dir / "reports/native_turbo_optimizer_evaluations.jsonl"
+    rows = [json.loads(line) for line in evaluations_path.read_text().splitlines()]
+    mutate_rows(rows)
+    evaluations_path.write_text(
+        "".join(json.dumps(row) + "\n" for row in rows),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match=expected_issue):
+        run_batch_native_turbo_optimization(
+            project_dir,
+            additional_evals=1,
+            continue_from_existing=True,
+            batch_evaluator=lambda _candidates: [],
+            batch_turbo_factory=_FakeBatchTurbo,
+        )
+
+
 def test_run_batch_native_turbo_optimization_accepts_adapter_argument(
     tmp_path: Path,
 ) -> None:
@@ -852,7 +1389,17 @@ def test_run_batch_native_turbo_optimization_applies_optimizer_cpu_thread_limit(
     )
 
     assert result.evaluation_count == 5
-    assert calls == [(3, {"set_environment": True, "backend": "native_turbo", "execution_mode": "local"})]
+    assert calls == [
+        (
+            3,
+            {
+                "set_environment": True,
+                "backend": "native_turbo",
+                "execution_mode": "local",
+                "transport_mode": "local",
+            },
+        )
+    ]
 
 
 def test_default_batch_turbo_factory_calls_f_batch_by_chunk() -> None:
@@ -891,6 +1438,65 @@ def test_default_batch_turbo_factory_calls_f_batch_by_chunk() -> None:
         ("turbo_trust_region", 2),
     ]
     assert turbo.fX.shape == (6, 1)
+
+
+def test_default_batch_turbo_factory_reconstructs_history_before_trust_region() -> None:
+    pytest.importorskip("torch")
+    pytest.importorskip("gpytorch")
+    np = pytest.importorskip("numpy")
+    calls: list[tuple[str, int]] = []
+    prior_traces = [
+        NativeTurboEvaluationTrace(
+            evaluation_index=index,
+            run_id=f"real_{index:03d}",
+            selection_phase=(
+                "initialization" if index <= 2 else "turbo_trust_region"
+            ),
+            raw_x=[float(index) / 10, float(index) / 10],
+            parameters={"x": str(index), "y": str(index)},
+            status="feasible",
+            objective=float(5 - index),
+            fom=float(5 - index),
+            constraint_penalty=0.0,
+            metrics={"objective": float(5 - index)},
+            result_manifest=None,
+            metric_result_manifest=None,
+            issues=[],
+            batch_id=("batch_001" if index <= 2 else f"batch_{index - 1:03d}"),
+            batch_slot=((index - 1) % 2) + 1 if index <= 2 else 1,
+            batch_size=2 if index <= 2 else 1,
+        )
+        for index in range(1, 5)
+    ]
+
+    def f_batch(raw_batch, *, selection_phase: str) -> list[float]:
+        calls.append((selection_phase, len(raw_batch)))
+        return [0.5 for _raw in raw_batch]
+
+    turbo = _default_batch_turbo_factory(
+        f_batch=f_batch,
+        lb=np.array([0.0, 0.0]),
+        ub=np.array([1.0, 1.0]),
+        n_init=4,
+        max_evals=6,
+        batch_size=2,
+        verbose=False,
+        n_training_steps=30,
+        prior_traces=prior_traces,
+    )
+    turbo._create_candidates = lambda *args, **kwargs: (  # noqa: SLF001
+        np.array([[0.8, 0.8], [0.9, 0.9]]),
+        np.array([[0.0, 1.0], [1.0, 0.0]]),
+        {},
+    )
+    turbo._select_candidates = lambda x_cand, _y_cand: x_cand[: turbo.batch_size]  # noqa: SLF001
+
+    turbo.optimize()
+
+    assert calls == [("turbo_trust_region", 2)]
+    assert turbo.n_evals == 6
+    assert turbo.fX.shape == (6, 1)
+    assert turbo.length == 1.6
 
 
 def test_prepare_explicit_candidate_real_run_allows_first_optimizer_candidate(
@@ -1177,6 +1783,67 @@ def test_batch_evaluator_limits_parallel_candidates_without_inner_child_parallel
     assert len(observations) == 4
     assert max_active_candidates == 2
     assert max_child_calls_per_candidate == 1
+
+
+def test_batch_evaluator_marks_preparation_as_optimizer_continuation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import hermes_workflow.native_turbo as module
+
+    project_dir = _create_native_project(tmp_path)
+    prepared: list[dict[str, object]] = []
+
+    def fake_prepare(_project_dir: Path, **kwargs) -> None:
+        prepared.append(kwargs)
+
+    monkeypatch.setattr(module, "prepare_explicit_candidate_real_run", fake_prepare)
+    monkeypatch.setattr(
+        module,
+        "execute_and_check_real_candidate",
+        lambda *args, **kwargs: NativeTurboObservation(
+            status="checked",
+            metrics=_passing_metric_values(project_dir),
+        ),
+    )
+    monkeypatch.setattr(
+        module,
+        "record_real_result",
+        lambda *args, **kwargs: type(
+            "RecordReport",
+            (),
+            {"status": type("Status", (), {"value": "pass"})(), "issues": []},
+        )(),
+    )
+    monkeypatch.setattr(
+        module,
+        "_apply_retention_with_observation",
+        lambda _project, **kwargs: kwargs["observation"],
+    )
+    candidate = NativeTurboBatchCandidate(
+        evaluation_index=6,
+        run_id="real_010",
+        candidate_id="candidate_000006",
+        batch_id="batch_003",
+        batch_slot=1,
+        batch_size=1,
+        selection_phase="turbo_trust_region",
+        raw_x=[1.0, 0.2],
+        parameters=_candidate_parameters(project_dir, int_value="1", width_value="0.2u"),
+        replacement_issues=[],
+    )
+
+    evaluator = make_real_candidate_batch_evaluator(
+        project_dir,
+        cadence_cshrc=None,
+        max_workers=1,
+        allow_optimizer_continuation=True,
+    )
+    observations = evaluator([candidate])
+
+    assert observations[0].status == "recorded"
+    assert prepared[0]["allow_optimizer_continuation"] is True
+    assert prepared[0]["allow_unresolved_batch_runs"] is True
 
 
 def test_default_adapter_runs_and_aggregates_multi_testbench_children(
@@ -1529,6 +2196,10 @@ def test_run_native_turbo_cli_uses_fake_runner(monkeypatch: pytest.MonkeyPatch, 
         "hermes_workflow.cli.run_native_turbo_optimization",
         fake_run_native_turbo_optimization,
     )
+    monkeypatch.setattr(
+        "hermes_workflow.cli.assert_valid_project",
+        lambda *_args, **_kwargs: object(),
+    )
     result = CliRunner().invoke(
         app,
             [
@@ -1589,6 +2260,10 @@ def test_run_native_turbo_cli_parallel_uses_batch_runner(
     monkeypatch.setattr(
         "hermes_workflow.cli.run_batch_native_turbo_optimization",
         fake_run_batch_native_turbo_optimization,
+    )
+    monkeypatch.setattr(
+        "hermes_workflow.cli.assert_valid_project",
+        lambda *_args, **_kwargs: object(),
     )
     result = CliRunner().invoke(
         app,
@@ -1679,6 +2354,75 @@ def test_write_native_turbo_reports_includes_batch_summary(tmp_path: Path) -> No
     assert audit_payload["batches"][0]["history_size_before"] == 0
 
 
+@pytest.mark.parametrize(
+    "failed_artifact",
+    [
+        "native_turbo_optimizer_evaluations.jsonl",
+        "optimizer_effectiveness_audit.json",
+        "native_turbo_optimizer_report.json",
+    ],
+)
+def test_write_native_turbo_reports_rolls_back_all_artifacts_on_publish_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    failed_artifact: str,
+) -> None:
+    import hermes_workflow.native_turbo as module
+
+    old_trace = NativeTurboEvaluationTrace(
+        evaluation_index=1,
+        run_id="real_001",
+        selection_phase="initialization",
+        raw_x=[1.0],
+        parameters={"x": "1"},
+        status="feasible",
+        objective=1.0,
+        fom=1.0,
+        constraint_penalty=0.0,
+        metrics={"objective": 1.0},
+        result_manifest=None,
+        metric_result_manifest=None,
+        issues=[],
+        batch_id="batch_001",
+        batch_slot=1,
+        batch_size=1,
+    )
+    write_native_turbo_reports(
+        tmp_path,
+        NativeTurboRunResult(
+            evaluation_count=1,
+            traces=[old_trace],
+            best_trace=old_trace,
+        ),
+    )
+    artifact_paths = [
+        tmp_path / "reports/native_turbo_optimizer_evaluations.jsonl",
+        tmp_path / "reports/optimizer_effectiveness_audit.json",
+        tmp_path / "reports/native_turbo_optimizer_report.json",
+    ]
+    old_artifacts = {path: path.read_bytes() for path in artifact_paths}
+    real_replace = module.os.replace
+
+    def fail_artifact_publish(source, target) -> None:
+        if Path(target).name == failed_artifact:
+            raise OSError(f"injected {failed_artifact} publish failure")
+        real_replace(source, target)
+
+    monkeypatch.setattr(module.os, "replace", fail_artifact_publish)
+
+    with pytest.raises(OSError, match="injected .* publish failure"):
+        write_native_turbo_reports(
+            tmp_path,
+            NativeTurboRunResult(
+                evaluation_count=0,
+                traces=[],
+                best_trace=None,
+            ),
+        )
+
+    assert {path: path.read_bytes() for path in artifact_paths} == old_artifacts
+
+
 class _CapturedNativeTurboMaxWorkers(Exception):
     """Sentinel raised by the monkeypatched evaluator factory to short-circuit
     `run_batch_native_turbo_optimization` after capturing the scheduler value."""
@@ -1736,8 +2480,12 @@ def test_native_turbo_uses_requirement_parallel_jobs_for_candidate_workers(
             cadence_cshrc,
             max_workers,
             adapter=None,
+            allow_optimizer_continuation=False,
+            retention_callback=None,
         ):
             captured["max_workers"] = max_workers
+            assert allow_optimizer_continuation is False
+            assert retention_callback is None
             raise _CapturedNativeTurboMaxWorkers
 
         monkeypatch.setattr(
@@ -1971,6 +2719,42 @@ def test_native_turbo_evaluate_real_candidate_deletes_run_dir_when_keep_failed_r
     assert decision["run_status"] == "failed"
     assert decision["local_action"] == "deleted"
     assert not (project_dir / "runs" / "real" / "real_001").exists()
+
+
+def test_retention_callback_receives_final_record_failure_classification(
+    tmp_path: Path,
+) -> None:
+    from hermes_workflow.native_turbo import (
+        NativeTurboObservation,
+        _apply_retention_with_observation,
+    )
+
+    project_dir = _create_approved_real_project_with_keep_flags(
+        tmp_path,
+        keep_failed_runs=True,
+        keep_successful_runs=True,
+    )
+    classifications: list[bool] = []
+
+    def capture_final_status(
+        _project_dir: Path,
+        _run_id: str,
+        _candidate_id: str | None,
+        run_succeeded: bool,
+    ) -> list[str]:
+        classifications.append(run_succeeded)
+        return []
+
+    observation = _apply_retention_with_observation(
+        project_dir,
+        run_id="real_001",
+        candidate_id="candidate_000001",
+        observation=NativeTurboObservation(status="record_failed"),
+        retention_callback=capture_final_status,
+    )
+
+    assert observation.status == "record_failed"
+    assert classifications == [False]
 
 
 def _make_split_native_turbo_traces() -> list[NativeTurboEvaluationTrace]:

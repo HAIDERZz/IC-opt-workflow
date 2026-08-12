@@ -4,9 +4,14 @@ from __future__ import annotations
 import re
 from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
-from hermes_workflow.schemas import StrictModel, validate_fixed_bool, validate_name
+from hermes_workflow.schemas import (
+    NonEmptyStr,
+    StrictModel,
+    validate_fixed_bool,
+    validate_name,
+)
 
 RUN_ID_RE = re.compile(r"^real_[0-9]{3}$")
 SAFE_CANDIDATE_ID_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
@@ -18,7 +23,7 @@ WorkflowMode = Literal["optimize", "fix_run"]
 class WorkflowSettings(StrictModel):
     schema_version: str
     mode: WorkflowMode
-    starting_run_id: str = "real_001"
+    starting_run_id: str | None = None
 
     @field_validator("schema_version")
     @classmethod
@@ -29,13 +34,27 @@ class WorkflowSettings(StrictModel):
 
     @field_validator("starting_run_id")
     @classmethod
-    def _starting_run_id_matches_pattern(cls, value: str) -> str:
+    def _starting_run_id_matches_pattern(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
         if not RUN_ID_RE.match(value):
             raise ValueError(
                 "starting_run_id must match real_[0-9]{3} "
                 "(first version reuses real_NNN IDs)"
             )
         return value
+
+    @model_validator(mode="after")
+    def _starting_run_id_matches_workflow(self) -> "WorkflowSettings":
+        if self.mode == "optimize":
+            if self.starting_run_id is not None:
+                raise ValueError(
+                    "starting_run_id is not supported for optimize workflow mode"
+                )
+            return self
+        if self.starting_run_id is None:
+            self.starting_run_id = "real_001"
+        return self
 
 
 class FixedPoint(StrictModel):
@@ -61,13 +80,20 @@ class FixedPointsConfig(StrictModel):
             raise ValueError('schema_version must be "1.0"')
         return value
 
+    @model_validator(mode="after")
+    def _candidate_ids_are_unique(self) -> "FixedPointsConfig":
+        candidate_ids = [point.candidate_id for point in self.points]
+        if len(candidate_ids) != len(set(candidate_ids)):
+            raise ValueError("candidate_id values must be unique")
+        return self
+
 
 class WaveformExport(StrictModel):
     name: str
-    testbench: str
-    expression: str
+    testbench: str | None = None
+    expression: NonEmptyStr
     output_format: Literal["csv"]
-    nil_policy: Literal["fail", "skip"] = "fail"
+    nil_policy: Literal["fail"] = "fail"
 
     @field_validator("name")
     @classmethod
@@ -76,7 +102,9 @@ class WaveformExport(StrictModel):
 
     @field_validator("testbench")
     @classmethod
-    def _testbench_is_identifier(cls, value: str) -> str:
+    def _testbench_is_identifier(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
         return validate_name(value, "waveform export testbench")
 
     @field_validator("expression")
@@ -101,6 +129,35 @@ class WaveformExportsConfig(StrictModel):
         if value != "1.0":
             raise ValueError('schema_version must be "1.0"')
         return value
+
+    @model_validator(mode="after")
+    def _export_names_are_unique(self) -> "WaveformExportsConfig":
+        names = [export.name for export in self.exports]
+        if len(names) != len(set(names)):
+            raise ValueError("waveform export names must be unique")
+        return self
+
+
+def fix_run_id_range_issue(
+    workflow: WorkflowSettings | None,
+    fixed_points: FixedPointsConfig | None,
+) -> str | None:
+    """Return an issue when sequential fixed-point IDs would exceed real_999."""
+    if (
+        workflow is None
+        or workflow.mode != "fix_run"
+        or workflow.starting_run_id is None
+        or fixed_points is None
+    ):
+        return None
+    first = int(workflow.starting_run_id.rsplit("_", 1)[1])
+    last = first + len(fixed_points.points) - 1
+    if last > 999:
+        return (
+            f"starting_run_id {workflow.starting_run_id} with "
+            f"{len(fixed_points.points)} fixed points would exceed real_999"
+        )
+    return None
 
 
 class WaveformExportResult(StrictModel):

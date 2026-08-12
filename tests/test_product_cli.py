@@ -1,4 +1,4 @@
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from types import SimpleNamespace
 
 import pytest
@@ -407,7 +407,7 @@ def test_continue_local_project_does_not_pass_strategy_detail_overrides(
     monkeypatch.setattr(
         optimizer_continuation_flow,
         "assert_valid_project",
-        lambda *a, **k: None,
+        lambda *a, **k: SimpleNamespace(optimizer=object()),
     )
 
     optimizer_continuation_flow.continue_local_project(
@@ -441,6 +441,106 @@ def test_ic_opt_continue_without_real_fails(monkeypatch, tmp_path: Path) -> None
 
     assert result.exit_code != 0
     assert "--continue" in result.output and "--real" in result.output
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        ["--real", "--doctor"],
+        ["--real", "--doctor", "--dry-orchestration"],
+        ["--real", "--doctor", "--continue", "2"],
+    ],
+)
+def test_ic_opt_rejects_doctor_combined_with_execution_modes(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    args: list[str],
+) -> None:
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    calls: list[str] = []
+    monkeypatch.setattr(
+        product_cli,
+        "run_product_doctor",
+        lambda *a, **k: calls.append("doctor"),
+    )
+
+    result = runner.invoke(product_cli.app, [str(project_dir), *args])
+
+    assert result.exit_code == 1
+    assert "--doctor cannot be combined" in result.output
+    assert calls == []
+
+
+def test_ic_opt_rejects_remote_dry_orchestration_before_ssh(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    calls: list[str] = []
+    monkeypatch.setattr(
+        product_cli,
+        "RemoteSshRunner",
+        lambda *a, **k: calls.append("ssh"),
+    )
+
+    result = runner.invoke(
+        product_cli.app,
+        [
+            str(tmp_path / "remote-project"),
+            "--ssh-profile",
+            "lab",
+            "--real",
+            "--dry-orchestration",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "--dry-orchestration is only supported" in result.output
+    assert calls == []
+
+
+def test_ic_opt_rejects_dry_orchestration_for_continuation(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    (project_dir / "cadence_env.csh").write_text("# test\n", encoding="utf-8")
+    calls: list[str] = []
+    monkeypatch.setattr(
+        product_cli,
+        "continue_local_project",
+        lambda *a, **k: calls.append("continue"),
+    )
+
+    result = runner.invoke(
+        product_cli.app,
+        [
+            str(project_dir),
+            "--real",
+            "--continue",
+            "2",
+            "--dry-orchestration",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "--dry-orchestration cannot be combined with --continue" in result.output
+    assert calls == []
+
+
+def test_ic_opt_rejects_dry_orchestration_without_real(tmp_path: Path) -> None:
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    (project_dir / "cadence_env.csh").write_text("# test\n", encoding="utf-8")
+
+    result = runner.invoke(
+        product_cli.app,
+        [str(project_dir), "--dry-orchestration"],
+    )
+
+    assert result.exit_code == 1
+    assert "--dry-orchestration requires --real" in result.output
 
 
 def test_ic_opt_real_continue_with_strategy_fails(monkeypatch, tmp_path: Path) -> None:
@@ -548,6 +648,118 @@ def test_ic_opt_real_dispatches_to_fix_run_when_workflow_mode_is_fix_run(
     assert fix_run_calls[0]["real"] is True
 
 
+def test_ic_opt_fix_run_without_real_fails_before_running_flow(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    (project_dir / "opt_requirement.md").write_text(
+        "# requirement\n",
+        encoding="utf-8",
+    )
+    calls: list[dict[str, object]] = []
+    monkeypatch.setattr(
+        product_cli,
+        "check_requirement",
+        lambda *a, **kw: SimpleNamespace(workflow_mode="fix_run", status="pass"),
+    )
+    monkeypatch.setattr(
+        product_cli,
+        "run_fix_run_project",
+        lambda *a, **kw: calls.append(dict(kw)),
+    )
+    monkeypatch.setattr(
+        product_cli,
+        "_resolve_cadence_cshrc",
+        lambda *_a, **_kw: pytest.fail(
+            "invalid fix-run flags must fail before Cadence environment resolution"
+        ),
+    )
+
+    result = runner.invoke(product_cli.app, [str(project_dir)])
+
+    assert result.exit_code == 1
+    assert "fix-run requires --real" in result.output
+    assert calls == []
+
+
+def test_ic_opt_fix_run_rejects_dry_orchestration_before_running_flow(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    (project_dir / "opt_requirement.md").write_text(
+        "# requirement\n",
+        encoding="utf-8",
+    )
+    calls: list[dict[str, object]] = []
+    monkeypatch.setattr(
+        product_cli,
+        "check_requirement",
+        lambda *a, **kw: SimpleNamespace(workflow_mode="fix_run", status="pass"),
+    )
+    monkeypatch.setattr(
+        product_cli,
+        "run_fix_run_project",
+        lambda *a, **kw: calls.append(dict(kw)),
+    )
+    monkeypatch.setattr(
+        product_cli,
+        "_resolve_cadence_cshrc",
+        lambda *_a, **_kw: pytest.fail(
+            "invalid fix-run flags must fail before Cadence environment resolution"
+        ),
+    )
+
+    result = runner.invoke(
+        product_cli.app,
+        [str(project_dir), "--real", "--dry-orchestration"],
+    )
+
+    assert result.exit_code == 1
+    assert "--dry-orchestration is not supported for fix-run" in result.output
+    assert calls == []
+
+
+def test_ic_opt_fix_run_rejects_continuation_before_cadence_resolution(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    (project_dir / "opt_requirement.md").write_text(
+        "# requirement\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        product_cli,
+        "check_requirement",
+        lambda *a, **kw: SimpleNamespace(workflow_mode="fix_run", status="pass"),
+    )
+    monkeypatch.setattr(
+        product_cli,
+        "_resolve_cadence_cshrc",
+        lambda *_a, **_kw: pytest.fail(
+            "fix-run continuation must fail before Cadence environment resolution"
+        ),
+    )
+    monkeypatch.setattr(
+        product_cli,
+        "continue_local_project",
+        lambda *_a, **_kw: pytest.fail("fix-run must not enter optimizer continuation"),
+    )
+
+    result = runner.invoke(
+        product_cli.app,
+        [str(project_dir), "--real", "--continue", "3"],
+    )
+
+    assert result.exit_code == 1
+    assert "--continue requires an optimize workflow" in result.output
+
+
 def test_ic_opt_real_dispatches_to_optimizer_when_workflow_absent(
     monkeypatch, tmp_path: Path
 ) -> None:
@@ -634,3 +846,176 @@ def test_ic_opt_fix_run_exits_nonzero_when_report_fails(monkeypatch, tmp_path: P
     assert result.exit_code != 0, result.output
     assert "fix-run flow completed" not in result.output
     assert "fix-run flow failed" in result.output
+
+
+def test_remote_real_releases_attempt_lock_when_doctor_fails(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    released: list[bool] = []
+
+    class Lease:
+        def release(self) -> None:
+            released.append(True)
+
+    monkeypatch.setattr(
+        product_cli,
+        "RemoteSshRunner",
+        lambda profile: SimpleNamespace(profile=profile),
+    )
+    monkeypatch.setattr(
+        product_cli,
+        "begin_remote_optimizer_attempt",
+        lambda *args, **kwargs: Lease(),
+    )
+    monkeypatch.setattr(
+        product_cli,
+        "run_remote_doctor",
+        lambda *args, **kwargs: SimpleNamespace(
+            status="fail",
+            issues=["synthetic doctor failure"],
+        ),
+    )
+
+    result = runner.invoke(
+        product_cli.app,
+        [str(tmp_path / "remote-project"), "--real", "--ssh-profile", "lab"],
+    )
+
+    assert result.exit_code == 1
+    assert "synthetic doctor failure" in result.output
+    assert released == [True]
+
+
+def test_remote_continue_runs_one_doctor_with_attempt_runner_and_cadence(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    events: list[str] = []
+    remote_runner = SimpleNamespace(profile="lab")
+    doctor_report = SimpleNamespace(
+        status="pass",
+        workflow_mode="optimize",
+        issues=[],
+    )
+
+    class Lease:
+        def release(self) -> None:
+            events.append("release")
+
+    monkeypatch.setattr(
+        product_cli,
+        "RemoteSshRunner",
+        lambda profile: remote_runner,
+    )
+    monkeypatch.setattr(
+        product_cli,
+        "begin_remote_optimizer_attempt",
+        lambda ref, *, runner: (
+            events.append("begin_attempt"),
+            Lease(),
+        )[-1],
+    )
+
+    def fake_doctor(ref, **kwargs):
+        events.append("doctor")
+        assert kwargs == {
+            "runner": remote_runner,
+            "cadence_cshrc": PurePosixPath("/remote/project/custom.csh"),
+        }
+        return doctor_report
+
+    def fake_continue(ref, **kwargs):
+        events.append("continue")
+        assert kwargs["runner"] is remote_runner
+        assert kwargs["remote_cadence_cshrc"] == PurePosixPath(
+            "/remote/project/custom.csh"
+        )
+        assert kwargs["doctor_report"] is doctor_report
+        assert kwargs["attempt_started"] is True
+        return SimpleNamespace(
+            status="pass",
+            recommended_run_id="real_012",
+            report_path=tmp_path / "optimizer_flow_run_report.json",
+        )
+
+    monkeypatch.setattr(product_cli, "run_remote_doctor", fake_doctor)
+    monkeypatch.setattr(product_cli, "continue_remote_project", fake_continue)
+
+    result = runner.invoke(
+        product_cli.app,
+        [
+            "/remote/project",
+            "--real",
+            "--continue",
+            "4",
+            "--ssh-profile",
+            "lab",
+            "--cadence-cshrc",
+            "/remote/project/custom.csh",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert events == ["begin_attempt", "doctor", "continue", "release"]
+
+
+def test_remote_continue_doctor_failure_releases_attempt_without_continuing(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    events: list[str] = []
+    remote_runner = SimpleNamespace(profile="lab")
+
+    class Lease:
+        def release(self) -> None:
+            events.append("release")
+
+    monkeypatch.setattr(
+        product_cli,
+        "RemoteSshRunner",
+        lambda profile: remote_runner,
+    )
+    monkeypatch.setattr(
+        product_cli,
+        "begin_remote_optimizer_attempt",
+        lambda ref, *, runner: (
+            events.append("begin_attempt"),
+            Lease(),
+        )[-1],
+    )
+    monkeypatch.setattr(
+        product_cli,
+        "run_remote_doctor",
+        lambda ref, **kwargs: (
+            events.append("doctor"),
+            SimpleNamespace(
+                status="fail",
+                workflow_mode="optimize",
+                issues=["remote Cadence environment changed"],
+            ),
+        )[-1],
+    )
+    monkeypatch.setattr(
+        product_cli,
+        "continue_remote_project",
+        lambda *args, **kwargs: pytest.fail(
+            "continuation must not start after doctor failure"
+        ),
+    )
+
+    result = runner.invoke(
+        product_cli.app,
+        [
+            str(tmp_path / "remote-project"),
+            "--real",
+            "--continue",
+            "4",
+            "--ssh-profile",
+            "lab",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "remote Cadence environment changed" in result.output
+    assert events == ["begin_attempt", "doctor", "release"]

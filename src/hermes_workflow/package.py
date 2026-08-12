@@ -27,6 +27,7 @@ OPTIONAL_CONFIG_FILE_NAMES = [
     "waveform_exports.yaml",
     "fixed_points.yaml",
     "workflow.yaml",
+    "history_warm_start.yaml",
 ]
 
 
@@ -97,10 +98,13 @@ def _render_execution_task(bundle: ContractBundle, manifest_payload: dict) -> st
             f"- `{constraint.metric}` {constraint.op.value} `{constraint.value}`"
             for constraint in bundle.metrics.constraints
         )
-        objective_lines = (
-            f"- Direction: `{bundle.metrics.objective.direction.value}`\n"
-            f"- Expression: `{bundle.metrics.objective.expression}`"
-        )
+        if bundle.metrics.objective is None:
+            objective_lines = "- No optimizer objective configured for this fix-run package."
+        else:
+            objective_lines = (
+                f"- Direction: `{bundle.metrics.objective.direction.value}`\n"
+                f"- Expression: `{bundle.metrics.objective.expression}`"
+            )
     else:
         metric_lines = "- No scalar metrics configured for this fix-run package."
         constraint_lines = "- No scalar constraints configured for this fix-run package."

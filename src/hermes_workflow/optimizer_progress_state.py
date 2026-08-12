@@ -81,13 +81,27 @@ def build_optimizer_progress_state(
     )
 
 
-def sync_optimizer_progress_state(project_dir: Path) -> Path:
+def sync_optimizer_progress_state(
+    project_dir: Path,
+    *,
+    expected_backend: str | None = None,
+) -> Path:
     """Re-derive ``state/optimizer_state.json`` from on-disk artifacts."""
     project_dir = Path(project_dir)
     bundle = assert_valid_project(project_dir)
     optimizer_settings = bundle.optimizer.optimizer
 
-    artifacts = load_optimizer_artifacts(project_dir, issues=[])
+    artifact_issues: list[str] = []
+    artifacts = load_optimizer_artifacts(
+        project_dir,
+        issues=artifact_issues,
+        expected_backend=expected_backend,
+    )
+    if expected_backend is not None and artifact_issues:
+        raise ValueError(
+            "cannot synchronize optimizer progress from mismatched artifacts: "
+            + "; ".join(artifact_issues)
+        )
     report = artifacts.report or {}
     traces = artifacts.traces or []
 

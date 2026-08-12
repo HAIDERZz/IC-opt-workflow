@@ -7,13 +7,15 @@ import posixpath
 import shlex
 import shutil
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any
 
 from hermes_workflow.netlists import prepare_netlist
 from hermes_workflow.remote_project import RemoteProjectRef, remote_cache_dir
-from hermes_workflow.remote_ssh import quote_remote_path
+from hermes_workflow.remote_ssh import quote_remote_path, require_boolean_probe
 from hermes_workflow.requirement_intake import (
     RequirementIntakeReport,
     RequirementPreparationReport,
@@ -40,6 +42,7 @@ _SNAPSHOT_MANIFEST_RELATIVE = Path(
     "reports/remote_preparation_snapshot.json"
 )
 _SNAPSHOT_COMPLETION_MARKER = Path(".complete")
+REMOTE_PREPARATION_SNAPSHOT_RETENTION = 3
 
 
 @dataclass(frozen=True)
@@ -56,14 +59,37 @@ def _remote_requirement_file_exists(
     remote_path: PurePosixPath | str,
 ) -> bool:
     probe = runner.run(f"test -f {quote_remote_path(remote_path)}")
-    if probe.return_code == 0:
-        return True
-    if probe.return_code == 1:
-        return False
-    raise RuntimeError(
-        f"remote file probe failed for {remote_path}: "
-        f"exit={probe.return_code}: {probe.stderr.strip()}"
+    return require_boolean_probe(
+        probe,
+        profile=getattr(runner, "profile", "remote"),
+        description=f"remote requirement file probe for {remote_path}",
     )
+
+
+def _remote_model_file_is_readable(
+    runner: Any,
+    remote_path: PurePosixPath | str,
+) -> bool:
+    quoted_path = quote_remote_path(remote_path)
+    probe = runner.run(f"test -f {quoted_path} && test -r {quoted_path}")
+    return require_boolean_probe(
+        probe,
+        profile=getattr(runner, "profile", "remote"),
+        description=f"remote model file readability probe for {remote_path}",
+    )
+
+
+def _memoized_remote_model_file_checker(
+    runner: Any,
+) -> Callable[[str], bool]:
+    results: dict[str, bool] = {}
+
+    def is_readable(path: str) -> bool:
+        if path not in results:
+            results[path] = _remote_model_file_is_readable(runner, path)
+        return results[path]
+
+    return is_readable
 
 
 def prepare_remote_project_cache(
@@ -89,20 +115,22 @@ def prepare_remote_project_cache(
             runner,
         )
 
+    model_file_is_readable = _memoized_remote_model_file_checker(runner)
+
     requirement_text = runner.read_text(ref.remote_project_dir / "opt_requirement.md")
     constraints_path = ref.remote_project_dir / "constraints.md"
     constraints_probe = runner.run(
         f"test -f {quote_remote_path(constraints_path)}"
     )
-    if constraints_probe.return_code == 0:
+    constraints_exists = require_boolean_probe(
+        constraints_probe,
+        profile=getattr(runner, "profile", "remote"),
+        description=f"remote constraints probe for {constraints_path}",
+    )
+    if constraints_exists:
         constraints_text = runner.read_text(ref.remote_project_dir / "constraints.md")
-    elif constraints_probe.return_code == 1:
-        constraints_text = None
     else:
-        raise RuntimeError(
-            "failed to probe remote constraints.md: "
-            f"exit={constraints_probe.return_code}: {constraints_probe.stderr.strip()}"
-        )
+        constraints_text = None
     (cache_dir / "opt_requirement.md").write_text(requirement_text, encoding="utf-8")
     if constraints_text is not None:
         (cache_dir / "constraints.md").write_text(constraints_text, encoding="utf-8")
@@ -113,6 +141,7 @@ def prepare_remote_project_cache(
             runner,
             path,
         ),
+        model_file_is_readable=model_file_is_readable,
     )
     if report.status != "pass":
         preparation_report = RequirementPreparationReport(
@@ -165,7 +194,10 @@ def prepare_remote_project_cache(
                 issues=issues,
             ),
         )
-    netlist_report = prepare_netlist(cache_dir)
+    netlist_report = prepare_netlist(
+        cache_dir,
+        model_file_is_readable=model_file_is_readable,
+    )
     if netlist_report.status.value != "pass":
         return RemotePrepareResult(
             status="fail",
@@ -217,7 +249,10 @@ def _persist_remote_preparation_snapshot(
 ) -> None:
     manifest_path = cache_dir / _SNAPSHOT_MANIFEST_RELATIVE
     manifest_sha256 = _sha256_file(manifest_path)
-    snapshot_id = f"{manifest_sha256[:16]}-{uuid.uuid4().hex}"
+    created_at = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
+    snapshot_id = (
+        f"{created_at}-{manifest_sha256[:16]}-{uuid.uuid4().hex}"
+    )
     remote_store = (
         ref.remote_project_dir
         / _REMOTE_PREPARATION_SNAPSHOT_STORE_RELATIVE
@@ -247,6 +282,49 @@ def _persist_remote_preparation_snapshot(
         f"{quoted_canonical}",
         check=True,
     )
+    _prune_remote_preparation_snapshots(
+        ref,
+        runner,
+        keep=REMOTE_PREPARATION_SNAPSHOT_RETENTION,
+    )
+
+
+def _prune_remote_preparation_snapshots(
+    ref: RemoteProjectRef,
+    runner: Any,
+    *,
+    keep: int,
+) -> None:
+    if keep < 1:
+        raise ValueError("remote preparation snapshot retention must be >= 1")
+    remote_store = (
+        ref.remote_project_dir
+        / _REMOTE_PREPARATION_SNAPSHOT_STORE_RELATIVE
+    )
+    canonical = _remote_preparation_snapshot_dir(ref)
+    q_store = quote_remote_path(remote_store)
+    q_canonical = quote_remote_path(canonical)
+    script = (
+        f"store={q_store}\n"
+        f"current=$(readlink -e -- {q_canonical}) || exit 78\n"
+        "count=0\n"
+        "for candidate in \"$store\"/*; do\n"
+        "  if [ -d \"$candidate\" ] && [ ! -L \"$candidate\" ]; then "
+        "count=$((count + 1)); fi\n"
+        "done\n"
+        f"excess=$((count - {keep}))\n"
+        "if [ \"$excess\" -le 0 ]; then exit 0; fi\n"
+        "for candidate in \"$store\"/*; do\n"
+        "  if [ \"$excess\" -le 0 ]; then break; fi\n"
+        "  if [ ! -d \"$candidate\" ] || [ -L \"$candidate\" ]; then continue; fi\n"
+        "  resolved=$(readlink -e -- \"$candidate\") || continue\n"
+        "  if [ \"$resolved\" = \"$current\" ]; then continue; fi\n"
+        "  rm -rf -- \"$candidate\" || exit 79\n"
+        "  excess=$((excess - 1))\n"
+        "done\n"
+        "if [ \"$excess\" -ne 0 ]; then exit 79; fi\n"
+    )
+    runner.run(script, check=True)
 
 
 def _restore_remote_preparation_snapshot(
@@ -256,15 +334,15 @@ def _restore_remote_preparation_snapshot(
 ) -> RemotePrepareResult:
     remote_snapshot = _remote_preparation_snapshot_dir(ref)
     probe = runner.run(f"test -d {quote_remote_path(remote_snapshot)}")
-    if probe.return_code == 1:
+    snapshot_exists = require_boolean_probe(
+        probe,
+        profile=getattr(runner, "profile", "remote"),
+        description=f"remote preparation snapshot probe for {remote_snapshot}",
+    )
+    if not snapshot_exists:
         raise RuntimeError(
             "remote preparation snapshot is missing; continuation cannot "
             f"re-read live requirement inputs: {remote_snapshot}"
-        )
-    if probe.return_code != 0:
-        raise RuntimeError(
-            "failed to probe remote preparation snapshot: "
-            f"exit={probe.return_code}: {probe.stderr.strip()}"
         )
     try:
         runner.download_tree(remote_snapshot, cache_dir)
@@ -290,9 +368,12 @@ def _restore_remote_preparation_snapshot(
         )
     _verify_remote_preparation_snapshot(cache_dir, manifest)
 
+    model_file_is_readable = _memoized_remote_model_file_checker(runner)
+
     requirement_report = check_requirement(
         cache_dir,
         maestro_input_exists=lambda _path: True,
+        model_file_is_readable=model_file_is_readable,
     )
     if requirement_report.status != "pass":
         preparation_report = RequirementPreparationReport(
@@ -307,7 +388,10 @@ def _restore_remote_preparation_snapshot(
             preparation_report=preparation_report,
         )
 
-    netlist_report = prepare_netlist(cache_dir)
+    netlist_report = prepare_netlist(
+        cache_dir,
+        model_file_is_readable=model_file_is_readable,
+    )
     if netlist_report.status.value != "pass":
         preparation_report = RequirementPreparationReport(
             status="fail",
@@ -395,10 +479,15 @@ def _download_required_remote_file(
     purpose: str,
 ) -> None:
     probe = runner.run(f"test -f {quote_remote_path(remote_path)}")
-    if probe.return_code != 0:
+    exists = require_boolean_probe(
+        probe,
+        profile=getattr(runner, "profile", "remote"),
+        description=f"{purpose} probe for {remote_path}",
+    )
+    if not exists:
         raise RuntimeError(
             f"{purpose} is missing or unreadable: {remote_path} "
-            f"(exit={probe.return_code}: {probe.stderr.strip()})"
+            "(path does not exist)"
         )
     try:
         runner.download(remote_path, local_path)

@@ -85,6 +85,70 @@ def test_finalize_optimizer_run_writes_closeout_report(
     assert (project_dir / "reports/optimizer_insight_report.html").exists()
 
 
+def test_finalize_optimizer_run_propagates_expected_backend_to_nested_consumers(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import hermes_workflow.optimizer_finalize as finalize_module
+
+    supplementary_root = tmp_path / ".remote_history_manifests"
+    calls: list[tuple[str, str | None, Path | None]] = []
+
+    def acceptance(
+        _project: Path,
+        *,
+        expected_backend: str | None = None,
+        supplementary_artifact_root: Path | None = None,
+    ) -> object:
+        calls.append(
+            ("acceptance", expected_backend, supplementary_artifact_root)
+        )
+        return type("Acceptance", (), {"status": "accepted", "warnings": []})()
+
+    def completion(
+        _project: Path,
+        *,
+        expected_backend: str | None = None,
+    ) -> object:
+        calls.append(("completion", expected_backend, None))
+        return type(
+            "Completion",
+            (),
+            {
+                "status": "pass",
+                "warnings": [],
+                "decision": "accept_best_observed",
+                "confidence": "medium",
+                "best_observed": {"run_id": "real_007"},
+            },
+        )()
+
+    def insight(
+        _project: Path,
+        *,
+        expected_backend: str | None = None,
+    ) -> object:
+        calls.append(("insight", expected_backend, None))
+        return type("Insight", (), {"status": "pass", "warnings": [], "issues": []})()
+
+    monkeypatch.setattr(finalize_module, "check_optimizer_run", acceptance)
+    monkeypatch.setattr(finalize_module, "summarize_optimizer_run", completion)
+    monkeypatch.setattr(finalize_module, "generate_optimizer_insight_report", insight)
+
+    report = finalize_optimizer_run(
+        tmp_path,
+        expected_backend="native_turbo",
+        supplementary_artifact_root=supplementary_root,
+    )
+
+    assert report.status == "pass"
+    assert calls == [
+        ("acceptance", "native_turbo", supplementary_root),
+        ("completion", "native_turbo", None),
+        ("insight", "native_turbo", None),
+    ]
+
+
 def test_finalize_optimizer_run_fails_closed_when_acceptance_rejects(
     tmp_path: Path,
 ) -> None:

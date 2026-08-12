@@ -1,91 +1,110 @@
 # Writing `opt_requirement.md`
 
-`opt_requirement.md` is the contract for the first real workflow run. It
-selects the mode and carries the machine-critical values for that mode. Do not
-use command-line flags to override those values for the first run.
+`opt_requirement.md` is the machine-checked contract for a first real workflow
+run. It selects the workflow mode and carries every value that may change the
+simulation or optimization. First-run CLI flags do not override those values.
 
-Supported modes:
+Unknown sections, unknown fields, duplicate YAML keys, misspelled names, and
+sections that do not apply to the selected mode fail closed. A parsed field is
+never intentionally accepted and then silently ignored.
 
-- `mode: optimize`: optimizer-driven search
-- `mode: fix_run`: fixed-point Spectre/OCEAN characterization and waveform CSV
-  export
+## Supported Modes
 
-The product command-line entry kept for optimizer run extension is
-continuation:
+- `mode: optimize`: optimizer-driven search using OpenBox or native TuRBO.
+- `mode: fix_run`: fixed-point Spectre/OCEAN characterization with scalar
+  Metrics, waveform CSV exports, or both.
+
+Local and remote/SSH execution use the same requirement. Transport is not a
+separate workflow mode. Continuation also has no separate requirement template:
 
 ```bash
 ic-opt <project> --real --continue N
 ```
 
-## Example Files
+Continuation extends the generated project backend and does not reread a
+changed `opt_requirement.md`. History Warm Start creates a new optimize project
+and is a different capability.
 
-This directory contains six requirement templates.
+## Complete Template Matrix
 
-| File | Use when |
+The eleven templates cover each distinct workflow, topology, output, history,
+corner, and production optimizer contract without duplicating the full
+Cartesian product.
+
+| File | Workflow and coverage |
 | --- | --- |
-| `opt_requirement.md` | one testbench optimization, source point corner |
-| `opt_requirement.multi_corner.md` | one testbench optimization, multiple process corners |
-| `opt_requirement.multi_testbench.md` | multiple testbench optimization, source point corner |
-| `opt_requirement.multi_tb_corner.md` | multiple testbench optimization, multiple process corners |
-| `opt_requirement.history_warm_start.md` | new optimize project that reuses compatible history from a previous same-circuit project |
-| `opt_requirement.fix_run.md` | fixed point run across 15 process/corner-variable combinations with waveform CSV export |
+| `opt_requirement.md` | OpenBox PRF-EIC; one testbench; source/nominal corner |
+| `opt_requirement.openbox_gp_eic.md` | complete OpenBox GP-EIC settings |
+| `opt_requirement.turbo.md` | complete native TuRBO trust-region settings |
+| `opt_requirement.multi_corner.md` | one testbench; multiple process corners |
+| `opt_requirement.multi_testbench.md` | multiple testbenches; source/nominal corner |
+| `opt_requirement.multi_tb_corner.md` | multiple testbenches and process corners |
+| `opt_requirement.history_warm_start.md` | multi-testbench OpenBox history warm start |
+| `opt_requirement.history_warm_start.multi_corner.md` | single-testbench, multi-corner OpenBox history warm start |
+| `opt_requirement.fix_run.md` | waveform-only; one testbench; 15 corners; one fixed point |
+| `opt_requirement.fix_run.metrics_only.md` | metrics-only; one testbench; multiple fixed points |
+| `opt_requirement.fix_run.multi_testbench.metrics_waveform.md` | routed Metrics plus Waveform Exports; multiple testbenches, corners, and fixed points |
 
-The multi-testbench templates are based on real validated Mixer multi-testbench
-requirements with CG/NF/BW, IIP3, and P1dB metrics routed to their owning
-testbenches. The history warm-start template is based on the verified second
-round Mixer history run. The fix-run template is based on a real validated local
-and remote 15-corner Mixer requirement. For a real project, copy the relevant
-template to `<project>/opt_requirement.md`, then replace private paths,
-history source paths, and circuit-specific values.
+Copy the closest file to `<project>/opt_requirement.md`, then replace all
+private paths, formulas, model sections, variable ranges, fixed points, and
+circuit-specific values. Examples are contracts, not universal circuit data.
 
-## Shared Sections
+## Section Applicability
 
-Each section must appear once and contain one fenced `yaml` block.
+Every section appears at most once and contains exactly one fenced `yaml` block.
 
-All real workflow requirements use:
+Optimize requires:
+
+```text
+Project
+Maestro Source
+Design Variables
+Metrics
+Constraints
+Objective
+Spectre Settings
+Optimizer Settings
+Approval Checklist
+```
+
+Optimize optionally accepts:
+
+```text
+Workflow
+Process Corners
+History Warm Start
+```
+
+Fix-run requires:
 
 ```text
 Workflow
 Project
 Maestro Source
+Design Variables
 Spectre Settings
+Fixed Points
 Approval Checklist
 ```
 
-Optimization requirements also use:
-
-```text
-Design Variables
-Metrics
-Constraints
-Objective
-Optimizer Settings
-```
-
-Fix-run requirements also use:
-
-```text
-Fixed Points
-Waveform Exports
-```
-
-Multi-corner templates include:
-
-```text
-Process Corners
-```
+Fix-run optionally accepts `Process Corners`, `Metrics`, and `Waveform Exports`,
+but at least one of Metrics or Waveform Exports must be present. Fix-run rejects
+Objective, Constraints, Optimizer Settings, and History Warm Start. Optimize
+rejects Fixed Points and Waveform Exports.
 
 ## Workflow
 
-Optimization:
+All new optimize templates make the mode explicit:
 
 ```yaml
 schema_version: "1.0"
 mode: optimize
-starting_run_id: real_001
 ```
 
-Fix-run:
+`starting_run_id` is not supported for optimize. Legacy optimize requirements
+may omit the entire Workflow section; omission still means `mode: optimize`.
+
+Fix-run uses:
 
 ```yaml
 schema_version: "1.0"
@@ -93,15 +112,28 @@ mode: fix_run
 starting_run_id: real_001
 ```
 
-If the `Workflow` section is omitted, the file is treated as an optimization
-requirement for backward compatibility.
+Fix-run `starting_run_id` must match `real_NNN`. It controls the first fixed
+point run ID; later points increment it in list order. It defaults to
+`real_001` when omitted. Requirement validation rejects a starting ID and point
+count whose final sequential ID would exceed `real_999`.
 
-## Maestro Source
-
-Single-testbench projects use a top-level Maestro source:
+## Project
 
 ```yaml
-maestro_point_root: /home/username/simulation/Virtuoso_Bridge_test/MixerCS_PSS_CG_Noise/maestro/results/maestro/Interactive.N/1/Mixer_CS_CG_NF
+project_name: mixer_cg_nf_opt
+description: Human-readable project purpose
+backend: maestro_exported_spectre_deck
+```
+
+`project_name` is an identifier. The only supported project backend is
+`maestro_exported_spectre_deck`.
+
+## Maestro Source and Testbench Routes
+
+A single-testbench project uses top-level fields:
+
+```yaml
+maestro_point_root: /home/username/simulation/<project>/maestro/results/maestro/Interactive.N/1/<test_name>
 virtuoso_library: Virtuoso_Bridge_test
 cell: MixerCS_PSS_CG_Noise
 design_view: schematic
@@ -110,43 +142,35 @@ test_name: Mixer_CS_CG_NF
 corner: Nominal
 ```
 
-Multi-testbench projects use `testbenches:`. Each metric or waveform export
-then uses a `testbench:` routing key.
+A multi-testbench project uses named entries:
 
 ```yaml
 testbenches:
   - id: cg_nf
-    maestro_point_root: /home/username/simulation/Virtuoso_Bridge_test/Mixer_PSS_CG_Noise/maestro/results/maestro/Interactive.N/1/CG_NF_Test
+    maestro_point_root: /home/username/simulation/<project>/maestro/results/maestro/Interactive.N/1/<test_name>
     virtuoso_library: Virtuoso_Bridge_test
-    cell: Mixer_PSS_CG_Noise
+    cell: MixerCS_PSS_CG_Noise
     design_view: schematic
     maestro_view: maestro
-    test_name: CG_NF_Test
+    test_name: Mixer_CS_CG_NF
     corner: Nominal
 ```
 
-`maestro_point_root` must be the Maestro/ADE result point directory that
-contains `netlist/input.scs`. Do not point to `input.scs` directly.
+`maestro_point_root` is the result point directory containing
+`netlist/input.scs`; it is not the `input.scs` file and not `psf/`.
+`corner` identifies the imported point's base corner for child-deck rendering.
+The library, cell, view, and test-name fields are preserved as package
+provenance; the workflow does not query Maestro to prove that they match the
+directory. Review them against the source point before approval.
 
-The path normally follows this shape:
-
-```text
-/home/username/simulation/<virtuoso_library>/<cellview_name>/maestro/results/maestro/Interactive.N/1/<test_name>
-```
-
-For example:
-
-```text
-/home/username/simulation/Virtuoso_Bridge_test/MixerCS_PSS_IIP3/maestro/results/maestro/Interactive.28/1/Mixer_CS_IIP3
-```
-
-Use the actual `Interactive.N` directory and final testbench directory from
-your Maestro run.
+For a top-level single testbench, Metrics and Waveform Exports omit
+`testbench`. When `Maestro Source.testbenches` is used, every Metric and
+Waveform Export must declare a `testbench` equal to one of the listed IDs.
 
 ## Process Corners
 
-Use `Process Corners` when the same candidate or fixed point must be evaluated
-across several model sections or corner variables.
+Without this section, the workflow creates one nominal child from the imported
+source deck. Optimize multi-corner requirements use aggregation policies:
 
 ```yaml
 objective_policy: worst_case
@@ -160,73 +184,158 @@ corners:
     model_section: Post_simu_top_ss
     variables:
       temperature: '125'
-  - id: ff
-    model_section: Post_simu_top_ff
+```
+
+- `objective_policy` is `nominal` or `worst_case`, and is optimize-only.
+- `constraint_policy` is `nominal` or `all_corners`, and is optimize-only.
+- `objective_policy: nominal` requires an explicit corner whose `id` is
+  `nominal`; YAML order is not used as a substitute for that identity.
+
+Fix-run characterizes and reports every child independently, so it has no
+objective or Constraint aggregation policy. A fix-run multi-corner section
+must omit both policy fields:
+
+```yaml
+corners:
+  - id: tt
+    model_section: Post_simu_top_tt
     variables:
-      temperature: '-40'
+      temperature: '27'
+  - id: ss
+    model_section: Post_simu_top_ss
+    variables:
+      temperature: '125'
 ```
 
-`variables` are generic netlist parameter overrides. A variable named
-`temperature` is not special-cased by the workflow.
+The renderer supplies internal `nominal`/`nominal` values only to satisfy the
+shared generated-config schema; they do not select or discard fix-run child
+results.
 
-## Optimization Metrics
+Corner entry fields have the same rendering meaning in both workflows:
 
-`ocean_expression` is copied into the OCEAN replay script. IC Auto Opt does not
-rewrite or reinterpret Calculator/OCEAN formulas.
+- `model_section` replaces the section on active `include ... section=...`
+  statements and fails if no such statement is found. It must be a non-empty
+  compact token: whitespace, quotes, backslashes, explicit YAML `null`, and
+  line breaks fail preflight before any deck is written.
+- `variables` replace top-level Spectre parameters by exact name and fail when
+  a requested name is absent. Every key must match the Spectre-safe identifier
+  form `[A-Za-z_][A-Za-z0-9_]*`; every value must be a non-empty, single-line
+  compact token without whitespace, quotes, or backslashes. An explicitly null
+  `variables` field fails; omit the field when no override is required.
+  `temperature` has no special meaning.
+- `description` is optional metadata; it does not change simulation behavior.
 
-Single-testbench metric:
+`model_file` is also supported:
+
+```yaml
+  - id: ss_external_model
+    model_file: /absolute/path/to/model.scs
+    model_section: Post_simu_top_ss
+```
+
+`model_file` is supported only when the imported deck has exactly one active
+`include ... section=...` line. Zero matches and multiple matches both fail
+closed; the field does not silently choose one include or rewrite several
+different model paths. For a multi-include deck, import a Maestro point with
+the intended model setup instead.
+The value must be an absolute POSIX path and a compact token without whitespace,
+quotes, backslashes, explicit YAML `null`, or line breaks. This is required
+because the renderer also supports an unquoted source `include` statement and
+must not create an injectable or syntactically split replacement.
+
+The workflow does not copy the referenced model file. Before netlist rendering,
+local requirement/CLI preflight requires it to be a readable regular file on
+the local machine. Remote doctor, fresh remote preparation, and frozen-snapshot
+restore instead run the equivalent strict `test -f && test -r` probe through
+SSH on the Remote Host. They never consult a same-named Controller path. A
+frozen snapshot rechecks the external model because the model itself is not a
+Materialized Artifact stored in that snapshot. SSH transport/protocol errors
+are not reported as a missing file; they fail closed as transport errors.
+
+## Design Variables
+
+```yaml
+- name: F
+  kind: integer
+  lower: '20'
+  upper: '30'
+  step: '2'
+- name: W
+  kind: continuous_step
+  lower: 0.6u
+  upper: 1.2u
+  step: 0.2u
+```
+
+Kinds are `integer` and `continuous_step`. Bounds and step use SPICE numeric
+syntax. Lower must not exceed upper and step must be positive. An integer range
+must be exactly divisible by its step. Continuous candidates are generated as
+`lower + k * step <= upper`, so a continuous upper bound may be off-grid; every
+generated or fixed value must still lie on the generated grid. A continuous
+variable's lower, upper, and step values must use the same unit suffix.
+
+## Metrics
+
+Single-testbench scalar metric:
 
 ```yaml
 - name: NF_3G
   unit: dB
-  ocean_expression: value(getData("NF" ?result "pnoise") 3e+09)
+  result: pnoise
+  ocean_expression: 'value(getData("NF") 3e+09)'
+  required_signals:
+    - NF
 ```
 
-Multi-testbench metric:
+Multi-testbench metrics add `testbench: cg_nf`. `result` is optional and emits
+`selectResult('pnoise')` before the formula. It is normally omitted when the
+formula already contains `?result`. `required_signals` is provenance and
+History Warm Start compatibility metadata; the workflow does not inspect PSF
+to prove those names exist. Formula errors, nil, waveform objects, and
+non-finite scalar values fail the metric.
+
+Metric nil and non-finite policies are fixed to `fail` and are not requirement
+fields. See `METRICS.md` for the complete field contract.
+
+## Constraints
+
+Operators are `lt`, `le`, `gt`, and `ge`:
 
 ```yaml
-- name: NF_3G
-  unit: dB
-  testbench: cg_nf
-  ocean_expression: value(getData("NF" ?result "pnoise") 3e+09)
+- metric: NF_3G
+  op: lt
+  value: 9 dB
 ```
 
-Optimizer metrics are scalar. Full waveform CSV export belongs in fix-run
-`Waveform Exports`.
+The referenced Metric must exist. The Constraint value must contain a finite
+number, whitespace, and exactly the same unit string as that Metric. There is
+no implicit conversion between dB, dBm, Hz, seconds, farads, or any other
+units.
 
-## Fix-Run Fixed Points
+The optional project-root `constraints.md` is separate human/supervisor
+guidance. Its presence and hash are recorded, but its prose is not translated
+into machine Constraints. Every enforced threshold must therefore appear in
+the `## Constraints` YAML block above.
 
-`Fixed Points` lists the exact parameters to simulate:
+## Objective
 
 ```yaml
-schema_version: "1.0"
-points:
-  - candidate_id: user_point_001
-    parameters:
-      F: '24'
-      W: 0.8u
-      L: 30n
+direction: minimize
+expression: NF_3G
 ```
 
-Each parameter name must match a design variable or a top-level Spectre
-parameter in the imported deck.
+Directions are `minimize` and `maximize`. Expressions may reference declared
+Metric names, finite numeric literals, parentheses, unary `+`/`-`, arithmetic
+`+`, `-`, `*`, `/`, `%`, `**`, and these functions:
 
-## Fix-Run Waveform Exports
-
-`Waveform Exports` lists OCEAN waveform expressions to export as CSV:
-
-```yaml
-schema_version: "1.0"
-exports:
-  - name: nf_pnoise
-    testbench: cg_nf
-    expression: 'getData("NF" ?result "pnoise")'
-    output_format: csv
-    nil_policy: fail
+```text
+min  max  ln
 ```
 
-`nil_policy: fail` makes a missing waveform fail the child run instead of
-silently producing incomplete evidence.
+`min` and `max` need at least one argument; `ln` takes one positive argument.
+Function domains must be valid and the final result must be a finite real
+scalar. Attributes, indexing, comprehensions, keywords, arbitrary function
+calls, and undeclared names are rejected.
 
 ## Spectre Settings
 
@@ -242,67 +351,139 @@ keep_failed_runs: true
 keep_successful_runs: true
 ```
 
-`threads_per_run` maps to Spectre `+mt`. In optimize mode, `parallel_jobs` is
-candidate-level Spectre process concurrency. In fix-run mode, it is
-testbench/corner child concurrency inside one fixed point; fixed points remain
-serial. `output_format` is `psfxl`.
+`threads_per_run` maps to Spectre `+mt`. In optimize, `parallel_jobs` is
+candidate-level process concurrency. In fix-run, it is testbench/corner child
+concurrency inside one fixed point; fixed points remain serial. The supported
+output format is `psfxl`.
+
+`keep_successful_runs` and `keep_failed_runs` control retention by completed
+run outcome. Fix-run applies the decision after every fixed point. A remote
+fix-run applies it to both the remote run directories and the downloaded local
+snapshot. The fix-run report and `state/run_retention/<run_id>.json` preserve
+the audit decision; deleted fix-run artifact paths are provenance, not
+optimizer continuation evidence.
 
 ## Optimizer Settings
+
+Every production template declares an explicit strategy. Supported production
+pairs are:
+
+```yaml
+algorithm: openbox
+strategy: openbox_gp_eic
+```
 
 ```yaml
 algorithm: openbox
 strategy: openbox_prf_eic
-initialization: sobol
-max_evaluations: 30
-batch_size: 10
-random_seed: 20260528
-optimizer_cpu_threads: 32
-failure_penalty: 1000000.0
-deduplicate_candidates: true
 ```
 
-Production strategy choices:
+```yaml
+algorithm: turbo
+strategy: turbo_trust_region
+```
 
-- `algorithm: openbox`, `strategy: openbox_gp_eic`
-- `algorithm: openbox`, `strategy: openbox_prf_eic`
-- `algorithm: turbo`, `strategy: turbo_trust_region`
+`openbox_auto` remains an explicit compatibility strategy used by sanitized
+templates whose validated source run used OpenBox automatic model selection.
+Do not omit strategy in a new production requirement. `random_baseline` is for
+diagnostic plumbing checks, not production optimization.
 
-`random_baseline` is for diagnostics, not production optimization.
+`initialization` is `sobol`, `latin_hypercube`, or `random`.
+`max_evaluations`, `batch_size`, and `optimizer_cpu_threads` are positive
+integers; `random_seed` is the reproducibility seed; `failure_penalty` is a
+positive floating-point optimizer penalty. `deduplicate_candidates` must be
+`true`.
+These fields are optimizer controls, while Spectre process and thread limits
+remain in Spectre Settings. `batch_size` may not exceed Spectre
+`parallel_jobs`. Native TuRBO also requires `max_evaluations` to be at least
+twice the number of Design Variables.
+
+OpenBox advanced fields are:
+
+```yaml
+openbox:
+  surrogate_type: gp
+  acq_type: eic
+  acq_optimizer_type: random_scipy
+  initial_trials: auto
+```
+
+With `openbox_auto`, these fields customize automatic model selection. With
+`openbox_gp_eic` or `openbox_prf_eic`, `surrogate_type`, `acq_type`, and
+`acq_optimizer_type` must agree with the named preset or validation fails;
+`initial_trials` may still override the preset's automatic trial count.
+
+Native TuRBO settings are:
+
+```yaml
+turbo:
+  snap_to_step: true
+  duplicate_handling: resample
+```
+
+Use the complete GP-EIC and TuRBO templates rather than changing only the
+algorithm name in another file.
+
+## Fix-Run Fixed Points
+
+```yaml
+schema_version: "1.0"
+points:
+  - candidate_id: user_point_001
+    parameters:
+      F: '24'
+      W: 0.8u
+```
+
+Every point must provide every Design Variable exactly once and may not add an
+undeclared top-level Spectre parameter. Values are checked before simulation
+for compatible unit suffix, bounds, and step-grid alignment. `candidate_id`
+values must be unique and use only letters, digits, `_`, `.`, and `-`.
+
+## Fix-Run Waveform Exports
+
+Single-testbench export:
+
+```yaml
+schema_version: "1.0"
+exports:
+  - name: nf_pnoise
+    expression: 'getData("NF" ?result "pnoise")'
+    output_format: csv
+    nil_policy: fail
+```
+
+Multi-testbench exports add a valid `testbench` route. CSV is the only output
+format. `nil_policy: fail` is the only supported policy: missing/nil waveform
+data fails the child instead of silently accepting incomplete evidence.
+`nil_policy: skip` is not a supported requirement value. Export names must be
+unique, and expressions must be non-empty and may not contain `outfile(`,
+`system(`, or `{{` template placeholders.
 
 ## History Warm Start
 
-`History Warm Start` is an optional optimize-mode section for a new project that
-references previous same-circuit project directories. It is different from
-`--continue N`: continuation extends the same optimizer project and does not
-reread a changed `opt_requirement.md`. It is not supported for fix-run.
-
-Docs-only section example:
+History Warm Start is optimize-only and OpenBox-only:
 
 ```yaml
 enabled: true
 sources:
-  - path: /path/to/previous_same_circuit_project
+  - path: /absolute/path/to/previous_same_circuit_project
     label: round1
-max_observations: 200
+max_observations: 80
 warm_start_strategy: topk
 ```
 
-The section renders to `config/history_warm_start.yaml`. The first supported
-contract requires exactly matching variable names and matching required metric
-definitions between current and previous projects. Old objective and constraint
-values are not reused; old raw metrics are re-evaluated with the current
-requirement. Points outside the current variable space are rejected as
-`out_of_current_space`.
+It renders to `config/history_warm_start.yaml`. Enabled history with native
+TuRBO or fix-run is rejected. Current and source projects must have exactly the
+same variable names and compatible Metric definitions. Metric compatibility
+includes name, unit, formula, testbench route, `result`, `required_signals`, and
+OCEAN contract metadata. Old objective and Constraint values are not reused;
+raw historical Metrics are evaluated under the current requirement. Points
+outside the current variable space are recorded as `out_of_current_space`.
 
-After a run, inspect `reports/history_warm_start_audit.json`,
+Inspect `reports/history_warm_start_audit.json`,
 `reports/history_warm_start_audit.md`, and `openbox.history_warm_start` in
-`reports/optimizer_run_report.json`. Constrained IC projects use
-`initial_configurations_from_history`; unconstrained single-objective projects
-may use `transfer_learning_history`.
-
-Use `opt_requirement.history_warm_start.md` for a complete verified second-round
-example. It keeps the real multi-testbench Mixer structure and replaces the
-previous-project path with `/absolute/path/to/previous_same_circuit_project`.
+`reports/optimizer_run_report.json` before claiming history was applied.
 
 ## Approval Checklist
 
@@ -313,11 +494,12 @@ variable_bounds_user_approved: true
 spectre_resource_settings_user_approved: true
 ```
 
-All values must be `true` before real-tool execution.
+All four values must be exactly `true` before real-tool execution.
+For a waveform-only fix-run, `metric_formulas_user_approved` also records the
+user's approval of every Waveform Export expression despite the legacy field
+name.
 
-## Check The File
-
-Run:
+## Check the Requirement
 
 ```bash
 hermes-workflow check-requirement <project>
@@ -326,4 +508,6 @@ hermes-workflow validate <project>
 hermes-workflow check-project-ready <project>
 ```
 
-For production execution, read `docs/OPTIMIZER_PRODUCTION_QUICKSTART.md`.
+Do not treat parsing alone as engineering acceptance. For production, inspect
+the rendered configs/netlists and the real local or remote result manifests and
+reports for the selected topology, corner matrix, output contract, and backend.

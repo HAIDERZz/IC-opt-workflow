@@ -240,9 +240,25 @@ def test_ic_opt_remote_fix_run_prints_controller_and_remote_report_paths(
 
 def test_ic_opt_remote_continue_routes_additional_evals(monkeypatch, tmp_path: Path) -> None:
     calls: list[dict[str, object]] = []
+    remote_runner = object()
+    doctor_report = SimpleNamespace(
+        status="pass",
+        workflow_mode="optimize",
+        issues=[],
+    )
+
+    monkeypatch.setattr(
+        product_cli,
+        "RemoteSshRunner",
+        lambda profile: remote_runner,
+    )
+
+    def fake_doctor(ref, **kwargs):
+        calls.append({"operation": "doctor", "ref": ref, **kwargs})
+        return doctor_report
 
     def fake_continue_remote_project(ref, **kwargs):
-        calls.append({"ref": ref, **kwargs})
+        calls.append({"operation": "continue", "ref": ref, **kwargs})
         return SimpleNamespace(
             status="pass",
             report_path=tmp_path / "reports" / "optimizer_flow_run_report.json",
@@ -251,6 +267,7 @@ def test_ic_opt_remote_continue_routes_additional_evals(monkeypatch, tmp_path: P
             issues=[],
         )
 
+    monkeypatch.setattr(product_cli, "run_remote_doctor", fake_doctor)
     monkeypatch.setattr(product_cli, "continue_remote_project", fake_continue_remote_project)
 
     result = runner.invoke(
@@ -261,8 +278,16 @@ def test_ic_opt_remote_continue_routes_additional_evals(monkeypatch, tmp_path: P
     assert result.exit_code == 0, result.output
     assert "remote continuation completed" in result.output
     assert "recommended: real_141" in result.output
-    assert calls[0]["additional_evals"] == 40
-    assert calls[0]["strategy"] is None
+    assert [call["operation"] for call in calls] == ["doctor", "continue"]
+    assert calls[0]["runner"] is remote_runner
+    assert calls[0]["cadence_cshrc"] == PurePosixPath(
+        "/remote/project/cadence_env.csh"
+    )
+    assert calls[1]["additional_evals"] == 40
+    assert calls[1]["strategy"] is None
+    assert calls[1]["runner"] is remote_runner
+    assert calls[1]["doctor_report"] is doctor_report
+    assert calls[1]["attempt_started"] is True
 
 
 def test_ic_opt_remote_continue_without_real_fails(monkeypatch, tmp_path: Path) -> None:

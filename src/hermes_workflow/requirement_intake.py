@@ -4,31 +4,49 @@ import hashlib
 import json
 import re
 import shutil
+import tempfile
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import Any
+from typing import Any, Literal
 
 import yaml
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, Field, TypeAdapter, ValidationError, field_validator
 
+from hermes_workflow.candidate_contract import (
+    assert_candidate_parameters_match_variables,
+)
 from hermes_workflow.netlists import prepare_netlist
 from hermes_workflow.schemas import (
     HistoryWarmStartConfig,
     MetricsConfig,
+    NamedTestbenchConfig,
+    NonEmptyStr,
     OptimizerConfig,
     ProcessCornerConfig,
     ProjectConfig,
     SpectreConfig,
+    StrictModel,
+    TestbenchConfig,
     TestbenchesConfig,
     VariablesConfig,
+    validate_name,
 )
 from hermes_workflow.fix_run_models import (
     FixedPointsConfig,
     WaveformExportsConfig,
+    WorkflowSettings,
+    fix_run_id_range_issue,
 )
+from hermes_workflow.measurement_routes import measurement_route_issues
 from hermes_workflow.requirement_semantics import validate_requirement_semantics
 from hermes_workflow.diagnostics import Diagnostic, DiagnosticSeverity
+from hermes_workflow.validate import (
+    history_warm_start_backend_issue,
+    local_model_file_is_readable,
+    optimizer_contract_issues,
+    variable_contract_issues,
+)
 
 REQUIRED_SECTIONS = [
     "Project",
@@ -44,11 +62,15 @@ REQUIRED_SECTIONS = [
 OPTIONAL_SECTIONS = [
     "Process Corners",
     "Workflow",
-    "Fixed Points",
-    "Waveform Exports",
     "History Warm Start",
 ]
+FIX_RUN_OPTIONAL_SECTIONS = [
+    "Process Corners",
+    "Metrics",
+    "Waveform Exports",
+]
 FIX_RUN_REQUIRED_SECTIONS = [
+    "Workflow",
     "Project",
     "Maestro Source",
     "Design Variables",
@@ -76,10 +98,64 @@ OPTIONAL_CONFIG_FILE_MODELS: dict[str, type[BaseModel]] = {
     "waveform_exports.yaml": WaveformExportsConfig,
     "history_warm_start.yaml": HistoryWarmStartConfig,
 }
+MANAGED_CONFIG_FILES = frozenset(
+    {
+        *CONFIG_FILE_MODELS,
+        *OPTIONAL_CONFIG_FILE_MODELS,
+        "workflow.yaml",
+    }
+)
 
 
 class _UniqueKeyLoader(yaml.SafeLoader):
     pass
+
+
+class _RequirementProject(StrictModel):
+    project_name: str
+    description: str = ""
+    backend: Literal["maestro_exported_spectre_deck"]
+
+    @field_validator("project_name")
+    @classmethod
+    def _project_name_is_identifier(cls, value: str) -> str:
+        return validate_name(value, "project_name")
+
+
+class _RequirementMetric(StrictModel):
+    name: str
+    unit: NonEmptyStr
+    ocean_expression: NonEmptyStr
+    testbench: str | None = None
+    result: NonEmptyStr | None = None
+    required_signals: list[NonEmptyStr] = Field(default_factory=list)
+
+    @field_validator("name")
+    @classmethod
+    def _name_is_identifier(cls, value: str) -> str:
+        return validate_name(value, "metric name")
+
+    @field_validator("testbench")
+    @classmethod
+    def _testbench_is_identifier(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return validate_name(value, "metric testbench")
+
+
+class _RequirementMaestroPoint(TestbenchConfig):
+    maestro_point_root: NonEmptyStr
+
+
+class _RequirementMaestroCollection(StrictModel):
+    testbenches: list[NamedTestbenchConfig] = Field(min_length=1)
+
+
+class _RequirementApprovalChecklist(StrictModel):
+    metric_formulas_user_approved: Literal[True]
+    maestro_source_user_approved: Literal[True]
+    variable_bounds_user_approved: Literal[True]
+    spectre_resource_settings_user_approved: Literal[True]
 
 
 def _construct_mapping_without_duplicate_keys(
@@ -147,11 +223,13 @@ def check_requirement(
     project_dir: str | Path,
     *,
     maestro_input_exists: Callable[[str], bool] | None = None,
+    model_file_is_readable: Callable[[str], bool] | None = None,
 ) -> RequirementIntakeReport:
     project_root = Path(project_dir)
     report = _parse_and_validate_requirement(
         project_root,
         maestro_input_exists=maestro_input_exists,
+        model_file_is_readable=model_file_is_readable,
     )
     _write_requirement_report(project_root, report)
     return report
@@ -183,6 +261,8 @@ def prepare_from_requirement(project_dir: str | Path) -> RequirementPreparationR
 
 
 def render_config_payloads(sections: dict[str, Any], *, workflow_mode: str = "optimize") -> dict[str, dict[str, Any]]:
+    if workflow_mode not in {"optimize", "fix_run"}:
+        raise ValueError(f"unsupported workflow_mode: {workflow_mode!r}")
     project = _dict_section(sections, "Project")
     maestro = _dict_section(sections, "Maestro Source")
     testbenches = _testbench_sources(maestro)
@@ -246,13 +326,14 @@ def render_config_payloads(sections: dict[str, Any], *, workflow_mode: str = "op
         if "Metrics" in sections:
             metrics = _list_section(sections, "Metrics")
             constraints = _list_section(sections, "Constraints") if "Constraints" in sections else []
-            objective = _dict_section(sections, "Objective") if "Objective" in sections else {}
-            payloads["metrics.yaml"] = {
+            metrics_payload: dict[str, Any] = {
                 "schema_version": "1.0",
                 "metrics": [_metric_payload(metric) for metric in metrics],
                 "constraints": constraints,
-                "objective": objective,
             }
+            if "Objective" in sections:
+                metrics_payload["objective"] = _dict_section(sections, "Objective")
+            payloads["metrics.yaml"] = metrics_payload
     else:
         # optimize mode: existing behavior
         metrics = _list_section(sections, "Metrics")
@@ -286,10 +367,24 @@ def render_config_payloads(sections: dict[str, Any], *, workflow_mode: str = "op
         corners = process_corners.get("corners", [])
         if not isinstance(corners, list):
             raise TypeError("Process Corners.corners must be a YAML list")
+        corner_policies = (
+            {
+                "objective_policy": "nominal",
+                "constraint_policy": "nominal",
+            }
+            if workflow_mode == "fix_run"
+            else {
+                "objective_policy": process_corners.get(
+                    "objective_policy", "worst_case"
+                ),
+                "constraint_policy": process_corners.get(
+                    "constraint_policy", "all_corners"
+                ),
+            }
+        )
         payloads["process_corners.yaml"] = {
             "schema_version": "1.0",
-            "objective_policy": process_corners.get("objective_policy", "worst_case"),
-            "constraint_policy": process_corners.get("constraint_policy", "all_corners"),
+            **corner_policies,
             "corners": corners,
         }
     else:
@@ -309,11 +404,23 @@ def write_config_payloads(
 ) -> None:
     config_dir = Path(project_dir) / "config"
     config_dir.mkdir(parents=True, exist_ok=True)
-    for file_name, payload in payloads.items():
-        (config_dir / file_name).write_text(
-            yaml.safe_dump(payload, sort_keys=False),
-            encoding="utf-8",
-        )
+    staging_dir = Path(
+        tempfile.mkdtemp(prefix=".requirement-config-", dir=config_dir)
+    )
+    try:
+        for file_name, payload in payloads.items():
+            (staging_dir / file_name).write_text(
+                yaml.safe_dump(payload, sort_keys=False),
+                encoding="utf-8",
+            )
+        for file_name in sorted(payloads):
+            (staging_dir / file_name).replace(config_dir / file_name)
+        for file_name in sorted(MANAGED_CONFIG_FILES - payloads.keys()):
+            stale_path = config_dir / file_name
+            if stale_path.exists() or stale_path.is_symlink():
+                stale_path.unlink()
+    finally:
+        shutil.rmtree(staging_dir, ignore_errors=True)
 
 
 def import_maestro_point_netlist(
@@ -461,6 +568,7 @@ def parse_requirement_text(
     *,
     constraints_text: str | None = None,
     maestro_input_exists: Callable[[str], bool] = lambda path: Path(path).expanduser().is_file(),
+    model_file_is_readable: Callable[[str], bool] = local_model_file_is_readable,
 ) -> RequirementIntakeReport:
     """Parse requirement text and validate its structure.
 
@@ -481,10 +589,8 @@ def parse_requirement_text(
     issues.extend(section_issues)
     structured_issues.extend(section_diagnostics)
     if not issues:
-        for name in REQUIRED_SECTIONS + OPTIONAL_SECTIONS:
-            if name not in raw_sections:
-                continue
-            payload, payload_issues = _parse_section_yaml(name, raw_sections[name])
+        for name, raw_section in raw_sections.items():
+            payload, payload_issues = _parse_section_yaml(name, raw_section)
             if payload_issues:
                 issues.extend(payload_issues)
                 structured_issues.extend(
@@ -493,6 +599,14 @@ def parse_requirement_text(
                 )
             else:
                 sections[name] = payload
+
+    if not issues:
+        issues.extend(
+            _validate_requirement_section_models(
+                sections,
+                workflow_mode=workflow_mode,
+            )
+        )
 
     if not issues:
         issues.extend(_validate_approval_checklist(sections))
@@ -509,6 +623,12 @@ def parse_requirement_text(
                 render_config_payloads(sections, workflow_mode=workflow_mode)
             except (KeyError, TypeError, ValueError, ValidationError) as exc:
                 issues.append(f"rendered config validation failed: {exc}")
+        for model_file in _corner_model_files(sections):
+            if not model_file_is_readable(model_file):
+                issues.append(
+                    "Process Corners.model_file is missing or unreadable: "
+                    f"{model_file}"
+                )
         for maestro_root in _maestro_point_roots(sections):
             netlist_input = PurePosixPath(str(maestro_root)) / "netlist" / "input.scs"
             if not maestro_input_exists(netlist_input.as_posix()):
@@ -541,10 +661,85 @@ def parse_requirement_text(
     )
 
 
+def _validate_requirement_section_models(
+    sections: dict[str, Any],
+    *,
+    workflow_mode: str,
+) -> list[str]:
+    project = sections.get("Project")
+    if project is not None:
+        try:
+            _RequirementProject.model_validate(project)
+        except ValidationError as exc:
+            return _section_validation_issues("Project", exc)
+
+    metrics = sections.get("Metrics")
+    if metrics is not None:
+        try:
+            TypeAdapter(list[_RequirementMetric]).validate_python(metrics)
+        except ValidationError as exc:
+            return _section_validation_issues("Metrics", exc)
+
+    maestro = sections.get("Maestro Source")
+    if maestro is not None:
+        maestro_model: type[BaseModel] = (
+            _RequirementMaestroCollection
+            if isinstance(maestro, dict) and "testbenches" in maestro
+            else _RequirementMaestroPoint
+        )
+        try:
+            maestro_model.model_validate(maestro)
+        except ValidationError as exc:
+            return _section_validation_issues("Maestro Source", exc)
+
+    approval = sections.get("Approval Checklist")
+    if approval is not None:
+        try:
+            _RequirementApprovalChecklist.model_validate(approval)
+        except ValidationError as exc:
+            return _section_validation_issues("Approval Checklist", exc)
+
+    process_corners = sections.get("Process Corners")
+    if process_corners is None:
+        return []
+    if not isinstance(process_corners, dict):
+        return ["Process Corners must be a YAML mapping"]
+    process_corners_for_validation = process_corners
+    if workflow_mode == "fix_run":
+        policy_fields = {"objective_policy", "constraint_policy"}
+        if policy_fields.intersection(process_corners):
+            return [
+                "Process Corners aggregation policies are not supported for "
+                "fix_run workflow; fix-run executes every declared corner"
+            ]
+        process_corners_for_validation = {
+            "objective_policy": "nominal",
+            "constraint_policy": "nominal",
+            **process_corners,
+        }
+    try:
+        process_corner_config = ProcessCornerConfig.model_validate(
+            {"schema_version": "1.0", **process_corners_for_validation}
+        )
+    except ValidationError as exc:
+        return _section_validation_issues("Process Corners", exc)
+    if workflow_mode == "optimize":
+        corner_ids = {corner.id for corner in process_corner_config.corners}
+        if (
+            process_corner_config.objective_policy == "nominal"
+            or process_corner_config.constraint_policy == "nominal"
+        ) and "nominal" not in corner_ids:
+            return [
+                "Process Corners nominal policy requires a corner with id 'nominal'"
+            ]
+    return []
+
+
 def _parse_and_validate_requirement(
     project_dir: Path,
     *,
     maestro_input_exists: Callable[[str], bool] | None = None,
+    model_file_is_readable: Callable[[str], bool] | None = None,
 ) -> RequirementIntakeReport:
     requirement_path = project_dir / "opt_requirement.md"
     issues: list[str] = []
@@ -586,6 +781,11 @@ def _parse_and_validate_requirement(
             if maestro_input_exists is not None
             else lambda path: Path(path).expanduser().is_file()
         ),
+        model_file_is_readable=(
+            model_file_is_readable
+            if model_file_is_readable is not None
+            else local_model_file_is_readable
+        ),
     )
 
 
@@ -617,12 +817,44 @@ def _extract_required_sections(
         )
         workflow_text = text[content_start:content_end]
         workflow_payload, workflow_issues = _parse_section_yaml("Workflow", workflow_text)
-        if not workflow_issues and isinstance(workflow_payload, dict):
-            workflow_mode = workflow_payload.get("mode", "optimize")
+        if workflow_issues:
+            issues.extend(workflow_issues)
+        else:
+            try:
+                workflow = WorkflowSettings.model_validate(workflow_payload)
+            except ValidationError as exc:
+                issues.extend(_section_validation_issues("Workflow", exc))
+            else:
+                workflow_mode = workflow.mode
+
+    if issues:
+        return {}, issues, structured_issues, workflow_mode
 
     required_sections = (
         FIX_RUN_REQUIRED_SECTIONS if workflow_mode == "fix_run" else REQUIRED_SECTIONS
     )
+    optional_sections = (
+        FIX_RUN_OPTIONAL_SECTIONS
+        if workflow_mode == "fix_run"
+        else OPTIONAL_SECTIONS
+    )
+    known_sections = set(
+        REQUIRED_SECTIONS
+        + OPTIONAL_SECTIONS
+        + FIX_RUN_REQUIRED_SECTIONS
+        + FIX_RUN_OPTIONAL_SECTIONS
+    )
+    allowed_sections = set(required_sections + optional_sections)
+    for name, _start, _end in headings:
+        if name not in known_sections:
+            issues.append(f"unknown requirement section: {name}")
+        elif name not in allowed_sections:
+            issues.append(
+                f"section {name} is not supported for workflow mode {workflow_mode}"
+            )
+
+    if issues:
+        return {}, issues, structured_issues, workflow_mode
 
     counts = {name: 0 for name in required_sections}
     for name, _start, _end in headings:
@@ -659,7 +891,7 @@ def _extract_required_sections(
                     evidence=[f"opt_requirement.md:{name}"],
                 )
             )
-    for name in OPTIONAL_SECTIONS:
+    for name in optional_sections:
         count = sum(1 for n, _s, _e in headings if n == name)
         if count > 1:
             issues.append(f"optional section appears more than once: {name}")
@@ -681,11 +913,29 @@ def _extract_required_sections(
 
     sections: dict[str, str] = {}
     for index, (name, _start, content_start) in enumerate(headings):
-        if name not in required_sections and name not in OPTIONAL_SECTIONS:
+        if name not in required_sections and name not in optional_sections:
             continue
         content_end = headings[index + 1][1] if index + 1 < len(headings) else len(text)
         sections[name] = text[content_start:content_end]
     return sections, [], structured_issues, workflow_mode
+
+
+def _section_validation_issues(
+    section: str,
+    error: ValidationError,
+) -> list[str]:
+    issues: list[str] = []
+    for item in error.errors(include_url=False):
+        location = ".".join(str(part) for part in item["loc"])
+        message = str(item["msg"])
+        if message.startswith("Value error, "):
+            message = message.removeprefix("Value error, ")
+        if not location and message.startswith("starting_run_id "):
+            issues.append(f"{section}.{message}")
+            continue
+        path = f"{section}.{location}" if location else section
+        issues.append(f"{path}: {message}")
+    return issues
 
 
 def _parse_section_yaml(name: str, text: str) -> tuple[Any, list[str]]:
@@ -1042,27 +1292,110 @@ def _metric_payload(metric: dict[str, Any]) -> dict[str, Any]:
 
 
 def _validate_config_payloads(payloads: dict[str, dict[str, Any]], *, workflow_mode: str = "optimize") -> None:
+    config_models: dict[str, BaseModel] = {}
     for file_name, model in CONFIG_FILE_MODELS.items():
         if file_name not in payloads:
             continue
-        model.model_validate(payloads[file_name])
+        config_models[file_name] = model.model_validate(payloads[file_name])
     optional_models: dict[str, BaseModel] = {}
     for file_name, model in OPTIONAL_CONFIG_FILE_MODELS.items():
         if file_name in payloads:
             optional_models[file_name] = model.model_validate(payloads[file_name])
 
-    # Validate fix-run specific config files
-    if workflow_mode == "fix_run":
-        if "fixed_points.yaml" in payloads:
-            FixedPointsConfig.model_validate(payloads["fixed_points.yaml"])
-        if "waveform_exports.yaml" in payloads:
-            WaveformExportsConfig.model_validate(payloads["waveform_exports.yaml"])
-
-    if "testbenches.yaml" in optional_models and "metrics.yaml" in payloads:
-        _validate_metric_testbench_routes(
-            MetricsConfig.model_validate(payloads["metrics.yaml"]),
-            _cast_config(TestbenchesConfig, optional_models["testbenches.yaml"]),
+    fixed_points = optional_models.get("fixed_points.yaml")
+    variables_model = config_models.get("variables.yaml")
+    if variables_model is not None:
+        variable_issues = variable_contract_issues(
+            _cast_config(VariablesConfig, variables_model)
         )
+        if variable_issues:
+            raise ValueError(
+                "; ".join(issue.message for issue in variable_issues)
+            )
+    if fixed_points is not None and variables_model is not None:
+        fixed_points_config = _cast_config(FixedPointsConfig, fixed_points)
+        variables_config = _cast_config(VariablesConfig, variables_model)
+        for point in fixed_points_config.points:
+            try:
+                assert_candidate_parameters_match_variables(
+                    variables_config,
+                    point.parameters,
+                )
+            except ValueError as exc:
+                raise ValueError(
+                    f"Fixed Points point {point.candidate_id!r}: {exc}"
+                ) from exc
+
+    workflow = (
+        WorkflowSettings.model_validate(payloads["workflow.yaml"])
+        if "workflow.yaml" in payloads
+        else None
+    )
+    fixed_points_config = (
+        _cast_config(FixedPointsConfig, fixed_points)
+        if fixed_points is not None
+        else None
+    )
+    run_range_issue = fix_run_id_range_issue(workflow, fixed_points_config)
+    if run_range_issue is not None:
+        raise ValueError(run_range_issue)
+
+    route_issues = measurement_route_issues(
+        metrics=(
+            MetricsConfig.model_validate(payloads["metrics.yaml"])
+            if "metrics.yaml" in payloads
+            else None
+        ),
+        waveform_exports=(
+            _cast_config(
+                WaveformExportsConfig,
+                optional_models["waveform_exports.yaml"],
+            )
+            if "waveform_exports.yaml" in optional_models
+            else None
+        ),
+        testbenches=(
+            _cast_config(TestbenchesConfig, optional_models["testbenches.yaml"])
+            if "testbenches.yaml" in optional_models
+            else None
+        ),
+    )
+    if route_issues:
+        raise ValueError("; ".join(issue.message for issue in route_issues))
+
+    if (
+        "optimizer.yaml" in config_models
+        and "variables.yaml" in config_models
+    ):
+        variables = _cast_config(VariablesConfig, config_models["variables.yaml"])
+        optimizer = _cast_config(
+            OptimizerConfig,
+            config_models["optimizer.yaml"],
+        )
+        optimizer_issues = optimizer_contract_issues(
+            optimizer_config=optimizer,
+            spectre_config=_cast_config(
+                SpectreConfig,
+                config_models["spectre.yaml"],
+            ),
+            variable_count=len(variables.variables),
+        )
+        if optimizer_issues:
+            raise ValueError(
+                "; ".join(issue.message for issue in optimizer_issues)
+            )
+        warm_start = optional_models.get("history_warm_start.yaml")
+        issue = history_warm_start_backend_issue(
+            optimizer=optimizer,
+            history_warm_start=(
+                _cast_config(HistoryWarmStartConfig, warm_start)
+                if warm_start is not None
+                else None
+            ),
+            variable_count=len(variables.variables),
+        )
+        if issue is not None:
+            raise ValueError(issue)
 
 
 def _testbench_sources(maestro: dict[str, Any]) -> list[dict[str, Any]]:
@@ -1089,20 +1422,18 @@ def _maestro_point_roots(sections: dict[str, Any]) -> list[str]:
         return []
 
 
-def _validate_metric_testbench_routes(
-    metrics_config: MetricsConfig,
-    testbenches_config: TestbenchesConfig,
-) -> None:
-    declared_testbenches = {testbench.id for testbench in testbenches_config.testbenches}
-    for metric in metrics_config.metrics:
-        if metric.testbench is None:
-            raise ValueError(
-                f"metric {metric.name} must declare testbench when Maestro Source.testbenches is used"
-            )
-        if metric.testbench not in declared_testbenches:
-            raise ValueError(
-                f"metric {metric.name} references unknown testbench {metric.testbench}"
-            )
+def _corner_model_files(sections: dict[str, Any]) -> list[str]:
+    process_corners = sections.get("Process Corners")
+    if not isinstance(process_corners, dict):
+        return []
+    corners = process_corners.get("corners")
+    if not isinstance(corners, list):
+        return []
+    return [
+        str(corner["model_file"])
+        for corner in corners
+        if isinstance(corner, dict) and corner.get("model_file") is not None
+    ]
 
 
 def _cast_config(model_type: type[Any], model: BaseModel) -> Any:

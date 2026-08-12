@@ -6,8 +6,13 @@ from pathlib import Path
 from typing import Any
 
 from hermes_workflow.diagnostics import Diagnostic, DiagnosticSeverity
-from hermes_workflow.optimizer_artifacts import EVALUATIONS_RELATIVE, load_optimizer_artifacts
-from hermes_workflow.optimizer_artifacts import REPORT_RELATIVE as OPTIMIZER_REPORT_RELATIVE
+from hermes_workflow.native_turbo_history import load_native_turbo_history
+from hermes_workflow.optimizer_artifacts import (
+    SUPPORTED_EVALUATIONS_RELATIVES,
+    SUPPORTED_REPORT_RELATIVES,
+    load_optimizer_artifacts,
+    normalize_optimizer_artifact_backend,
+)
 from hermes_workflow.optimizer_strategy import (
     OptimizerStrategyRequest,
     resolve_optimizer_strategy,
@@ -18,6 +23,7 @@ from hermes_workflow.schemas import (
     OptimizerAlgorithm,
     OptimizerStrategy,
     TurboOptimizerSettings,
+    VariablesConfig,
 )
 
 
@@ -250,8 +256,14 @@ def build_dirty_state_summary(
             )
     has_execution_package = (project_dir / "execution_package").is_dir()
     has_optimizer_state = (project_dir / OPTIMIZER_STATE_PATH).is_file()
-    has_optimizer_run_report = (project_dir / OPTIMIZER_REPORT_RELATIVE).is_file()
-    has_optimizer_evaluations = (project_dir / EVALUATIONS_RELATIVE).is_file()
+    has_optimizer_run_report = any(
+        (project_dir / relative).is_file()
+        for relative in SUPPORTED_REPORT_RELATIVES
+    )
+    has_optimizer_evaluations = any(
+        (project_dir / relative).is_file()
+        for relative in SUPPORTED_EVALUATIONS_RELATIVES
+    )
 
     summary = {
         "has_runs": has_runs,
@@ -334,6 +346,25 @@ def build_doctor_semantic_summaries(
         resource_summary,
         diagnostics,
     )
+
+
+def build_doctor_variables_config(
+    sections: dict[str, Any],
+) -> VariablesConfig | None:
+    """Build the exact VariablesConfig used for Native history preflight."""
+
+    variables = sections.get("Design Variables")
+    if not isinstance(variables, list) or not variables:
+        return None
+    try:
+        return VariablesConfig.model_validate(
+            {"schema_version": "1.0", "variables": variables}
+        )
+    except ValueError:
+        # Requirement intake owns the detailed schema diagnostic. Native
+        # history validation will fail closed if no valid VariablesConfig can
+        # be supplied after that check.
+        return None
 
 
 def _testbench_count(sections: dict[str, Any]) -> tuple[int, bool]:
@@ -421,18 +452,50 @@ def build_optimizer_progress_summary(
     project_dir: Path,
     *,
     requirement_max_evaluations: int | None = None,
+    expected_backend: str | None = None,
+    variables_config: VariablesConfig | None = None,
 ) -> tuple[dict[str, Any], list[Diagnostic]]:
     """Compare optimizer report/evaluations/state/ledger counts.
 
     Returns ``(summary, diagnostics)``. The summary always carries the same
     set of count keys (``None`` when the underlying artifact is missing).
-    A single :class:`Diagnostic` with code
-    ``OPTIMIZER_PROGRESS_STATE_MISMATCH`` is emitted when any present pair of
-    counts disagree; missing artifacts are silent so a fresh project does
-    not produce noise.
+    Once any optimizer report/evaluations artifact exists, incomplete,
+    corrupt, or wrong-backend pairs fail closed with
+    ``OPTIMIZER_PROGRESS_ARTIFACT_INVALID``. Disagreeing counts emit
+    ``OPTIMIZER_PROGRESS_STATE_MISMATCH``. A completely fresh project remains
+    silent.
     """
     project_dir = Path(project_dir)
-    artifacts = load_optimizer_artifacts(project_dir, issues=[])
+    has_optimizer_history = any(
+        (project_dir / relative).exists()
+        for relative in (
+            *SUPPORTED_REPORT_RELATIVES,
+            *SUPPORTED_EVALUATIONS_RELATIVES,
+        )
+    )
+    artifact_issues: list[str] = []
+    artifacts = load_optimizer_artifacts(
+        project_dir,
+        issues=artifact_issues if has_optimizer_history else [],
+        expected_backend=expected_backend if has_optimizer_history else None,
+    )
+    selected_native_history = artifacts.source == "legacy_native_turbo" or (
+        expected_backend is not None
+        and normalize_optimizer_artifact_backend(expected_backend) == "native_turbo"
+    )
+    if has_optimizer_history and not artifact_issues and selected_native_history:
+        if variables_config is None:
+            artifact_issues.append(
+                "native TuRBO history validation requires the current VariablesConfig"
+            )
+        else:
+            try:
+                load_native_turbo_history(
+                    project_dir,
+                    variables=variables_config,
+                )
+            except ValueError as exc:
+                artifact_issues.append(str(exc))
     report = artifacts.report or {}
     traces = artifacts.traces or []
 
@@ -481,6 +544,33 @@ def build_optimizer_progress_summary(
     diagnostics: list[Diagnostic] = []
     mismatches: list[str] = []
 
+    if artifact_issues:
+        diagnostics.append(
+            Diagnostic(
+                code="OPTIMIZER_PROGRESS_ARTIFACT_INVALID",
+                severity=DiagnosticSeverity.ERROR,
+                stage="doctor",
+                component="doctor_readiness",
+                message="Optimizer progress artifacts are incomplete or invalid.",
+                detail="; ".join(artifact_issues),
+                likely_cause=(
+                    "The optimizer report/evaluations pair is incomplete, "
+                    "corrupt, or belongs to a different optimizer backend."
+                ),
+                recommended_action=(
+                    "Restore a matching optimizer report/evaluations pair for "
+                    "the configured backend before continuing."
+                ),
+                evidence=[
+                    relative.as_posix()
+                    for relative in (
+                        *SUPPORTED_REPORT_RELATIVES,
+                        *SUPPORTED_EVALUATIONS_RELATIVES,
+                    )
+                ],
+            )
+        )
+
     def _disagree(left: Any, right: Any) -> bool:
         return left is not None and right is not None and left != right
 
@@ -489,7 +579,9 @@ def build_optimizer_progress_summary(
         or evaluation_trace_count > 0
         or state_payload is not None
     )
-    has_evaluations_file = (project_dir / EVALUATIONS_RELATIVE).exists()
+    has_evaluations_file = (
+        project_dir / artifacts.evaluations_relative
+    ).exists()
     trace_count_for_compare: int | None = (
         evaluation_trace_count if has_evaluations_file else None
     )

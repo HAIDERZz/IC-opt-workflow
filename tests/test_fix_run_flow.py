@@ -4,11 +4,13 @@ from __future__ import annotations
 import json
 import threading
 import time
+from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import yaml
+import pytest
 
 from hermes_workflow.fix_run_models import (
     FixRunPointReport,
@@ -45,6 +47,250 @@ def _create_fix_run_project(tmp_path: Path) -> Path:
         name="fix_run_project",
         workflow_mode="fix_run",
     )
+
+
+def _parse_audit_timestamp(value: str) -> datetime:
+    """Parse the product's canonical second-resolution UTC timestamp."""
+    assert value.endswith("Z")
+    parsed = datetime.fromisoformat(value.removesuffix("Z") + "+00:00")
+    assert parsed.tzinfo is not None
+    assert parsed.utcoffset() == UTC.utcoffset(None)
+    return parsed
+
+
+def test_local_fix_run_records_real_execution_time_in_audit_provenance(
+    tmp_path: Path,
+) -> None:
+    """The public local flow must not stamp every run with a fixed 2026 date."""
+    from hermes_workflow.fix_run_flow import run_fix_run_project
+
+    project_dir = _create_fix_run_project(tmp_path)
+    started_at_utc = datetime.now(UTC).replace(microsecond=0)
+
+    with (
+        patch(
+            "hermes_workflow.fix_run_flow.check_requirement",
+            return_value=_mock_intake(project_dir),
+        ),
+        patch(
+            "hermes_workflow.fix_run_flow.prepare_from_requirement",
+            return_value=_mock_preparation(project_dir),
+        ),
+        patch(
+            "hermes_workflow.fix_run_flow.run_product_doctor",
+            return_value=MagicMock(status="pass", issues=[]),
+        ),
+        patch("hermes_workflow.fix_run_flow.prepare_explicit_candidate_real_run"),
+        patch(
+            "hermes_workflow.fix_run_flow.run_spectre_ocean_adapter",
+            return_value=_mock_adapter_result(project_dir),
+        ),
+        patch(
+            "hermes_workflow.fix_run_flow._apply_fix_run_retention",
+            return_value=[],
+        ),
+    ):
+        run_fix_run_project(project_dir, real=True)
+
+    completed_at_utc = datetime.now(UTC).replace(microsecond=0)
+    manifest = json.loads(
+        (
+            project_dir / "execution_package" / "execution_manifest.json"
+        ).read_text(encoding="utf-8")
+    )
+    instruction = json.loads(
+        (project_dir / "supervisor_instruction.json").read_text(encoding="utf-8")
+    )
+
+    manifest_timestamp = _parse_audit_timestamp(manifest["created_at_utc"])
+    instruction_timestamp = _parse_audit_timestamp(instruction["created_at_utc"])
+    assert started_at_utc <= manifest_timestamp <= completed_at_utc
+    assert manifest_timestamp <= instruction_timestamp <= completed_at_utc
+
+
+def test_local_fix_run_rejects_non_real_execution_without_writing_report(
+    tmp_path: Path,
+) -> None:
+    from hermes_workflow.fix_run_flow import run_fix_run_project
+
+    project_dir = _create_fix_run_project(tmp_path)
+
+    with pytest.raises(ValueError, match="fix-run requires real execution"):
+        run_fix_run_project(project_dir, real=False, cadence_cshrc=None)
+
+    assert not (project_dir / "reports" / "fix_run_report.json").exists()
+
+
+def test_local_fix_run_applies_declared_retention_policy_once_per_point(
+    tmp_path: Path,
+) -> None:
+    from hermes_workflow.fix_run_flow import run_fix_run_project
+
+    project_dir = _create_fix_run_project(tmp_path)
+    with (
+        patch(
+            "hermes_workflow.fix_run_flow.check_requirement",
+            return_value=_mock_intake(project_dir),
+        ),
+        patch(
+            "hermes_workflow.fix_run_flow.prepare_from_requirement",
+            return_value=_mock_preparation(project_dir),
+        ),
+        patch(
+            "hermes_workflow.fix_run_flow.run_product_doctor",
+            return_value=MagicMock(status="pass", issues=[]),
+        ),
+        patch("hermes_workflow.fix_run_flow.build_execution_package"),
+        patch("hermes_workflow.fix_run_flow.decide_fix_run_real_run"),
+        patch("hermes_workflow.fix_run_flow.prepare_explicit_candidate_real_run"),
+        patch(
+            "hermes_workflow.fix_run_flow.run_spectre_ocean_adapter",
+            return_value=_mock_adapter_result(project_dir),
+        ),
+        patch("hermes_workflow.fix_run_flow.apply_local_run_retention") as retention,
+    ):
+        retention.return_value = SimpleNamespace(local_action="kept", issues=[])
+
+        report = run_fix_run_project(project_dir, real=True)
+
+    assert report.status == "pass"
+    retention.assert_called_once_with(
+        project_dir,
+        run_id="real_001",
+        candidate_id=_fixed_point_candidate_id(project_dir),
+        run_succeeded=True,
+        preserve_evidence=False,
+    )
+
+
+def test_local_fix_run_retention_policy_really_deletes_successful_point(
+    tmp_path: Path,
+) -> None:
+    from hermes_workflow.fix_run_flow import _apply_fix_run_retention
+
+    project_dir = _create_fix_run_project(tmp_path)
+    spectre_path = project_dir / "config" / "spectre.yaml"
+    spectre = yaml.safe_load(spectre_path.read_text(encoding="utf-8"))
+    spectre["spectre"]["keep_successful_runs"] = False
+    spectre_path.write_text(
+        yaml.safe_dump(spectre, sort_keys=False),
+        encoding="utf-8",
+    )
+    run_dir = project_dir / "runs" / "real" / "real_001"
+    run_dir.mkdir(parents=True)
+    (run_dir / "sentinel.txt").write_text("run evidence\n", encoding="utf-8")
+    metric_relative = (
+        "runs/real/real_001/metrics/metric_result_manifest.json"
+    )
+    metric_path = project_dir / metric_relative
+    metric_path.parent.mkdir(parents=True)
+    metric_path.write_text(
+        json.dumps(
+            {
+                "run_id": "real_001",
+                "candidate_id": "fixed_001",
+                "status": "succeeded",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (run_dir / "result_manifest.json").write_text(
+        json.dumps(
+            {
+                "run_id": "real_001",
+                "candidate_id": "fixed_001",
+                "status": "succeeded",
+                "metric_result_manifest": metric_relative,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    issues = _apply_fix_run_retention(
+        project_dir,
+        run_id="real_001",
+        candidate_id="fixed_001",
+        run_succeeded=True,
+    )
+
+    assert issues == []
+    assert not run_dir.exists()
+    decision = json.loads(
+        (
+            project_dir / "state" / "run_retention" / "real_001.json"
+        ).read_text(encoding="utf-8")
+    )
+    assert decision["run_status"] == "successful"
+    assert decision["local_action"] == "deleted"
+
+
+def test_multi_child_fix_run_deletes_without_optimizer_parent_evidence(
+    tmp_path: Path,
+) -> None:
+    from hermes_workflow.fix_run_flow import _apply_fix_run_retention
+
+    project_dir = _create_fix_run_project(tmp_path)
+    spectre_path = project_dir / "config/spectre.yaml"
+    spectre = yaml.safe_load(spectre_path.read_text(encoding="utf-8"))
+    spectre["spectre"]["keep_successful_runs"] = False
+    spectre_path.write_text(yaml.safe_dump(spectre, sort_keys=False), encoding="utf-8")
+    run_dir = project_dir / "runs/real/real_001"
+    child = run_dir / "testbenches/tb_aux/corners/tt"
+    child.mkdir(parents=True)
+    (child / "child_result.json").write_text("{}\n", encoding="utf-8")
+
+    issues = _apply_fix_run_retention(
+        project_dir,
+        run_id="real_001",
+        candidate_id="fixed_001",
+        run_succeeded=True,
+    )
+
+    assert issues == []
+    assert not run_dir.exists()
+    assert not (project_dir / "state/run_retention_evidence").exists()
+
+
+def test_prepare_collision_never_reclassifies_or_deletes_prior_run(
+    tmp_path: Path,
+) -> None:
+    from hermes_workflow.fix_run_flow import run_fix_run_project
+
+    project_dir = _create_fix_run_project(tmp_path)
+    old_run = project_dir / "runs/real/real_001"
+    old_run.mkdir(parents=True)
+    sentinel = old_run / "prior-success.bin"
+    sentinel.write_bytes(b"prior successful attempt")
+    with (
+        patch(
+            "hermes_workflow.fix_run_flow.check_requirement",
+            return_value=_mock_intake(project_dir),
+        ),
+        patch(
+            "hermes_workflow.fix_run_flow.prepare_from_requirement",
+            return_value=_mock_preparation(project_dir),
+        ),
+        patch(
+            "hermes_workflow.fix_run_flow.run_product_doctor",
+            return_value=MagicMock(status="pass", issues=[]),
+        ),
+        patch("hermes_workflow.fix_run_flow.build_execution_package"),
+        patch("hermes_workflow.fix_run_flow.decide_fix_run_real_run"),
+        patch(
+            "hermes_workflow.fix_run_flow.prepare_explicit_candidate_real_run",
+            side_effect=FileExistsError("real_001 already exists"),
+        ),
+        patch("hermes_workflow.fix_run_flow._apply_fix_run_retention") as retention,
+    ):
+        report = run_fix_run_project(project_dir, real=True)
+
+    assert report.status == "fail"
+    retention.assert_not_called()
+    assert sentinel.read_bytes() == b"prior successful attempt"
+    assert not (project_dir / "state/run_retention/real_001.json").exists()
+    assert not (project_dir / "state/run_retention_evidence/real_001").exists()
 
 
 def _create_two_point_fix_run_project(tmp_path: Path) -> Path:
@@ -173,7 +419,6 @@ def _strip_optimizer_configs_for_fix_run(project_dir: Path) -> None:
                 "exports": [
                     {
                         "name": "nf_pnoise",
-                        "testbench": "cg_nf",
                         "expression": 'getData("NF" ?result "pnoise")',
                         "output_format": "csv",
                         "nil_policy": "fail",
@@ -600,7 +845,6 @@ def test_fix_run_report_fails_when_waveform_csv_missing(tmp_path: Path) -> None:
                 "exports": [
                     {
                         "name": "nf_pnoise",
-                        "testbench": "cg_nf",
                         "expression": 'getData("NF" ?result "pnoise")',
                         "output_format": "csv",
                         "nil_policy": "fail",

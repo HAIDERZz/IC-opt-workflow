@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import Counter
 from dataclasses import dataclass
+from datetime import UTC, datetime
 import json
 from pathlib import Path, PurePosixPath
 
@@ -18,7 +19,6 @@ REAL_RUN_ROOT = "runs/real"
 DEFAULT_RUN_ID = "real_001"
 DEFAULT_TESTBENCH_ID = "default_testbench"
 REPORT_RELATIVE = "reports/multi_testbench_aggregation_report.json"
-AGGREGATE_TIMESTAMP = "2026-06-06T00:40:00Z"
 
 
 class ChildAggregationStatus(BaseModel):
@@ -79,6 +79,7 @@ def aggregate_multi_testbench_run(
 ) -> MultiTestbenchAggregationReport:
     project_dir = Path(project_dir)
     selected_run_id = run_id or DEFAULT_RUN_ID
+    aggregate_started_at_utc = _utc_now()
     bundle = assert_valid_project(project_dir)
 
     corner_ids, objective_policy, constraint_policy = _configured_corner_ids(bundle)
@@ -212,6 +213,7 @@ def aggregate_multi_testbench_run(
 
                 aggregate_metrics = list(corner_aggregates[selected_corner].metric_rows)
 
+    aggregate_completed_at_utc = _utc_now()
     _write_aggregate_artifacts(
         project_dir=project_dir,
         run_id=selected_run_id,
@@ -225,7 +227,8 @@ def aggregate_multi_testbench_run(
         child_metric_results=child_metric_results,
         child_command_traces=child_command_traces,
         issues=issues,
-        completed_at_utc=AGGREGATE_TIMESTAMP,
+        aggregate_started_at_utc=aggregate_started_at_utc,
+        aggregate_completed_at_utc=aggregate_completed_at_utc,
     )
 
     report = MultiTestbenchAggregationReport(
@@ -443,7 +446,8 @@ def _write_aggregate_artifacts(
     child_metric_results: list[dict],
     child_command_traces: list[dict],
     issues: list[str],
-    completed_at_utc: str,
+    aggregate_started_at_utc: str,
+    aggregate_completed_at_utc: str,
 ) -> None:
     run_prefix = f"{REAL_RUN_ROOT}/{run_id}"
     run_dir = _project_path(project_dir, run_prefix)
@@ -474,8 +478,8 @@ def _write_aggregate_artifacts(
         "run_id": run_id,
         "candidate_id": candidate_id,
         "status": result_status.value,
-        "started_at_utc": AGGREGATE_TIMESTAMP,
-        "completed_at_utc": completed_at_utc,
+        "started_at_utc": aggregate_started_at_utc,
+        "completed_at_utc": aggregate_completed_at_utc,
         "simulator": _aggregate_simulator_metadata(prepared=prepared, request=request),
         "prepared_input_scs": prepared_input_relative,
         "prepared_input_sha256": sha256_file(prepared_input_path),
@@ -582,8 +586,17 @@ def _configured_corner_ids(bundle) -> tuple[list[str | None], str, str]:
     process_corners = getattr(bundle, "process_corners", None)
     if process_corners is None:
         return [None], "nominal", "nominal"
+    corner_ids = [corner.id for corner in process_corners.corners]
+    if (
+        process_corners.objective_policy == "nominal"
+        and "nominal" not in corner_ids
+    ):
+        raise ValueError(
+            "process_corners objective_policy=nominal requires a corner with "
+            "id=nominal"
+        )
     return (
-        [corner.id for corner in process_corners.corners],
+        corner_ids,
         process_corners.objective_policy,
         process_corners.constraint_policy,
     )
@@ -618,3 +631,7 @@ def _load_json(path: Path) -> dict | None:
 def _write_json(path: Path, payload: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def _utc_now() -> str:
+    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")

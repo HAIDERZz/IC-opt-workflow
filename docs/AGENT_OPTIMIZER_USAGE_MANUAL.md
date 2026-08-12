@@ -1,6 +1,6 @@
 # Agent Workflow Usage Manual
 
-This manual describes how an agent should operate IC Auto Opt v0.1.9.
+This manual describes how an agent should operate IC Auto Opt v0.1.10.
 
 The agent is an operator and report reader. It should use the product CLI,
 inspect workflow artifacts, and report evidence. It should not invent optimizer
@@ -97,17 +97,29 @@ ic-opt PROJECT_DIR --real --continue N
 ```
 
 All other values stay inherited from `opt_requirement.md` and generated config.
+The command continues the backend already stored in the project: OpenBox stays
+OpenBox and native TuRBO stays native TuRBO. Never convert native history into
+an OpenBox continuation or restart TuRBO initialization under the same project.
+For Remote continuation, the product reruns Remote Doctor once for the current
+attempt before frozen-snapshot restore, history synchronization, or backend
+dispatch; do not bypass that gate with a cached doctor result from an earlier
+attempt.
 
 ## Requirement Modes
 
 | User goal | Template | Mode |
 | --- | --- | --- |
 | Single testbench, source-point corner optimization | `opt_requirement.md` | `optimize` |
+| Explicit OpenBox GP-EIC optimization | `opt_requirement.openbox_gp_eic.md` | `optimize` |
+| Explicit native TuRBO optimization | `opt_requirement.turbo.md` | `optimize` |
 | Single testbench, multiple process corners | `opt_requirement.multi_corner.md` | `optimize` |
 | Multiple testbenches, source-point corner | `opt_requirement.multi_testbench.md` | `optimize` |
 | Multiple testbenches and multiple process corners | `opt_requirement.multi_tb_corner.md` | `optimize` |
 | New same-circuit run using previous project history | `opt_requirement.history_warm_start.md` | `optimize` + History Warm Start |
+| Multi-corner run using previous same-circuit history | `opt_requirement.history_warm_start.multi_corner.md` | `optimize` + History Warm Start |
 | User-specified fixed points and waveform CSV export | `opt_requirement.fix_run.md` | `fix_run` |
+| Fixed points with scalar Metrics only | `opt_requirement.fix_run.metrics_only.md` | `fix_run` |
+| Multi-testbench fixed points with Metrics and Waveforms | `opt_requirement.fix_run.multi_testbench.metrics_waveform.md` | `fix_run` |
 
 ## History Warm Start
 
@@ -116,6 +128,9 @@ optimize-project warm-start from previous same-circuit projects. It renders to
 `config/history_warm_start.yaml`. Do not recommend it for fix-run, and do not
 combine it with `--continue N`; continuation only extends an existing optimizer
 project and does not reread a changed requirement.
+
+Enabled History Warm Start is OpenBox-only and is rejected for native TuRBO.
+For native TuRBO, use `--continue N`; do not claim warm-start data was consumed.
 
 Use `examples/spectre_maestro_project/opt_requirement.history_warm_start.md`
 as the checked example when the user asks for a new same-circuit history run.

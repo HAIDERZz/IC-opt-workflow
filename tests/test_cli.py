@@ -1,11 +1,16 @@
 import json
+import shutil
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from typer.testing import CliRunner
 
 from hermes_workflow import __version__
 from hermes_workflow.cli import app
+from hermes_workflow.requirement_intake import prepare_from_requirement
+from hermes_workflow.validate import local_model_file_is_readable
+from tests.project_factory import create_generic_project
 from tests.report_helpers import write_pass_reports
 
 
@@ -43,6 +48,95 @@ def test_cli_version_prints_package_version() -> None:
 
     assert result.exit_code == 0
     assert __version__ in result.stdout
+
+
+def test_validate_cli_uses_local_model_file_checker(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_validate(project_dir: Path, **kwargs: object) -> object:
+        captured.update(kwargs)
+        return SimpleNamespace(ok=True, format=lambda: "validation passed")
+
+    monkeypatch.setattr("hermes_workflow.cli.validate_project_files", fake_validate)
+
+    result = runner.invoke(app, ["validate", str(tmp_path)])
+
+    assert result.exit_code == 0
+    assert captured["model_file_is_readable"] is local_model_file_is_readable
+
+
+def test_prepare_netlist_cli_uses_local_model_file_checker(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_prepare(project_dir: Path, **kwargs: object) -> object:
+        captured.update(kwargs)
+        return SimpleNamespace(
+            status=SimpleNamespace(value="pass"),
+            issues=[],
+        )
+
+    monkeypatch.setattr("hermes_workflow.cli.prepare_netlist", fake_prepare)
+
+    result = runner.invoke(app, ["prepare-netlist", str(tmp_path)])
+
+    assert result.exit_code == 0
+    assert captured["model_file_is_readable"] is local_model_file_is_readable
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        ["run-openbox-real"],
+        ["continue-openbox-real", "--additional-evals", "1"],
+        ["run-native-turbo"],
+    ],
+)
+def test_local_real_optimizer_clis_preflight_model_files_before_backend(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    command: list[str],
+) -> None:
+    import hermes_workflow.cli as cli_module
+
+    captured: dict[str, object] = {}
+
+    def fail_preflight(project_dir: Path, **kwargs: object) -> object:
+        captured.update(kwargs)
+        raise ValueError("local model preflight failed")
+
+    monkeypatch.setattr(
+        cli_module,
+        "assert_valid_project",
+        fail_preflight,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        cli_module,
+        "run_openbox_real_optimization",
+        lambda *args, **kwargs: pytest.fail("backend must not run"),
+    )
+    monkeypatch.setattr(
+        cli_module,
+        "run_native_turbo_optimization",
+        lambda *args, **kwargs: pytest.fail("backend must not run"),
+    )
+    monkeypatch.setattr(
+        cli_module,
+        "run_batch_native_turbo_optimization",
+        lambda *args, **kwargs: pytest.fail("backend must not run"),
+    )
+
+    result = runner.invoke(app, [*command[:1], str(tmp_path), *command[1:]])
+
+    assert result.exit_code == 1
+    assert "local model preflight failed" in result.output
+    assert captured["model_file_is_readable"] is local_model_file_is_readable
 
 
 @pytest.mark.parametrize(
@@ -156,7 +250,6 @@ def test_run_openbox_fake_rejects_cli_workload_overrides(
 @pytest.mark.parametrize(
     ("flag", "value"),
     [
-        ("--additional-evals", "1"),
         ("--batch-size", "1"),
         ("--parallel-jobs", "1"),
     ],
@@ -181,11 +274,45 @@ def test_continue_openbox_real_rejects_cli_workload_resource_overrides(
     assert "No such option" in result.output
 
 
+def test_continue_openbox_real_requires_additional_evaluations(
+    tmp_path: Path,
+) -> None:
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+
+    result = runner.invoke(
+        app,
+        ["continue-openbox-real", str(project_dir)],
+    )
+
+    assert result.exit_code != 0
+    assert "--additional-evals" in result.output
+
+
+def test_continue_openbox_real_rejects_non_positive_additional_evaluations(
+    tmp_path: Path,
+) -> None:
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+
+    result = runner.invoke(
+        app,
+        [
+            "continue-openbox-real",
+            str(project_dir),
+            "--additional-evals",
+            "0",
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert "--additional-evals" in result.output
+
+
 @pytest.mark.parametrize(
     ("flag", "value"),
     [
         ("--max-evals", "1"),
-        ("--additional-evals", "1"),
     ],
 )
 def test_package_optimizer_task_rejects_cli_workload_overrides(
@@ -720,62 +847,72 @@ def test_cli_record_real_result_reports_failure_without_traceback(
     assert "Traceback" not in result.output
 
 
-def test_run_openbox_fake_cli_writes_artifacts(monkeypatch, tmp_path: Path) -> None:
-    import hermes_workflow.cli as cli_module
-
+def test_run_openbox_fake_cli_uses_requirement_budget_and_batch_size(
+    tmp_path: Path,
+) -> None:
+    fixture_root = Path(__file__).parent / "fixtures" / "requirement_intake"
     project_dir = tmp_path / "bridge_test_inv"
-
-    class FakeResult:
-        evaluation_count = 4
-        report_path = project_dir / "reports" / "optimizer_run_report.json"
-        evaluations_path = project_dir / "reports" / "optimizer_evaluations.jsonl"
-
-    seen: dict[str, int | None] = {}
-
-    def fake_run(project_dir: Path, *, max_evals: int | None, batch_size: int | None) -> FakeResult:
-        seen["max_evals"] = max_evals
-        seen["batch_size"] = batch_size
-        reports_dir = project_dir / "reports"
-        reports_dir.mkdir(parents=True, exist_ok=True)
-        (reports_dir / "optimizer_run_report.json").write_text(
-            json.dumps(
-                {
-                    "backend": "openbox",
-                    "best_candidate": None,
-                    "batch_summary": {
-                        "batch_count": 0,
-                        "max_batch_worker_count": batch_size,
-                        "status_counts": {},
-                    },
-                    "evaluation_count": max_evals,
-                    "evaluations": "reports/optimizer_evaluations.jsonl",
-                    "execution_mode": "fake",
-                    "issues": [],
-                    "schema_version": "1.0",
-                    "status": "completed",
-                }
-            )
-            + "\n",
-            encoding="utf-8",
-        )
-        (reports_dir / "optimizer_evaluations.jsonl").write_text("", encoding="utf-8")
-        return FakeResult()
-
-    monkeypatch.setattr(cli_module, "run_openbox_fake_optimization", fake_run)
-
-    result = runner.invoke(
-        cli_module.app,
-        [
-            "run-openbox-fake",
-            str(project_dir),
-        ],
+    shutil.copytree(fixture_root / "valid_project", project_dir)
+    requirement_path = project_dir / "opt_requirement.md"
+    requirement = requirement_path.read_text(encoding="utf-8")
+    requirement = requirement.replace(
+        "__MAESTRO_POINT_ROOT__",
+        (fixture_root / "valid_maestro_point").as_posix(),
     )
+    requirement = requirement.replace(
+        "algorithm: openbox\n",
+        "algorithm: random\nstrategy: random_baseline\n",
+    )
+    requirement = requirement.replace("max_evaluations: 100", "max_evaluations: 3")
+    requirement = requirement.replace("batch_size: 10", "batch_size: 2")
+    requirement_path.write_text(requirement, encoding="utf-8")
+    prepared = prepare_from_requirement(project_dir)
+    assert prepared.status == "pass", prepared.issues
 
-    assert result.exit_code == 0
-    assert seen == {"max_evals": None, "batch_size": None}
-    assert "openbox fake optimizer completed: 4 evaluations" in result.output
+    result = runner.invoke(app, ["run-openbox-fake", str(project_dir)])
+
+    assert result.exit_code == 0, result.output
+    report = json.loads(
+        (project_dir / "reports" / "optimizer_run_report.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert report["evaluation_count"] == 3
+    assert report["openbox"]["max_evals"] == 3
+    assert report["openbox"]["batch_size"] == 2
+    assert report["batch_summary"]["batch_count"] == 2
+    assert report["batch_summary"]["max_batch_worker_count"] == 2
+    assert "openbox fake optimizer completed: 3 evaluations" in result.output
     assert "report: reports/optimizer_run_report.json" in result.output
     assert "evaluations: reports/optimizer_evaluations.jsonl" in result.output
+
+
+def test_run_openbox_fake_cli_rejects_fix_run_without_traceback_or_writes(
+    tmp_path: Path,
+) -> None:
+    project_dir = create_generic_project(
+        tmp_path,
+        name="fix_run_project",
+        workflow_mode="fix_run",
+    )
+    before = {
+        path.relative_to(project_dir).as_posix(): path.read_bytes()
+        for path in project_dir.rglob("*")
+        if path.is_file()
+    }
+
+    result = runner.invoke(app, ["run-openbox-fake", str(project_dir)])
+
+    after = {
+        path.relative_to(project_dir).as_posix(): path.read_bytes()
+        for path in project_dir.rglob("*")
+        if path.is_file()
+    }
+    assert result.exit_code == 1
+    assert isinstance(result.exception, SystemExit)
+    assert "OpenBox fake optimization requires optimize workflow" in result.output
+    assert "Traceback" not in result.output
+    assert after == before
 
 
 def test_cli_assess_real_run_recovery_reports_pending(tmp_path: Path) -> None:

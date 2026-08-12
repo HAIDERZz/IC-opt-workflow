@@ -84,6 +84,15 @@ def resolve_optimizer_strategy(
     if strategy in OPENBOX_STRATEGY_PRESETS:
         openbox = request.openbox or OpenBoxAdvancedSettings()
         preset = OPENBOX_STRATEGY_PRESETS[strategy]
+        if strategy is not OptimizerStrategyName.OPENBOX_AUTO:
+            for field in ("surrogate_type", "acq_type", "acq_optimizer_type"):
+                requested = getattr(openbox, field)
+                required = str(preset[field])
+                if requested is not None and requested != required:
+                    raise ValueError(
+                        f"optimizer.strategy {strategy.value} requires "
+                        f"optimizer.openbox.{field}={required}; got {requested}"
+                    )
         initial_trials = openbox.initial_trials
         if initial_trials is None:
             initial_trials = preset["initial_trials"]

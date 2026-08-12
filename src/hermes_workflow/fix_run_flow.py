@@ -25,6 +25,7 @@ from hermes_workflow.fix_run_models import (
 from hermes_workflow.package import build_execution_package
 from hermes_workflow.product_doctor import run_product_doctor
 from hermes_workflow.real_run import prepare_explicit_candidate_real_run
+from hermes_workflow.run_retention import apply_local_run_retention
 from hermes_workflow.requirement_intake import check_requirement, prepare_from_requirement
 from hermes_workflow.validate import assert_valid_project
 
@@ -272,6 +273,29 @@ def _run_local_child_adapters(
     return [outcome for outcome in outcomes if outcome is not None]
 
 
+def _apply_fix_run_retention(
+    project_root: Path,
+    *,
+    run_id: str,
+    candidate_id: str,
+    run_succeeded: bool,
+) -> list[str]:
+    """Apply the declared policy once after a fixed point is finalized."""
+    try:
+        decision = apply_local_run_retention(
+            project_root,
+            run_id=run_id,
+            candidate_id=candidate_id,
+            run_succeeded=run_succeeded,
+            preserve_evidence=False,
+        )
+    except Exception as exc:  # noqa: BLE001 - retain the primary run evidence.
+        return [f"run retention raised: {exc}"]
+    if decision.local_action == "failed":
+        return list(decision.issues) or ["local run retention failed"]
+    return []
+
+
 def run_fix_run_project(
     project_dir: str | Path,
     *,
@@ -287,6 +311,8 @@ def run_fix_run_project(
        running the Spectre/OCEAN adapter for each testbench/corner.
     4. Writes ``reports/fix_run_report.json`` and returns a ``FixRunReport``.
     """
+    if not real:
+        raise ValueError("fix-run requires real execution")
     project_root = Path(project_dir)
 
     # --- Requirement intake ---
@@ -323,12 +349,8 @@ def run_fix_run_project(
                 )
 
         # --- Build execution package and approve ---
-        build_execution_package(
-            project_root, created_at_utc="2026-06-01T00:00:00Z"
-        )
-        decide_fix_run_real_run(
-            project_root, created_at_utc="2026-06-01T00:10:00Z"
-        )
+        build_execution_package(project_root)
+        decide_fix_run_real_run(project_root)
 
         # --- Run each fixed point ---
         for point_index, point in enumerate(fixed_points_config.points):
@@ -457,6 +479,15 @@ def run_fix_run_project(
                             ),
                         )
                     )
+
+            point_issues.extend(
+                _apply_fix_run_retention(
+                    project_root,
+                    run_id=run_id,
+                    candidate_id=point.candidate_id,
+                    run_succeeded=not point_issues and not child_issues,
+                )
+            )
 
             point_reports.append(
                 FixRunPointReport(

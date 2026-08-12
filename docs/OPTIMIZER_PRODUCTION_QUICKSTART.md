@@ -61,19 +61,23 @@ Start from one of:
 
 ```text
 examples/spectre_maestro_project/opt_requirement.md
+examples/spectre_maestro_project/opt_requirement.openbox_gp_eic.md
+examples/spectre_maestro_project/opt_requirement.turbo.md
 examples/spectre_maestro_project/opt_requirement.multi_corner.md
 examples/spectre_maestro_project/opt_requirement.multi_testbench.md
 examples/spectre_maestro_project/opt_requirement.multi_tb_corner.md
 examples/spectre_maestro_project/opt_requirement.history_warm_start.md
+examples/spectre_maestro_project/opt_requirement.history_warm_start.multi_corner.md
 examples/spectre_maestro_project/opt_requirement.fix_run.md
+examples/spectre_maestro_project/opt_requirement.fix_run.metrics_only.md
+examples/spectre_maestro_project/opt_requirement.fix_run.multi_testbench.metrics_waveform.md
 ```
 
-Use `opt_requirement.multi_testbench.md` and `opt_requirement.multi_tb_corner.md`
-for real-run-based Mixer multi-testbench structures with separate CG/NF/BW,
-IIP3, and P1dB metric ownership. Use `opt_requirement.history_warm_start.md`
-for a verified second-round same-circuit history run. Use
-`opt_requirement.fix_run.md` for fixed-point characterization and waveform CSV
-export. It is based on a real validated 15-corner Mixer requirement.
+Use the explicit GP-EIC or TuRBO files when optimizer selection must be
+unambiguous. Multi-testbench files demonstrate complete measurement routing.
+History warm-start files cover source-point and multi-corner OpenBox reuse.
+The three fix-run files cover waveform-only, metrics-only, and combined
+multi-testbench fixed-point characterization.
 
 In fix-run mode, `parallel_jobs` controls child testbench/corner concurrency
 inside one fixed point. `threads_per_run` remains per Spectre process. Multiple

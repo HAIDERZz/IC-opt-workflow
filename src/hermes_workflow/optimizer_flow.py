@@ -16,7 +16,11 @@ from hermes_workflow.optimizer_completion import summarize_optimizer_run
 from hermes_workflow.optimizer_decision import generate_optimizer_decision_report
 from hermes_workflow.optimizer_finalize import finalize_optimizer_run
 from hermes_workflow.optimizer_insights import generate_optimizer_insight_report
-from hermes_workflow.optimizer_strategy import OptimizerStrategyName
+from hermes_workflow.optimizer_strategy import (
+    OptimizerStrategyName,
+    OptimizerStrategyRequest,
+    resolve_optimizer_strategy,
+)
 from hermes_workflow.optimizer_task_package import build_optimizer_execution_task_package
 from hermes_workflow.package import build_execution_package
 from hermes_workflow.project_readiness import check_project_ready
@@ -54,12 +58,20 @@ def _backend_from_project_strategy(
         return _backend_from_explicit_strategy(backend, strategy)
     if not (project_dir / "config" / "optimizer.yaml").exists():
         return backend
-    configured_strategy = assert_valid_project(project_dir).optimizer.optimizer.strategy
-    if configured_strategy is None:
-        return backend
-    return _backend_for_strategy(
-        OptimizerStrategyName.from_user_value(configured_strategy)
+    bundle = assert_valid_project(project_dir)
+    settings = bundle.optimizer.optimizer
+    resolved = resolve_optimizer_strategy(
+        OptimizerStrategyRequest(
+            algorithm=settings.algorithm,
+            strategy=settings.strategy,
+            openbox=settings.openbox,
+            turbo=settings.turbo,
+            variable_count=len(bundle.variables.variables),
+        )
     )
+    # The diagnostic random baseline is implemented by the OpenBox backend;
+    # native TuRBO is the only separate execution backend.
+    return "native_turbo" if resolved.backend == "native_turbo" else "openbox"
 
 
 @dataclass(frozen=True)
@@ -150,6 +162,12 @@ def optimize_project(
             max_evals=max_evals,
             backend=execution_backend,
         )
+        _run_step(
+            steps,
+            "check-requirement",
+            lambda: service.check_requirement(project_root),
+            _expect_optimize_requirement,
+        )
         if real:
             doctor_report = service.run_product_doctor(
                 project_root,
@@ -159,12 +177,6 @@ def optimize_project(
                 raise ValueError(
                     "doctor failed: " + "; ".join(doctor_report.issues)
                 )
-        _run_step(
-            steps,
-            "check-requirement",
-            lambda: service.check_requirement(project_root),
-            lambda result: _expect_status(result, "pass"),
-        )
         _run_step(
             steps,
             "prepare-from-requirement",
@@ -291,31 +303,46 @@ def optimize_project(
         _run_step(
             steps,
             "check-optimizer-run",
-            lambda: service.check_optimizer_run(project_root),
+            lambda: service.check_optimizer_run(
+                project_root,
+                expected_backend=execution_backend,
+            ),
             lambda result: _expect_status(result, "accepted"),
         )
         _run_step(
             steps,
             "summarize-optimizer-run",
-            lambda: service.summarize_optimizer_run(project_root),
+            lambda: service.summarize_optimizer_run(
+                project_root,
+                expected_backend=execution_backend,
+            ),
             lambda result: _expect_status(result, "pass"),
         )
         _run_step(
             steps,
             "finalize-optimizer-run",
-            lambda: service.finalize_optimizer_run(project_root),
+            lambda: service.finalize_optimizer_run(
+                project_root,
+                expected_backend=execution_backend,
+            ),
             lambda result: _expect_status(result, "pass"),
         )
         _run_step(
             steps,
             "visualize-optimizer-run",
-            lambda: service.generate_optimizer_insight_report(project_root),
+            lambda: service.generate_optimizer_insight_report(
+                project_root,
+                expected_backend=execution_backend,
+            ),
             lambda result: _expect_status(result, "pass"),
         )
         decision = _run_step(
             steps,
             "decide-optimizer-run",
-            lambda: service.generate_optimizer_decision_report(project_root),
+            lambda: service.generate_optimizer_decision_report(
+                project_root,
+                expected_backend=execution_backend,
+            ),
             lambda result: _expect_status(result, "pass"),
         )
         recommended_run_id = _string_attr(decision, "recommended_run_id")
@@ -414,6 +441,19 @@ def _expect_status(result: Any, expected: str) -> str | None:
     if status == expected:
         return None
     return _issues_detail(result) or f"status is {status or 'unknown'}, expected {expected}"
+
+
+def _expect_optimize_requirement(result: Any) -> str | None:
+    status_issue = _expect_status(result, "pass")
+    if status_issue is not None:
+        return status_issue
+    workflow_mode = getattr(result, "workflow_mode", "optimize")
+    if workflow_mode != "optimize":
+        return (
+            "optimize requires workflow mode 'optimize'; "
+            f"got {workflow_mode!r}"
+        )
+    return None
 
 
 def _expect_approval(result: Any) -> str | None:

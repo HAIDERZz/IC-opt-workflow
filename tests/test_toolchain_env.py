@@ -1,4 +1,5 @@
 import json
+import sys
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -8,6 +9,33 @@ from hermes_workflow.toolchain_env import PythonProbeResult, check_toolchain_env
 
 
 runner = CliRunner()
+
+
+def test_check_toolchain_environment_defaults_to_current_runtime_environment(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    venv = tmp_path / "runtime-venv"
+    bin_dir = venv / "bin"
+    bin_dir.mkdir(parents=True)
+    (bin_dir / "python").write_text("#!/bin/sh\n", encoding="utf-8")
+    (bin_dir / "hermes-workflow").write_text("#!/bin/sh\n", encoding="utf-8")
+    cadence_cshrc = tmp_path / "cadence.csh"
+    cadence_cshrc.write_text("# cadence\n", encoding="utf-8")
+    monkeypatch.setattr(sys, "prefix", str(venv))
+
+    report = check_toolchain_environment(
+        cadence_cshrc=cadence_cshrc,
+        probe_runner=lambda *_args: PythonProbeResult(
+            return_code=0,
+            stdout='{"python_executable": "/runtime/python"}',
+            stderr="",
+        ),
+    )
+
+    assert report["status"] == "pass"
+    assert report["openbox_venv"] == str(venv)
+    assert "/tmp/ic_auto_opt_openbox_spike" not in json.dumps(report)
 
 
 def test_check_toolchain_environment_passes_with_injected_probe(tmp_path: Path) -> None:

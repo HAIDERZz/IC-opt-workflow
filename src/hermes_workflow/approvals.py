@@ -64,6 +64,60 @@ def decide_first_real_run(
     return _write_instruction(project_dir, instruction)
 
 
+def decide_continuation_real_run(
+    project_dir: Path,
+    *,
+    created_at_utc: str | None = None,
+) -> dict:
+    """Re-decide the real-run approval for a continuation controller cache.
+
+    A remote continuation rebuilds its controller cache from the frozen
+    preparation snapshot, which never contains the supervisor instruction or
+    the optimizer preflight reports. Preflight readiness is replaced by the
+    prior-history acceptance gate, so this decision only revalidates the
+    immutable config against the execution manifest.
+    """
+    created_at = created_at_utc or (
+        datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    )
+    project_dir = Path(project_dir)
+    validation_report = validate_project_files(project_dir)
+    manifest_path = project_dir / "execution_package" / "execution_manifest.json"
+    if not manifest_path.exists():
+        return _write_instruction(
+            project_dir,
+            _reject(created_at, "execution manifest is missing", {}),
+        )
+
+    approved_hashes, manifest_error = _load_approved_config_hashes(manifest_path)
+    if manifest_error is not None:
+        return _write_instruction(
+            project_dir,
+            _reject(created_at, manifest_error, approved_hashes),
+        )
+    if not validation_report.ok:
+        return _write_instruction(
+            project_dir,
+            _reject(created_at, validation_report.format(), approved_hashes),
+        )
+
+    instruction = {
+        "schema_version": "1.0",
+        "created_at_utc": created_at,
+        "decision": "approve_first_real_run",
+        "reason": "continuation config validation passed",
+        "allowed_actions": ["run_standalone_spectre_optimizer"],
+        "forbidden_actions": [
+            "modify_maestro_setup",
+            "modify_immutable_config_files",
+            "change_variable_bounds",
+            "change_objective_or_constraints",
+        ],
+        "approved_config_hashes": approved_hashes,
+    }
+    return _write_instruction(project_dir, instruction)
+
+
 def decide_fix_run_real_run(
     project_dir: Path,
     *,

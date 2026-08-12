@@ -6,7 +6,11 @@ from pathlib import Path
 import pytest
 import yaml
 
-from hermes_workflow.approvals import decide_first_real_run, decide_fix_run_real_run
+from hermes_workflow.approvals import (
+    decide_continuation_real_run,
+    decide_first_real_run,
+    decide_fix_run_real_run,
+)
 from tests.project_factory import (
     create_generic_project,
     create_packaged_generic_project,
@@ -352,4 +356,52 @@ def test_fix_run_approval_uses_distinct_allowed_actions(tmp_path: Path) -> None:
     assert instruction["decision"] == "approve_first_real_run"
     assert "prepare_fixed_candidate_real_run" in instruction["allowed_actions"]
     assert "run_standalone_spectre_optimizer" not in instruction["allowed_actions"]
+    assert "run_standalone_spectre_optimizer" in instruction["forbidden_actions"]
+
+
+def test_continuation_approval_approves_without_preflight_reports(
+    tmp_path: Path,
+) -> None:
+    """Continuation rebuilds its controller cache from the frozen snapshot, so
+    the optimizer preflight reports are replaced by prior-history acceptance
+    and must not be required for the continuation approval."""
+    project_dir = _create_packaged_project(
+        tmp_path,
+        name="continuation_approval_project",
+    )
+
+    instruction = decide_continuation_real_run(
+        project_dir,
+        created_at_utc="2026-08-12T00:10:00Z",
+    )
+
+    instruction_path = project_dir / "supervisor_instruction.json"
+    payload = json.loads(instruction_path.read_text(encoding="utf-8"))
+    assert instruction["decision"] == "approve_first_real_run"
+    assert payload["decision"] == "approve_first_real_run"
+    assert instruction["reason"] == "continuation config validation passed"
+    assert "run_standalone_spectre_optimizer" in instruction["allowed_actions"]
+    assert payload["approved_config_hashes"]["config/project_config.yaml"]
+    assert not (project_dir / "reports" / "dry_run_report.json").exists()
+
+
+def test_continuation_approval_rejects_manifest_missing_config_hashes(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_packaged_project(
+        tmp_path,
+        name="continuation_reject_project",
+    )
+    manifest_path = project_dir / "execution_package" / "execution_manifest.json"
+    manifest_payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    del manifest_payload["immutable_config_files"]
+    write_json(manifest_path, manifest_payload)
+
+    instruction = decide_continuation_real_run(
+        project_dir,
+        created_at_utc="2026-08-12T00:10:00Z",
+    )
+
+    assert instruction["decision"] == "reject_first_real_run"
+    assert "execution manifest is missing immutable_config_files" in instruction["reason"]
     assert "run_standalone_spectre_optimizer" in instruction["forbidden_actions"]

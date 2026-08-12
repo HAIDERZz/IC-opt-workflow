@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 import pytest
+import yaml
 
 from hermes_workflow.history_warm_start import (
     HISTORY_WARM_START_AUDIT_MD_RELATIVE,
@@ -43,6 +44,19 @@ def _write_evaluations(project_dir: Path, rows: list[str]) -> None:
     path.write_text("".join(line + "\n" for line in rows), encoding="utf-8")
 
 
+def _select_openbox(project_dir: Path) -> None:
+    optimizer_path = project_dir / "config" / "optimizer.yaml"
+    payload = yaml.safe_load(optimizer_path.read_text(encoding="utf-8"))
+    payload["optimizer"].update(
+        {
+            "algorithm": "openbox",
+            "strategy": "openbox_auto",
+            "turbo": None,
+        }
+    )
+    write_yaml(optimizer_path, payload)
+
+
 def _current_project_with_warm_start(
     tmp_path: Path,
     sources: list[dict[str, object]],
@@ -50,7 +64,11 @@ def _current_project_with_warm_start(
     enabled: bool = True,
     max_observations: int | None = None,
 ) -> tuple[Path, object]:
+    (tmp_path / "current_project" / "config" / "history_warm_start.yaml").unlink(
+        missing_ok=True
+    )
     project_dir = create_generic_project(tmp_path, name="current_project")
+    _select_openbox(project_dir)
     settings: dict[str, object] = {
         "enabled": enabled,
         "sources": sources,
@@ -238,6 +256,7 @@ def test_relative_source_path_resolves_relative_to_current_project(
     tmp_path: Path,
 ) -> None:
     project_dir = create_generic_project(tmp_path, name="current_project")
+    _select_openbox(project_dir)
     source_dir = create_generic_project(project_dir, name="prev_round")
     _write_evaluations(source_dir, [_row()])
     write_yaml(

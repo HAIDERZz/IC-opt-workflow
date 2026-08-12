@@ -91,23 +91,23 @@ def _services(project_dir: Path, calls: list[str]) -> OptimizerFlowServices:
                 ),
             ),
         ),
-        check_optimizer_run=lambda _project: record(
+        check_optimizer_run=lambda _project, **_kwargs: record(
             "check-optimizer-run",
             SimpleNamespace(status="accepted", issues=[]),
         ),
-        summarize_optimizer_run=lambda _project: record(
+        summarize_optimizer_run=lambda _project, **_kwargs: record(
             "summarize-optimizer-run",
             SimpleNamespace(status="pass", issues=[]),
         ),
-        finalize_optimizer_run=lambda _project: record(
+        finalize_optimizer_run=lambda _project, **_kwargs: record(
             "finalize-optimizer-run",
             SimpleNamespace(status="pass", issues=[]),
         ),
-        generate_optimizer_insight_report=lambda _project: record(
+        generate_optimizer_insight_report=lambda _project, **_kwargs: record(
             "visualize-optimizer-run",
             SimpleNamespace(status="pass", issues=[]),
         ),
-        generate_optimizer_decision_report=lambda _project: record(
+        generate_optimizer_decision_report=lambda _project, **_kwargs: record(
             "decide-optimizer-run",
             SimpleNamespace(
                 status="pass",
@@ -175,8 +175,8 @@ def test_optimize_project_dry_orchestration_stops_before_real_optimizer(
     )
 
     assert calls == [
-        "doctor",
         "check-requirement",
+        "doctor",
         "prepare-from-requirement",
         "validate",
         "check-project-ready",
@@ -193,6 +193,40 @@ def test_optimize_project_dry_orchestration_stops_before_real_optimizer(
     payload = json.loads(report.report_path.read_text(encoding="utf-8"))
     assert payload["dry_orchestration"] is True
     assert payload["steps"][-1]["name"] == "package-optimizer-task"
+
+
+def test_optimize_project_rejects_fix_run_requirement_before_preparation(
+    tmp_path: Path,
+) -> None:
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    cadence_cshrc = tmp_path / "cadence_env.csh"
+    cadence_cshrc.write_text("# test\n", encoding="utf-8")
+    calls: list[str] = []
+    services = replace(
+        _services(project_dir, calls),
+        check_requirement=lambda _project: (
+            calls.append("check-requirement")
+            or SimpleNamespace(
+                status="pass",
+                issues=[],
+                workflow_mode="fix_run",
+            )
+        ),
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="optimize requires workflow mode 'optimize'",
+    ):
+        optimize_project(
+            project_dir,
+            real=True,
+            cadence_cshrc=cadence_cshrc,
+            services=services,
+        )
+
+    assert calls == ["check-requirement"]
 
 
 def test_optimize_project_dry_orchestration_reports_turbo_strategy_backend(
@@ -271,8 +305,8 @@ def test_optimize_project_real_runs_closeout_without_recording_user_acceptance(
     )
 
     assert calls == [
-        "doctor",
         "check-requirement",
+        "doctor",
         "prepare-from-requirement",
         "validate",
         "check-project-ready",
@@ -368,6 +402,68 @@ def test_optimize_project_turbo_strategy_routes_to_native_turbo(
     assert report.backend == "native_turbo"
     payload = json.loads(report.report_path.read_text(encoding="utf-8"))
     assert payload["backend"] == "native_turbo"
+
+
+def test_fresh_native_closeout_requires_current_backend_from_flow(
+    tmp_path: Path,
+) -> None:
+    """Stale neutral OpenBox artifacts must not satisfy a fresh native closeout."""
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    cadence_cshrc = tmp_path / "cadence_env.csh"
+    cadence_cshrc.write_text("# cadence", encoding="utf-8")
+    calls: list[str] = []
+    consumers: list[tuple[str, str]] = []
+
+    def closeout_consumer(name: str, status: str):
+        def consume(
+            _project: Path,
+            *,
+            expected_backend: str,
+        ) -> SimpleNamespace:
+            consumers.append((name, expected_backend))
+            if name == "decide":
+                return SimpleNamespace(
+                    status=status,
+                    recommended_run_id="real_007",
+                    recommended_action="stop_for_user_review",
+                    issues=[],
+                )
+            return SimpleNamespace(status=status, issues=[])
+
+        return consume
+
+    services = replace(
+        _services(project_dir, calls),
+        run_batch_native_turbo_optimization=lambda _project, **_kwargs: (
+            SimpleNamespace(evaluation_count=7)
+        ),
+        check_optimizer_run=closeout_consumer("check", "accepted"),
+        summarize_optimizer_run=closeout_consumer("summarize", "pass"),
+        finalize_optimizer_run=closeout_consumer("finalize", "pass"),
+        generate_optimizer_insight_report=closeout_consumer("insight", "pass"),
+        generate_optimizer_decision_report=closeout_consumer("decide", "pass"),
+    )
+
+    report = optimize_project(
+        project_dir,
+        real=True,
+        max_evals=7,
+        batch_size=2,
+        parallel_jobs=2,
+        cadence_cshrc=cadence_cshrc,
+        strategy="turbo_trust_region",
+        services=services,
+    )
+
+    assert report.status == "pass"
+    assert consumers == [
+        ("check", "native_turbo"),
+        ("summarize", "native_turbo"),
+        ("finalize", "native_turbo"),
+        ("insight", "native_turbo"),
+        ("decide", "native_turbo"),
+    ]
 
 
 def test_optimize_cli_wires_real_dry_orchestration_options(

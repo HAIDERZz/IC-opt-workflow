@@ -24,15 +24,13 @@ backend: maestro_exported_spectre_deck
 ## Maestro Source
 
 ```yaml
-testbenches:
-  - id: cg_nf
-    maestro_point_root: /home/username/simulation/Virtuoso_Bridge_test/MixerCS_PSS_CG_Noise/maestro/results/maestro/Interactive.N/1/Mixer_CS_CG_NF
-    virtuoso_library: Virtuoso_Bridge_test
-    cell: MixerCS_PSS_CG_Noise
-    design_view: schematic
-    maestro_view: maestro
-    test_name: Mixer_CS_CG_NF
-    corner: Nominal
+maestro_point_root: /home/username/simulation/Virtuoso_Bridge_test/MixerCS_PSS_CG_Noise/maestro/results/maestro/Interactive.N/1/Mixer_CS_CG_NF
+virtuoso_library: Virtuoso_Bridge_test
+cell: MixerCS_PSS_CG_Noise
+design_view: schematic
+maestro_view: maestro
+test_name: Mixer_CS_CG_NF
+corner: Nominal
 ```
 
 ## Design Variables
@@ -97,8 +95,6 @@ keep_successful_runs: true
 ## Process Corners
 
 ```yaml
-objective_policy: worst_case
-constraint_policy: all_corners
 corners:
   - id: tt_m25
     model_section: Post_simu_top_tt
@@ -188,7 +184,6 @@ points:
 schema_version: "1.0"
 exports:
   - name: nf_pnoise
-    testbench: cg_nf
     expression: 'getData("NF" ?result "pnoise")'
     output_format: csv
     nil_policy: fail

@@ -71,13 +71,14 @@ def build_metric_extraction_request(
     for wf in waveform_exports or []:
         wf_entry = {
             "name": wf.name,
-            "testbench": wf.testbench,
             "expression": wf.expression,
             "expression_sha256": expression_sha256(wf.expression),
             "output_format": wf.output_format,
             "nil_policy": wf.nil_policy,
             "csv_output_file": f"{run_prefix}/metrics/waveforms/{wf.name}.csv",
         }
+        if wf.testbench is not None:
+            wf_entry["testbench"] = wf.testbench
         wf_entries.append(wf_entry)
 
     result = {

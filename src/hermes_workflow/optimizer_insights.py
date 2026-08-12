@@ -92,11 +92,19 @@ class OptimizerInsightReport:
     html_generation: dict[str, Any] = field(default_factory=dict)
 
 
-def generate_optimizer_insight_report(project_dir: str | Path) -> OptimizerInsightReport:
+def generate_optimizer_insight_report(
+    project_dir: str | Path,
+    *,
+    expected_backend: str | None = None,
+) -> OptimizerInsightReport:
     project_root = Path(project_dir)
     issues: list[str] = []
     warnings: list[str] = []
-    artifacts = load_optimizer_artifacts(project_root, issues)
+    artifacts = load_optimizer_artifacts(
+        project_root,
+        issues,
+        expected_backend=expected_backend,
+    )
     report_payload = artifacts.report
     traces = artifacts.traces
 

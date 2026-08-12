@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import ast
-import math
+import os
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from pathlib import Path, PurePosixPath
@@ -23,7 +23,25 @@ from hermes_workflow.schemas import (
     VariableKind,
     VariablesConfig,
 )
-from hermes_workflow.fix_run_models import WaveformExportsConfig
+from hermes_workflow.fix_run_models import (
+    FixedPointsConfig,
+    WaveformExportsConfig,
+    WorkflowSettings,
+    fix_run_id_range_issue,
+)
+from hermes_workflow.candidate_contract import (
+    assert_candidate_parameters_match_variables,
+)
+from hermes_workflow.measurement_routes import measurement_route_issues
+from hermes_workflow.objective_contract import (
+    evaluate_objective_expression,
+    objective_expression_issues,
+)
+from hermes_workflow.requirement_semantics import parse_constraint_threshold
+from hermes_workflow.optimizer_strategy import (
+    OptimizerStrategyRequest,
+    resolve_optimizer_strategy,
+)
 
 
 CONFIG_MODELS: dict[str, type[BaseModel]] = {
@@ -44,6 +62,8 @@ FIX_RUN_ONE_OF_CONFIGS: tuple[str, ...] = (
     "waveform_exports.yaml",
 )
 OPTIONAL_CONFIG_MODELS: dict[str, type[BaseModel]] = {
+    "workflow.yaml": WorkflowSettings,
+    "fixed_points.yaml": FixedPointsConfig,
     "metrics.yaml": MetricsConfig,
     "optimizer.yaml": OptimizerConfig,
     "testbenches.yaml": TestbenchesConfig,
@@ -57,26 +77,6 @@ CONTINUOUS_RE = re.compile(
     r"^\s*(?P<value>[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)"
     r"(?:\s*(?P<unit>\S+))?\s*$"
 )
-
-_ALLOWED_OBJECTIVE_NODES = (
-    ast.Expression,
-    ast.BinOp,
-    ast.UnaryOp,
-    ast.Call,
-    ast.Name,
-    ast.Load,
-    ast.Constant,
-    ast.Add,
-    ast.Sub,
-    ast.Mult,
-    ast.Div,
-    ast.Pow,
-    ast.Mod,
-    ast.UAdd,
-    ast.USub,
-)
-_OBJECTIVE_FUNCTIONS = {"min": min, "max": max, "ln": math.log}
-
 
 @dataclass(frozen=True)
 class ValidationIssue:
@@ -111,21 +111,56 @@ class ContractBundle:
     metrics: MetricsConfig | None
     spectre: SpectreConfig
     optimizer: OptimizerConfig | None
+    workflow: WorkflowSettings | None = None
+    fixed_points: FixedPointsConfig | None = None
     waveform_exports: WaveformExportsConfig | None = None
     history_warm_start: HistoryWarmStartConfig | None = None
 
 
-def validate_project_files(project_dir: Path) -> ValidationReport:
+def require_optimize_bundle(
+    bundle: ContractBundle,
+    *,
+    operation: str = "optimizer execution",
+) -> ContractBundle:
+    """Require a complete optimize-mode contract at public optimizer seams."""
+    workflow_mode = bundle.workflow.mode if bundle.workflow is not None else "optimize"
+    if (
+        workflow_mode != "optimize"
+        or bundle.optimizer is None
+        or bundle.metrics is None
+        or bundle.metrics.objective is None
+    ):
+        raise ValueError(f"{operation} requires optimize workflow")
+    return bundle
+
+
+def validate_project_files(
+    project_dir: Path,
+    *,
+    model_file_is_readable: Callable[[str], bool] | None = None,
+) -> ValidationReport:
     issues: list[ValidationIssue] = []
     loaded = _load_config_models(project_dir, issues)
     bundle = _bundle_from_loaded(project_dir, loaded)
     if bundle is not None:
-        issues.extend(_validate_contract_bundle(bundle))
+        issues.extend(
+            _validate_contract_bundle(
+                bundle,
+                model_file_is_readable=model_file_is_readable,
+            )
+        )
     return ValidationReport(issues)
 
 
-def assert_valid_project(project_dir: Path) -> ContractBundle:
-    report = validate_project_files(project_dir)
+def assert_valid_project(
+    project_dir: Path,
+    *,
+    model_file_is_readable: Callable[[str], bool] | None = None,
+) -> ContractBundle:
+    report = validate_project_files(
+        project_dir,
+        model_file_is_readable=model_file_is_readable,
+    )
     if not report.ok:
         raise ValueError(report.format())
     return load_contract_bundle(project_dir)
@@ -146,6 +181,18 @@ def _load_config_models(
     loaded: dict[str, BaseModel] = {}
     config_dir = project_dir / "config"
     workflow_mode = _detect_workflow_mode(config_dir)
+    if not (config_dir / "workflow.yaml").exists() and (
+        config_dir / "fixed_points.yaml"
+    ).exists():
+        issues.append(
+            ValidationIssue(
+                file="config/workflow.yaml",
+                path="",
+                message=(
+                    "workflow.yaml is required when fixed_points.yaml is present"
+                ),
+            )
+        )
 
     for file_name, model in CONFIG_MODELS.items():
         config_path = config_dir / file_name
@@ -175,7 +222,7 @@ def _load_config_models(
             loaded[file_name] = model.model_validate(payload)
         except ValidationError as exc:
             issues.extend(_validation_error_issues(project_dir, config_path, exc))
-
+            continue
     # Mode-specific required configs.
     mode_required = (
         FIX_RUN_REQUIRED_CONFIGS
@@ -228,6 +275,28 @@ def _load_config_models(
             loaded[file_name] = model.model_validate(payload)
         except ValidationError as exc:
             issues.extend(_validation_error_issues(project_dir, config_path, exc))
+            continue
+        if (
+            file_name == "metrics.yaml"
+            and workflow_mode != "fix_run"
+            and isinstance(loaded[file_name], MetricsConfig)
+            and loaded[file_name].objective is None
+        ):
+            issues.append(
+                ValidationIssue(
+                    file=_display_file(project_dir, config_path),
+                    path="objective",
+                    message="required field is missing for optimize workflow",
+                )
+            )
+
+    issues.extend(
+        _config_mode_applicability_issues(
+            project_dir=project_dir,
+            config_dir=config_dir,
+            workflow_mode=workflow_mode,
+        )
+    )
 
     return loaded
 
@@ -263,6 +332,16 @@ def _bundle_from_loaded(
             if "optimizer.yaml" in loaded
             else None
         ),
+        workflow=(
+            _cast_model(WorkflowSettings, loaded["workflow.yaml"])
+            if "workflow.yaml" in loaded
+            else None
+        ),
+        fixed_points=(
+            _cast_model(FixedPointsConfig, loaded["fixed_points.yaml"])
+            if "fixed_points.yaml" in loaded
+            else None
+        ),
         waveform_exports=(
             _cast_model(WaveformExportsConfig, loaded["waveform_exports.yaml"])
             if "waveform_exports.yaml" in loaded
@@ -276,16 +355,174 @@ def _bundle_from_loaded(
     )
 
 
-def _validate_contract_bundle(bundle: ContractBundle) -> list[ValidationIssue]:
+def _validate_contract_bundle(
+    bundle: ContractBundle,
+    *,
+    model_file_is_readable: Callable[[str], bool] | None,
+) -> list[ValidationIssue]:
     issues: list[ValidationIssue] = []
     issues.extend(_validate_netlist_paths(bundle.project_config))
-    issues.extend(_validate_variables(bundle.variables))
+    if bundle.process_corners is not None:
+        for index, corner in enumerate(bundle.process_corners.corners):
+            if (
+                corner.model_file is not None
+                and model_file_is_readable is not None
+                and not model_file_is_readable(corner.model_file)
+            ):
+                issues.append(
+                    _issue(
+                        "process_corners.yaml",
+                        f"corners[{index}].model_file",
+                        f"model_file is missing or unreadable: {corner.model_file}",
+                    )
+                )
+    issues.extend(variable_contract_issues(bundle.variables))
     if bundle.metrics is not None:
-        issues.extend(_validate_metrics(bundle.metrics, bundle.testbenches))
-        issues.extend(_validate_objective_expression(bundle.metrics))
+        issues.extend(_validate_metrics(bundle.metrics))
+        if bundle.metrics.objective is not None:
+            issues.extend(_validate_objective_expression(bundle.metrics))
+    for route_issue in measurement_route_issues(
+        metrics=bundle.metrics,
+        waveform_exports=bundle.waveform_exports,
+        testbenches=bundle.testbenches,
+    ):
+        issues.append(
+            _issue(route_issue.file, route_issue.path, route_issue.message)
+        )
+    if bundle.fixed_points is not None:
+        for index, point in enumerate(bundle.fixed_points.points):
+            try:
+                assert_candidate_parameters_match_variables(
+                    bundle.variables,
+                    point.parameters,
+                )
+            except ValueError as exc:
+                issues.append(
+                    _issue(
+                        "fixed_points.yaml",
+                        f"points[{index}].parameters",
+                        str(exc),
+                    )
+                )
+    range_issue = fix_run_id_range_issue(bundle.workflow, bundle.fixed_points)
+    if range_issue is not None:
+        issues.append(_issue("workflow.yaml", "starting_run_id", range_issue))
+    if bundle.workflow is not None and bundle.workflow.mode == "fix_run":
+        if bundle.metrics is not None and bundle.metrics.objective is not None:
+            issues.append(
+                _issue(
+                    "metrics.yaml",
+                    "objective",
+                    "objective is not supported for fix_run workflow",
+                )
+            )
+        if bundle.metrics is not None and bundle.metrics.constraints:
+            issues.append(
+                _issue(
+                    "metrics.yaml",
+                    "constraints",
+                    "constraints are not supported for fix_run workflow",
+                )
+            )
+        if bundle.process_corners is not None:
+            if bundle.process_corners.objective_policy != "nominal":
+                issues.append(
+                    _issue(
+                        "process_corners.yaml",
+                        "objective_policy",
+                        "objective_policy must be nominal for fix_run workflow",
+                    )
+                )
+            if bundle.process_corners.constraint_policy != "nominal":
+                issues.append(
+                    _issue(
+                        "process_corners.yaml",
+                        "constraint_policy",
+                        "constraint_policy must be nominal for fix_run workflow",
+                    )
+                )
+    elif bundle.process_corners is not None:
+        corner_ids = {corner.id for corner in bundle.process_corners.corners}
+        if (
+            bundle.process_corners.objective_policy == "nominal"
+            or bundle.process_corners.constraint_policy == "nominal"
+        ) and "nominal" not in corner_ids:
+            issues.append(
+                _issue(
+                    "process_corners.yaml",
+                    "corners",
+                    "nominal policy requires a corner with id 'nominal'",
+                )
+            )
     if bundle.optimizer is not None:
-        issues.extend(_validate_optimizer_contract(bundle))
+        issues.extend(
+            optimizer_contract_issues(
+                optimizer_config=bundle.optimizer,
+                spectre_config=bundle.spectre,
+                variable_count=len(bundle.variables.variables),
+            )
+        )
+    warm_start_issue = history_warm_start_backend_issue(
+        optimizer=bundle.optimizer,
+        history_warm_start=bundle.history_warm_start,
+        variable_count=len(bundle.variables.variables),
+    )
+    if warm_start_issue is not None:
+        issues.append(
+            _issue(
+                "history_warm_start.yaml",
+                "history_warm_start.enabled",
+                warm_start_issue,
+            )
+        )
     return issues
+
+
+def local_model_file_is_readable(path: str) -> bool:
+    model_file = Path(path).expanduser()
+    return model_file.is_file() and os.access(model_file, os.R_OK)
+
+
+def history_warm_start_backend_issue(
+    *,
+    optimizer: OptimizerConfig | None,
+    history_warm_start: HistoryWarmStartConfig | None,
+    variable_count: int,
+) -> str | None:
+    """Return the capability-contract issue for an enabled warm start.
+
+    Strategy resolution is centralized in ``optimizer_strategy``; this keeps
+    intake and on-disk project validation aligned when defaults or explicit
+    strategies select the native TuRBO backend.
+    """
+    if (
+        history_warm_start is None
+        or not history_warm_start.history_warm_start.enabled
+    ):
+        return None
+
+    if optimizer is None:
+        return (
+            "history_warm_start.enabled=true is only supported for optimize "
+            "workflow"
+        )
+
+    settings = optimizer.optimizer
+    resolved = resolve_optimizer_strategy(
+        OptimizerStrategyRequest(
+            algorithm=settings.algorithm,
+            strategy=settings.strategy,
+            openbox=settings.openbox,
+            turbo=settings.turbo,
+            variable_count=max(variable_count, 1),
+        )
+    )
+    if resolved.backend == "openbox":
+        return None
+    return (
+        "history_warm_start.enabled=true requires the OpenBox optimizer backend; "
+        f"resolved backend is {resolved.backend}"
+    )
 
 
 def _validate_netlist_paths(project_config: ProjectConfig) -> list[ValidationIssue]:
@@ -331,7 +568,9 @@ def _validate_netlist_paths(project_config: ProjectConfig) -> list[ValidationIss
     return issues
 
 
-def _validate_variables(variables_config: VariablesConfig) -> list[ValidationIssue]:
+def variable_contract_issues(
+    variables_config: VariablesConfig,
+) -> list[ValidationIssue]:
     issues: list[ValidationIssue] = []
     for index, variable in enumerate(variables_config.variables):
         path = f"variables[{index}]"
@@ -478,50 +717,28 @@ def _has_whitespace_unit_suffix(raw: str) -> bool:
 
 def _validate_metrics(
     metrics_config: MetricsConfig,
-    testbenches_config: TestbenchesConfig | None,
 ) -> list[ValidationIssue]:
-    declared_metrics = {metric.name for metric in metrics_config.metrics}
+    metrics_by_name = {metric.name: metric for metric in metrics_config.metrics}
     issues: list[ValidationIssue] = []
-    declared_testbenches = (
-        {testbench.id for testbench in testbenches_config.testbenches}
-        if testbenches_config is not None
-        else set()
-    )
-    for index, metric in enumerate(metrics_config.metrics):
-        if testbenches_config is None:
-            if metric.testbench is not None:
-                issues.append(
-                    _issue(
-                        "metrics.yaml",
-                        f"metrics[{index}].testbench",
-                        "metric testbench requires config/testbenches.yaml",
-                    )
-                )
-            continue
-        if metric.testbench is None:
-            issues.append(
-                _issue(
-                    "metrics.yaml",
-                    f"metrics[{index}].testbench",
-                    "metric must declare testbench when config/testbenches.yaml exists",
-                )
-            )
-            continue
-        if metric.testbench not in declared_testbenches:
-            issues.append(
-                _issue(
-                    "metrics.yaml",
-                    f"metrics[{index}].testbench",
-                    f"metric {metric.name} references unknown testbench {metric.testbench}",
-                )
-            )
     for index, constraint in enumerate(metrics_config.constraints):
-        if constraint.metric not in declared_metrics:
+        metric = metrics_by_name.get(constraint.metric)
+        if metric is None:
             issues.append(
                 _issue(
                     "metrics.yaml",
                     f"constraints[{index}].metric",
                     f"constraint references unknown metric {constraint.metric}",
+                )
+            )
+            continue
+        try:
+            parse_constraint_threshold(constraint.value, metric.unit)
+        except ValueError as exc:
+            issues.append(
+                _issue(
+                    "metrics.yaml",
+                    f"constraints[{index}].value",
+                    str(exc),
                 )
             )
     return issues
@@ -530,185 +747,51 @@ def _validate_metrics(
 def _validate_objective_expression(
     metrics_config: MetricsConfig,
 ) -> list[ValidationIssue]:
-    try:
-        tree = ast.parse(metrics_config.objective.expression, mode="eval")
-    except SyntaxError as exc:
-        return [
-            _issue(
-                "metrics.yaml",
-                "objective.expression",
-                f"invalid objective expression: {exc.msg}",
-            )
-        ]
-
+    if metrics_config.objective is None:
+        return []
     declared_metrics = {metric.name for metric in metrics_config.metrics}
-    issues: list[ValidationIssue] = []
-    for node in ast.walk(tree):
-        if not _is_allowed_objective_node(node):
-            issues.append(
-                _issue(
-                    "metrics.yaml",
-                    "objective.expression",
-                    f"unsupported objective expression node {type(node).__name__}",
-                )
-            )
-            continue
-
-        if isinstance(node, ast.Call):
-            if not isinstance(node.func, ast.Name) or node.func.id not in _OBJECTIVE_FUNCTIONS:
-                function_name = getattr(node.func, "id", type(node.func).__name__)
-                issues.append(
-                    _issue(
-                        "metrics.yaml",
-                        "objective.expression",
-                        f"unsupported objective function {function_name}",
-                    )
-                )
-            if node.keywords:
-                issues.append(
-                    _issue(
-                        "metrics.yaml",
-                        "objective.expression",
-                        "objective function keyword arguments are unsupported",
-                    )
-                )
-        elif (
-            isinstance(node, ast.Name)
-            and node.id not in declared_metrics
-            and node.id not in _OBJECTIVE_FUNCTIONS
-        ):
-            issues.append(
-                _issue(
-                    "metrics.yaml",
-                    "objective.expression",
-                    f"objective references unknown metric {node.id}",
-                )
-            )
-        elif isinstance(node, ast.Constant):
-            issues.extend(_validate_objective_literal(node.value))
-
-    return issues
-
-
-def _validate_objective_literal(value: object) -> list[ValidationIssue]:
-    if isinstance(value, bool) or not isinstance(value, int | float):
-        return [
-            _issue(
-                "metrics.yaml",
-                "objective.expression",
-                f"unsupported objective literal {value!r}",
-            )
-        ]
-
-    if isinstance(value, float) and not math.isfinite(value):
-        return [
-            _issue(
-                "metrics.yaml",
-                "objective.expression",
-                "objective numeric literals must be finite",
-            )
-        ]
-
-    return []
-
-
-def _is_allowed_objective_node(node: ast.AST) -> bool:
-    return isinstance(node, _ALLOWED_OBJECTIVE_NODES)
+    return [
+        _issue("metrics.yaml", "objective.expression", message)
+        for message in objective_expression_issues(
+            metrics_config.objective.expression,
+            declared_metrics,
+        )
+    ]
 
 
 def evaluate_objective(expression: str, metrics: dict[str, float]) -> float:
-    """Evaluate a validated objective expression against computed metric values.
-
-    Parses the expression AST, substitutes metric names with float values,
-    and evaluates arithmetic. Only allows the same nodes as validation:
-    metric name references, numeric constants, and arithmetic operators.
-
-    Raises ValueError if the expression contains unknown names, disallowed
-    nodes, boolean constants, or non-finite numeric constants.
-    """
-    try:
-        tree = ast.parse(expression, mode="eval")
-    except SyntaxError as exc:
-        raise ValueError(f"invalid objective expression: {exc.msg}") from exc
-
-    for node in ast.walk(tree):
-        if not isinstance(node, _ALLOWED_OBJECTIVE_NODES):
-            raise ValueError(
-                f"unsupported objective expression node {type(node).__name__}"
-            )
-        if isinstance(node, ast.Call):
-            if not isinstance(node.func, ast.Name) or node.func.id not in _OBJECTIVE_FUNCTIONS:
-                function_name = getattr(node.func, "id", type(node.func).__name__)
-                raise ValueError(f"unsupported objective function {function_name}")
-            if node.keywords:
-                raise ValueError("objective function keyword arguments are unsupported")
-        elif isinstance(node, ast.Name):
-            if node.id in _OBJECTIVE_FUNCTIONS:
-                continue
-            if node.id not in metrics:
-                raise ValueError(f"objective references unknown metric {node.id}")
-        elif isinstance(node, ast.Constant):
-            if isinstance(node.value, bool) or not isinstance(node.value, int | float):
-                raise ValueError(f"unsupported objective literal {node.value!r}")
-            if isinstance(node.value, float) and not math.isfinite(node.value):
-                raise ValueError("objective numeric literals must be finite")
-
-    return _eval_ast(tree.body, metrics)
+    """Evaluate using the same objective contract enforced by both validators."""
+    return evaluate_objective_expression(expression, metrics)
 
 
-def _eval_ast(node: ast.AST, metrics: dict[str, float]) -> float:
-    """Recursively evaluate an objective AST node with metric substitution."""
-    if isinstance(node, ast.Constant):
-        return float(node.value)
-    if isinstance(node, ast.Name):
-        if node.id in _OBJECTIVE_FUNCTIONS:
-            raise ValueError(f"objective function {node.id} must be called")
-        return metrics[node.id]
-    if isinstance(node, ast.Call):
-        if not isinstance(node.func, ast.Name) or node.func.id not in _OBJECTIVE_FUNCTIONS:
-            function_name = getattr(node.func, "id", type(node.func).__name__)
-            raise ValueError(f"unsupported objective function {function_name}")
-        if node.keywords:
-            raise ValueError("objective function keyword arguments are unsupported")
-        args = [_eval_ast(arg, metrics) for arg in node.args]
-        if node.func.id == "ln":
-            if len(args) != 1:
-                raise ValueError("objective function ln expects one argument")
-            if args[0] <= 0:
-                raise ValueError("objective function ln argument must be positive")
-        return float(_OBJECTIVE_FUNCTIONS[node.func.id](*args))
-    if isinstance(node, ast.UnaryOp):
-        operand = _eval_ast(node.operand, metrics)
-        if isinstance(node.op, ast.UAdd):
-            return operand
-        if isinstance(node.op, ast.USub):
-            return -operand
-        raise ValueError(f"unsupported unary operator {type(node.op).__name__}")
-    if isinstance(node, ast.BinOp):
-        left = _eval_ast(node.left, metrics)
-        right = _eval_ast(node.right, metrics)
-        if isinstance(node.op, ast.Add):
-            return left + right
-        if isinstance(node.op, ast.Sub):
-            return left - right
-        if isinstance(node.op, ast.Mult):
-            return left * right
-        if isinstance(node.op, ast.Div):
-            return left / right
-        if isinstance(node.op, ast.Pow):
-            return left**right
-        if isinstance(node.op, ast.Mod):
-            return left % right
-        raise ValueError(f"unsupported binary operator {type(node.op).__name__}")
-    raise ValueError(f"unsupported objective expression node {type(node).__name__}")
-
-
-def _validate_optimizer_contract(bundle: ContractBundle) -> list[ValidationIssue]:
+def optimizer_contract_issues(
+    *,
+    optimizer_config: OptimizerConfig,
+    spectre_config: SpectreConfig,
+    variable_count: int,
+) -> list[ValidationIssue]:
     issues: list[ValidationIssue] = []
-    if bundle.optimizer is None:
-        return issues
-    optimizer = bundle.optimizer.optimizer
-    spectre = bundle.spectre.spectre
+    optimizer = optimizer_config.optimizer
+    spectre = spectre_config.spectre
+
+    try:
+        resolve_optimizer_strategy(
+            OptimizerStrategyRequest(
+                algorithm=optimizer.algorithm,
+                strategy=optimizer.strategy,
+                openbox=optimizer.openbox,
+                turbo=optimizer.turbo,
+                variable_count=max(variable_count, 1),
+            )
+        )
+    except ValueError as exc:
+        issues.append(
+            _issue(
+                "optimizer.yaml",
+                "optimizer.strategy",
+                str(exc),
+            )
+        )
 
     if optimizer.batch_size > spectre.parallel_jobs:
         issues.append(
@@ -722,7 +805,7 @@ def _validate_optimizer_contract(bundle: ContractBundle) -> list[ValidationIssue
     if (
         optimizer.algorithm == OptimizerAlgorithm.TURBO
         or optimizer.algorithm == "turbo"
-    ) and optimizer.max_evaluations < 2 * len(bundle.variables.variables):
+    ) and optimizer.max_evaluations < 2 * variable_count:
         issues.append(
             _issue(
                 "optimizer.yaml",
@@ -758,13 +841,38 @@ def _display_file(project_dir: Path, config_path: Path) -> str:
         return config_path.as_posix()
 
 
+def _config_mode_applicability_issues(
+    *, project_dir: Path, config_dir: Path, workflow_mode: str
+) -> list[ValidationIssue]:
+    if workflow_mode == "fix_run":
+        unsupported = ("optimizer.yaml", "history_warm_start.yaml")
+    else:
+        unsupported = ("fixed_points.yaml", "waveform_exports.yaml")
+
+    issues: list[ValidationIssue] = []
+    for file_name in unsupported:
+        config_path = config_dir / file_name
+        if not config_path.exists():
+            continue
+        issues.append(
+            ValidationIssue(
+                file=_display_file(project_dir, config_path),
+                path="",
+                message=(
+                    f"{file_name} is not supported for {workflow_mode} workflow"
+                ),
+            )
+        )
+    return issues
+
+
 def _detect_workflow_mode(config_dir: Path) -> str:
     """Detect workflow mode from config/workflow.yaml.
 
-    Falls back to ``fix_run`` if ``fixed_points.yaml`` exists but
-    ``workflow.yaml`` does not (defensive — keeps fix-run shape recognized).
-    Defaults to ``optimize`` otherwise. Malformed YAML defaults to
-    ``optimize`` so the standard required-config validator still runs."""
+    A missing or invalid workflow file never infers ``fix_run`` from another
+    config file. Those inputs are validated separately; mode selection remains
+    ``optimize`` until a supported explicit mode is present.
+    """
     workflow_path = config_dir / "workflow.yaml"
     if workflow_path.exists():
         try:
@@ -773,10 +881,8 @@ def _detect_workflow_mode(config_dir: Path) -> str:
             return "optimize"
         if isinstance(payload, dict):
             mode = payload.get("mode")
-            if isinstance(mode, str):
+            if mode in {"optimize", "fix_run"}:
                 return mode
-    if (config_dir / "fixed_points.yaml").exists():
-        return "fix_run"
     return "optimize"
 
 

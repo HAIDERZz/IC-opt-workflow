@@ -125,6 +125,38 @@ def test_build_execution_package_copies_config_and_records_hashes(tmp_path: Path
         )
 
 
+def test_build_execution_package_hashes_history_warm_start_config(
+    tmp_path: Path,
+) -> None:
+    project_dir = tmp_path / "bridge_test_inv"
+    create_project_from_template(project_dir)
+    history_config = project_dir / "config" / "history_warm_start.yaml"
+    history_config.write_text(
+        "schema_version: '1.0'\n"
+        "history_warm_start:\n"
+        "  enabled: false\n"
+        "  sources: []\n"
+        "  warm_start_strategy: topk\n",
+        encoding="utf-8",
+    )
+
+    manifest = build_execution_package(
+        project_dir,
+        created_at_utc="2026-05-28T00:00:00Z",
+    )
+
+    copied = (
+        project_dir
+        / "execution_package"
+        / "config"
+        / "history_warm_start.yaml"
+    )
+    assert copied.read_bytes() == history_config.read_bytes()
+    assert manifest.payload["immutable_config_files"][
+        "config/history_warm_start.yaml"
+    ] == sha256(history_config.read_bytes()).hexdigest()
+
+
 def test_build_execution_package_refuses_existing_manifest(tmp_path: Path) -> None:
     project_dir = tmp_path / "bridge_test_inv"
     create_project_from_template(project_dir)
@@ -274,7 +306,6 @@ def _convert_to_fix_run_project(project_dir: Path) -> None:
                 "exports": [
                     {
                         "name": "nf_pnoise",
-                        "testbench": "cg_nf",
                         "expression": 'getData("NF" ?result "pnoise")',
                         "output_format": "csv",
                         "nil_policy": "fail",

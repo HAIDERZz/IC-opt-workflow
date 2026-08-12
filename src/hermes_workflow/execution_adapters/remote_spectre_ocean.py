@@ -85,7 +85,7 @@ def run_remote_spectre_ocean_adapter(
     if corner_id is not None:
         remote_run_dir = remote_run_dir / "corners" / corner_id
     try:
-        runner.upload_tree(context.run_dir, remote_run_dir)
+        runner.upload_tree(context.run_dir, remote_run_dir, replace=True)
     except Exception as exc:
         upload_trace = _build_remote_command_trace(
             context,

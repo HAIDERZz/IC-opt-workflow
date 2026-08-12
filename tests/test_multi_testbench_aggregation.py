@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import shutil
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -9,10 +10,14 @@ import pytest
 from hermes_workflow.approvals import decide_first_real_run
 from hermes_workflow.dry_run import run_dry_run
 from hermes_workflow.metric_results import check_metric_results
-from hermes_workflow.multi_testbench_aggregation import aggregate_multi_testbench_run
+from hermes_workflow.multi_testbench_aggregation import (
+    _utc_now,
+    aggregate_multi_testbench_run,
+)
 import yaml
 
 from hermes_workflow.package import build_execution_package, sha256_file
+from hermes_workflow.optimizer_acceptance import check_optimizer_run
 from tests.project_factory import create_generic_project
 from hermes_workflow.real_run import prepare_real_run
 from hermes_workflow.reports import (
@@ -28,6 +33,23 @@ from tests.test_requirement_intake import _copy_multi_testbench_requirement_proj
 
 def _load_json(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _parse_audit_timestamp(value: str) -> datetime:
+    assert value.endswith("Z")
+    parsed = datetime.fromisoformat(value.removesuffix("Z") + "+00:00")
+    assert parsed.tzinfo is not None
+    assert parsed.utcoffset() == UTC.utcoffset(None)
+    return parsed
+
+
+def test_aggregate_clock_reports_current_utc() -> None:
+    before = datetime.now(UTC).replace(microsecond=0)
+
+    observed = _parse_audit_timestamp(_utc_now())
+
+    after = datetime.now(UTC).replace(microsecond=0)
+    assert before <= observed <= after
 
 
 def _write_json(path: Path, payload: dict) -> None:
@@ -143,6 +165,7 @@ def _inject_three_corner_section(
 ) -> None:
     requirement_path = project_dir / "opt_requirement.md"
     text = requirement_path.read_text(encoding="utf-8")
+    first_corner_id = "nominal" if objective_policy == "nominal" else "tt"
     corners_section = f"""
 ## Process Corners
 
@@ -150,7 +173,7 @@ def _inject_three_corner_section(
 objective_policy: {objective_policy}
 constraint_policy: {constraint_policy}
 corners:
-  - id: tt
+  - id: {first_corner_id}
     model_section: Post_simu_top_tt
     variables:
       temperature: "27"
@@ -669,6 +692,33 @@ def test_aggregate_multi_testbench_child_manifests_pass_existing_checks(
     ]
 
 
+def test_aggregate_multi_testbench_records_current_consistent_utc_provenance(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    project_dir = _create_ready_multi_testbench_project(tmp_path)
+    _write_child_handoff(project_dir, testbench_id="cg_nf", metric_name="MAX_GAIN")
+    _write_child_handoff(project_dir, testbench_id="iip3", metric_name="IIP3")
+    timestamps = iter(
+        [
+            "2026-08-11T07:00:00Z",
+            "2026-08-11T07:00:03Z",
+        ]
+    )
+    monkeypatch.setattr(
+        "hermes_workflow.multi_testbench_aggregation._utc_now",
+        lambda: next(timestamps),
+    )
+
+    aggregate_multi_testbench_run(project_dir, run_id="real_001")
+
+    aggregate_result = _load_json(
+        project_dir / "runs" / "real" / "real_001" / "result_manifest.json"
+    )
+    assert aggregate_result["started_at_utc"] == "2026-08-11T07:00:00Z"
+    assert aggregate_result["completed_at_utc"] == "2026-08-11T07:00:03Z"
+
+
 def test_aggregate_result_manifest_inherits_prepared_spectre_settings(
     tmp_path: Path,
 ) -> None:
@@ -809,6 +859,127 @@ def test_aggregate_multi_testbench_real_failure_marks_candidate_result_failed(
     assert "simulator result is not succeeded" in metric_report.issues
 
 
+def test_optimizer_acceptance_allows_aggregate_real_failure_metric_sidecar(
+    tmp_path: Path,
+) -> None:
+    """A real multi-TB aggregate always writes a metric sidecar reference.
+
+    Native/OpenBox traces intentionally omit that reference when the candidate
+    is classified as ``real_check_failed``.  The failed observation remains
+    valid evidence and must not be rejected as a successful-linkage mismatch.
+    """
+    project_dir = _create_ready_multi_testbench_project(tmp_path)
+    _write_child_handoff(project_dir, testbench_id="cg_nf", metric_name="MAX_GAIN")
+    _write_child_handoff(
+        project_dir,
+        testbench_id="iip3",
+        metric_name="IIP3",
+        result_status="failed",
+    )
+    aggregate_multi_testbench_run(project_dir, run_id="real_001")
+    acceptance = _write_native_failed_aggregate_trace_and_accept(project_dir)
+
+    assert acceptance.status == "accepted", acceptance.issues
+    assert acceptance.result_manifest_count == 2
+    assert acceptance.metric_manifest_count == 1
+
+
+def _write_native_failed_aggregate_trace_and_accept(project_dir: Path):
+    from hermes_workflow.native_turbo import (
+        NativeTurboBatchRunner,
+        NativeTurboObservation,
+        execute_and_check_real_candidate,
+        load_native_turbo_contract,
+        write_native_turbo_reports,
+    )
+
+    failed_result_path = project_dir / "runs/real/real_001/result_manifest.json"
+    failed_result = _load_json(failed_result_path)
+    failed_result["candidate_id"] = "candidate_000001"
+    _write_json(failed_result_path, failed_result)
+    failed_metric_path = (
+        project_dir / "runs/real/real_001/metrics/metric_result_manifest.json"
+    )
+    failed_metric = _load_json(failed_metric_path)
+    failed_metric["candidate_id"] = "candidate_000001"
+    _write_json(failed_metric_path, failed_metric)
+    success_metric_relative = (
+        "runs/real/real_002/metrics/metric_result_manifest.json"
+    )
+    success_result = dict(failed_result)
+    success_result.update(
+        {
+            "run_id": "real_002",
+            "candidate_id": "candidate_000002",
+            "status": "succeeded",
+            "metric_result_manifest": success_metric_relative,
+        }
+    )
+    _write_json(
+        project_dir / "runs/real/real_002/result_manifest.json",
+        success_result,
+    )
+    success_metric = dict(failed_metric)
+    success_metric.update(
+        {
+            "run_id": "real_002",
+            "candidate_id": "candidate_000002",
+            "status": "succeeded",
+        }
+    )
+    _write_json(project_dir / success_metric_relative, success_metric)
+    selected_metrics = {
+        metric["name"]: float(metric["value"])
+        for metric in success_metric["metrics"]
+    }
+    contract = load_native_turbo_contract(project_dir)
+
+    def evaluate(candidates):
+        failed = execute_and_check_real_candidate(
+            project_dir,
+            run_id=candidates[0].run_id,
+            adapter=lambda *_args, **_kwargs: type(
+                "AdapterResult", (), {"status": "failed", "issues": []}
+            )(),
+        )
+        assert failed.status == "real_check_failed"
+        assert failed.metric_result_manifest is None
+        succeeded = NativeTurboObservation(
+            status="recorded",
+            metrics=selected_metrics,
+            result_manifest="runs/real/real_002/result_manifest.json",
+            metric_result_manifest=success_metric_relative,
+        )
+        return [failed, succeeded]
+
+    class TwoPointTurbo:
+        def __init__(self, *, f_batch, lb, ub, **_kwargs) -> None:
+            self.f_batch = f_batch
+            self.lb = lb
+            self.ub = ub
+
+        def optimize(self) -> None:
+            low = [float(value) for value in self.lb]
+            high = [float(value) for value in self.ub]
+            self.f_batch([low, high], selection_phase="initialization")
+
+    runner = NativeTurboBatchRunner(
+        variables=contract.variables,
+        metrics=contract.metrics,
+        optimizer=contract.optimizer,
+        batch_evaluator=evaluate,
+        batch_turbo_factory=TwoPointTurbo,
+        max_evals=2,
+        parallel_jobs=2,
+        threads_per_run=10,
+    )
+    result = runner.run()
+    assert result.traces[0].status == "real_check_failed"
+    assert result.traces[0].metric_result_manifest is None
+    write_native_turbo_reports(project_dir, result, execution_mode="local")
+    return check_optimizer_run(project_dir, expected_backend="native_turbo")
+
+
 def test_aggregate_multi_corner_feasible_uses_worst_case_corner_metrics(
     tmp_path: Path,
 ) -> None:
@@ -940,6 +1111,75 @@ def test_aggregate_multi_corner_real_failure_propagates(
 
     assert report.status == "real_check_failed"
     assert any("ss" in issue for issue in report.issues)
+    acceptance = _write_native_failed_aggregate_trace_and_accept(project_dir)
+    assert acceptance.status == "accepted", acceptance.issues
+
+
+def test_optimizer_acceptance_rejects_multi_corner_selected_metric_drift(
+    tmp_path: Path,
+) -> None:
+    project_dir = _create_ready_multi_corner_multi_testbench_project(tmp_path)
+    for corner_id in ("tt", "ff", "ss"):
+        _write_corner_child_handoff(
+            project_dir,
+            testbench_id="cg_nf",
+            corner_id=corner_id,
+            metric_name="MAX_GAIN",
+            value=8.0,
+            result_status="failed" if corner_id == "ss" else "succeeded",
+        )
+        _write_corner_child_handoff(
+            project_dir,
+            testbench_id="iip3",
+            corner_id=corner_id,
+            metric_name="IIP3",
+            value=10.0,
+        )
+    aggregate_multi_testbench_run(project_dir, run_id="real_001")
+    accepted = _write_native_failed_aggregate_trace_and_accept(project_dir)
+    assert accepted.status == "accepted", accepted.issues
+
+    evaluations_path = (
+        project_dir / "reports/native_turbo_optimizer_evaluations.jsonl"
+    )
+    rows = [
+        json.loads(line)
+        for line in evaluations_path.read_text(encoding="utf-8").splitlines()
+    ]
+    rows[1]["metrics"]["IIP3"] += 1.0
+    evaluations_path.write_text(
+        "".join(json.dumps(row, sort_keys=True) + "\n" for row in rows),
+        encoding="utf-8",
+    )
+    optimizer_report_path = (
+        project_dir / "reports/native_turbo_optimizer_report.json"
+    )
+    optimizer_report = _load_json(optimizer_report_path)
+    optimizer_report["best_candidate"] = rows[1]
+    _write_json(optimizer_report_path, optimizer_report)
+
+    rejected = check_optimizer_run(project_dir, expected_backend="native_turbo")
+
+    assert rejected.status == "rejected"
+    assert any(
+        "trace metrics do not match parent metric manifest" in issue
+        for issue in rejected.issues
+    )
+
+
+def test_aggregate_nominal_objective_requires_declared_nominal_corner(
+    tmp_path: Path,
+) -> None:
+    with pytest.raises(
+        ValueError,
+        match="nominal policy requires a corner with id 'nominal'",
+    ):
+        _create_ready_single_testbench_corner_project(
+            tmp_path,
+            corner_ids=["tt", "ss"],
+            objective_policy="nominal",
+            constraint_policy="all_corners",
+        )
 
 
 def test_aggregate_multi_corner_nominal_policy_ignores_non_nominal_constraint_failure(
@@ -951,7 +1191,7 @@ def test_aggregate_multi_corner_nominal_policy_ignores_non_nominal_constraint_fa
         constraint_policy="nominal",
     )
     for corner_id, gain, iip3 in (
-        ("tt", 8.0, 10.0),
+        ("nominal", 8.0, 10.0),
         ("ff", 4.0, 10.0),
         ("ss", 9.0, 11.0),
     ):
@@ -976,7 +1216,7 @@ def test_aggregate_multi_corner_nominal_policy_ignores_non_nominal_constraint_fa
     )
 
     assert report.status == "succeeded"
-    assert report.selected_corner == "tt"
+    assert report.selected_corner == "nominal"
     assert report.worst_corner is None
     assert {
         metric["name"]: metric["value"]

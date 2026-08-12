@@ -27,6 +27,10 @@ from hermes_workflow.remote_doctor import run_remote_doctor
 from hermes_workflow.remote_prepare import prepare_remote_project_cache
 from hermes_workflow.remote_project import RemoteProjectRef
 from hermes_workflow.remote_ssh import RemoteSshRunner
+from hermes_workflow.run_retention import (
+    apply_local_run_retention,
+    apply_remote_run_retention,
+)
 from hermes_workflow.validate import assert_valid_project
 
 from hermes_workflow.execution_adapters.remote_spectre_ocean import (
@@ -265,6 +269,49 @@ def _run_remote_child_adapters(
     return [outcome for outcome in outcomes if outcome is not None]
 
 
+def _apply_fix_run_retention(
+    project_dir: Path,
+    *,
+    remote_ref: RemoteProjectRef,
+    runner: Any,
+    run_id: str,
+    candidate_id: str,
+    run_succeeded: bool,
+) -> list[str]:
+    """Apply one coherent retention decision to Remote and Controller copies."""
+    issues: list[str] = []
+    try:
+        remote_decision = apply_remote_run_retention(
+            project_dir,
+            remote_ref=remote_ref,
+            runner=runner,
+            run_id=run_id,
+            candidate_id=candidate_id,
+            run_succeeded=run_succeeded,
+            preserve_evidence=False,
+        )
+    except Exception as exc:  # noqa: BLE001 - retain the primary run evidence.
+        issues.append(f"remote run retention raised: {exc}")
+    else:
+        if remote_decision.remote_action == "failed":
+            issues.extend(remote_decision.issues or ["remote run retention failed"])
+
+    try:
+        local_decision = apply_local_run_retention(
+            project_dir,
+            run_id=run_id,
+            candidate_id=candidate_id,
+            run_succeeded=run_succeeded,
+            preserve_evidence=False,
+        )
+    except Exception as exc:  # noqa: BLE001 - retain the primary run evidence.
+        issues.append(f"Controller cache retention raised: {exc}")
+    else:
+        if local_decision.local_action == "failed":
+            issues.extend(local_decision.issues or ["Controller cache retention failed"])
+    return issues
+
+
 def run_remote_fix_run_project(
     remote_ref: RemoteProjectRef,
     *,
@@ -272,6 +319,7 @@ def run_remote_fix_run_project(
     real: bool = True,
     runner: Any | None = None,
     doctor_report: Any | None = None,
+    attempt_started: bool = False,
 ) -> FixRunReport:
     """Execute the remote fix-run workflow for a project.
 
@@ -283,7 +331,15 @@ def run_remote_fix_run_project(
        manifests.
     5. Writes ``reports/fix_run_report.json`` and returns a ``FixRunReport``.
     """
+    if not real:
+        raise ValueError("remote fix-run requires real execution")
     ssh = runner or RemoteSshRunner(remote_ref.ssh_profile)
+    if not attempt_started:
+        from hermes_workflow.remote_optimizer_flow import (
+            _archive_remote_fix_run_report,
+        )
+
+        _archive_remote_fix_run_report(remote_ref, ssh)
 
     # --- Remote doctor ---
     doctor = doctor_report or run_remote_doctor(
@@ -328,12 +384,8 @@ def run_remote_fix_run_project(
 
     if real:
         # --- Build execution package and approve ---
-        build_execution_package(
-            project_dir, created_at_utc="2026-06-01T00:00:00Z"
-        )
-        decide_fix_run_real_run(
-            project_dir, created_at_utc="2026-06-01T00:10:00Z"
-        )
+        build_execution_package(project_dir)
+        decide_fix_run_real_run(project_dir)
 
         # --- Run each fixed point ---
         for point_index, point in enumerate(fixed_points_config.points):
@@ -467,6 +519,17 @@ def run_remote_fix_run_project(
                         )
                     )
 
+            point_issues.extend(
+                _apply_fix_run_retention(
+                    project_dir,
+                    remote_ref=remote_ref,
+                    runner=ssh,
+                    run_id=run_id,
+                    candidate_id=point.candidate_id,
+                    run_succeeded=not point_issues and not child_issues,
+                )
+            )
+
             point_reports.append(
                 FixRunPointReport(
                     candidate_id=point.candidate_id,
@@ -528,6 +591,16 @@ def _sync_report_to_remote(
         except Exception as exc:
             raise RuntimeError(
                 f"failed to upload fix-run artifacts {remote_runs}: {exc}"
+            ) from exc
+
+    retention_dir = cache_dir / "state" / "run_retention"
+    if retention_dir.is_dir():
+        remote_retention = ref.remote_project_dir / "state" / "run_retention"
+        try:
+            ssh.upload_tree(retention_dir, remote_retention)
+        except Exception as exc:
+            raise RuntimeError(
+                f"failed to upload fix-run retention evidence {remote_retention}: {exc}"
             ) from exc
 
     # The pass report is the completion marker and must be published last.

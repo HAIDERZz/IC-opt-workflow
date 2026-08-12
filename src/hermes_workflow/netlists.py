@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Callable
 from pathlib import Path, PurePosixPath
 
 import yaml
@@ -17,8 +18,15 @@ INCLUDE_SECTION_RE = re.compile(r"^(include\s+\S+\s+section=)\S+", re.MULTILINE)
 INCLUDE_FILE_RE = re.compile(r'^(include\s+)("?)[^"\s]+("?\s+section=\S+)', re.MULTILINE)
 
 
-def prepare_netlist(project_dir: Path) -> NetlistPreparationReport:
-    bundle = assert_valid_project(project_dir)
+def prepare_netlist(
+    project_dir: Path,
+    *,
+    model_file_is_readable: Callable[[str], bool] | None = None,
+) -> NetlistPreparationReport:
+    bundle = assert_valid_project(
+        project_dir,
+        model_file_is_readable=model_file_is_readable,
+    )
     variable_names = [variable.name for variable in bundle.variables.variables]
     if bundle.testbenches is not None:
         report = _prepare_multi_testbench_netlists(bundle, variable_names)
@@ -372,29 +380,48 @@ def render_corner_netlist_template(
     corner: ProcessCorner,
     base_corner_id: str,
 ) -> str:
-    if corner.id == base_corner_id:
+    if (
+        corner.id == base_corner_id
+        and corner.model_section is None
+        and corner.model_file is None
+        and corner.variables is None
+    ):
         return source_text
 
     result = source_text
     if corner.model_section is not None:
-        if not INCLUDE_SECTION_RE.search(result):
+        result, replacement_count = INCLUDE_SECTION_RE.subn(
+            r"\g<1>" + corner.model_section,
+            result,
+        )
+        if replacement_count == 0:
             raise ValueError(
                 f"corner {corner.id} requests model_section={corner.model_section!r} "
                 "but no include ... section=... line was found"
             )
-        result = INCLUDE_SECTION_RE.sub(
-            r"\g<1>" + corner.model_section,
-            result,
-        )
 
     if corner.model_file is not None:
-        result = INCLUDE_FILE_RE.sub(
+        result, replacement_count = INCLUDE_FILE_RE.subn(
             r"\g<1>\g<2>" + corner.model_file + r"\g<3>",
             result,
         )
+        if replacement_count != 1:
+            raise ValueError(
+                f"corner {corner.id} requests model_file={corner.model_file!r} "
+                "which must match exactly one include ... section=... line; "
+                f"found {replacement_count}"
+            )
 
     if corner.variables is not None:
-        result = _rewrite_corner_variables(result, corner.variables)
+        result, found_counts = _rewrite_corner_variables(result, corner.variables)
+        missing = sorted(name for name, count in found_counts.items() if count == 0)
+        if missing:
+            rendered = ", ".join(repr(name) for name in missing)
+            noun = "variable" if len(missing) == 1 else "variables"
+            raise ValueError(
+                f"corner {corner.id} {noun} {rendered} was not found in "
+                "top-level parameters"
+            )
 
     return result
 
@@ -402,10 +429,11 @@ def render_corner_netlist_template(
 def _rewrite_corner_variables(
     source_text: str,
     corner_variables: dict[str, str],
-) -> str:
+) -> tuple[str, dict[str, int]]:
     lines = source_text.splitlines(keepends=True)
     output_lines = list(lines)
     subckt_depth = 0
+    found_counts = {name: 0 for name in corner_variables}
 
     for statement in _logical_statements(lines):
         statement_text = "".join(lines[index] for index in statement)
@@ -421,6 +449,11 @@ def _rewrite_corner_variables(
         if first_token != "parameters" or subckt_depth > 0:
             continue
 
+        for name, count in _count_approved_assignments(
+            statement_text,
+            set(corner_variables),
+        ).items():
+            found_counts[name] += count
         rewritten = _rewrite_parameter_values(statement_text, corner_variables)
         rewritten_lines = _split_rewritten_statement(rewritten, statement_text)
         if len(rewritten_lines) != len(statement):
@@ -428,7 +461,7 @@ def _rewrite_corner_variables(
         for index, rewritten_line in zip(statement, rewritten_lines, strict=True):
             output_lines[index] = rewritten_line
 
-    return "".join(output_lines)
+    return "".join(output_lines), found_counts
 
 
 def _rewrite_parameter_values(
@@ -465,6 +498,7 @@ def prepare_corner_netlist_templates(
 
     payload = yaml.safe_load(corner_path.read_text(encoding="utf-8"))
     corner_config = ProcessCornerConfig.model_validate(payload)
+    base_corner_id = _testbench_base_corner_id(bundle, testbench_id)
 
     issues: list[str] = []
     for corner in corner_config.corners:
@@ -472,7 +506,7 @@ def prepare_corner_netlist_templates(
             corner_text = render_corner_netlist_template(
                 base_template_text,
                 corner,
-                bundle.project_config.testbench.corner,
+                base_corner_id,
             )
         except ValueError as exc:
             issues.append(str(exc))
@@ -493,6 +527,20 @@ def prepare_corner_netlist_templates(
         corner_template_path.write_text(corner_text, encoding="utf-8")
 
     return issues
+
+
+def _testbench_base_corner_id(
+    bundle: ContractBundle,
+    testbench_id: str | None,
+) -> str:
+    if testbench_id is None:
+        return bundle.project_config.testbench.corner
+    if bundle.testbenches is None:
+        raise ValueError(f"unknown testbench for corner rendering: {testbench_id}")
+    for testbench in bundle.testbenches.testbenches:
+        if testbench.id == testbench_id:
+            return testbench.corner
+    raise ValueError(f"unknown testbench for corner rendering: {testbench_id}")
 
 
 def _build_report(

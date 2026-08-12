@@ -16,6 +16,10 @@ from hermes_workflow.optimizer_artifacts import (
     EVALUATIONS_RELATIVE as OPTIMIZER_EVALUATIONS_RELATIVE,
 )
 from hermes_workflow.optimizer_artifacts import REPORT_RELATIVE as OPTIMIZER_REPORT_RELATIVE
+from hermes_workflow.optimizer_strategy import (
+    OptimizerStrategyRequest,
+    resolve_optimizer_strategy,
+)
 from hermes_workflow.optimizer_strategy import OptimizerStrategyName
 from hermes_workflow.real_result_record import LEDGER_PATH, OPTIMIZER_STATE_PATH
 from hermes_workflow.validate import assert_valid_project
@@ -25,7 +29,6 @@ TASK_FILE_NAME = "OPTIMIZER_EXECUTION_TASK.md"
 MANIFEST_FILE_NAME = "optimizer_execution_manifest.json"
 NATIVE_TURBO_BACKEND = "native_turbo"
 OPENBOX_BACKEND = "openbox"
-DEFAULT_OPENBOX_EXECUTION_VENV = "/tmp/ic_auto_opt_openbox_spike/.venv"
 NATIVE_TURBO_REQUIRED_RETURNED_ARTIFACTS = [
     str(NATIVE_TURBO_REPORT_RELATIVE),
     str(NATIVE_TURBO_EVALUATIONS_RELATIVE),
@@ -48,6 +51,11 @@ SUPERVISOR_CLOSEOUT_ARTIFACTS = [
     "reports/optimizer_insight_report.md",
     "reports/optimizer_visuals/*.svg",
 ]
+HISTORY_CONTINUATION_CONFLICT = (
+    "history warm-start cannot be combined with continuation; use continuation "
+    "for same-project budget extension, or start a new project for history "
+    "warm-start"
+)
 
 
 def _effective_strategy_value(
@@ -62,13 +70,28 @@ def _effective_strategy_value(
     return OptimizerStrategyName.from_user_value(configured_strategy).value
 
 
-def _backend_for_effective_strategy(backend: str, strategy: str | None) -> str:
-    if strategy is None:
-        return backend
-    strategy_name = OptimizerStrategyName.from_user_value(strategy)
+def _resolved_project_backend(
+    optimizer_settings: object,
+    *,
+    strategy: str | None,
+    variable_count: int,
+) -> str:
+    resolved = resolve_optimizer_strategy(
+        OptimizerStrategyRequest(
+            algorithm=optimizer_settings.algorithm,
+            strategy=(
+                OptimizerStrategyName.from_user_value(strategy)
+                if strategy is not None
+                else optimizer_settings.strategy
+            ),
+            openbox=optimizer_settings.openbox,
+            turbo=optimizer_settings.turbo,
+            variable_count=variable_count,
+        )
+    )
     return (
         NATIVE_TURBO_BACKEND
-        if strategy_name is OptimizerStrategyName.TURBO_TRUST_REGION
+        if resolved.backend == NATIVE_TURBO_BACKEND
         else OPENBOX_BACKEND
     )
 
@@ -85,19 +108,46 @@ def build_optimizer_execution_task_package(
     *,
     cadence_cshrc: Path,
     parallel: bool = True,
-    optimizer_backend: str = NATIVE_TURBO_BACKEND,
+    optimizer_backend: str | None = None,
     strategy: str | None = None,
     continuation: bool = False,
+    additional_evals: int | None = None,
+    openbox_venv: Path | None = None,
     created_at_utc: str | None = None,
 ) -> OptimizerExecutionTaskPackage:
     project_dir = Path(project_dir).resolve()
     cadence_cshrc = Path(cadence_cshrc).expanduser().resolve()
-    backend = _normalize_backend(optimizer_backend)
     bundle = assert_valid_project(project_dir)
-    effective_strategy = _effective_strategy_value(bundle.optimizer.optimizer, strategy)
-    backend = _backend_for_effective_strategy(backend, effective_strategy)
+    if bundle.optimizer is None:
+        raise ValueError("optimizer task package requires an optimize workflow")
+    optimizer_settings = bundle.optimizer.optimizer
+    effective_strategy = _effective_strategy_value(optimizer_settings, strategy)
+    backend = _resolved_project_backend(
+        optimizer_settings,
+        strategy=effective_strategy,
+        variable_count=len(bundle.variables.variables),
+    )
+    if optimizer_backend is not None:
+        requested_backend = _normalize_backend(optimizer_backend)
+        if requested_backend != backend:
+            raise ValueError(
+                f"optimizer_backend {requested_backend} does not match project "
+                f"backend {backend}"
+            )
+    resolved_openbox_venv = (
+        Path(openbox_venv).expanduser().resolve()
+        if openbox_venv is not None
+        else None
+    )
+    if resolved_openbox_venv is not None and backend != OPENBOX_BACKEND:
+        raise ValueError("openbox_venv is only valid for the openbox backend")
+    if (
+        continuation
+        and bundle.history_warm_start is not None
+        and bundle.history_warm_start.history_warm_start.enabled
+    ):
+        raise ValueError(HISTORY_CONTINUATION_CONFLICT)
     max_evals = bundle.optimizer.optimizer.max_evaluations
-    additional_evals = None
     _validate_budget(
         backend=backend,
         max_evals=max_evals,
@@ -119,6 +169,7 @@ def build_optimizer_execution_task_package(
         parallel_jobs=parallel_jobs,
         continuation=continuation,
         strategy=effective_strategy,
+        additional_evals=additional_evals,
     )
     spectre_settings = {
         "preset": spectre.preset.value,
@@ -132,10 +183,19 @@ def build_optimizer_execution_task_package(
         "inside_candidate_execution": "serial",
     }
     audit_commands = [
-        ["hermes-workflow", "check-optimizer-run", str(project_dir)],
-        ["hermes-workflow", "summarize-optimizer-run", str(project_dir)],
-        ["hermes-workflow", "finalize-optimizer-run", str(project_dir)],
-        ["hermes-workflow", "optimizer-status", str(project_dir)],
+        [
+            "hermes-workflow",
+            command_name,
+            str(project_dir),
+            "--expected-backend",
+            backend,
+        ]
+        for command_name in (
+            "check-optimizer-run",
+            "summarize-optimizer-run",
+            "finalize-optimizer-run",
+            "optimizer-status",
+        )
     ]
     payload = {
         "schema_version": "1.0",
@@ -153,10 +213,19 @@ def build_optimizer_execution_task_package(
         "batch_size": batch_size,
         "parallel_jobs": parallel_jobs,
         "cadence_cshrc": str(cadence_cshrc),
+        "openbox_venv": (
+            str(resolved_openbox_venv)
+            if resolved_openbox_venv is not None
+            else None
+        ),
         "spectre_settings": spectre_settings,
         "scheduler": scheduler_settings,
         "required_returned_artifacts": _required_returned_artifacts(backend),
-        "toolchain_check_command": _toolchain_check_command(backend, cadence_cshrc),
+        "toolchain_check_command": _toolchain_check_command(
+            backend,
+            cadence_cshrc,
+            resolved_openbox_venv,
+        ),
     }
 
     task_path = execution_dir / TASK_FILE_NAME
@@ -191,15 +260,15 @@ def _validate_budget(
     additional_evals: int | None,
     continuation: bool,
 ) -> None:
-    if continuation and backend != OPENBOX_BACKEND:
-        raise ValueError("continuation is only supported for the openbox backend")
     if max_evals is None:
         raise ValueError("max_evals is required")
     if max_evals < 1:
         raise ValueError("max_evals must be >= 1")
     if continuation:
-        if additional_evals is not None:
-            raise ValueError("additional_evals is no longer accepted for continuation")
+        if additional_evals is None:
+            raise ValueError("additional_evals is required for continuation")
+        if additional_evals < 1:
+            raise ValueError("additional_evals must be >= 1")
         return
     if additional_evals is not None:
         raise ValueError("additional_evals is only valid for continuation")
@@ -214,17 +283,21 @@ def _required_returned_artifacts(backend: str) -> list[str]:
     return base + list(SUPERVISOR_CLOSEOUT_ARTIFACTS)
 
 
-def _toolchain_check_command(backend: str, cadence_cshrc: Path) -> list[str] | None:
+def _toolchain_check_command(
+    backend: str,
+    cadence_cshrc: Path,
+    openbox_venv: Path | None,
+) -> list[str] | None:
     if backend != OPENBOX_BACKEND:
         return None
-    return [
+    command = [
         "hermes-workflow",
         "check-toolchain-env",
-        "--openbox-venv",
-        DEFAULT_OPENBOX_EXECUTION_VENV,
-        "--cadence-cshrc",
-        str(cadence_cshrc),
     ]
+    if openbox_venv is not None:
+        command.extend(["--openbox-venv", str(openbox_venv)])
+    command.extend(["--cadence-cshrc", str(cadence_cshrc)])
+    return command
 
 
 def _command(
@@ -237,16 +310,29 @@ def _command(
     parallel_jobs: int,
     continuation: bool,
     strategy: str | None,
+    additional_evals: int | None,
 ) -> list[str]:
     if backend == OPENBOX_BACKEND:
         if continuation:
             command = ["hermes-workflow", "continue-openbox-real", str(project_dir)]
+            command.extend(["--additional-evals", str(additional_evals)])
         else:
             command = ["hermes-workflow", "run-openbox-real", str(project_dir)]
         if strategy:
             command.extend(["--strategy", strategy])
         command.extend(["--cadence-cshrc", str(cadence_cshrc)])
         return command
+
+    if continuation:
+        return [
+            "ic-opt",
+            str(project_dir),
+            "--real",
+            "--continue",
+            str(additional_evals),
+            "--cadence-cshrc",
+            str(cadence_cshrc),
+        ]
 
     command = ["hermes-workflow", "run-native-turbo", str(project_dir)]
     command.append("--parallel" if parallel else "--sequential")
@@ -350,7 +436,11 @@ def _required_behavior(payload: dict) -> str:
                 "- Do not silently fall back to TuRBO or manually choose candidates.",
             ]
         )
-    return "- Use native `Turbo1.optimize()` through `run-native-turbo`."
+    command_name = "ic-opt --continue" if payload.get("continuation") else "run-native-turbo"
+    return (
+        "- Use native `Turbo1.optimize()` through "
+        f"`{command_name}` without switching optimizer backend."
+    )
 
 
 def _continuation_note(payload: dict) -> str:
@@ -380,13 +470,21 @@ Run this before OpenBox real execution:
 def _execution_environment(payload: dict) -> str:
     if payload["backend"] != OPENBOX_BACKEND:
         return ""
+    venv_instruction = (
+        "- Put the explicitly selected OpenBox execution venv first in `PATH`:\n"
+        f"  `{payload['openbox_venv']}`."
+        if payload.get("openbox_venv")
+        else (
+            "- Use the Python environment that provides the invoked "
+            "`hermes-workflow`; no packaging-machine venv path is assumed."
+        )
+    )
     return f"""
 ## Execution Environment
 
 - Source Cadence cshrc before the optimizer command:
   `{payload["cadence_cshrc"]}`.
-- Put the OpenBox execution venv first in `PATH`:
-  `{DEFAULT_OPENBOX_EXECUTION_VENV}`.
+{venv_instruction}
 - Set `MPLCONFIGDIR` to a writable `/tmp` directory.
 - Run real OpenBox/Spectre/OCEAN execution through a non-sandbox or escalated
   command path.

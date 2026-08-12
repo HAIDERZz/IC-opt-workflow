@@ -26,7 +26,7 @@ from hermes_workflow.real_run import (
 from hermes_workflow.real_run_recovery import assert_no_unresolved_real_runs
 from hermes_workflow.package import sha256_file
 from hermes_workflow.schemas import VariableKind
-from hermes_workflow.validate import assert_valid_project
+from hermes_workflow.validate import assert_valid_project, require_optimize_bundle
 
 
 @dataclass(frozen=True)
@@ -53,7 +53,10 @@ def suggest_candidate_request(
     created_at_utc: str | None = None,
 ) -> CandidateSuggestionResult:
     project_dir = Path(project_dir)
-    bundle = assert_valid_project(project_dir)
+    bundle = require_optimize_bundle(
+        assert_valid_project(project_dir),
+        operation="candidate suggestion",
+    )
     assert_no_unresolved_real_runs(project_dir)
     ledger_rows = _read_ledger_rows_or_raise(project_dir)
     state = _load_optimizer_state(project_dir)

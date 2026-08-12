@@ -13,6 +13,7 @@ observations for retention purposes; the optimizer was able to use them.
 from __future__ import annotations
 
 import json
+import hashlib
 import re
 import shutil
 from dataclasses import dataclass, field
@@ -21,7 +22,13 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 from hermes_workflow.real_run import RUN_ID_RE
-from hermes_workflow.remote_ssh import quote_remote_path
+from hermes_workflow.package import sha256_file
+from hermes_workflow.remote_ssh import quote_remote_path, require_boolean_probe
+from hermes_workflow.retention_evidence import (
+    STORE_RELATIVE as RETENTION_EVIDENCE_STORE_RELATIVE,
+    load_retention_evidence,
+    preserve_retention_evidence,
+)
 from hermes_workflow.validate import assert_valid_project
 
 
@@ -64,6 +71,10 @@ class RunRetentionDecision:
     remote_action: str
     local_run_dir: str
     remote_run_dir: str | None
+    evidence_status: str = "not_required"
+    evidence_path: str | None = None
+    evidence_digest: str | None = None
+    attempt_identity: str = ""
     issues: list[str] = field(default_factory=list)
     decided_at_utc: str = ""
 
@@ -111,6 +122,10 @@ def _decision_to_payload(decision: RunRetentionDecision) -> dict[str, Any]:
         "remote_action": decision.remote_action,
         "local_run_dir": decision.local_run_dir,
         "remote_run_dir": decision.remote_run_dir,
+        "evidence_status": decision.evidence_status,
+        "evidence_path": decision.evidence_path,
+        "evidence_digest": decision.evidence_digest,
+        "attempt_identity": decision.attempt_identity,
         "issues": list(decision.issues),
         "decided_at_utc": decision.decided_at_utc,
     }
@@ -129,6 +144,10 @@ def _payload_to_decision(payload: dict[str, Any]) -> RunRetentionDecision:
         remote_action=str(payload["remote_action"]),
         local_run_dir=str(payload["local_run_dir"]),
         remote_run_dir=payload.get("remote_run_dir"),
+        evidence_status=str(payload.get("evidence_status", "not_required")),
+        evidence_path=payload.get("evidence_path"),
+        evidence_digest=payload.get("evidence_digest"),
+        attempt_identity=str(payload.get("attempt_identity", "")),
         issues=list(payload.get("issues") or []),
         decided_at_utc=str(payload.get("decided_at_utc", "")),
     )
@@ -159,6 +178,52 @@ def _read_existing_decision(
     return _payload_to_decision(payload)
 
 
+def _result_manifest_digest(project_dir: Path, run_id: str) -> str:
+    result = _local_run_dir_for(project_dir, run_id) / "result_manifest.json"
+    if result.is_file() and not result.is_symlink():
+        return sha256_file(result)
+    try:
+        evidence = load_retention_evidence(project_dir, run_id=run_id)
+        payload = json.loads(
+            (evidence.bundle_path / "evidence.json").read_text(encoding="utf-8")
+        )
+    except (RuntimeError, OSError, json.JSONDecodeError):
+        return "missing"
+    expected = f"runs/real/{run_id}/result_manifest.json"
+    for artifact in payload.get("artifacts", []):
+        if (
+            isinstance(artifact, dict)
+            and artifact.get("canonical_path") == expected
+            and isinstance(artifact.get("sha256"), str)
+        ):
+            return artifact["sha256"]
+    return "missing"
+
+
+def _attempt_identity(
+    *,
+    run_id: str,
+    candidate_id: str | None,
+    run_status: str,
+    policy: RunRetentionPolicy,
+    result_digest: str,
+    preserve_evidence: bool,
+) -> str:
+    payload = {
+        "run_id": run_id,
+        "candidate_id": candidate_id,
+        "run_status": run_status,
+        "keep_failed_runs": policy.keep_failed_runs,
+        "keep_successful_runs": policy.keep_successful_runs,
+        "policy_source": policy.source,
+        "result_manifest_sha256": result_digest,
+        "preserve_evidence": preserve_evidence,
+    }
+    return hashlib.sha256(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+
+
 def apply_local_run_retention(
     project_dir: Path,
     *,
@@ -167,6 +232,7 @@ def apply_local_run_retention(
     run_succeeded: bool,
     policy: RunRetentionPolicy | None = None,
     now_utc: str | None = None,
+    preserve_evidence: bool = True,
 ) -> RunRetentionDecision:
     """Apply retention to the local candidate run directory and write a decision.
 
@@ -181,7 +247,17 @@ def apply_local_run_retention(
 
     resolved_policy = policy or load_run_retention_policy(project_dir)
     local_run_dir = _local_run_dir_for(project_dir, run_id)
+    local_run_existed_before = local_run_dir.exists()
+    existing = _read_existing_decision(project_dir, run_id)
     run_status = "successful" if run_succeeded else "failed"
+    attempt_identity = _attempt_identity(
+        run_id=run_id,
+        candidate_id=candidate_id,
+        run_status=run_status,
+        policy=resolved_policy,
+        result_digest=_result_manifest_digest(project_dir, run_id),
+        preserve_evidence=preserve_evidence,
+    )
     keep_for_status = (
         resolved_policy.keep_successful_runs
         if run_succeeded
@@ -189,22 +265,55 @@ def apply_local_run_retention(
     )
 
     new_issues: list[str] = []
+    evidence_status = "not_required"
+    evidence_path: str | None = None
+    evidence_digest: str | None = None
     if not local_run_dir.exists():
         local_action = _LOCAL_MISSING
     elif keep_for_status:
         local_action = _LOCAL_KEPT
-    else:
+    elif not preserve_evidence:
         try:
             shutil.rmtree(local_run_dir)
             local_action = _LOCAL_DELETED
+        except Exception as exc:  # noqa: BLE001 — surface deletion failure.
+            local_action = _LOCAL_FAILED
+            new_issues.append(f"local rmtree of {local_run_dir} failed: {exc}")
+    else:
+        try:
+            evidence = preserve_retention_evidence(
+                project_dir,
+                run_id=run_id,
+                candidate_id=candidate_id,
+            )
+            evidence_status = "preserved"
+            evidence_path = str(evidence.bundle_path)
+            evidence_digest = evidence.digest
         except Exception as exc:  # noqa: BLE001 — surface any deletion failure.
             local_action = _LOCAL_FAILED
             new_issues.append(
-                f"local rmtree of {local_run_dir} failed: {exc}"
+                f"retention evidence preservation for {local_run_dir} failed: {exc}"
             )
+        else:
+            try:
+                shutil.rmtree(local_run_dir)
+                local_action = _LOCAL_DELETED
+            except Exception as exc:  # noqa: BLE001 — surface deletion failure.
+                local_action = _LOCAL_FAILED
+                new_issues.append(
+                    f"local rmtree of {local_run_dir} failed: {exc}"
+                )
 
-    existing = _read_existing_decision(project_dir, run_id)
-    if existing is None:
+    starts_new_attempt = (
+        existing is not None
+        and existing.local_action in {_LOCAL_DELETED, _LOCAL_MISSING}
+        and local_run_existed_before
+    )
+    if (
+        existing is None
+        or existing.attempt_identity != attempt_identity
+        or starts_new_attempt
+    ):
         decision = RunRetentionDecision(
             schema_version=SCHEMA_VERSION,
             run_id=run_id,
@@ -217,6 +326,10 @@ def apply_local_run_retention(
             remote_action=_REMOTE_NOT_APPLICABLE,
             local_run_dir=str(local_run_dir),
             remote_run_dir=None,
+            evidence_status=evidence_status,
+            evidence_path=evidence_path,
+            evidence_digest=evidence_digest,
+            attempt_identity=attempt_identity,
             issues=list(new_issues),
             decided_at_utc=now_utc or _now_utc(),
         )
@@ -238,6 +351,14 @@ def apply_local_run_retention(
             remote_action=existing.remote_action,
             local_run_dir=str(local_run_dir),
             remote_run_dir=existing.remote_run_dir,
+            evidence_status=(
+                evidence_status
+                if evidence_status != "not_required"
+                else existing.evidence_status
+            ),
+            evidence_path=evidence_path or existing.evidence_path,
+            evidence_digest=evidence_digest or existing.evidence_digest,
+            attempt_identity=attempt_identity,
             issues=merged_issues,
             decided_at_utc=existing.decided_at_utc or (now_utc or _now_utc()),
         )
@@ -274,6 +395,7 @@ def apply_remote_run_retention(
     run_succeeded: bool,
     policy: RunRetentionPolicy | None = None,
     now_utc: str | None = None,
+    preserve_evidence: bool = True,
 ) -> RunRetentionDecision:
     """Apply retention to the remote candidate run directory.
 
@@ -288,6 +410,7 @@ def apply_remote_run_retention(
     resolved_policy = policy or load_run_retention_policy(project_dir)
     remote_project_dir: PurePosixPath = remote_ref.remote_project_dir
     remote_run_dir = remote_project_dir / "runs" / "real" / run_id
+    local_run_exists_at_remote_call = _local_run_dir_for(project_dir, run_id).exists()
     _validate_remote_target(remote_run_dir, remote_project_dir, run_id)
 
     keep_for_status = (
@@ -296,17 +419,70 @@ def apply_remote_run_retention(
         else resolved_policy.keep_failed_runs
     )
     run_status = "successful" if run_succeeded else "failed"
+    attempt_identity = _attempt_identity(
+        run_id=run_id,
+        candidate_id=candidate_id,
+        run_status=run_status,
+        policy=resolved_policy,
+        result_digest=_result_manifest_digest(project_dir, run_id),
+        preserve_evidence=preserve_evidence,
+    )
     new_issues: list[str] = []
+    evidence_status = "not_required"
+    evidence_path: str | None = None
+    evidence_digest: str | None = None
 
     if keep_for_status:
         remote_action = _REMOTE_KEPT
     else:
         try:
             probe = runner.run(f"test -d {quote_remote_path(remote_run_dir)}")
-            return_code = getattr(probe, "return_code", None)
-            if return_code != 0:
+            exists = require_boolean_probe(
+                probe,
+                profile=getattr(runner, "profile", "remote"),
+                description=f"remote retention directory probe for {remote_run_dir}",
+            )
+            if not exists:
                 remote_action = _REMOTE_MISSING
+            elif not preserve_evidence:
+                runner.run(
+                    f"rm -rf -- {quote_remote_path(remote_run_dir)}",
+                    check=True,
+                )
+                remote_action = _REMOTE_DELETED
             else:
+                try:
+                    evidence = load_retention_evidence(
+                        project_dir,
+                        run_id=run_id,
+                    )
+                except RuntimeError:
+                    evidence = preserve_retention_evidence(
+                        project_dir,
+                        run_id=run_id,
+                        candidate_id=candidate_id,
+                    )
+                evidence_status = "preserved"
+                evidence_path = str(evidence.bundle_path)
+                evidence_digest = evidence.digest
+                remote_evidence_dir = (
+                    remote_project_dir
+                    / PurePosixPath(
+                        RETENTION_EVIDENCE_STORE_RELATIVE.as_posix()
+                    )
+                    / run_id
+                )
+                runner.upload_tree(
+                    evidence.bundle_path,
+                    remote_evidence_dir,
+                    replace=True,
+                )
+                runner.run(
+                    f"cd {quote_remote_path(remote_evidence_dir)} && "
+                    "sha256sum --quiet -c -- checksums.sha256",
+                    timeout_s=getattr(runner, "transfer_timeout_s", None),
+                    check=True,
+                )
                 runner.run(
                     f"rm -rf -- {quote_remote_path(remote_run_dir)}",
                     check=True,
@@ -319,7 +495,16 @@ def apply_remote_run_retention(
             )
 
     existing = _read_existing_decision(project_dir, run_id)
-    if existing is None:
+    starts_new_attempt = (
+        existing is not None
+        and existing.local_action in {_LOCAL_DELETED, _LOCAL_MISSING}
+        and local_run_exists_at_remote_call
+    )
+    if (
+        existing is None
+        or existing.attempt_identity != attempt_identity
+        or starts_new_attempt
+    ):
         local_run_dir = _local_run_dir_for(project_dir, run_id)
         decision = RunRetentionDecision(
             schema_version=SCHEMA_VERSION,
@@ -333,6 +518,10 @@ def apply_remote_run_retention(
             remote_action=remote_action,
             local_run_dir=str(local_run_dir),
             remote_run_dir=remote_run_dir.as_posix(),
+            evidence_status=evidence_status,
+            evidence_path=evidence_path,
+            evidence_digest=evidence_digest,
+            attempt_identity=attempt_identity,
             issues=list(new_issues),
             decided_at_utc=now_utc or _now_utc(),
         )
@@ -350,6 +539,14 @@ def apply_remote_run_retention(
             remote_action=remote_action,
             local_run_dir=existing.local_run_dir,
             remote_run_dir=remote_run_dir.as_posix(),
+            evidence_status=(
+                evidence_status
+                if evidence_status != "not_required"
+                else existing.evidence_status
+            ),
+            evidence_path=evidence_path or existing.evidence_path,
+            evidence_digest=evidence_digest or existing.evidence_digest,
+            attempt_identity=attempt_identity,
             issues=merged_issues,
             decided_at_utc=existing.decided_at_utc or (now_utc or _now_utc()),
         )

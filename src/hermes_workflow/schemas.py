@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from enum import StrEnum
+from pathlib import PurePosixPath
 from typing import Annotated, Literal
 
 from pydantic import (
@@ -173,6 +174,74 @@ class ProcessCorner(StrictModel):
     def _id_is_identifier(cls, value: str) -> str:
         return validate_name(value, "corner id")
 
+    @field_validator("model_section")
+    @classmethod
+    def _model_section_is_safe_token(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        if (
+            not value
+            or any(character.isspace() for character in value)
+            or any(character in value for character in ("'", '"', "\\"))
+        ):
+            raise ValueError(
+                "corner model_section must be a non-empty compact token "
+                "without quotes or backslashes"
+            )
+        return value
+
+    @field_validator("model_file")
+    @classmethod
+    def _model_file_is_safe_absolute_path(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        if (
+            not value
+            or any(character.isspace() for character in value)
+            or any(ord(character) < 32 or ord(character) == 127 for character in value)
+            or any(character in value for character in ("'", '"', "\\"))
+        ):
+            raise ValueError(
+                "corner model_file must be a non-empty compact path without "
+                "whitespace, quotes, or backslashes"
+            )
+        if not PurePosixPath(value).is_absolute():
+            raise ValueError("corner model_file must be an absolute POSIX path")
+        return value
+
+    @field_validator("variables")
+    @classmethod
+    def _variables_are_safe_tokens(
+        cls,
+        value: dict[str, str] | None,
+    ) -> dict[str, str] | None:
+        if value is None:
+            return None
+        for name, raw_value in value.items():
+            validate_name(name, "corner variable name")
+            if (
+                not raw_value
+                or any(character.isspace() for character in raw_value)
+                or any(character in raw_value for character in ("'", '"', "\\"))
+            ):
+                raise ValueError(
+                    f"corner variable {name} must be a non-empty compact token "
+                    "without quotes or backslashes"
+                )
+        return value
+
+    @model_validator(mode="after")
+    def _provided_render_fields_are_not_null(self) -> "ProcessCorner":
+        for field_name in ("model_section", "model_file", "variables"):
+            if (
+                field_name in self.model_fields_set
+                and getattr(self, field_name) is None
+            ):
+                raise ValueError(
+                    f"corner {field_name} must be omitted rather than null"
+                )
+        return self
+
 
 class ProcessCornerConfig(StrictModel):
     schema_version: Literal["1.0"]
@@ -265,6 +334,13 @@ class OceanMetricSpec(StrictModel):
             raise ValueError("ocean.expression must not contain template placeholders")
         return value
 
+    @field_validator("result")
+    @classmethod
+    def _result_is_identifier(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return validate_name(value, "ocean.result")
+
 
 class MetricSpec(StrictModel):
     name: str
@@ -307,7 +383,7 @@ class MetricsConfig(StrictModel):
     schema_version: Literal["1.0"]
     metrics: list[MetricSpec] = Field(min_length=1)
     constraints: list[ConstraintSpec] = Field(default_factory=list)
-    objective: ObjectiveSpec
+    objective: ObjectiveSpec | None = None
 
     @model_validator(mode="after")
     def _metric_names_are_unique(self) -> "MetricsConfig":

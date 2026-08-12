@@ -57,14 +57,15 @@ from hermes_workflow.requirement_intake import (
     prepare_from_requirement,
 )
 from hermes_workflow.result_handoff import check_real_run
-from hermes_workflow.validate import validate_project_files
+from hermes_workflow.validate import (
+    assert_valid_project,
+    local_model_file_is_readable,
+    validate_project_files,
+)
 
 
 app = typer.Typer(help="Hermes file-contract workflow tools.")
 
-CONTINUATION_SURROGATE_TYPE = "prf"
-CONTINUATION_ACQ_TYPE = "eic"
-CONTINUATION_ACQ_OPTIMIZER_TYPE = "local_random"
 
 
 def _version_callback(value: bool) -> None:
@@ -126,7 +127,7 @@ def _exit_with_recovery_report(
 @app.command("check-toolchain-env")
 def check_toolchain_env_command(
     openbox_venv: Annotated[
-        Path,
+        Path | None,
         typer.Option(
             "--openbox-venv",
             help="OpenBox/Hermes execution venv to check.",
@@ -187,7 +188,10 @@ def validate_command(
     ],
 ) -> None:
     try:
-        report = validate_project_files(project_dir)
+        report = validate_project_files(
+            project_dir,
+            model_file_is_readable=local_model_file_is_readable,
+        )
     except (OSError, ValueError) as exc:
         _exit_with_error(exc)
     typer.echo(report.format())
@@ -203,7 +207,10 @@ def prepare_netlist_command(
     ],
 ) -> None:
     try:
-        report = prepare_netlist(project_dir)
+        report = prepare_netlist(
+            project_dir,
+            model_file_is_readable=local_model_file_is_readable,
+        )
     except (OSError, ValueError) as exc:
         _exit_with_error(exc)
     if report.status.value == "pass":
@@ -361,9 +368,27 @@ def package_optimizer_task_command(
         bool,
         typer.Option(
             "--continuation",
-            help="Generate an OpenBox continuation task instead of a first-run task.",
+            help="Generate a continuation task instead of a first-run task.",
         ),
     ] = False,
+    additional_evals: Annotated[
+        int | None,
+        typer.Option(
+            "--additional-evals",
+            min=1,
+            help="New evaluations requested by a continuation task.",
+        ),
+    ] = None,
+    openbox_venv: Annotated[
+        Path | None,
+        typer.Option(
+            "--openbox-venv",
+            help=(
+                "Optional OpenBox execution venv on the machine that will "
+                "run the packaged task."
+            ),
+        ),
+    ] = None,
     cadence_cshrc: Annotated[
         Path,
         typer.Option("--cadence-cshrc", help="Cadence cshrc to source for execution."),
@@ -376,12 +401,15 @@ def package_optimizer_task_command(
         ),
     ] = True,
     backend: Annotated[
-        str,
+        str | None,
         typer.Option(
             "--backend",
-            help="Optimizer backend for the execution task: native-turbo or openbox.",
+            help=(
+                "Optional optimizer backend override: native-turbo or openbox. "
+                "By default, resolve the backend from project configuration."
+            ),
         ),
-    ] = "native-turbo",
+    ] = None,
     strategy: Annotated[
         str | None,
         typer.Option("--strategy", help="Optimizer strategy preset."),
@@ -395,6 +423,8 @@ def package_optimizer_task_command(
             optimizer_backend=backend,
             strategy=strategy,
             continuation=continuation,
+            additional_evals=additional_evals,
+            openbox_venv=openbox_venv,
         )
     except (OSError, ValueError) as exc:
         _exit_with_error(exc)
@@ -714,9 +744,19 @@ def check_optimizer_run_command(
         Path,
         typer.Argument(help="Project directory with completed optimizer artifacts."),
     ],
+    expected_backend: Annotated[
+        str | None,
+        typer.Option(
+            "--expected-backend",
+            help="Require optimizer artifacts from this backend.",
+        ),
+    ] = None,
 ) -> None:
     try:
-        report = check_optimizer_run(project_dir)
+        report = check_optimizer_run(
+            project_dir,
+            expected_backend=expected_backend,
+        )
     except (OSError, ValueError) as exc:
         _exit_with_error(exc)
     if report.status == "accepted":
@@ -737,9 +777,19 @@ def summarize_optimizer_run_command(
         Path,
         typer.Argument(help="Project directory with accepted optimizer artifacts."),
     ],
+    expected_backend: Annotated[
+        str | None,
+        typer.Option(
+            "--expected-backend",
+            help="Require optimizer artifacts from this backend.",
+        ),
+    ] = None,
 ) -> None:
     try:
-        report = summarize_optimizer_run(project_dir)
+        report = summarize_optimizer_run(
+            project_dir,
+            expected_backend=expected_backend,
+        )
     except (OSError, ValueError) as exc:
         _exit_with_error(exc)
     if report.status == "pass":
@@ -888,9 +938,19 @@ def finalize_optimizer_run_command(
         Path,
         typer.Argument(help="Project directory with completed optimizer artifacts."),
     ],
+    expected_backend: Annotated[
+        str | None,
+        typer.Option(
+            "--expected-backend",
+            help="Require optimizer artifacts from this backend.",
+        ),
+    ] = None,
 ) -> None:
     try:
-        report = finalize_optimizer_run(project_dir)
+        report = finalize_optimizer_run(
+            project_dir,
+            expected_backend=expected_backend,
+        )
     except (OSError, ValueError) as exc:
         _exit_with_error(exc)
     if report.status == "pass":
@@ -917,9 +977,19 @@ def optimizer_status_command(
         Path,
         typer.Argument(help="Project directory with optimizer artifacts."),
     ],
+    expected_backend: Annotated[
+        str | None,
+        typer.Option(
+            "--expected-backend",
+            help="Require optimizer artifacts from this backend.",
+        ),
+    ] = None,
 ) -> None:
     try:
-        summary = summarize_optimizer_status(project_dir)
+        summary = summarize_optimizer_status(
+            project_dir,
+            expected_backend=expected_backend,
+        )
     except (OSError, ValueError) as exc:
         _exit_with_error(exc)
 
@@ -1081,6 +1151,10 @@ def run_openbox_real_command(
     ] = None,
 ) -> None:
     try:
+        assert_valid_project(
+            project_dir,
+            model_file_is_readable=local_model_file_is_readable,
+        )
         result = run_openbox_real_optimization(
             project_dir,
             max_evals=None,
@@ -1109,6 +1183,14 @@ def continue_openbox_real_command(
     project_dir: Annotated[
         Path,
         typer.Argument(help="Project directory with prior OpenBox optimizer artifacts."),
+    ],
+    additional_evals: Annotated[
+        int,
+        typer.Option(
+            "--additional-evals",
+            min=1,
+            help="Required number of new evaluations to append.",
+        ),
     ],
     cadence_cshrc: Annotated[
         Path | None,
@@ -1146,29 +1228,32 @@ def continue_openbox_real_command(
     ] = None,
 ) -> None:
     try:
-        _ensure_base_execution_manifest(project_dir)
-        if strategy is None:
-            effective_surrogate_type = surrogate_type or CONTINUATION_SURROGATE_TYPE
-            effective_acq_type = acq_type or CONTINUATION_ACQ_TYPE
-            effective_acq_optimizer_type = (
-                acq_optimizer_type or CONTINUATION_ACQ_OPTIMIZER_TYPE
+        assert_valid_project(
+            project_dir,
+            model_file_is_readable=local_model_file_is_readable,
+        )
+        acceptance = check_optimizer_run(
+            project_dir,
+            expected_backend="openbox",
+        )
+        if acceptance.status != "accepted":
+            detail = "; ".join(acceptance.issues) or "acceptance status is not accepted"
+            raise RuntimeError(
+                f"prior optimizer history acceptance rejected: {detail}"
             )
-        else:
-            effective_surrogate_type = surrogate_type
-            effective_acq_type = acq_type
-            effective_acq_optimizer_type = acq_optimizer_type
+        _ensure_base_execution_manifest(project_dir)
         result = run_openbox_real_optimization(
             project_dir,
             max_evals=None,
-            additional_evals=None,
+            additional_evals=additional_evals,
             continue_from_existing=True,
             batch_size=None,
             parallel_jobs=None,
             cadence_cshrc=cadence_cshrc,
             strategy=strategy,
-            surrogate_type=effective_surrogate_type,
-            acq_type=effective_acq_type,
-            acq_optimizer_type=effective_acq_optimizer_type,
+            surrogate_type=surrogate_type,
+            acq_type=acq_type,
+            acq_optimizer_type=acq_optimizer_type,
             initial_trials=initial_trials,
         )
     except (OSError, RuntimeError, ValueError) as exc:
@@ -1263,6 +1348,10 @@ def run_native_turbo_command(
     ] = False,
 ) -> None:
     try:
+        assert_valid_project(
+            project_dir,
+            model_file_is_readable=local_model_file_is_readable,
+        )
         runner = (
             run_batch_native_turbo_optimization
             if parallel

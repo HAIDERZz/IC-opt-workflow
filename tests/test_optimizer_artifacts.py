@@ -65,3 +65,97 @@ def test_loader_falls_back_to_legacy_native_turbo_artifacts(tmp_path: Path) -> N
     assert artifacts.source == "legacy_native_turbo"
     assert artifacts.report["status"] == "completed"
     assert artifacts.traces[0]["status"] == "feasible"
+
+
+def test_loader_selects_expected_native_backend_over_stale_neutral_openbox(
+    tmp_path: Path,
+) -> None:
+    _write_json(
+        tmp_path / REPORT_RELATIVE,
+        {"status": "completed", "backend": "openbox", "evaluation_count": 99},
+    )
+    _write_jsonl(
+        tmp_path / EVALUATIONS_RELATIVE,
+        [{"evaluation_index": 99, "status": "stale_openbox"}],
+    )
+    _write_json(
+        tmp_path / LEGACY_NATIVE_REPORT_RELATIVE,
+        {
+            "status": "completed",
+            "backend": "native_turbo",
+            "evaluation_count": 1,
+        },
+    )
+    _write_jsonl(
+        tmp_path / LEGACY_NATIVE_EVALUATIONS_RELATIVE,
+        [{"evaluation_index": 1, "status": "feasible"}],
+    )
+    issues: list[str] = []
+
+    artifacts = load_optimizer_artifacts(
+        tmp_path,
+        issues,
+        expected_backend="native_turbo",
+    )
+
+    assert issues == []
+    assert artifacts.source == "legacy_native_turbo"
+    assert artifacts.report["backend"] == "native_turbo"
+    assert artifacts.traces == [{"evaluation_index": 1, "status": "feasible"}]
+
+
+def test_loader_keeps_neutral_artifacts_for_expected_openbox(tmp_path: Path) -> None:
+    _write_json(
+        tmp_path / REPORT_RELATIVE,
+        {"status": "completed", "backend": "openbox", "evaluation_count": 1},
+    )
+    _write_jsonl(
+        tmp_path / EVALUATIONS_RELATIVE,
+        [{"evaluation_index": 1, "status": "feasible"}],
+    )
+    _write_json(
+        tmp_path / LEGACY_NATIVE_REPORT_RELATIVE,
+        {"status": "completed", "backend": "native_turbo", "evaluation_count": 7},
+    )
+    _write_jsonl(
+        tmp_path / LEGACY_NATIVE_EVALUATIONS_RELATIVE,
+        [{"evaluation_index": 7, "status": "native"}],
+    )
+    issues: list[str] = []
+
+    artifacts = load_optimizer_artifacts(
+        tmp_path,
+        issues,
+        expected_backend="openbox",
+    )
+
+    assert issues == []
+    assert artifacts.source == "backend_neutral"
+    assert artifacts.report["backend"] == "openbox"
+
+
+def test_loader_fails_closed_when_available_artifacts_do_not_match_backend(
+    tmp_path: Path,
+) -> None:
+    _write_json(
+        tmp_path / REPORT_RELATIVE,
+        {"status": "completed", "backend": "openbox", "evaluation_count": 1},
+    )
+    _write_jsonl(
+        tmp_path / EVALUATIONS_RELATIVE,
+        [{"evaluation_index": 1, "status": "feasible"}],
+    )
+    issues: list[str] = []
+
+    artifacts = load_optimizer_artifacts(
+        tmp_path,
+        issues,
+        expected_backend="native_turbo",
+    )
+
+    assert artifacts.report == {}
+    assert artifacts.traces == []
+    assert any(
+        "expected backend native_turbo" in issue and "openbox" in issue
+        for issue in issues
+    )

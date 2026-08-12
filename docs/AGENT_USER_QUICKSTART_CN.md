@@ -27,11 +27,16 @@ agent 操作当前版本的 IC Auto Opt 时，不只是替用户运行命令。a
 | 目标 | 模板 | 模式 |
 | --- | --- | --- |
 | 单 testbench、source-point corner 优化 | `opt_requirement.md` | `optimize` |
+| 显式 OpenBox GP-EIC 优化 | `opt_requirement.openbox_gp_eic.md` | `optimize` |
+| 显式 native TuRBO 优化 | `opt_requirement.turbo.md` | `optimize` |
 | 单 testbench、多 process corner 优化 | `opt_requirement.multi_corner.md` | `optimize` |
 | 多 testbench、source-point corner 优化 | `opt_requirement.multi_testbench.md` | `optimize` |
 | 多 testbench、多 process corner 优化 | `opt_requirement.multi_tb_corner.md` | `optimize` |
 | 新项目引用同电路旧项目历史 | `opt_requirement.history_warm_start.md` | `optimize` + History Warm Start |
+| 多 process corner 项目引用同电路旧项目历史 | `opt_requirement.history_warm_start.multi_corner.md` | `optimize` + History Warm Start |
 | 固定参数点和 waveform CSV 导出 | `opt_requirement.fix_run.md` | `fix_run` |
+| 固定参数点、只提取 scalar Metrics | `opt_requirement.fix_run.metrics_only.md` | `fix_run` |
+| 多 testbench 固定点、同时提取 Metrics 与 Waveform | `opt_requirement.fix_run.multi_testbench.metrics_waveform.md` | `fix_run` |
 
 ## 命令
 
@@ -52,13 +57,18 @@ ic-opt --ssh-profile PROFILE PROJECT_DIR --real --continue N
 ```
 
 `--continue N` 是追加仿真入口。`--ssh-profile PROFILE` 只选择远端执行 profile，
-不是资源或优化器覆盖。
+不是资源或优化器覆盖。续跑沿用项目已经生成的 backend：OpenBox 续跑 OpenBox，
+native TuRBO 续跑 native TuRBO，不允许静默换 backend 或重新走初始化点。每个 Remote
+续跑 attempt 都会先对当前远端环境重新执行一次 Doctor，然后才允许恢复 snapshot、同步
+历史和启动优化器。
 
 ## History Warm Start
 
 `History Warm Start` 是新建 optimize 项目时引用同一电路旧项目历史的入口，不是
 `--continue N`。`--continue N` 只给同一个项目追加预算，不重新读取用户改过的
 `opt_requirement.md`。History warm-start 不支持 fix-run，也不能和 `--continue` 一起跑。
+启用的 History Warm Start 只支持 OpenBox；与 native TuRBO 组合会在 requirement/project
+校验阶段明确失败。Native TuRBO 项目追加预算应使用 `--continue N`。
 
 最小 section：
 
@@ -175,6 +185,7 @@ finger count 类整数、类别变量、或大量候选点 snap 后重复时，�
 ```text
 examples/spectre_maestro_project/opt_requirement.multi_corner.md
 examples/spectre_maestro_project/opt_requirement.multi_tb_corner.md
+examples/spectre_maestro_project/opt_requirement.history_warm_start.multi_corner.md
 ```
 
 agent 需要报告 objective policy、constraint policy、被选中的 run、各 corner
@@ -199,6 +210,8 @@ ic-opt --ssh-profile PROFILE PROJECT_DIR --real
 
 ```text
 examples/spectre_maestro_project/opt_requirement.fix_run.md
+examples/spectre_maestro_project/opt_requirement.fix_run.metrics_only.md
+examples/spectre_maestro_project/opt_requirement.fix_run.multi_testbench.metrics_waveform.md
 ```
 
 正确的 pnoise waveform expression 形式是：

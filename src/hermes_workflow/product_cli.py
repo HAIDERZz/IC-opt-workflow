@@ -122,6 +122,130 @@ def _echo_report_path(project_dir: Path, report_path: Path | None) -> None:
     except ValueError:
         typer.echo(f"report: {report_path}")
 
+
+def _validate_cli_mode_flags(
+    *,
+    real: bool,
+    dry_orchestration: bool,
+    doctor: bool,
+    continue_evals: int | None,
+    ssh_profile: str | None,
+) -> None:
+    if doctor and (real or dry_orchestration or continue_evals is not None):
+        raise ValueError(
+            "--doctor cannot be combined with --real, --continue, or "
+            "--dry-orchestration"
+        )
+    if not dry_orchestration:
+        return
+    if ssh_profile is not None:
+        raise ValueError(
+            "--dry-orchestration is only supported for a local first-run "
+            "optimize workflow"
+        )
+    if continue_evals is not None:
+        raise ValueError("--dry-orchestration cannot be combined with --continue")
+    if not real:
+        raise ValueError("--dry-orchestration requires --real")
+
+
+def _release_remote_attempt_lease(
+    lease: object | None,
+    *,
+    primary_error: BaseException | None,
+) -> None:
+    release = getattr(lease, "release", None)
+    if not callable(release):
+        return
+    try:
+        release()
+    except Exception as release_error:
+        if primary_error is None:
+            raise
+        primary_error.add_note(
+            f"Additionally failed to release remote attempt lock: {release_error}"
+        )
+
+
+def _run_remote_real_cli(
+    ref: RemoteProjectRef,
+    *,
+    remote_cshrc: PurePosixPath,
+    remote_runner: RemoteSshRunner,
+) -> None:
+    lease = begin_remote_optimizer_attempt(ref, runner=remote_runner)
+    primary_error: BaseException | None = None
+    try:
+        doctor_report = run_remote_doctor(
+            ref,
+            runner=remote_runner,
+            cadence_cshrc=remote_cshrc,
+        )
+        if doctor_report.status != "pass":
+            raise ValueError(
+                "remote doctor failed: " + "; ".join(doctor_report.issues)
+            )
+        workflow_mode = doctor_report.workflow_mode
+        if workflow_mode == "fix_run":
+            fix_report = run_remote_fix_run_project(
+                ref,
+                remote_cadence_cshrc=remote_cshrc,
+                real=True,
+                runner=remote_runner,
+                doctor_report=doctor_report,
+                attempt_started=True,
+            )
+            if fix_report.status != "pass":
+                raise ValueError("remote fix-run flow failed")
+            typer.echo("remote fix-run flow completed")
+            typer.echo(
+                "local report: "
+                f"{remote_cache_dir(ref) / 'reports' / 'fix_run_report.json'}"
+            )
+            typer.echo(
+                "remote report: "
+                f"{ref.remote_project_dir / 'reports' / 'fix_run_report.json'}"
+            )
+            return
+        if workflow_mode != "optimize":
+            raise ValueError(
+                "remote requirement has unsupported workflow mode: "
+                f"{workflow_mode!r}"
+            )
+        report = optimize_remote_project(
+            ref,
+            real=True,
+            remote_cadence_cshrc=remote_cshrc,
+            max_evals=None,
+            batch_size=None,
+            parallel_jobs=None,
+            strategy=None,
+            runner=remote_runner,
+            doctor_report=doctor_report,
+            attempt_started=True,
+        )
+        if report.status != "pass":
+            issues = getattr(report, "issues", [])
+            raise ValueError(
+                "remote optimizer flow failed: " + "; ".join(issues)
+            )
+        typer.echo("remote optimizer flow completed")
+        if report.recommended_run_id is not None:
+            typer.echo(f"recommended: {report.recommended_run_id}")
+        typer.echo(f"local report: {report.report_path}")
+        typer.echo(
+            "remote report: "
+            f"{ref.remote_project_dir / 'reports' / 'optimizer_decision_report.md'}"
+        )
+    except BaseException as exc:
+        primary_error = exc
+        raise
+    finally:
+        _release_remote_attempt_lease(
+            lease,
+            primary_error=primary_error,
+        )
+
 @app.command()
 def main(
     project_dir: Annotated[
@@ -136,7 +260,10 @@ def main(
         bool,
         typer.Option(
             "--dry-orchestration",
-            help="Run offline gates and stop before real tools.",
+            help=(
+                "For local first-run optimize only: require --real, run offline "
+                "gates, and stop before real tools."
+            ),
         ),
     ] = False,
     cadence_cshrc: Annotated[
@@ -160,9 +287,24 @@ def main(
     ] = False,
     continue_evals: Annotated[
         int | None,
-        typer.Option("--continue", min=1, help="Continue an existing optimization by N evaluations."),
+        typer.Option(
+            "--continue",
+            min=1,
+            help="With --real, continue an existing optimization by N evaluations.",
+        ),
     ] = None,
 ) -> None:
+    try:
+        _validate_cli_mode_flags(
+            real=real,
+            dry_orchestration=dry_orchestration,
+            doctor=doctor,
+            continue_evals=continue_evals,
+            ssh_profile=ssh_profile,
+        )
+    except ValueError as exc:
+        _exit_with_error(exc)
+
     if ssh_profile is not None:
         ref = RemoteProjectRef(
             ssh_profile=ssh_profile,
@@ -197,7 +339,24 @@ def main(
                 if cadence_cshrc is not None
                 else ref.remote_project_dir / "cadence_env.csh"
             )
+            remote_runner = RemoteSshRunner(ref.ssh_profile)
+            lease = None
+            remote_error: Exception | None = None
             try:
+                lease = begin_remote_optimizer_attempt(
+                    ref,
+                    runner=remote_runner,
+                )
+                doctor_report = run_remote_doctor(
+                    ref,
+                    runner=remote_runner,
+                    cadence_cshrc=remote_cshrc,
+                )
+                if doctor_report.status != "pass":
+                    raise ValueError(
+                        "remote doctor failed: "
+                        + "; ".join(doctor_report.issues)
+                    )
                 report = continue_remote_project(
                     ref,
                     additional_evals=continue_evals,
@@ -205,9 +364,19 @@ def main(
                     batch_size=None,
                     parallel_jobs=None,
                     strategy=None,
+                    runner=remote_runner,
+                    doctor_report=doctor_report,
+                    attempt_started=True,
                 )
             except (OSError, RuntimeError, ValueError) as exc:
-                _exit_with_error(exc)
+                remote_error = exc
+            finally:
+                _release_remote_attempt_lease(
+                    lease,
+                    primary_error=remote_error,
+                )
+            if remote_error is not None:
+                _exit_with_error(remote_error)
             if report.status == "pass":
                 typer.echo("remote continuation completed")
                 if report.recommended_run_id is not None:
@@ -224,78 +393,14 @@ def main(
             )
             remote_runner = RemoteSshRunner(ref.ssh_profile)
             try:
-                begin_remote_optimizer_attempt(ref, runner=remote_runner)
-                doctor_report = run_remote_doctor(
+                _run_remote_real_cli(
                     ref,
-                    runner=remote_runner,
-                    cadence_cshrc=remote_cshrc,
+                    remote_cshrc=remote_cshrc,
+                    remote_runner=remote_runner,
                 )
             except (OSError, RuntimeError, ValueError) as exc:
                 _exit_with_error(exc)
-            if doctor_report.status != "pass":
-                _exit_with_error(
-                    ValueError(
-                        "remote doctor failed: " + "; ".join(doctor_report.issues)
-                    )
-                )
-            workflow_mode = doctor_report.workflow_mode
-            if workflow_mode == "fix_run":
-                try:
-                    fix_report = run_remote_fix_run_project(
-                        ref,
-                        remote_cadence_cshrc=remote_cshrc,
-                        real=True,
-                        runner=remote_runner,
-                        doctor_report=doctor_report,
-                    )
-                except (OSError, RuntimeError, ValueError) as exc:
-                    _exit_with_error(exc)
-                if fix_report.status == "pass":
-                    typer.echo("remote fix-run flow completed")
-                    typer.echo(
-                        "local report: "
-                        f"{remote_cache_dir(ref) / 'reports' / 'fix_run_report.json'}"
-                    )
-                    typer.echo(
-                        "remote report: "
-                        f"{ref.remote_project_dir / 'reports' / 'fix_run_report.json'}"
-                    )
-                    return
-                typer.echo("remote fix-run flow failed")
-                raise typer.Exit(code=1)
-            if workflow_mode != "optimize":
-                _exit_with_error(
-                    ValueError(
-                        "remote requirement has unsupported workflow mode: "
-                        f"{workflow_mode!r}"
-                    )
-                )
-            try:
-                report = optimize_remote_project(
-                    ref,
-                    real=True,
-                    remote_cadence_cshrc=remote_cshrc,
-                    max_evals=None,
-                    batch_size=None,
-                    parallel_jobs=None,
-                    strategy=None,
-                    runner=remote_runner,
-                    doctor_report=doctor_report,
-                    attempt_started=True,
-                )
-            except (OSError, RuntimeError, ValueError) as exc:
-                _exit_with_error(exc)
-            if report.status == "pass":
-                typer.echo("remote optimizer flow completed")
-                if report.recommended_run_id is not None:
-                    typer.echo(f"recommended: {report.recommended_run_id}")
-                typer.echo(f"local report: {report.report_path}")
-                typer.echo(
-                    f"remote report: {ref.remote_project_dir / 'reports' / 'optimizer_decision_report.md'}"
-                )
-                return
-            _print_report_issues(report)
-            raise typer.Exit(code=1)
+            return
         _exit_with_error(
             ValueError("remote mode requires --doctor, --real, or --continue N")
         )
@@ -317,6 +422,26 @@ def main(
         _print_report_issues(report)
         _echo_report_path(project_dir, report.report_path)
         raise typer.Exit(code=1)
+
+    workflow_mode: str | None = None
+    if (project_dir / "opt_requirement.md").exists():
+        try:
+            intake = check_requirement(project_dir)
+        except (OSError, RuntimeError, ValueError) as exc:
+            _exit_with_error(exc)
+        workflow_mode = getattr(intake, "workflow_mode", None)
+
+    if workflow_mode == "fix_run":
+        if continue_evals is not None:
+            _exit_with_error(
+                ValueError("--continue requires an optimize workflow")
+            )
+        if not real:
+            _exit_with_error(ValueError("fix-run requires --real"))
+        if dry_orchestration:
+            _exit_with_error(
+                ValueError("--dry-orchestration is not supported for fix-run")
+            )
 
     try:
         resolved_cadence_cshrc = _resolve_cadence_cshrc(project_dir, cadence_cshrc)
@@ -346,29 +471,24 @@ def main(
         raise typer.Exit(code=1)
 
     # --- Fix-run dispatch ---
-    if (project_dir / "opt_requirement.md").exists():
+    if workflow_mode == "fix_run":
         try:
-            intake = check_requirement(project_dir)
-        except Exception:
-            intake = None
-        if intake is not None and getattr(intake, "workflow_mode", None) == "fix_run":
-            try:
-                fix_report = run_fix_run_project(
-                    project_dir,
-                    real=real,
-                    cadence_cshrc=resolved_cadence_cshrc,
-                )
-            except (OSError, RuntimeError, ValueError) as exc:
-                _exit_with_error(exc)
-            if fix_report.status == "pass":
-                typer.echo("fix-run flow completed")
-                _echo_report_path(
-                    project_dir,
-                    project_dir / "reports" / "fix_run_report.json",
-                )
-                return
-            typer.echo("fix-run flow failed")
-            raise typer.Exit(code=1)
+            fix_report = run_fix_run_project(
+                project_dir,
+                real=real,
+                cadence_cshrc=resolved_cadence_cshrc,
+            )
+        except (OSError, RuntimeError, ValueError) as exc:
+            _exit_with_error(exc)
+        if fix_report.status == "pass":
+            typer.echo("fix-run flow completed")
+            _echo_report_path(
+                project_dir,
+                project_dir / "reports" / "fix_run_report.json",
+            )
+            return
+        typer.echo("fix-run flow failed")
+        raise typer.Exit(code=1)
 
     try:
         report = optimize_project(

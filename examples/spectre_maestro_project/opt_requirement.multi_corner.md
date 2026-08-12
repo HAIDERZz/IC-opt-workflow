@@ -3,6 +3,13 @@
 Use this template when one optimizer candidate is evaluated by one testbench
 across several process corners.
 
+## Workflow
+
+```yaml
+schema_version: "1.0"
+mode: optimize
+```
+
 ## Project
 
 ```yaml

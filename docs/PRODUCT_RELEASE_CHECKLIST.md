@@ -34,6 +34,21 @@ src/hermes_workflow/templates/spectre_maestro_project/opt_requirement.history_wa
 
 examples/spectre_maestro_project/opt_requirement.fix_run.md
 src/hermes_workflow/templates/spectre_maestro_project/opt_requirement.fix_run.md
+
+examples/spectre_maestro_project/opt_requirement.openbox_gp_eic.md
+src/hermes_workflow/templates/spectre_maestro_project/opt_requirement.openbox_gp_eic.md
+
+examples/spectre_maestro_project/opt_requirement.turbo.md
+src/hermes_workflow/templates/spectre_maestro_project/opt_requirement.turbo.md
+
+examples/spectre_maestro_project/opt_requirement.history_warm_start.multi_corner.md
+src/hermes_workflow/templates/spectre_maestro_project/opt_requirement.history_warm_start.multi_corner.md
+
+examples/spectre_maestro_project/opt_requirement.fix_run.metrics_only.md
+src/hermes_workflow/templates/spectre_maestro_project/opt_requirement.fix_run.metrics_only.md
+
+examples/spectre_maestro_project/opt_requirement.fix_run.multi_testbench.metrics_waveform.md
+src/hermes_workflow/templates/spectre_maestro_project/opt_requirement.fix_run.multi_testbench.metrics_waveform.md
 ```
 
 ## Required Checks
@@ -53,6 +68,9 @@ Packaged template `config/*.yaml` files must be current Mixer starter resources,
 not legacy inverter starter resources.
 
 The release `docs/` directory should contain only current product, user, agent,
-toolchain, and troubleshooting documentation. Do not include development logs,
-temporary agent work notes, generated analysis folders, graph outputs, or raw
-Cadence artifacts in the release package.
+toolchain, troubleshooting, and explicitly curated maintenance-audit
+documentation. The maintained correctness ledger under `docs/audits/` may be
+kept in the source repository and GitHub source archive, but it is not installed
+as Python runtime package data. Do not include temporary agent work notes,
+generated analysis folders, graph outputs, or raw Cadence artifacts in the
+release package.

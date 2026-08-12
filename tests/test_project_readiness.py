@@ -114,6 +114,13 @@ def _make_fix_run_readiness_project(tmp_path: Path) -> Path:
                         "output_format": "csv",
                         "nil_policy": "fail",
                     },
+                    {
+                        "name": "iip3_spectrum",
+                        "testbench": "iip3",
+                        "expression": 'getData("iip3")',
+                        "output_format": "csv",
+                        "nil_policy": "fail",
+                    },
                 ],
             },
             sort_keys=False,

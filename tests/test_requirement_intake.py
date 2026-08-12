@@ -196,6 +196,136 @@ def test_check_requirement_rejects_duplicate_yaml_key(tmp_path: Path) -> None:
     )
 
 
+def test_requirement_rejects_unknown_process_corner_field_instead_of_defaulting(
+    tmp_path: Path,
+) -> None:
+    project_dir = _copy_requirement_project(tmp_path)
+    path = project_dir / "opt_requirement.md"
+    path.write_text(
+        path.read_text(encoding="utf-8")
+        + """
+
+## Process Corners
+
+```yaml
+objective_polciy: nominal
+constraint_policy: all_corners
+corners:
+  - id: nominal
+```
+""",
+        encoding="utf-8",
+    )
+
+    report = check_requirement(project_dir)
+
+    assert report.status == "fail"
+    assert any(
+        "Process Corners.objective_polciy" in issue
+        and "Extra inputs are not permitted" in issue
+        for issue in report.issues
+    )
+
+
+def test_requirement_rejects_unknown_project_field(tmp_path: Path) -> None:
+    project_dir = _copy_requirement_project(tmp_path)
+    path = project_dir / "opt_requirement.md"
+    text = path.read_text(encoding="utf-8").replace(
+        "backend: maestro_exported_spectre_deck",
+        "backend: maestro_exported_spectre_deck\nbackned: typo",
+        1,
+    )
+    path.write_text(text, encoding="utf-8")
+
+    report = check_requirement(project_dir)
+
+    assert report.status == "fail"
+    assert any(
+        "Project.backned" in issue and "Extra inputs are not permitted" in issue
+        for issue in report.issues
+    )
+
+
+def test_requirement_rejects_unknown_metric_field(tmp_path: Path) -> None:
+    project_dir = _copy_requirement_project(tmp_path)
+    path = project_dir / "opt_requirement.md"
+    text = path.read_text(encoding="utf-8").replace(
+        "unit: s",
+        "unit: s\n  unt: typo",
+        1,
+    )
+    path.write_text(text, encoding="utf-8")
+
+    report = check_requirement(project_dir)
+
+    assert report.status == "fail"
+    assert any(
+        "Metrics.0.unt" in issue and "Extra inputs are not permitted" in issue
+        for issue in report.issues
+    )
+
+
+def test_requirement_rejects_unsafe_metric_result_selector(tmp_path: Path) -> None:
+    project_dir = _copy_requirement_project(tmp_path)
+    path = project_dir / "opt_requirement.md"
+    text = path.read_text(encoding="utf-8").replace(
+        "result: tran",
+        'result: tran);system("touch /tmp/x")',
+        1,
+    )
+    path.write_text(text, encoding="utf-8")
+
+    report = check_requirement(project_dir)
+
+    assert report.status == "fail"
+    assert any(
+        "metrics.0.ocean.result" in issue and "ocean.result must match" in issue
+        for issue in report.issues
+    )
+
+
+def test_requirement_rejects_unknown_maestro_source_field(tmp_path: Path) -> None:
+    project_dir = _copy_requirement_project(tmp_path)
+    path = project_dir / "opt_requirement.md"
+    text = path.read_text(encoding="utf-8").replace(
+        f"maestro_point_root: {VALID_MAESTRO_POINT.as_posix()}",
+        f"maestro_point_root: {VALID_MAESTRO_POINT.as_posix()}\n"
+        "maestro_point_rooot: /wrong/path",
+        1,
+    )
+    path.write_text(text, encoding="utf-8")
+
+    report = check_requirement(project_dir)
+
+    assert report.status == "fail"
+    assert any(
+        "Maestro Source.maestro_point_rooot" in issue
+        and "Extra inputs are not permitted" in issue
+        for issue in report.issues
+    )
+
+
+def test_requirement_rejects_unknown_approval_field(tmp_path: Path) -> None:
+    project_dir = _copy_requirement_project(tmp_path)
+    path = project_dir / "opt_requirement.md"
+    text = path.read_text(encoding="utf-8").replace(
+        "metric_formulas_user_approved: true",
+        "metric_formulas_user_approved: true\n"
+        "metric_formula_user_approved: true",
+        1,
+    )
+    path.write_text(text, encoding="utf-8")
+
+    report = check_requirement(project_dir)
+
+    assert report.status == "fail"
+    assert any(
+        "Approval Checklist.metric_formula_user_approved" in issue
+        and "Extra inputs are not permitted" in issue
+        for issue in report.issues
+    )
+
+
 def test_check_requirement_rejects_unapproved_checklist(tmp_path: Path) -> None:
     project_dir = _copy_requirement_project(tmp_path)
     text = (project_dir / "opt_requirement.md").read_text(encoding="utf-8")
@@ -205,7 +335,216 @@ def test_check_requirement_rejects_unapproved_checklist(tmp_path: Path) -> None:
     report = check_requirement(project_dir)
 
     assert report.status == "fail"
-    assert "approval checklist metric_formulas_user_approved must be true" in report.issues
+    assert any(
+        "Approval Checklist.metric_formulas_user_approved" in issue
+        and "Input should be True" in issue
+        for issue in report.issues
+    )
+
+
+def test_requirement_objective_rejects_function_not_supported_by_runtime(
+    tmp_path: Path,
+) -> None:
+    project_dir = _copy_requirement_project(tmp_path)
+    path = project_dir / "opt_requirement.md"
+    text = path.read_text(encoding="utf-8").replace(
+        'expression: "(rise + fall) * DC"',
+        "expression: sqrt(rise)",
+        1,
+    )
+    path.write_text(text, encoding="utf-8")
+
+    report = check_requirement(project_dir)
+
+    assert report.status == "fail"
+    assert any(
+        "unsupported objective function sqrt" in issue for issue in report.issues
+    )
+
+
+def test_requirement_objective_accepts_runtime_modulo_operator(
+    tmp_path: Path,
+) -> None:
+    project_dir = _copy_requirement_project(tmp_path)
+    path = project_dir / "opt_requirement.md"
+    text = path.read_text(encoding="utf-8").replace(
+        'expression: "(rise + fall) * DC"',
+        "expression: rise % fall",
+        1,
+    )
+    path.write_text(text, encoding="utf-8")
+
+    report = check_requirement(project_dir)
+
+    assert report.status == "pass", report.issues
+
+
+def test_requirement_objective_preflight_does_not_assume_fake_metric_values(
+    tmp_path: Path,
+) -> None:
+    project_dir = _copy_requirement_project(tmp_path)
+    path = project_dir / "opt_requirement.md"
+    text = path.read_text(encoding="utf-8").replace(
+        'expression: "(rise + fall) * DC"',
+        "expression: ln(DC - 1)",
+        1,
+    )
+    path.write_text(text, encoding="utf-8")
+
+    report = check_requirement(project_dir)
+
+    assert report.status == "pass", report.issues
+
+
+def test_requirement_rejects_constraint_unit_that_disagrees_with_metric(
+    tmp_path: Path,
+) -> None:
+    project_dir = _copy_requirement_project(tmp_path)
+    path = project_dir / "opt_requirement.md"
+    text = path.read_text(encoding="utf-8").replace(
+        'value: "80e-12 s"',
+        'value: "80e-12 Hz"',
+        1,
+    )
+    path.write_text(text, encoding="utf-8")
+
+    report = check_requirement(project_dir)
+
+    assert report.status == "fail"
+    assert any(
+        "constraint rise unit 'Hz' does not match metric unit 's'" in issue
+        for issue in report.issues
+    )
+
+
+def test_requirement_rejects_constraint_without_metric_unit(tmp_path: Path) -> None:
+    project_dir = _copy_requirement_project(tmp_path)
+    path = project_dir / "opt_requirement.md"
+    text = path.read_text(encoding="utf-8").replace(
+        'value: "80e-12 s"',
+        'value: "80e-12"',
+        1,
+    )
+    path.write_text(text, encoding="utf-8")
+
+    report = check_requirement(project_dir)
+
+    assert report.status == "fail"
+    assert any(
+        "finite numeric threshold followed by unit 's'" in issue
+        for issue in report.issues
+    )
+
+
+def test_requirement_rejects_integer_variable_range_off_grid(
+    tmp_path: Path,
+) -> None:
+    project_dir = _copy_requirement_project(tmp_path)
+    path = project_dir / "opt_requirement.md"
+    path.write_text(
+        path.read_text(encoding="utf-8").replace('step: "1"', 'step: "4"', 1),
+        encoding="utf-8",
+    )
+
+    report = check_requirement(project_dir)
+
+    assert report.status == "fail"
+    assert any("FN range must be divisible by step" in issue for issue in report.issues)
+
+
+def test_requirement_rejects_optimizer_batch_larger_than_parallel_jobs(
+    tmp_path: Path,
+) -> None:
+    project_dir = _copy_requirement_project(tmp_path)
+    path = project_dir / "opt_requirement.md"
+    path.write_text(
+        path.read_text(encoding="utf-8").replace(
+            "batch_size: 10", "batch_size: 11", 1
+        ),
+        encoding="utf-8",
+    )
+
+    report = check_requirement(project_dir)
+
+    assert report.status == "fail"
+    assert any(
+        "optimizer.batch_size must be <= spectre.parallel_jobs" in issue
+        for issue in report.issues
+    )
+
+
+def test_requirement_rejects_turbo_budget_below_dimension_minimum(
+    tmp_path: Path,
+) -> None:
+    project_dir = _copy_requirement_project(tmp_path)
+    path = project_dir / "opt_requirement.md"
+    optimizer_yaml = """\
+algorithm: turbo
+strategy: turbo_trust_region
+initialization: sobol
+max_evaluations: 7
+batch_size: 4
+random_seed: 20260528
+failure_penalty: 1000000.0
+deduplicate_candidates: true
+turbo:
+  snap_to_step: true
+  duplicate_handling: resample
+"""
+    path.write_text(
+        _replace_section_yaml(
+            path.read_text(encoding="utf-8"),
+            "Optimizer Settings",
+            optimizer_yaml,
+        ),
+        encoding="utf-8",
+    )
+
+    report = check_requirement(project_dir)
+
+    assert report.status == "fail"
+    assert any(
+        "optimizer.max_evaluations must be >= 2 * number_of_variables" in issue
+        for issue in report.issues
+    )
+
+
+def test_requirement_rejects_openbox_preset_overridden_by_nested_settings(
+    tmp_path: Path,
+) -> None:
+    project_dir = _copy_requirement_project(tmp_path)
+    path = project_dir / "opt_requirement.md"
+    optimizer_yaml = """\
+algorithm: openbox
+strategy: openbox_gp_eic
+initialization: sobol
+max_evaluations: 100
+batch_size: 10
+random_seed: 20260528
+failure_penalty: 1000000.0
+deduplicate_candidates: true
+openbox:
+  surrogate_type: prf
+  acq_type: pi
+  acq_optimizer_type: local_random
+"""
+    path.write_text(
+        _replace_section_yaml(
+            path.read_text(encoding="utf-8"),
+            "Optimizer Settings",
+            optimizer_yaml,
+        ),
+        encoding="utf-8",
+    )
+
+    report = check_requirement(project_dir)
+
+    assert report.status == "fail"
+    assert any(
+        "openbox_gp_eic" in issue
+        and "requires optimizer.openbox.surrogate_type=gp; got prf" in issue
+        for issue in report.issues
+    )
 
 
 def test_check_requirement_preserves_constraints_md_as_guidance_only(tmp_path: Path) -> None:
@@ -278,6 +617,38 @@ openbox:
         "acq_optimizer_type": "random_scipy",
         "initial_trials": 12,
     }
+
+
+def test_prepare_from_requirement_removes_stale_managed_config_when_section_is_removed(
+    tmp_path: Path,
+) -> None:
+    project_dir = _copy_requirement_project(tmp_path)
+    requirement_path = project_dir / "opt_requirement.md"
+    original = requirement_path.read_text(encoding="utf-8")
+    requirement_path.write_text(
+        original
+        + """
+
+## History Warm Start
+
+```yaml
+enabled: false
+sources: []
+```
+""",
+        encoding="utf-8",
+    )
+
+    first = prepare_from_requirement(project_dir)
+    assert first.status == "pass", first.issues
+    stale_path = project_dir / "config" / "history_warm_start.yaml"
+    assert stale_path.is_file()
+
+    requirement_path.write_text(original, encoding="utf-8")
+    second = prepare_from_requirement(project_dir)
+
+    assert second.status == "pass", second.issues
+    assert not stale_path.exists()
 
 
 def test_requirement_intake_writes_process_corners_and_optimizer_strategy(
@@ -990,6 +1361,77 @@ def test_parse_requirement_text_accepts_history_warm_start_section(
     assert report.sections["History Warm Start"]["sources"][0]["path"] == "/tmp/old_project"
 
 
+def test_parse_requirement_text_rejects_enabled_history_warm_start_for_turbo(
+    tmp_path: Path,
+) -> None:
+    project_dir = _copy_requirement_project(tmp_path)
+    text = _insert_history_warm_start_section(
+        (project_dir / "opt_requirement.md").read_text(encoding="utf-8")
+    )
+    text = _replace_section_yaml(
+        text,
+        "Optimizer Settings",
+        """algorithm: turbo
+strategy: turbo_trust_region
+initialization: sobol
+max_evaluations: 100
+batch_size: 10
+random_seed: 20260528
+failure_penalty: 1000000.0
+deduplicate_candidates: true
+turbo:
+  snap_to_step: true
+  duplicate_handling: resample
+""",
+    )
+
+    report = parse_requirement_text(
+        text,
+        constraints_text=None,
+        maestro_input_exists=lambda _path: True,
+    )
+
+    assert report.status == "fail"
+    assert any(
+        "history_warm_start.enabled=true requires the OpenBox optimizer backend; "
+        "resolved backend is native_turbo" in issue
+        for issue in report.issues
+    )
+
+
+def test_parse_requirement_text_allows_disabled_history_warm_start_for_turbo(
+    tmp_path: Path,
+) -> None:
+    project_dir = _copy_requirement_project(tmp_path)
+    text = _insert_history_warm_start_section(
+        (project_dir / "opt_requirement.md").read_text(encoding="utf-8")
+    ).replace("enabled: true", "enabled: false")
+    text = _replace_section_yaml(
+        text,
+        "Optimizer Settings",
+        """algorithm: turbo
+strategy: turbo_trust_region
+initialization: sobol
+max_evaluations: 100
+batch_size: 10
+random_seed: 20260528
+failure_penalty: 1000000.0
+deduplicate_candidates: true
+turbo:
+  snap_to_step: true
+  duplicate_handling: resample
+""",
+    )
+
+    report = parse_requirement_text(
+        text,
+        constraints_text=None,
+        maestro_input_exists=lambda _path: True,
+    )
+
+    assert report.status == "pass", report.issues
+
+
 def test_render_config_payloads_emits_history_warm_start_yaml(
     tmp_path: Path,
 ) -> None:
@@ -1063,9 +1505,12 @@ def _rebuild_as_fix_run_requirement(text: str) -> str:
         if name in _FIX_RUN_DROP_SECTIONS:
             continue
         rebuilt.append(f"## {name}\n{section_body}")
-    rebuilt.append("## Workflow\n\n```yaml\nmode: fix_run\nstarting_run_id: real_001\n```\n")
     rebuilt.append(
-        "## Fixed Points\n\n```yaml\npoints:\n"
+        "## Workflow\n\n```yaml\nschema_version: '1.0'\n"
+        "mode: fix_run\nstarting_run_id: real_001\n```\n"
+    )
+    rebuilt.append(
+        "## Fixed Points\n\n```yaml\nschema_version: '1.0'\npoints:\n"
         "  - candidate_id: fp_001\n"
         "    parameters:\n"
         '      FN: "2"\n'
@@ -1075,7 +1520,7 @@ def _rebuild_as_fix_run_requirement(text: str) -> str:
         "```\n"
     )
     rebuilt.append(
-        "## Waveform Exports\n\n```yaml\nexports:\n"
+        "## Waveform Exports\n\n```yaml\nschema_version: '1.0'\nexports:\n"
         "  - name: nf\n"
         '    expression: \'getData("NF" ?result "pnoise")\'\n'
         "    output_format: csv\n"
@@ -1097,6 +1542,6 @@ def test_fix_run_requirement_rejects_history_warm_start(tmp_path: Path) -> None:
 
     assert report.status == "fail"
     assert (
-        "History Warm Start is only supported for optimize workflow mode"
+        "section History Warm Start is not supported for workflow mode fix_run"
         in report.issues
     )

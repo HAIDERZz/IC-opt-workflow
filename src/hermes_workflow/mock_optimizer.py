@@ -13,6 +13,7 @@ from hermes_workflow.validate import (
     ContractBundle,
     assert_valid_project,
     evaluate_objective,
+    require_optimize_bundle,
 )
 
 try:
@@ -222,7 +223,10 @@ def run_mock_optimization(
     from hermes_workflow.schemas import BestCandidate, LedgerRow, ObjectiveDirection
 
     project_dir = Path(project_dir)
-    bundle = assert_valid_project(project_dir)
+    bundle = require_optimize_bundle(
+        assert_valid_project(project_dir),
+        operation="mock optimizer",
+    )
     optimizer = bundle.optimizer.optimizer
     metrics_config = bundle.metrics
     variables_config = bundle.variables

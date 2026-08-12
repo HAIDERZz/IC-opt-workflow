@@ -15,6 +15,7 @@ from hermes_workflow.native_turbo import (
     NativeTurboEvaluationTrace,
     NativeTurboObservation,
     NativeTurboRunResult,
+    RetentionCallback,
     _apply_retention_with_observation,
     execute_and_check_real_candidate,
     evaluate_candidate_objective,
@@ -24,6 +25,9 @@ from hermes_workflow.native_turbo import (
 from hermes_workflow.optimizer_strategy import (
     OptimizerStrategyRequest,
     resolve_optimizer_strategy,
+)
+from hermes_workflow.optimizer_trace_identity import (
+    optimizer_trace_identity_issues,
 )
 from hermes_workflow.optimizer_effectiveness import build_batch_effectiveness_audit
 from hermes_workflow.optimizer_artifacts import (
@@ -43,7 +47,11 @@ from hermes_workflow.schemas import (
     VariableKind,
     VariablesConfig,
 )
-from hermes_workflow.validate import ContractBundle, assert_valid_project
+from hermes_workflow.validate import (
+    ContractBundle,
+    assert_valid_project,
+    require_optimize_bundle,
+)
 from hermes_workflow.history_warm_start import (
     HISTORY_WARM_START_AUDIT_MD_RELATIVE,
     HISTORY_WARM_START_AUDIT_RELATIVE,
@@ -179,7 +187,7 @@ def run_openbox_fake_optimization(
     max_evals: int | None = None,
     additional_evals: int | None = None,
     continue_from_existing: bool = False,
-    batch_size: int,
+    batch_size: int | None = None,
     advisor_factory: AdvisorFactory | None = None,
     random_seed: int | None = None,
     strategy: str | None = None,
@@ -188,18 +196,26 @@ def run_openbox_fake_optimization(
     acq_optimizer_type: str | None = None,
     initial_trials: int | None = None,
 ) -> NativeTurboRunResult:
-    if batch_size < 1:
-        raise ValueError("batch_size must be >= 1")
-
     project_root = Path(project_dir)
+    bundle = require_optimize_bundle(
+        assert_valid_project(project_root),
+        operation="OpenBox fake optimization",
+    )
     _ensure_optimizer_history_for_continuation(
         project_root, continue_from_existing=continue_from_existing
     )
-    contract = load_native_turbo_contract(project_root)
+    selected_batch_size = (
+        batch_size
+        if batch_size is not None
+        else bundle.optimizer.optimizer.batch_size
+    )
+    if selected_batch_size < 1:
+        raise ValueError("batch_size must be >= 1")
+
     seed = (
         random_seed
         if random_seed is not None
-        else contract.optimizer.optimizer.random_seed
+        else bundle.optimizer.optimizer.random_seed
     )
     prior_traces = _load_continuation_traces(
         project_root,
@@ -211,19 +227,19 @@ def run_openbox_fake_optimization(
         additional_evals=additional_evals,
         continue_from_existing=continue_from_existing,
         prior_count=len(prior_traces),
-        default_max_evals=None,
+        default_max_evals=bundle.optimizer.optimizer.max_evaluations,
     )
     result = _run_openbox_batches(
         project_root,
         max_evals=selected_max_evals,
-        batch_size=batch_size,
+        batch_size=selected_batch_size,
         advisor_factory=advisor_factory,
         evaluator=_fake_batch_evaluator,
         execution_mode=FAKE_EXECUTION_MODE,
         random_seed=seed,
-        parallel_jobs=batch_size,
+        parallel_jobs=selected_batch_size,
         threads_per_run=None,
-        optimizer_cpu_threads=contract.optimizer.optimizer.optimizer_cpu_threads,
+        optimizer_cpu_threads=bundle.optimizer.optimizer.optimizer_cpu_threads,
         prior_traces=prior_traces,
         continuation_additional_evals=additional_evals,
         strategy=strategy,
@@ -359,9 +375,13 @@ def run_openbox_real_optimization(
     acq_type: str | None = None,
     acq_optimizer_type: str | None = None,
     initial_trials: int | None = None,
+    retention_callback: RetentionCallback | None = None,
 ) -> NativeTurboRunResult:
     project_root = Path(project_dir)
-    bundle = assert_valid_project(project_root)
+    bundle = require_optimize_bundle(
+        assert_valid_project(project_root),
+        operation="OpenBox",
+    )
     _assert_warm_start_not_combined_with_continuation(
         bundle, continue_from_existing=continue_from_existing
     )
@@ -408,6 +428,7 @@ def run_openbox_real_optimization(
         max_workers=min(selected_parallel_jobs, selected_batch_size),
         adapter=adapter,
         allow_optimizer_continuation=continue_from_existing,
+        retention_callback=retention_callback,
     )
     return _run_openbox_batches(
         project_root,
@@ -628,7 +649,7 @@ def _sync_progress_state_after_report(project_dir: Path, report_path: Path) -> N
     )
 
     try:
-        sync_optimizer_progress_state(project_dir)
+        sync_optimizer_progress_state(project_dir, expected_backend=OPENBOX_BACKEND)
     except Exception as exc:  # noqa: BLE001 — defensive sync sidecar
         try:
             payload = json.loads(report_path.read_text(encoding="utf-8"))
@@ -760,7 +781,11 @@ def _load_continuation_traces(
     if not enabled:
         return []
     issues: list[str] = []
-    artifacts = load_optimizer_artifacts(project_dir, issues)
+    artifacts = load_optimizer_artifacts(
+        project_dir,
+        issues,
+        expected_backend=OPENBOX_BACKEND,
+    )
     if issues:
         raise ValueError(
             "cannot load OpenBox continuation artifacts: " + "; ".join(issues)
@@ -771,6 +796,15 @@ def _load_continuation_traces(
         raise ValueError(
             "OpenBox continuation execution mode mismatch: "
             f"expected {execution_mode}"
+        )
+    identity_issues = optimizer_trace_identity_issues(
+        artifacts.traces,
+        is_fake=execution_mode == FAKE_EXECUTION_MODE,
+    )
+    if identity_issues:
+        raise ValueError(
+            "OpenBox continuation trace identity is invalid: "
+            + "; ".join(identity_issues)
         )
     traces = [_trace_from_payload(row) for row in artifacts.traces]
     if not traces:
@@ -925,10 +959,13 @@ def _run_openbox_batches(
     duplicate_replacements = 0
     early_stop_reason: str | None = None
     batch_index = _max_batch_index(traces)
-    run_offset = (
-        _next_run_offset(project_dir, "real", prior_traces=traces)
-        if execution_mode == REAL_EXECUTION_MODE
-        else prior_count
+    run_prefix = (
+        "real" if execution_mode == REAL_EXECUTION_MODE else "fake"
+    )
+    run_offset = _next_run_offset(
+        project_dir,
+        run_prefix,
+        prior_traces=traces,
     )
     settings = OpenBoxBatchRunSettings(
         execution_mode=execution_mode,
@@ -1593,18 +1630,26 @@ def _next_run_offset(
     prior_traces: list[NativeTurboEvaluationTrace] | None = None,
 ) -> int:
     root = project_dir / "runs" / "real"
-    next_index = 1
-    while (root / f"{run_prefix}_{next_index:03d}").exists():
-        next_index += 1
-    highest_historical_index = 0
     expected_prefix = f"{run_prefix}_"
+    highest_existing_index = 0
+    if root.is_dir():
+        for entry in root.iterdir():
+            if not entry.name.startswith(expected_prefix):
+                continue
+            suffix = entry.name.removeprefix(expected_prefix)
+            if len(suffix) == 3 and suffix.isdecimal():
+                highest_existing_index = max(
+                    highest_existing_index,
+                    int(suffix),
+                )
+    highest_historical_index = 0
     for trace in prior_traces or []:
         if not trace.run_id.startswith(expected_prefix):
             continue
         suffix = trace.run_id.removeprefix(expected_prefix)
         if suffix.isdecimal():
             highest_historical_index = max(highest_historical_index, int(suffix))
-    return max(next_index - 1, highest_historical_index)
+    return max(highest_existing_index, highest_historical_index)
 
 
 def _fake_batch_evaluator(
@@ -1630,6 +1675,7 @@ def make_openbox_real_candidate_batch_evaluator(
     max_workers: int,
     adapter: Callable[..., object] | None = None,
     allow_optimizer_continuation: bool = False,
+    retention_callback: RetentionCallback | None = None,
 ) -> BatchEvaluator:
     project_dir = Path(project_dir)
     selected_max_workers = max(1, max_workers)
@@ -1681,6 +1727,7 @@ def make_openbox_real_candidate_batch_evaluator(
                         run_id=candidate.run_id,
                         candidate_id=candidate.candidate_id,
                         observation=observation,
+                        retention_callback=retention_callback,
                     )
                 )
                 continue
@@ -1697,6 +1744,7 @@ def make_openbox_real_candidate_batch_evaluator(
                             result_manifest=observation.result_manifest,
                             metric_result_manifest=observation.metric_result_manifest,
                         ),
+                        retention_callback=retention_callback,
                     )
                 )
                 continue
@@ -1711,6 +1759,7 @@ def make_openbox_real_candidate_batch_evaluator(
                         result_manifest=observation.result_manifest,
                         metric_result_manifest=observation.metric_result_manifest,
                     ),
+                    retention_callback=retention_callback,
                 )
             )
         return finalized

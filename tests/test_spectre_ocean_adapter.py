@@ -85,8 +85,8 @@ def _create_ready_corner_project(tmp_path: Path) -> Path:
     # Overwrite the default nominal-only corner config with real corners
     corners_yaml = """\
 schema_version: "1.0"
-objective_policy: nominal
-constraint_policy: nominal
+objective_policy: worst_case
+constraint_policy: all_corners
 corners:
   - id: ss
     description: slow-slow corner

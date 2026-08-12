@@ -249,6 +249,30 @@ def test_summarize_optimizer_run_loads_accepted_run(tmp_path: Path) -> None:
     )
 
 
+def test_summarize_optimizer_run_only_trusts_accepted_recomputed_best(
+    tmp_path: Path,
+) -> None:
+    project_dir = _write_accepted_optimizer_project(tmp_path)
+    optimizer_report_path = (
+        project_dir / "reports/native_turbo_optimizer_report.json"
+    )
+    optimizer_payload = json.loads(
+        optimizer_report_path.read_text(encoding="utf-8")
+    )
+    optimizer_payload["best_candidate"] = {
+        **optimizer_payload["best_candidate"],
+        "run_id": "real_999",
+        "objective": -999_999_999.0,
+    }
+    _write_json(optimizer_report_path, optimizer_payload)
+
+    report = summarize_optimizer_run(project_dir)
+
+    assert report.status == "pass"
+    assert report.best_observed is not None
+    assert report.best_observed["run_id"] == "real_006"
+
+
 def test_summarize_optimizer_run_recommends_continue_when_recent_best_improves(
     tmp_path: Path,
 ) -> None:
@@ -345,6 +369,120 @@ def test_summarize_optimizer_run_recommends_accept_when_trace_exhausts_space(
     assert report.global_optimum_claim is True
     assert report.search_space["estimated_discrete_combinations"] == 2
     assert report.search_space["evaluated_fraction"] == 1.0
+    assert report.search_space["exhaustive_trace"] is True
+
+
+def test_summarize_optimizer_run_ignores_duplicate_candidates_in_search_space_coverage(
+    tmp_path: Path,
+) -> None:
+    rows = [
+        _trace_row(evaluation_index=1, run_id="real_001", status="feasible", objective=1.0),
+        _trace_row(
+            evaluation_index=1,
+            run_id="real_002",
+            status="duplicate_candidate_skipped",
+            objective=1.0,
+        ),
+    ]
+    project_dir = _write_accepted_optimizer_project(
+        tmp_path,
+        rows=rows,
+        variables=[
+            {
+                "kind": "integer",
+                "lower": "1",
+                "name": "FN",
+                "step": "1",
+                "upper": "2",
+            }
+        ],
+    )
+
+    report = summarize_optimizer_run(project_dir)
+
+    assert report.evaluation_count == 2
+    assert report.search_space["estimated_discrete_combinations"] == 2
+    assert report.search_space["evaluated_fraction"] == 0.5
+    assert report.search_space["exhaustive_trace"] is False
+    assert report.global_optimum_claim is False
+
+
+def test_summarize_optimizer_run_ignores_failed_candidates_in_search_space_coverage(
+    tmp_path: Path,
+) -> None:
+    rows = [
+        _trace_row(evaluation_index=1, run_id="real_001", status="feasible", objective=1.0),
+        _trace_row(
+            evaluation_index=2,
+            run_id="real_002",
+            status="real_check_failed",
+            objective=5.0,
+        ),
+    ]
+    project_dir = _write_accepted_optimizer_project(
+        tmp_path,
+        rows=rows,
+        variables=[
+            {
+                "kind": "integer",
+                "lower": "1",
+                "name": "FN",
+                "step": "1",
+                "upper": "2",
+            }
+        ],
+    )
+
+    report = summarize_optimizer_run(project_dir)
+
+    assert report.evaluation_count == 2
+    assert report.search_space["estimated_discrete_combinations"] == 2
+    assert report.search_space["evaluated_fraction"] == 0.5
+    assert report.search_space["exhaustive_trace"] is False
+    assert report.global_optimum_claim is False
+
+
+def test_summarize_optimizer_run_forbids_global_optimum_when_coverage_is_partial(
+    tmp_path: Path,
+) -> None:
+    rows = [
+        _trace_row(evaluation_index=1, run_id="real_001", status="feasible", objective=1.0),
+        _trace_row(
+            evaluation_index=1,
+            run_id="real_002",
+            status="duplicate_candidate_skipped",
+            objective=1.0,
+        ),
+        _trace_row(
+            evaluation_index=2,
+            run_id="real_003",
+            status="real_check_failed",
+            objective=5.0,
+        ),
+    ]
+    project_dir = _write_accepted_optimizer_project(
+        tmp_path,
+        rows=rows,
+        variables=[
+            {
+                "kind": "integer",
+                "lower": "1",
+                "name": "FN",
+                "step": "1",
+                "upper": "3",
+            }
+        ],
+    )
+
+    report = summarize_optimizer_run(project_dir)
+
+    # Total trace count matches the finite search-space size, but only one
+    # trace is a credibly evaluated, unique candidate.
+    assert report.evaluation_count == 3
+    assert report.search_space["estimated_discrete_combinations"] == 3
+    assert report.search_space["evaluated_fraction"] == 1 / 3
+    assert report.search_space["exhaustive_trace"] is False
+    assert report.global_optimum_claim is False
 
 
 def test_summarize_optimizer_run_recommends_exhaustive_when_space_is_small(

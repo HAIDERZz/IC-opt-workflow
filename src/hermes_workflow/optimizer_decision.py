@@ -40,12 +40,17 @@ class OptimizerDecisionReport:
 
 def generate_optimizer_decision_report(
     project_dir: str | Path,
+    *,
+    expected_backend: str | None = None,
 ) -> OptimizerDecisionReport:
     project_root = Path(project_dir)
     issues: list[str] = []
     warnings: list[str] = []
 
-    insight = generate_optimizer_insight_report(project_root)
+    insight = generate_optimizer_insight_report(
+        project_root,
+        expected_backend=expected_backend,
+    )
     warnings.extend(insight.warnings)
     if insight.status != "pass":
         issues.append("optimizer insight report failed")

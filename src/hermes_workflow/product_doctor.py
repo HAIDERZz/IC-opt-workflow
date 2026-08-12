@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import sys
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Callable
@@ -10,10 +9,14 @@ from hermes_workflow.diagnostics import Diagnostic, DiagnosticSeverity
 from hermes_workflow.doctor_readiness import (
     build_dirty_state_summary,
     build_doctor_semantic_summaries,
+    build_doctor_variables_config,
     build_optimizer_progress_summary,
 )
-from hermes_workflow.optimizer_artifacts import EVALUATIONS_RELATIVE
-from hermes_workflow.optimizer_artifacts import REPORT_RELATIVE as OPTIMIZER_REPORT_RELATIVE
+from hermes_workflow.optimizer_artifacts import (
+    SUPPORTED_EVALUATIONS_RELATIVES,
+    SUPPORTED_REPORT_RELATIVES,
+)
+from hermes_workflow.optimizer_runtime import check_controller_optimizer_runtime
 from hermes_workflow.project_readiness import check_project_ready
 from hermes_workflow.real_result_record import LEDGER_PATH, OPTIMIZER_STATE_PATH
 from hermes_workflow.requirement_intake import (
@@ -65,6 +68,9 @@ class ProductDoctorServices:
     check_project_ready: Callable[[Path], Any] = check_project_ready
     check_toolchain_environment: Callable[..., dict[str, Any]] = (
         check_toolchain_environment
+    )
+    check_controller_optimizer_runtime: Callable[..., dict[str, Any]] = (
+        check_controller_optimizer_runtime
     )
     check_license: Callable[..., LicenseProbeReport] = run_local_license_probe
 
@@ -128,8 +134,17 @@ def run_product_doctor(
         )
     _add(checks, issues, "project_directory", "pass", "project directory exists")
 
-    requirement_ok, requirement_sections = _check_requirement(
+    requirement_ok, requirement_sections, workflow_mode = _check_requirement(
         project_root, service, checks, issues
+    )
+    _check_controller_optimizer_runtime(
+        requirement_sections,
+        workflow_mode=workflow_mode,
+        requirement_ok=requirement_ok,
+        service=service,
+        checks=checks,
+        issues=issues,
+        structured_issues=structured_issues,
     )
     cadence_ok = _check_cadence_cshrc(cadence_cshrc, checks, issues)
     license_probe_report = _check_license_probe(
@@ -139,14 +154,6 @@ def run_product_doctor(
         service=service,
         checks=checks,
         issues=issues,
-    )
-    _check_toolchain(
-        project_root,
-        service,
-        checks,
-        issues,
-        openbox_venv=openbox_venv or Path(sys.prefix),
-        cadence_cshrc=cadence_cshrc if cadence_ok else None,
     )
 
     prepare_ok = False
@@ -193,13 +200,19 @@ def run_product_doctor(
         warnings.append(f"{diagnostic.code}: {diagnostic.message}")
 
     requirement_max_evaluations: int | None = None
+    expected_backend: str | None = None
     if isinstance(optimizer_summary, dict):
         candidate = optimizer_summary.get("max_evaluations")
         if isinstance(candidate, int):
             requirement_max_evaluations = candidate
+        backend_candidate = optimizer_summary.get("resolved_backend")
+        if isinstance(backend_candidate, str):
+            expected_backend = backend_candidate
     optimizer_progress_summary, progress_diagnostics = build_optimizer_progress_summary(
         project_root,
         requirement_max_evaluations=requirement_max_evaluations,
+        expected_backend=expected_backend,
+        variables_config=build_doctor_variables_config(requirement_sections),
     )
     structured_issues.extend(progress_diagnostics)
     for diagnostic in progress_diagnostics:
@@ -235,21 +248,24 @@ def _check_requirement(
     service: ProductDoctorServices,
     checks: list[ProductDoctorCheck],
     issues: list[str],
-) -> tuple[bool, dict[str, Any]]:
+) -> tuple[bool, dict[str, Any], str]:
     try:
         result = service.check_requirement(project_root)
     except Exception as exc:
         _add(checks, issues, "requirement", "fail", str(exc))
-        return False, {}
+        return False, {}, "optimize"
     sections = getattr(result, "sections", None)
     if not isinstance(sections, dict):
         sections = {}
+    workflow_mode = getattr(result, "workflow_mode", "optimize")
+    if not isinstance(workflow_mode, str):
+        workflow_mode = "optimize"
     if getattr(result, "status", None) == "pass":
         _add(checks, issues, "requirement", "pass", "opt_requirement.md parsed")
-        return True, sections
+        return True, sections, workflow_mode
     detail = _issues_detail(getattr(result, "issues", []))
     _add(checks, issues, "requirement", "fail", detail or "requirement intake failed")
-    return False, sections
+    return False, sections, workflow_mode
 
 
 def _check_cadence_cshrc(
@@ -325,49 +341,66 @@ def _check_license_probe(
     return report
 
 
-def _check_toolchain(
-    project_root: Path,
+def _check_controller_optimizer_runtime(
+    requirement_sections: dict[str, Any],
+    *,
+    workflow_mode: str,
+    requirement_ok: bool,
     service: ProductDoctorServices,
     checks: list[ProductDoctorCheck],
     issues: list[str],
-    *,
-    openbox_venv: Path,
-    cadence_cshrc: Path | None,
+    structured_issues: list[Diagnostic],
 ) -> None:
-    if cadence_cshrc is None:
-        _add(
-            checks,
-            issues,
-            "toolchain_environment",
-            "fail",
-            "skipped because Cadence cshrc is missing",
+    name = "controller_optimizer_runtime"
+    if not requirement_ok:
+        checks.append(
+            ProductDoctorCheck(
+                name=name,
+                status="skipped",
+                detail="skipped because opt_requirement.md is not valid",
+            )
         )
         return
     try:
-        payload = service.check_toolchain_environment(
-            openbox_venv=openbox_venv,
-            cadence_cshrc=cadence_cshrc,
-            report_path=project_root / "reports" / "toolchain_env_report.json",
+        payload = service.check_controller_optimizer_runtime(
+            requirement_sections,
+            workflow_mode=workflow_mode,
         )
     except Exception as exc:
-        _add(checks, issues, "toolchain_environment", "fail", str(exc))
-        return
-    if payload.get("status") == "pass":
-        _add(
-            checks,
-            issues,
-            "toolchain_environment",
-            "pass",
-            "OpenBox/Hermes imports and Cadence cshrc path passed",
+        payload = {"status": "fail", "detail": str(exc), "issues": [str(exc)]}
+    status = payload.get("status")
+    detail = payload.get("detail")
+    if not isinstance(detail, str) or not detail:
+        detail = _issues_detail(payload.get("issues", []))
+    if status in {"pass", "skipped"}:
+        checks.append(
+            ProductDoctorCheck(
+                name=name,
+                status=str(status),
+                detail=detail or "Controller optimizer runtime check completed",
+            )
         )
         return
-    detail = _issues_detail(payload.get("issues", []))
-    _add(
-        checks,
-        issues,
-        "toolchain_environment",
-        "fail",
-        detail or "toolchain environment check failed",
+    detail = detail or "Controller optimizer runtime check failed"
+    _add(checks, issues, name, "fail", detail)
+    structured_issues.append(
+        Diagnostic(
+            code="CONTROLLER_OPTIMIZER_RUNTIME_UNAVAILABLE",
+            severity=DiagnosticSeverity.ERROR,
+            stage="controller",
+            component="optimizer_runtime",
+            message="Controller optimizer runtime is unavailable.",
+            detail=detail,
+            likely_cause=(
+                "The Python process running ic-opt cannot import the dependencies "
+                "required by the resolved optimizer backend."
+            ),
+            recommended_action=(
+                "Install the reported Controller-side optimizer dependencies and "
+                "rerun --doctor."
+            ),
+            evidence=[f"resolved_backend={payload.get('resolved_backend')}"],
+        )
     )
 
 
@@ -464,11 +497,13 @@ def _check_continuation_artifacts(
 
 
 def _has_optimizer_history(project_root: Path) -> bool:
-    optimizer_paths = [
-        project_root / OPTIMIZER_REPORT_RELATIVE,
-        project_root / EVALUATIONS_RELATIVE,
-    ]
-    return any(path.exists() for path in optimizer_paths)
+    return any(
+        (project_root / relative).exists()
+        for relative in (
+            *SUPPORTED_REPORT_RELATIVES,
+            *SUPPORTED_EVALUATIONS_RELATIVES,
+        )
+    )
 
 
 def _report(

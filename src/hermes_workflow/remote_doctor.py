@@ -1,20 +1,30 @@
 from __future__ import annotations
 
 import json
+import shutil
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from tempfile import TemporaryDirectory
-from typing import Any
+from typing import Any, Callable
 
 from hermes_workflow.doctor_readiness import (
     RealRunDirFacts,
     build_doctor_semantic_summaries,
+    build_doctor_variables_config,
     build_optimizer_progress_summary,
     is_incomplete_real_run_dir,
 )
 from hermes_workflow.remote_project import RemoteProjectRef, remote_cache_dir
 from hermes_workflow.remote_ssh import RemoteSshRunner, quote_remote_path
+from hermes_workflow.remote_ssh import raise_for_remote_result, require_boolean_probe
+from hermes_workflow.optimizer_artifacts import (
+    SUPPORTED_ARTIFACT_RELATIVES,
+    SUPPORTED_EVALUATIONS_RELATIVES,
+    SUPPORTED_REPORT_RELATIVES,
+)
+from hermes_workflow.optimizer_runtime import check_controller_optimizer_runtime
 from hermes_workflow.requirement_intake import RequirementIntakeReport, parse_requirement_text
+from hermes_workflow.schemas import VariablesConfig
 from hermes_workflow.diagnostics import Diagnostic, DiagnosticSeverity
 from hermes_workflow.license_probe import (
     LicenseProbeReport,
@@ -46,11 +56,139 @@ class RemoteDoctorReport:
 
 
 _REMOTE_PROGRESS_ARTIFACTS = (
-    Path("reports/optimizer_run_report.json"),
-    Path("reports/optimizer_evaluations.jsonl"),
+    *SUPPORTED_ARTIFACT_RELATIVES,
     Path("state/optimizer_state.json"),
     Path("ledger/experiment_ledger.jsonl"),
 )
+
+
+def _record_controller_dependencies(
+    checks: dict[str, dict[str, str]],
+    issues: list[str],
+    structured_issues: list[Diagnostic],
+    *,
+    which: Callable[[str], str | None],
+) -> None:
+    for tool in ("ssh", "scp", "tar"):
+        resolved = which(tool)
+        name = f"controller_{tool}"
+        if resolved:
+            checks[name] = {
+                "status": "pass",
+                "message": f"Controller dependency {tool} resolved: {resolved}",
+            }
+            continue
+        message = f"Controller dependency is missing: {tool}"
+        checks[name] = {"status": "fail", "message": message}
+        issues.append(message)
+        structured_issues.append(
+            Diagnostic(
+                code="CONTROLLER_TRANSFER_TOOL_MISSING",
+                severity=DiagnosticSeverity.ERROR,
+                stage="remote_ssh",
+                component="remote_doctor",
+                message=message,
+                detail=(
+                    f"Remote mode requires {tool} on the Controller PATH."
+                ),
+                likely_cause=(
+                    f"The Controller environment cannot execute {tool}."
+                ),
+                recommended_action=(
+                    f"Install {tool} on the Controller and rerun --doctor."
+                ),
+                evidence=[tool],
+            )
+        )
+
+
+def _record_remote_runtime_dependencies(
+    ref: RemoteProjectRef,
+    ssh: Any,
+    checks: dict[str, dict[str, str]],
+    issues: list[str],
+    structured_issues: list[Diagnostic],
+) -> None:
+    probes = {
+        "remote_posix_shell": (
+            "test -x /bin/sh",
+            "/bin/sh is executable",
+        ),
+        "remote_tar": (
+            "command -v tar >/dev/null 2>&1",
+            "tar is available",
+        ),
+        "remote_readlink_e": (
+            "readlink -e /bin/sh >/dev/null 2>&1",
+            "readlink -e is supported",
+        ),
+        "remote_stat_lc": (
+            "stat -Lc '%d:%i' /bin/sh >/dev/null 2>&1",
+            "stat -Lc is supported",
+        ),
+        "remote_sha256sum": (
+            "printf x | sha256sum >/dev/null 2>&1",
+            "sha256sum is available",
+        ),
+    }
+    for name, (command, description) in probes.items():
+        _record_command_check(
+            checks,
+            issues,
+            structured_issues,
+            name,
+            (
+                _run_remote_bootstrap(ssh, command)
+                if name == "remote_posix_shell"
+                else ssh.run(command)
+            ),
+            description,
+            evidence=[command],
+            failure_code="REMOTE_RUNTIME_DEPENDENCY_MISSING",
+            failure_detail=(
+                f"Remote mode requires this capability: {description}."
+            ),
+            failure_action=(
+                "Install GNU/POSIX runtime dependencies on the Remote host "
+                "and rerun --doctor."
+            ),
+        )
+
+    probe_parent = ref.remote_project_dir / "state"
+    publish_command = (
+        f"test -d {quote_remote_path(ref.remote_project_dir)} && "
+        f"test -w {quote_remote_path(ref.remote_project_dir)} || exit 1; "
+        f"probe={quote_remote_path(probe_parent)}/.ic-opt-doctor-publish-probe-$$; "
+        "rm -rf -- \"$probe\"; mkdir -p -- \"$probe/a\"; "
+        "printf x > \"$probe/a/file\"; cp -a -- \"$probe/a\" \"$probe/b\"; "
+        "mv -T -- \"$probe/b\" \"$probe/c\"; "
+        "test -f \"$probe/c/file\"; status=$?; "
+        "rm -rf -- \"$probe\"; exit $status"
+    )
+    _record_command_check(
+        checks,
+        issues,
+        structured_issues,
+        "remote_atomic_tree_publish",
+        ssh.run(publish_command),
+        "mkdir, cp -a, mv -T, and rm support staged tree publication",
+        evidence=[str(ref.remote_project_dir / "state")],
+        failure_code="REMOTE_ATOMIC_PUBLISH_UNSUPPORTED",
+        failure_detail=(
+            "The Remote filesystem or coreutils cannot perform the staged "
+            "tree publication required by remote mode."
+        ),
+        failure_action=(
+            "Provide GNU coreutils with cp -a and mv -T on the Remote host."
+        ),
+    )
+
+
+def _run_remote_bootstrap(ssh: Any, command: str) -> Any:
+    bootstrap = getattr(ssh, "run_login_shell", None)
+    if callable(bootstrap):
+        return bootstrap(command)
+    return ssh.run(command)
 
 
 def run_remote_doctor(
@@ -60,6 +198,10 @@ def run_remote_doctor(
     cadence_cshrc: PurePosixPath | str | None = None,
     cache_root: Path | None = None,
     cli_max_evals: int | None = None,
+    controller_which: Callable[[str], str | None] = shutil.which,
+    controller_optimizer_runtime_probe: Callable[..., dict[str, Any]] = (
+        check_controller_optimizer_runtime
+    ),
 ) -> RemoteDoctorReport:
     ssh = runner or RemoteSshRunner(ref.ssh_profile)
     cache_dir = remote_cache_dir(ref, cache_root=cache_root)
@@ -76,12 +218,19 @@ def run_remote_doctor(
         "remote_project_dir": str(ref.remote_project_dir),
     }
 
+    _record_controller_dependencies(
+        checks,
+        issues,
+        structured_issues,
+        which=controller_which,
+    )
+
     _record_command_check(
         checks,
         issues,
         structured_issues,
         "ssh",
-        ssh.run("true"),
+        _run_remote_bootstrap(ssh, "true"),
         f"verify: ssh {ref.ssh_profile} true",
         evidence=[str(ref.remote_project_dir)],
         failure_code="SSH_LOGIN_FAILED",
@@ -127,6 +276,13 @@ def run_remote_doctor(
         ),
         failure_action="Fix permissions on the remote project directory.",
     )
+    _record_remote_runtime_dependencies(
+        ref,
+        ssh,
+        checks,
+        issues,
+        structured_issues,
+    )
 
     requirement_text = _read_required_remote_text(
         ssh,
@@ -152,6 +308,10 @@ def run_remote_doctor(
                 ssh,
                 path,
             ),
+            model_file_is_readable=lambda path: _remote_model_file_is_readable(
+                ssh,
+                path,
+            ),
         )
         checks["requirement"] = {
             "status": req_report.status,
@@ -163,6 +323,15 @@ def run_remote_doctor(
             req_report.sections, dict
         ) else {}
         workflow_mode = req_report.workflow_mode
+        _record_controller_optimizer_runtime(
+            checks,
+            issues,
+            structured_issues,
+            requirement_sections=requirement_sections,
+            workflow_mode=workflow_mode,
+            probe=controller_optimizer_runtime_probe,
+            requirement_ok=req_report.status == "pass",
+        )
         _record_parallel_jobs_warning(
             checks,
             req_report,
@@ -190,25 +359,37 @@ def run_remote_doctor(
             "the remote project root."
         ),
     )
-    _record_command_check(
-        checks,
-        issues,
-        structured_issues,
-        "spectre_ocean",
-        ssh.run(
-            "csh -fc "
-            + quote_remote_path(
-                f"source {quote_remote_path(cshrc_path)}; which spectre; which ocean"
-            )
+    cadence_tool_statuses: list[str] = []
+    for tool in ("spectre", "ocean"):
+        _record_command_check(
+            checks,
+            issues,
+            structured_issues,
+            tool,
+            ssh.run(
+                "csh -fc "
+                + quote_remote_path(
+                    f"source {quote_remote_path(cshrc_path)}; which {tool}"
+                )
+            ),
+            f"{tool} is available after sourcing cshrc",
+            evidence=[str(cshrc_path)],
+            failure_code="CADENCE_TOOL_MISSING",
+            failure_detail=(
+                f"Unable to locate {tool} after sourcing cadence cshrc."
+            ),
+            failure_action=(
+                f"Update cadence_env.csh so which {tool} resolves on the remote host."
+            ),
+        )
+        cadence_tool_statuses.append(checks[tool]["status"])
+    checks["spectre_ocean"] = {
+        "status": (
+            "pass" if all(status == "pass" for status in cadence_tool_statuses)
+            else "fail"
         ),
-        "spectre and ocean are available after sourcing cshrc",
-        evidence=[str(cshrc_path)],
-        failure_code="CADENCE_TOOL_MISSING",
-        failure_detail="Unable to locate spectre or ocean after sourcing cadence cshrc.",
-        failure_action=(
-            "Update cadence_env.csh so which spectre and which ocean resolve on the remote host."
-        ),
-    )
+        "message": "spectre and ocean were checked independently",
+    }
 
     # License probe: check require_license_check from requirement sections
     cache_dir = remote_cache_dir(ref, cache_root=cache_root)
@@ -233,6 +414,66 @@ def run_remote_doctor(
         workflow_mode=workflow_mode,
         license_probe_report=license_probe_report,
         cli_max_evals=cli_max_evals,
+    )
+
+
+def _record_controller_optimizer_runtime(
+    checks: dict[str, dict[str, str]],
+    issues: list[str],
+    structured_issues: list[Diagnostic],
+    *,
+    requirement_sections: dict[str, Any],
+    workflow_mode: str,
+    probe: Callable[..., dict[str, Any]],
+    requirement_ok: bool,
+) -> None:
+    name = "controller_optimizer_runtime"
+    if not requirement_ok:
+        checks[name] = {
+            "status": "skipped",
+            "message": "skipped because opt_requirement.md is not valid",
+        }
+        return
+    try:
+        payload = probe(
+            requirement_sections,
+            workflow_mode=workflow_mode,
+        )
+    except Exception as exc:
+        payload = {"status": "fail", "detail": str(exc), "issues": [str(exc)]}
+    status = payload.get("status")
+    detail = payload.get("detail")
+    if not isinstance(detail, str) or not detail:
+        detail = "; ".join(
+            str(issue) for issue in payload.get("issues", []) if str(issue)
+        )
+    if status in {"pass", "skipped"}:
+        checks[name] = {
+            "status": str(status),
+            "message": detail or "Controller optimizer runtime check completed",
+        }
+        return
+    detail = detail or "Controller optimizer runtime check failed"
+    checks[name] = {"status": "fail", "message": detail}
+    issues.append(f"{name}: {detail}")
+    structured_issues.append(
+        Diagnostic(
+            code="CONTROLLER_OPTIMIZER_RUNTIME_UNAVAILABLE",
+            severity=DiagnosticSeverity.ERROR,
+            stage="controller",
+            component="optimizer_runtime",
+            message="Controller optimizer runtime is unavailable.",
+            detail=detail,
+            likely_cause=(
+                "The Python process running ic-opt cannot import the dependencies "
+                "required by the resolved optimizer backend."
+            ),
+            recommended_action=(
+                "Install the reported Controller-side optimizer dependencies and "
+                "rerun --doctor."
+            ),
+            evidence=[f"resolved_backend={payload.get('resolved_backend')}"],
+        )
     )
 
 
@@ -409,13 +650,23 @@ def _remote_requirement_file_exists(
     remote_path: PurePosixPath | str,
 ) -> bool:
     probe = ssh.run(f"test -f {quote_remote_path(remote_path)}")
-    if probe.return_code == 0:
-        return True
-    if probe.return_code == 1:
-        return False
-    raise RuntimeError(
-        f"remote file probe failed for {remote_path}: "
-        f"exit={probe.return_code}: {probe.stderr.strip()}"
+    return require_boolean_probe(
+        probe,
+        profile=getattr(ssh, "profile", "remote"),
+        description=f"remote requirement file probe for {remote_path}",
+    )
+
+
+def _remote_model_file_is_readable(
+    ssh: Any,
+    remote_path: PurePosixPath | str,
+) -> bool:
+    quoted_path = quote_remote_path(remote_path)
+    probe = ssh.run(f"test -f {quoted_path} && test -r {quoted_path}")
+    return require_boolean_probe(
+        probe,
+        profile=getattr(ssh, "profile", "remote"),
+        description=f"remote model file readability probe for {remote_path}",
     )
 
 
@@ -424,14 +675,14 @@ def _read_optional_remote_text(
     remote_path: PurePosixPath,
 ) -> str | None:
     probe = ssh.run(f"test -f {quote_remote_path(remote_path)}")
-    if probe.return_code == 0:
-        return ssh.read_text(remote_path)
-    if probe.return_code == 1:
-        return None
-    raise RuntimeError(
-        f"remote file probe failed for {remote_path}: "
-        f"exit={probe.return_code}: {probe.stderr.strip()}"
+    exists = require_boolean_probe(
+        probe,
+        profile=getattr(ssh, "profile", "remote"),
+        description=f"remote optional file probe for {remote_path}",
     )
+    if exists:
+        return ssh.read_text(remote_path)
+    return None
 
 
 def _build_remote_optimizer_progress_summary(
@@ -439,25 +690,29 @@ def _build_remote_optimizer_progress_summary(
     ssh: Any,
     *,
     requirement_max_evaluations: int | None,
+    expected_backend: str | None,
+    variables_config: VariablesConfig | None,
 ) -> tuple[dict[str, Any], list[Diagnostic]]:
     with TemporaryDirectory(prefix="ic-opt-remote-doctor-") as temp_dir:
         snapshot_dir = Path(temp_dir)
         for relative in _REMOTE_PROGRESS_ARTIFACTS:
             remote_path = ref.remote_project_dir / relative.as_posix()
             probe = ssh.run(f"test -f {quote_remote_path(remote_path)}")
-            if probe.return_code == 1:
+            exists = require_boolean_probe(
+                probe,
+                profile=getattr(ssh, "profile", ref.ssh_profile),
+                description=f"remote progress artifact probe for {remote_path}",
+            )
+            if not exists:
                 continue
-            if probe.return_code != 0:
-                raise RuntimeError(
-                    f"remote progress probe failed for {remote_path}: "
-                    f"exit={probe.return_code}: {probe.stderr.strip()}"
-                )
             local_path = snapshot_dir / relative
             local_path.parent.mkdir(parents=True, exist_ok=True)
             local_path.write_text(ssh.read_text(remote_path), encoding="utf-8")
         return build_optimizer_progress_summary(
             snapshot_dir,
             requirement_max_evaluations=requirement_max_evaluations,
+            expected_backend=expected_backend,
+            variables_config=variables_config,
         )
 
 
@@ -489,19 +744,62 @@ def _write_doctor(
                 "message": message,
             }
             issues.append(f"{diagnostic.code}: {message}")
-    dirty_state, dirty_diagnostics = _build_remote_dirty_state(ref, ssh)
+    try:
+        dirty_state, dirty_diagnostics = _build_remote_dirty_state(ref, ssh)
+    except Exception as exc:
+        dirty_state = {
+            "has_runs": None,
+            "has_incomplete_real_run": None,
+            "has_execution_package": None,
+            "has_optimizer_state": None,
+            "has_optimizer_run_report": None,
+            "has_optimizer_evaluations": None,
+        }
+        dirty_diagnostics = [
+            Diagnostic(
+                code="REMOTE_DIRTY_STATE_PROBE_FAILED",
+                severity=DiagnosticSeverity.ERROR,
+                stage="remote_ssh",
+                component="remote_doctor",
+                message="Unable to inspect Remote project state.",
+                detail=str(exc),
+                likely_cause=(
+                    "SSH transport or a required Remote command failed."
+                ),
+                recommended_action=(
+                    "Restore Remote command execution and rerun --doctor."
+                ),
+                evidence=[str(ref.remote_project_dir)],
+            )
+        ]
     structured_issues.extend(dirty_diagnostics)
+    for diagnostic in dirty_diagnostics:
+        if diagnostic.severity is DiagnosticSeverity.ERROR:
+            message = diagnostic.detail or diagnostic.message
+            checks[diagnostic.code.lower()] = {
+                "status": "fail",
+                "message": message,
+            }
+            issues.append(f"{diagnostic.code}: {message}")
     requirement_max_evaluations: int | None = None
+    expected_backend: str | None = None
     if isinstance(optimizer_summary, dict):
         candidate = optimizer_summary.get("max_evaluations")
         if isinstance(candidate, int):
             requirement_max_evaluations = candidate
+        backend_candidate = optimizer_summary.get("resolved_backend")
+        if isinstance(backend_candidate, str):
+            expected_backend = backend_candidate
     try:
         optimizer_progress_summary, progress_diagnostics = (
             _build_remote_optimizer_progress_summary(
                 ref,
                 ssh,
                 requirement_max_evaluations=requirement_max_evaluations,
+                expected_backend=expected_backend,
+                variables_config=build_doctor_variables_config(
+                    requirement_sections
+                ),
             )
         )
     except Exception as exc:
@@ -635,17 +933,19 @@ def _build_remote_dirty_state(
     incomplete_runs: list[str] = []
     if has_runs:
         runs_root = project / "runs" / "real"
-        listing = ssh.run(
-            f"ls -1 {quote_remote_path(runs_root)} 2>/dev/null"
+        listing = ssh.run(f"ls -1 {quote_remote_path(runs_root)}")
+        raise_for_remote_result(
+            listing,
+            profile=getattr(ssh, "profile", ref.ssh_profile),
+            description=f"remote real-run directory listing for {runs_root}",
         )
-        if listing.return_code == 0:
-            for name in (line.strip() for line in listing.stdout.splitlines()):
-                if not name:
-                    continue
-                run_dir = runs_root / name
-                facts = _remote_real_run_dir_facts(ssh, run_dir)
-                if is_incomplete_real_run_dir(facts):
-                    incomplete_runs.append(name)
+        for name in (line.strip() for line in listing.stdout.splitlines()):
+            if not name:
+                continue
+            run_dir = runs_root / name
+            facts = _remote_real_run_dir_facts(ssh, run_dir)
+            if is_incomplete_real_run_dir(facts):
+                incomplete_runs.append(name)
     has_incomplete_real_run = bool(incomplete_runs)
     if has_incomplete_real_run:
         for name in incomplete_runs:
@@ -681,11 +981,13 @@ def _build_remote_dirty_state(
     has_optimizer_state = _remote_path_exists(
         ssh, project / "state" / "optimizer_state.json", kind="file"
     )
-    has_optimizer_run_report = _remote_path_exists(
-        ssh, project / "reports" / "optimizer_run_report.json", kind="file"
+    has_optimizer_run_report = any(
+        _remote_path_exists(ssh, project / relative.as_posix(), kind="file")
+        for relative in SUPPORTED_REPORT_RELATIVES
     )
-    has_optimizer_evaluations = _remote_path_exists(
-        ssh, project / "reports" / "optimizer_evaluations.jsonl", kind="file"
+    has_optimizer_evaluations = any(
+        _remote_path_exists(ssh, project / relative.as_posix(), kind="file")
+        for relative in SUPPORTED_EVALUATIONS_RELATIVES
     )
     summary = {
         "has_runs": has_runs,
@@ -700,11 +1002,12 @@ def _build_remote_dirty_state(
 
 def _remote_path_exists(ssh: Any, remote_path: PurePosixPath, *, kind: str) -> bool:
     flag = "-d" if kind == "dir" else "-f"
-    try:
-        result = ssh.run(f"test {flag} {quote_remote_path(remote_path)}")
-    except Exception:
-        return False
-    return result.return_code == 0
+    result = ssh.run(f"test {flag} {quote_remote_path(remote_path)}")
+    return require_boolean_probe(
+        result,
+        profile=getattr(ssh, "profile", "remote"),
+        description=f"remote doctor path probe for {remote_path}",
+    )
 
 
 def _remote_real_run_dir_facts(

@@ -134,6 +134,68 @@ def test_openbox_advanced_settings_override_preset() -> None:
     assert resolved.initial_trials == 7
 
 
+@pytest.mark.parametrize(
+    ("strategy", "openbox", "field", "required"),
+    [
+        (
+            OptimizerStrategyName.OPENBOX_GP_EIC,
+            OpenBoxAdvancedSettings(surrogate_type="prf"),
+            "surrogate_type",
+            "gp",
+        ),
+        (
+            OptimizerStrategyName.OPENBOX_GP_EIC,
+            OpenBoxAdvancedSettings(acq_type="pi"),
+            "acq_type",
+            "eic",
+        ),
+        (
+            OptimizerStrategyName.OPENBOX_GP_EIC,
+            OpenBoxAdvancedSettings(acq_optimizer_type="local_random"),
+            "acq_optimizer_type",
+            "random_scipy",
+        ),
+        (
+            OptimizerStrategyName.OPENBOX_PRF_EIC,
+            OpenBoxAdvancedSettings(surrogate_type="gp"),
+            "surrogate_type",
+            "prf",
+        ),
+        (
+            OptimizerStrategyName.OPENBOX_PRF_EIC,
+            OpenBoxAdvancedSettings(acq_type="pi"),
+            "acq_type",
+            "eic",
+        ),
+        (
+            OptimizerStrategyName.OPENBOX_PRF_EIC,
+            OpenBoxAdvancedSettings(acq_optimizer_type="random_scipy"),
+            "acq_optimizer_type",
+            "local_random",
+        ),
+    ],
+)
+def test_named_openbox_preset_rejects_conflicting_advanced_settings(
+    strategy: OptimizerStrategyName,
+    openbox: OpenBoxAdvancedSettings,
+    field: str,
+    required: str,
+) -> None:
+    with pytest.raises(
+        ValueError,
+        match=rf"{strategy.value}.*{field}.*{required}",
+    ):
+        resolve_optimizer_strategy(
+            OptimizerStrategyRequest(
+                algorithm=OptimizerAlgorithm.OPENBOX,
+                strategy=strategy,
+                openbox=openbox,
+                turbo=None,
+                variable_count=4,
+            )
+        )
+
+
 @pytest.mark.parametrize("raw_strategy", ["openbox_eic", "openbox-eic"])
 def test_openbox_eic_is_rejected_as_strategy_name(raw_strategy: str) -> None:
     with pytest.raises(ValueError, match="eic is an acquisition function"):
