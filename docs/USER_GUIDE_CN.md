@@ -48,9 +48,11 @@ python3 -m venv .venv   # 如果当地默认 python3 版本较旧，这里改用
 hyperparameter importance、SHAP/lightgbm 相关分析时安装。它包含一些较大的包，
 在 Linux 上也可能需要 Python development headers。
 
-`requirements-product.txt` 以 editable 方式安装（`-e .`、`-e vendor/open-box`、
-`-e vendor/TuRBO`），并会拉取 `torch`/`gpytorch`。首次安装体量较大；clone 得到的
-仓库目录之后不能删除或移动，否则 editable 安装会失效。
+`requirements-product.txt` 以 editable 方式安装（`-e .`、`-e vendor/open-box`），
+并通过 `-e .` 拉取 `pyproject.toml` 声明的 `torch`/`gpytorch` 等依赖。首次安装
+体量较大；clone 得到的仓库目录之后不能删除或移动，否则 editable 安装会失效。
+native TuRBO 不通过 pip 安装：运行时会从 `vendor/TuRBO`（或 `$TURBO_HOME`）
+自动加载，因此仓库目录同样不能被删除或移动。
 
 不要把 `.venv` 建在用户的优化项目目录里。工具仓库和每个电路优化项目应该分开。
 

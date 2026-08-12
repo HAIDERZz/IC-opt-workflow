@@ -117,10 +117,16 @@ against a maintenance-audit document that leaks a maintainer's absolute home
 directory path before it reaches the GitHub source archive; see the note
 below on what `docs/audits/` content is allowed to ship.
 
-Cross-check the two-step install dependency files
-(`requirements-product.txt`, and optionally `requirements-advanced.txt`)
-against `pyproject.toml`'s `[project.dependencies]` for drift before release;
-there is no automated check for this today.
+`pyproject.toml` is the sole authority for library version pins:
+`[project.dependencies]` for the product set and
+`[project.optional-dependencies].advanced` for `pyrfr`/`shap`/`lightgbm`.
+`requirements-product.txt` and `requirements-advanced.txt` no longer mirror
+those pins — they install via `-e .` and `-e .[advanced]` respectively, plus
+`swig` (which cannot go in an extra because it must be installed before the
+`pyrfr` source build runs) and the `vendor/open-box` editable install.
+Confirm before release that neither requirements file has re-introduced a
+duplicate library pin, and that `-e .` / `-e .[advanced]` still appear in
+each file; there is no automated check for this today.
 
 The three version sources (`VERSION`, `pyproject.toml`, and
 `src/hermes_workflow/__init__.py`) must agree; the two `test` lines above only

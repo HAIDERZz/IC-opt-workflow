@@ -55,12 +55,23 @@ python3 -m venv .venv   # use python3.11 (or newer) here if the site python3 is 
 Import check:
 
 ```bash
-./.venv/bin/python -c "import openbox, turbo, torch, gpytorch, scipy, threadpoolctl, matplotlib, numpy, hermes_workflow; print('product optimizer env ok')"
+./.venv/bin/python -c "
+import sys
+from hermes_workflow.native_turbo import DEFAULT_TURBO_PATH
+sys.path.insert(0, str(DEFAULT_TURBO_PATH))
+import openbox, turbo, torch, gpytorch, scipy, threadpoolctl, matplotlib, numpy, hermes_workflow
+print('product optimizer env ok')
+"
 ```
 
-`matplotlib` backs `visualize-optimizer-run`; `numpy` is imported directly by
-the native TuRBO adapter. Neither is checked by `check-toolchain-env` below,
-so this manual import check is the only coverage for them.
+`requirements-product.txt` does not pip-install `turbo` (see "Native TuRBO
+Resolution" below), so a bare `import turbo` fails unless `DEFAULT_TURBO_PATH`
+is inserted into `sys.path` first, as this check does; plain `import
+hermes_workflow` does not trigger that insertion itself, since it only
+happens inside the native TuRBO entry-point functions. `matplotlib` backs
+`visualize-optimizer-run`; `numpy` is imported directly by the native TuRBO
+adapter. Neither is checked by `check-toolchain-env` below, so this manual
+import check is the only coverage for them.
 
 The low-level `check-toolchain-env` command only verifies the OpenBox path: it
 runs `import openbox` and `import hermes_workflow.openbox_backend` in the
@@ -100,12 +111,14 @@ prepends this path with `sys.path.insert(0, ...)` before importing `turbo`.
   `-e .` line in `requirements-product.txt`). A non-editable install, or a
   release root that has been moved after install, breaks the fallback and
   native TuRBO import fails.
-- `sys.path.insert(0, ...)` runs unconditionally and takes priority over
-  whatever `turbo` package pip already installed (including the
-  `-e vendor/TuRBO` editable install from `requirements-product.txt`). If
-  `TURBO_HOME` is set to the wrong tree, native TuRBO silently imports that
-  wrong `turbo` package instead of raising an error — verify `TURBO_HOME`
-  points at the intended `vendor/TuRBO` checkout before relying on it.
+- `requirements-product.txt` does not install `turbo` via pip at all;
+  `sys.path.insert(0, ...)` is the only mechanism that makes `turbo`
+  importable. It runs unconditionally and takes priority over any `turbo`
+  package installed by other means (for example, a stray `pip install
+  turbo` into the same environment). If `TURBO_HOME` is set to the wrong
+  tree, native TuRBO silently imports that wrong `turbo` package instead of
+  raising an error — verify `TURBO_HOME` points at the intended
+  `vendor/TuRBO` checkout before relying on it.
 
 ## Remote Attempt Lock
 

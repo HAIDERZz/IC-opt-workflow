@@ -10,11 +10,12 @@
 
 -e .
 -e vendor/open-box
--e vendor/TuRBO
+# TuRBO is not pip-installed here: hermes_workflow resolves it at runtime
+# from vendor/TuRBO (or $TURBO_HOME) via DEFAULT_TURBO_PATH, which every
+# native TuRBO entry point inserts into sys.path before importing turbo
+# (see src/hermes_workflow/native_turbo.py). No editable install needed.
 -r vendor/open-box/requirements/main.txt
 
-matplotlib>=3.7
-scipy>=1.10
-threadpoolctl>=3.1
-torch>=2.0
-gpytorch>=1.11
+# Library version pins (matplotlib, scipy, threadpoolctl, torch, gpytorch)
+# are not repeated here. `-e .` installs them from pyproject.toml's
+# `dependencies` array, which is the sole authority for those pins.

@@ -22,8 +22,10 @@ python3 -m venv .venv
 
 `requirements-product.txt` already installs the package in editable mode
 (`-e .`), so the last command only needs the `dev` extra
-(`pytest`, `ruff`, `scipy`) that "Before Sending Changes" below requires.
-Skipping it makes `pytest`/`ruff` unavailable.
+(`pytest`, `ruff`) that "Before Sending Changes" below requires. `scipy` is
+not repeated in the `dev` extra because `-e .` already installs it from
+`pyproject.toml`'s main `dependencies`. Skipping the `dev` extra install
+makes `pytest`/`ruff` unavailable.
 
 Use the site's Python 3.11+ command if `python3` is older than 3.11.
 
