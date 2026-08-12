@@ -680,7 +680,7 @@ git diff --check：pass
 #### 验收环境
 
 - 验收输入来自维护者指定的
-  `/home/zzchen/remote_opt/Mixer_CS_validation_b09_remote10_20260614_050335`；
+  `/home/<user>/remote_opt/Mixer_CS_validation_b09_remote10_20260614_050335`；
 - 使用真实 OpenSSH、Spectre X、OCEAN、OpenBox PRF-EIC；
 - 3 个 testbench × 3 个 process corner × 100 个候选，共 900 个真实子仿真；
 - 候选并行度 10、batch size 10、每个 Spectre run 10 threads；
@@ -838,7 +838,7 @@ git diff --check：pass
 ### 14.7 真实 Remote 100-candidate 工程验收
 
 维护者指定的原始项目
-`/home/zzchen/remote_opt/Mixer_CS_validation_b09_remote10_20260614_050335`
+`/home/<user>/remote_opt/Mixer_CS_validation_b09_remote10_20260614_050335`
 首先按原样运行 doctor。新增的 Controller/Remote dependencies、Spectre 和 OCEAN
 全部通过，但 requirement 因其记录的旧 `Interactive.12/.../Mixer_CS_P1dB` 已被清理
 而正确 fail closed。没有篡改这一历史证据包。
@@ -846,7 +846,7 @@ git diff --check：pass
 随后创建独立 Remote 验收副本：
 
 ```text
-/home/zzchen/remote_opt/Mixer_CS_validation_second_batch_20260810
+/home/<user>/remote_opt/Mixer_CS_validation_second_batch_20260810
 ```
 
 副本沿用指定包保存且上一轮已完成真实验证的三套 exported netlist，构造成三个
@@ -1172,9 +1172,9 @@ detach/reattach 已从当前 release 完成门槛中移除，统一作为未来�
 
 ### 18.1 开发包与发行 checkout 同步
 
-- 权威开发包：`/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow`
+- 权威开发包：`/home/<user>/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow`
 - 拥有 `origin/main` 的发行 checkout：
-  `/home/zzchen/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow-v0.1`
+  `/home/<user>/Agent_virtuoso/EDA_AI_AGENT/ic-auto-opt-workflow-v0.1`
 - 同步前 checksum 审计确认发行 checkout 有 112 个功能文件陈旧或缺失：root 3、
   docs 6、examples 13、skills 1、src 55、tests 34。
 - 已按白名单同步源码、测试、11 个 requirement 模板、用户文档、skill、README、
@@ -1398,5 +1398,9 @@ Doctor gate。`run_product_doctor(openbox_venv=...)` 与旧 services 字段保�
   不影响已验收的 Remote continuation。
 - continuation 审批 wiring 测试使用更完整的 packaged fixture；真实生产 gate 和本次
   Remote 验收已通过，该测试增强不再延长本次发布。
+- Remote Doctor 返回码分类粒度：`rc=1/127`（能力缺失）与 `rc=126/255`（命令执行
+  或 SSH transport 异常）当前统一归类为 `REMOTE_RUNTIME_DEPENDENCY_MISSING`，
+  诊断 message 不携带实际返回码；这一诊断准确性 P2 项不影响 fail-closed 判定，
+  留待后续版本细化。
 
 除上述延期项外，v0.1.10 本轮维护停止继续开发；发布后新增需求进入后续版本。
